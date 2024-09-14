@@ -79,7 +79,7 @@ private struct ZoomableScrollViewImpl<Content: View>: UIViewControllerRepresenta
             self.view = scrollView
 
             scrollView.delegate = self // for viewForZooming(in:)
-            scrollView.maximumZoomScale = 10
+            scrollView.maximumZoomScale = 15
             scrollView.minimumZoomScale = 1
             scrollView.bouncesZoom = true
             scrollView.showsHorizontalScrollIndicator = false

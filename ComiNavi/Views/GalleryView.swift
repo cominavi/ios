@@ -44,17 +44,36 @@ struct GalleryView: View {
                     GridItem(.adaptive(minimum: 50), spacing: 4)
                 ], spacing: 4) {
                     ForEach(circles, id: \.id) { circle in
+                        let item = GalleryViewCircleItem(circle: circle)
+
                         NavigationLink(destination: Text(circle.circleName ?? "")) {
-                            GalleryViewCircleItem(circle: circle)
+                            item
                         }
                         .apply {
                             if #available(iOS 16.0, *) {
                                 $0.contextMenu {
                                     circleContextMenu(circle: circle)
                                 } preview: {
-                                    CirclePreviewView(circle: circle)
-                                        .frame(width: 300, alignment: .leading)
-                                        .padding()
+                                    VStack(alignment: .leading) {
+                                        item
+                                            .frame(width: 250, height: 250, alignment: .leading)
+
+                                        Text(circle.circleName ?? "")
+                                            .font(.title)
+                                            .bold()
+
+                                        Text(circle.penName ?? "")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+
+                                        Text(circle.description ?? "")
+                                            .font(.body)
+                                            .minimumScaleFactor(0.85)
+                                            .multilineTextAlignment(.leading)
+                                            .truncationMode(.tail)
+                                    }
+                                    .frame(width: 300, alignment: .leading)
+                                    .padding()
                                 }
                             } else {
                                 $0.contextMenu {
