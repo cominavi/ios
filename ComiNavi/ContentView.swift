@@ -31,7 +31,7 @@ struct ContentView: View {
             TabView {
                 GalleryView()
                     .tabItem {
-                        Label("Gallery", systemImage: "photo")
+                        Label("Gallery", systemImage: "square.grid.2x2")
                     }
 
                 MapView()

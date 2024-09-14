@@ -9,38 +9,36 @@ import SwiftUI
 
 struct GalleryViewCircleItem: View {
     var circle: CirclemsDataSchema.ComiketCircleWC
-    @State var image: Data?
+    @State private var image: Image?
+
+    // save fetch task so we could cancel it if needed
+    @State private var fetchTask: Task<Void, Error>?
 
     func fetchImage() {
-        Task {
-            self.image = await CirclemsDataSource.shared.getCircleImage(circleId: circle.id)
+        self.fetchTask = Task {
+            if let imageData = await CirclemsDataSource.shared.getCircleImage(circleId: circle.id) {
+                self.image = await Image.asyncInit(data: imageData)
+            }
+            self.fetchTask = nil
         }
     }
 
     var body: some View {
-        VStack {
-            Group {
-                if self.image != nil {
-                    Image(data: image)?
-                        .resizable()
-                        .scaledToFit()
-                } else {
-                    Color.gray
-                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                }
+        Group {
+            if let image = image {
+                image.resizable()
+            } else {
+                Color.gray
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             }
-            // I know that the image is 211x300. specify the aspect ratio
-            .aspectRatio(211 / 300, contentMode: .fit)
-            // fill width
-            .frame(minWidth: 0, maxWidth: .infinity)
-            .shadow(radius: 5)
-
-            Text(circle.circleName ?? "")
-                .font(.caption)
-                .lineLimit(1)
         }
+        // I know that the image is 211x300. specify the aspect ratio
+        .aspectRatio(211 / 300, contentMode: .fit)
         .onAppear {
             fetchImage()
+        }
+        .onDisappear {
+            self.fetchTask?.cancel()
         }
     }
 }

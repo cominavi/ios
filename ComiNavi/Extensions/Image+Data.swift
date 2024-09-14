@@ -34,4 +34,22 @@ extension Image {
         return nil
         #endif
     }
+
+    /// Asynchronously initializes a SwiftUI `Image` from data.
+    static func asyncInit(data: Data?) async -> Image? {
+        guard let data = data else {
+            return nil
+        }
+
+        return await withUnsafeContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                if let uiImage = UIImage(data: data) {
+                    let image = Image(uiImage: uiImage)
+                    continuation.resume(returning: image)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
 }

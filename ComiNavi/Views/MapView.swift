@@ -8,24 +8,65 @@
 import SwiftUI
 
 struct MapView: View {
-    @StateObject var circle = CirclemsDataSource.shared
+    @State private var background: CirclemsImageSchema.ComiketCommonImage?
 
-    @State var circles: [CirclemsDataSchema.ComiketCircleWC] = []
-    @State var background: CirclemsImageSchema.ComiketCommonImage?
+    @State private var day: Int = CirclemsDataSource.shared.comiket.days.first?.dayIndex ?? 1
+    @State private var area: String = CirclemsDataSource.shared.comiket.days.first?.halls.first?.mapName ?? ""
+
+    @State private var image: Image?
+
+    var halls: [UFDSchema.DayHall] {
+        CirclemsDataSource.shared.comiket.days.first(where: { $0.dayIndex == day })?.halls ?? []
+    }
 
     func fetch() {
         Task {
-            self.circles = await circle.getCircles()
-//            self.background = await circle.getCommonImage(name: "")
+            self.image = nil
+            print("Fetching \(day) \(area)")
+            let image = await CirclemsDataSource.shared.getFloorMap(layer: .base, day: day, areaFileNameFragment: area)
+            if let backgroundData = image?.image {
+                self.image = await Image.asyncInit(data: backgroundData)
+            }
         }
     }
 
     var body: some View {
-        // make a zoomable map here. not MapKit, we need to draw everything ourselves
-        Text("Map: \(circles.count) circles")
-            .onAppear {
-                fetch()
+        VStack {
+            HStack {
+                Picker("Day", selection: $day) {
+                    ForEach(CirclemsDataSource.shared.comiket.days, id: \.self) { day in
+                        Text("\(day.dayIndex)日目").tag(day.dayIndex)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Picker("Hall", selection: $area) {
+                    ForEach(halls, id: \.self) { hall in
+                        Text(hall.name).tag(hall.mapName)
+                    }
+                }
+                .pickerStyle(.segmented)
             }
+
+            ZoomableScrollView {
+                if let image = image {
+                    image
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    ProgressView()
+                }
+            }
+        }
+        .onAppear {
+            fetch()
+        }
+        .onChange(of: day) { _ in
+            fetch()
+        }
+        .onChange(of: area) { _ in
+            fetch()
+        }
     }
 }
 
