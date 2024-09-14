@@ -5,57 +5,55 @@
 //  Created by Galvin Gao on 9/12/24.
 //
 
-import SwiftUI
+import AuthenticationServices
 import SwiftData
+import SwiftUI
+import UIKit
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @StateObject var circle = CirclemsDataSource.shared
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+        switch circle.readiness {
+        case .uninitialized:
+            VStack {
+                ProgressView()
+                Text("Pending...")
+                    .foregroundStyle(.secondary)
+            }
+        case .initializing:
+            VStack {
+                ProgressView()
+                Text("Initializing...")
+                    .foregroundStyle(.secondary)
+            }
+        case .ready:
+            TabView {
+                GalleryView()
+                    .tabItem {
+                        Label("Gallery", systemImage: "photo")
                     }
-                }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+
+                MapView()
+                    .tabItem {
+                        Label("Map", systemImage: "map")
                     }
-                }
             }
-        } detail: {
-            Text("Select an item")
-        }
-    }
+        case .error(let error):
+            VStack {
+                Image(systemName: "xmark.octagon.fill")
+                    .resizable()
+                    .frame(width: 32, height: 32)
+                    .foregroundStyle(.red)
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+                Text("Error: \(error.localizedDescription)")
+                    .foregroundStyle(.secondary)
             }
+            .padding()
         }
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
