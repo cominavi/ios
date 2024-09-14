@@ -10,6 +10,14 @@ import Foundation
 class DirectoryManager {
     static let shared = DirectoryManager()
 
+    enum CacheScope: String {
+        case circlems
+    }
+
+    enum CacheType: String {
+        case images
+    }
+
     private init() {}
 
     private func createDirectoryIfNeeded(at url: URL) {
@@ -49,6 +57,17 @@ class DirectoryManager {
 
     var temporaryDirectory: URL {
         let url = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        createDirectoryIfNeeded(at: url)
+        return url
+    }
+
+    // --
+
+    func cachesFor(comiketId: Int, _ scope: CacheScope, _ type: CacheType, createIfNeeded: Bool = false) -> URL {
+        let url = cachesDirectory
+            .appendingPathComponent("comiket\(comiketId)", isDirectory: true)
+            .appendingPathComponent(scope.rawValue, isDirectory: true)
+            .appendingPathComponent(type.rawValue, isDirectory: true)
         createDirectoryIfNeeded(at: url)
         return url
     }

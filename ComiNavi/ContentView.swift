@@ -29,7 +29,7 @@ struct ContentView: View {
             }
         case .ready:
             TabView {
-                GalleryView()
+                CirclesViewControllerWrapper()
                     .tabItem {
                         Label("Gallery", systemImage: "square.grid.2x2")
                     }

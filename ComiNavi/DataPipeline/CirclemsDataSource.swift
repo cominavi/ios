@@ -47,15 +47,26 @@ class CirclemsDataSource: ObservableObject {
     @Published var readiness: Readiness = .uninitialized
     
     private init() {
+        self.initialize()
+    }
+    
+    private func initialize() {
         self.readiness = .initializing
         
-        do {
-            try self.initDatabaseConnections()
-            try self.preloadUFDData()
-            
-            self.readiness = .ready
-        } catch {
-            self.readiness = .error(error: error)
+        Task {
+            do {
+                try self.initDatabaseConnections()
+                try self.preloadUFDData()
+                try await self.extractAndCacheCircleImages()
+                
+                DispatchQueue.main.async {
+                    self.readiness = .ready
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.readiness = .error(error: error)
+                }
+            }
         }
     }
     
@@ -98,9 +109,7 @@ class CirclemsDataSource: ObservableObject {
             // Save the Cover Image under (cachesDirectory)/(comiketNo)/circlems/cover.png, if it does not exist
             var coverImageURL: URL? = nil
             if let coverImageData = coverImageData {
-                coverImageURL = DirectoryManager.shared.cachesDirectory
-                    .appendingPathComponent("\(infoFirst.comiketNo)")
-                    .appendingPathComponent("circlems")
+                coverImageURL = DirectoryManager.shared.cachesFor(comiketId: infoFirst.comiketNo, .circlems, .images, createIfNeeded: true)
                     .appendingPathComponent("cover.png")
                 try coverImageURL?.writeIfNotExists(coverImageData)
             }
@@ -172,6 +181,32 @@ class CirclemsDataSource: ObservableObject {
         }
     }
     
+    private func extractAndCacheCircleImages() async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInteractive).async {
+                do {
+                    try self.sqliteImage.read { db in
+                        let circleImages = try CirclemsImageSchema.ComiketCircleImage.fetchAll(db)
+                        
+                        for image in circleImages {
+                            guard let data = image.cutImage else { continue }
+                            
+                            let url = DirectoryManager.shared.cachesFor(comiketId: image.comiketNo, .circlems, .images, createIfNeeded: true)
+                                .appendingPathComponent("circles")
+                                .appendingPathComponent("\(image.id).png")
+                            
+                            try url.writeIfNotExists(data)
+                        }
+                        
+                        continuation.resume()
+                    }
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
     func getCircles() async -> [CirclemsDataSchema.ComiketCircleWC] {
         do {
             let circles = try await self.sqliteMain.read { db in
@@ -211,7 +246,23 @@ class CirclemsDataSource: ObservableObject {
         }
     }
     
+    private func getCircleImageFromCache(circleId: Int) -> Data? {
+        do {
+            let url = DirectoryManager.shared.cachesFor(comiketId: comiket.number, .circlems, .images)
+                .appendingPathComponent("circles")
+                .appendingPathComponent("\(circleId).png")
+            
+            return try Data(contentsOf: url)
+        } catch {
+            return nil
+        }
+    }
+    
     func getCircleImage(circleId: Int) async -> Data? {
+        if let image = self.getCircleImageFromCache(circleId: circleId) {
+            return image
+        }
+        
         do {
             let image = try await self.sqliteImage.read { db in
                 // FIXME: comiketNo = 104: hardcoded
