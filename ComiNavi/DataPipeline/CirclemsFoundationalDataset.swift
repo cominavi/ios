@@ -25,14 +25,14 @@ enum UnifiedFoundationalDatasetSchema {
         /// > Example: (a URL pointing to a local PNG image)
         var cover: URL?
         
-        /// Sections
+        /// Days
         var days: [Day]
+        
+        /// Blocks
+        var blocks: [Block]
     }
     
     struct Day: Identifiable, Hashable {
-        /// The parent comiket
-        var comiket: Comiket
-        
         /// Currently equals to `[comiketId, dayIndex].joined(separator: "_")`
         var id: String
         
@@ -50,9 +50,6 @@ enum UnifiedFoundationalDatasetSchema {
     }
     
     struct DayHall: Identifiable, Hashable {
-        /// The parent day
-        var day: Day
-        
         /// Currently equals to `[comiketId, dayIndex, mapName].joined(separator: "_")`
         var id: String
         
@@ -70,9 +67,6 @@ enum UnifiedFoundationalDatasetSchema {
     }
     
     struct DayHallArea: Identifiable, Hashable {
-        /// The parent hall
-        var hall: DayHall
-        
         /// Currently equals to `[comiketId, dayIndex, mapName, externalAreaId].joined(separator: "_")`
         var id: String
         
@@ -80,5 +74,15 @@ enum UnifiedFoundationalDatasetSchema {
         var name: String
         
         var externalAreaId: Int
+    }
+    
+    struct Block: Identifiable, Hashable {
+        /// Currently equals to the `[comiketId, blockId].joined(separator: "_")`
+        var id: String
+        
+        /// > Example: `あ`
+        var name: String
+        
+        var externalBlockId: Int
     }
 }

@@ -100,6 +100,9 @@ class CirclemsDataSource: ObservableObject {
             // Fetch ComiketMapWC
             let mapEntries = try CirclemsDataSchema.ComiketMapWC.fetchAll(db, sql: "SELECT * FROM ComiketMapWC")
             
+            // Fetch ComiketBlockWC
+            let blockEntries = try CirclemsDataSchema.ComiketBlockWC.fetchAll(db, sql: "SELECT * FROM ComiketBlockWC")
+            
             let coverImageData = coverImage?.image
             
             guard let infoFirst = infoEntries.first else {
@@ -120,7 +123,8 @@ class CirclemsDataSource: ObservableObject {
                 number: infoFirst.comiketNo,
                 name: infoFirst.comiketName ?? "N/A",
                 cover: coverImageURL,
-                days: []
+                days: [],
+                blocks: []
             )
             
             // Populate Day objects
@@ -132,7 +136,6 @@ class CirclemsDataSource: ObservableObject {
                 )
                 
                 let day = UFDSchema.Day(
-                    comiket: comiket,
                     id: "\(date.comiketNo)_\(date.id)",
                     dayIndex: date.id,
                     date: dateComponents,
@@ -149,7 +152,6 @@ class CirclemsDataSource: ObservableObject {
                 guard let map = mapEntries.first(where: { $0.id == floor.mapId }) else { continue }
                 
                 let hall = UFDSchema.DayHall(
-                    day: comiket.days[day],
                     id: "\(floor.comiketNo)_\(floor.day)_\(map.name ?? "")",
                     name: map.name ?? "",
                     mapName: map.filename ?? "",
@@ -168,7 +170,6 @@ class CirclemsDataSource: ObservableObject {
                 guard let hall = comiket.days[day].halls.firstIndex(where: { $0.externalMapId == area.mapId }) else { continue }
                 
                 let area = UFDSchema.DayHallArea(
-                    hall: comiket.days[day].halls[hall],
                     id: "\(area.comiketNo)_\(area.id)_\(area.mapId)_\(area.id)",
                     name: area.name ?? "",
                     externalAreaId: area.id
@@ -177,14 +178,31 @@ class CirclemsDataSource: ObservableObject {
                 comiket.days[day].halls[hall].areas.append(area)
             }
             
+            // Populate Block objects
+            for block in blockEntries {
+                let block = UFDSchema.Block(
+                    id: "\(block.comiketNo)_\(block.id)",
+                    name: block.name ?? "",
+                    externalBlockId: block.id
+                )
+                
+                comiket.blocks.append(block)
+            }
+            
             return comiket
         }
     }
     
     private func extractAndCacheCircleImages() async throws {
+        if UserDefaults.standard.bool(forKey: "CirclemsDataSource.extractAndCacheCircleImages") {
+            return
+        }
+        
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInteractive).async {
                 do {
+                    UserDefaults.standard.set(true, forKey: "CirclemsDataSource.extractAndCacheCircleImages")
+                    
                     try self.sqliteImage.read { db in
                         let circleImages = try CirclemsImageSchema.ComiketCircleImage.fetchAll(db)
                         
@@ -255,6 +273,16 @@ class CirclemsDataSource: ObservableObject {
             return try Data(contentsOf: url)
         } catch {
             return nil
+        }
+    }
+    
+    func getBlocks() -> [CirclemsDataSchema.ComiketBlockWC] {
+        do {
+            return try self.sqliteMain.read { db in
+                try CirclemsDataSchema.ComiketBlockWC.fetchAll(db)
+            }
+        } catch {
+            return []
         }
     }
     

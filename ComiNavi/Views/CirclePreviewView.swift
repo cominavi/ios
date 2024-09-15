@@ -29,6 +29,7 @@ struct CirclePreviewView: View {
                 .multilineTextAlignment(.leading)
                 .truncationMode(.tail)
         }
+        .padding()
     }
 }
 

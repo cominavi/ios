@@ -29,16 +29,20 @@ struct ContentView: View {
             }
         case .ready:
             TabView {
-                CirclesViewControllerWrapper()
+                GalleryViewControllerWrappedView()
+                    .ignoresSafeArea()
                     .tabItem {
                         Label("Gallery", systemImage: "square.grid.2x2")
                     }
 
-                MapView()
-                    .tabItem {
-                        Label("Map", systemImage: "map")
-                    }
+                NavigationView {
+                    MapView()
+                }
+                .tabItem {
+                    Label("Map", systemImage: "map")
+                }
             }
+
         case .error(let error):
             VStack {
                 Image(systemName: "xmark.octagon.fill")
