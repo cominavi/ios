@@ -32,6 +32,44 @@ extension FloorMapLayer {
     }
 }
 
+final class JapaneseTokenizer: FTS5WrapperTokenizer {
+    static let name = "cominavi_ja_tokenizer"
+    var wrappedTokenizer: any GRDB.FTS5Tokenizer
+    
+    // Kana to Romaji mapping
+    private let kanaToRomaji: [String: String] = [
+        "あ": "a", "い": "i", "う": "u", "え": "e", "お": "o",
+        "か": "ka", "き": "ki", "く": "ku", "け": "ke", "こ": "ko",
+        "さ": "sa", "し": "shi", "す": "su", "せ": "se", "そ": "so",
+        "た": "ta", "ち": "chi", "つ": "tsu", "て": "te", "と": "to",
+        "な": "na", "に": "ni", "ぬ": "nu", "ね": "ne", "の": "no",
+        "は": "ha", "ひ": "hi", "ふ": "fu", "へ": "he", "ほ": "ho",
+        "ま": "ma", "み": "mi", "む": "mu", "め": "me", "も": "mo",
+        "や": "ya", "ゆ": "yu", "よ": "yo",
+        "ら": "ra", "り": "ri", "る": "ru", "れ": "re", "ろ": "ro",
+        "わ": "wa", "を": "wo", "ん": "n"
+    ]
+    
+    func accept(token: String, flags: GRDB.FTS5TokenFlags, for tokenization: GRDB.FTS5Tokenization, tokenCallback: (String, GRDB.FTS5TokenFlags) throws -> Void) throws {
+        // Convert the token from Kana to Romaji
+        var romajiToken = ""
+        for character in token {
+            if let romaji = kanaToRomaji[String(character)] {
+                romajiToken += romaji
+            } else {
+                romajiToken += String(character) // If no mapping, keep the original character
+            }
+        }
+        
+        // Pass the converted token to the callback
+        try tokenCallback(romajiToken, flags)
+    }
+    
+    init(db: GRDB.Database, arguments: [String]) throws {
+        wrappedTokenizer = try db.makeTokenizer(.unicode61())
+    }
+}
+
 typealias Circle = CirclemsDataSchema.ComiketCircleWC
 
 // There are 2 SQLite3 databases located under ComiNavi/DevContent/DB: webcatalog104.db, webcatalog104Image1.db
@@ -55,7 +93,7 @@ class CirclemsDataSource: ObservableObject {
         
         Task {
             do {
-                try self.initDatabaseConnections()
+                try await self.initDatabaseConnections()
                 try self.preloadUFDData()
                 try await self.extractAndCacheCircleImages()
                 
@@ -70,13 +108,24 @@ class CirclemsDataSource: ObservableObject {
         }
     }
     
-    private func initDatabaseConnections() throws {
+    private func initDatabaseConnections() async throws {
         // Initialize the SQLite databases
         var configuration = Configuration()
         configuration.readonly = true
         
         sqliteMain = try DatabasePool(path: Bundle.main.bundlePath + "/webcatalog104.db", configuration: configuration)
         sqliteImage = try DatabasePool(path: Bundle.main.bundlePath + "/webcatalog104Image1.db", configuration: configuration)
+        
+//        try await sqliteMain.write { db in
+//            try db.create(virtualTable: "ComiketCircleWC_ft", using: FTS5()) { t in
+//                t.tokenizer = JapaneseTokenizer.tokenizerDescriptor()
+//                t.column("comiketNo")
+//                t.column("id")
+//                t.column("penName")
+//                t.column("circleName")
+//                t.column("description")
+//            }
+//        }
     }
 
     private func preloadUFDData() throws {

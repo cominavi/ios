@@ -14,7 +14,7 @@ struct CircleBlockGroup {
     static func from(circles: [Circle]) -> [CircleBlockGroup] {
         var groupedCircles: [CircleBlockGroup] = []
 
-        var blocks: [Int: [Circle]] = Dictionary(grouping: circles, by: { $0.blockId ?? 0 })
+        let blocks: [Int: [Circle]] = Dictionary(grouping: circles, by: { $0.blockId ?? 0 })
         for blockId in blocks.keys.sorted() {
             guard let block = CirclemsDataSource.shared.comiket.blocks.first(where: { $0.externalBlockId == blockId }) else {
                 continue

@@ -161,14 +161,17 @@ class CircleCollectionViewSectionHeader: UICollectionReusableView {
 }
 
 class GalleryCollectionViewController: UIViewController, UICollectionViewDelegateFlowLayout {
+    var circles: [Circle] = []
     var circleGroups: [CircleBlockGroup] = []
 
     private var collectionView: UICollectionView!
     private var layout: UICollectionViewFlowLayout! = UICollectionViewFlowLayout()
     private var searchController: UISearchController! = UISearchController()
     private var titleView: GalleryCollectionTitleView!
+    private var numberOfColumns: CGFloat = 6
 
     init(circles: [Circle]) {
+        self.circles = circles
         self.circleGroups = CircleBlockGroup.from(circles: circles)
         super.init(nibName: nil, bundle: nil)
     }
@@ -205,8 +208,13 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         self.title = "Gallery"
         titleView = GalleryCollectionTitleView()
         titleView.titleLabel.text = "Gallery"
-        titleView.subtitleLabel.text = "\(CirclemsDataSource.shared.comiket.name) | \(circleGroups.count) circles"
+        titleView.subtitleLabel.text = "\(CirclemsDataSource.shared.comiket.name) | \(circleGroups.count) blocks"
         self.navigationItem.titleView = titleView
+
+        // add two right button items to navigation item that decreases/increases the number of columns
+        let decreaseButton = UIBarButtonItem(image: UIImage(systemName: "minus"), style: .plain, target: self, action: #selector(increaseColumns))
+        let increaseButton = UIBarButtonItem(image: UIImage(systemName: "plus"), style: .plain, target: self, action: #selector(decreaseColumns))
+        self.navigationItem.rightBarButtonItems = [increaseButton, decreaseButton]
 
         searchController.obscuresBackgroundDuringPresentation = false
         searchController.searchBar.placeholder = "Search..."
@@ -214,8 +222,17 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         self.definesPresentationContext = true
     }
 
+    @objc private func decreaseColumns() {
+        self.numberOfColumns = max(2, numberOfColumns - 1)
+        updateCollectionViewLayout()
+    }
+
+    @objc private func increaseColumns() {
+        self.numberOfColumns = min(6, numberOfColumns + 1)
+        updateCollectionViewLayout()
+    }
+
     private func updateCollectionViewLayout() {
-        let numberOfColumns: CGFloat = 6
         let borderWidth: CGFloat = 0
         let totalSpacing = (numberOfColumns - 1) * borderWidth
         let width = (collectionView.bounds.width - totalSpacing) / numberOfColumns
@@ -224,7 +241,9 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         let aspectRatio: CGFloat = 300 / 211
         let height = width * aspectRatio
 
-        layout.itemSize = CGSize(width: width, height: height)
+        UIView.animate(withDuration: 0.3) {
+            self.layout.itemSize = CGSize(width: width, height: height)
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -255,38 +274,6 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         hostingController.didMove(toParent: destinationVC)
 
         navigationController?.pushViewController(destinationVC, animated: true)
-    }
-}
-
-// - MARK: State Restoration
-extension GalleryCollectionViewController {
-    override func encodeRestorableState(with coder: NSCoder) {
-        super.encodeRestorableState(with: coder)
-        // Save the first visible circle ID
-        if let indexPath = collectionView.indexPathsForVisibleItems.first {
-            let circle = circleGroups[indexPath.section].circles[indexPath.item]
-            coder.encode(circle.id, forKey: "firstVisibleCircleId")
-            print("Saving circle with ID: \(circle.id)")
-        }
-    }
-
-    override func decodeRestorableState(with coder: NSCoder) {
-        super.decodeRestorableState(with: coder)
-        // Restore the first visible circle ID
-        let circleId = coder.decodeInteger(forKey: "firstVisibleCircleId")
-        print("Restoring circle with ID: \(circleId)")
-        var foundSectionIndex, foundItemIndex: Int?
-        for (sectionIndex, group) in circleGroups.enumerated() {
-            if let index = group.circles.firstIndex(where: { $0.id == circleId }) {
-                foundSectionIndex = sectionIndex
-                foundItemIndex = index
-                break
-            }
-        }
-
-        if let foundSectionIndex = foundSectionIndex, let foundItemIndex = foundItemIndex {
-            collectionView.scrollToItem(at: IndexPath(item: foundItemIndex, section: foundSectionIndex), at: .top, animated: false)
-        }
     }
 }
 
