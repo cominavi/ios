@@ -7,35 +7,60 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B5231EE32C98031100625D19 /* webcatalog104.db in Resources */ = {isa = PBXBuildFile; fileRef = B5231EC22C98031100625D19 /* webcatalog104.db */; };
+		B5231EE42C98031100625D19 /* webcatalog104Image1.db in Resources */ = {isa = PBXBuildFile; fileRef = B5231EC32C98031100625D19 /* webcatalog104Image1.db */; };
+		B5231EE52C98031100625D19 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B5231ECE2C98031100625D19 /* Preview Assets.xcassets */; };
+		B5231EE62C98031100625D19 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B5231EDD2C98031100625D19 /* Assets.xcassets */; };
+		B5231EE82C98031100625D19 /* CirclemsDataSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EBD2C98031100625D19 /* CirclemsDataSchema.swift */; };
+		B5231EE92C98031100625D19 /* CirclemsDataSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EBE2C98031100625D19 /* CirclemsDataSource.swift */; };
+		B5231EEA2C98031100625D19 /* CirclemsFoundationalDataset.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EBF2C98031100625D19 /* CirclemsFoundationalDataset.swift */; };
+		B5231EEB2C98031100625D19 /* CirclemsImageSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EC02C98031100625D19 /* CirclemsImageSchema.swift */; };
+		B5231EEC2C98031100625D19 /* Extensions+URL.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EC62C98031100625D19 /* Extensions+URL.swift */; };
+		B5231EED2C98031100625D19 /* Image+Data.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EC72C98031100625D19 /* Image+Data.swift */; };
+		B5231EEE2C98031100625D19 /* ViewModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EC82C98031100625D19 /* ViewModifier.swift */; };
+		B5231EEF2C98031100625D19 /* DirectoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231ED02C98031100625D19 /* DirectoryManager.swift */; };
+		B5231EF02C98031100625D19 /* CenteringScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231ED22C98031100625D19 /* CenteringScrollView.swift */; };
+		B5231EF12C98031100625D19 /* CircleBlockGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231ED42C98031100625D19 /* CircleBlockGroup.swift */; };
+		B5231EF22C98031100625D19 /* GalleryCollectionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231ED52C98031100625D19 /* GalleryCollectionViewController.swift */; };
+		B5231EF32C98031100625D19 /* GalleryViewCircleItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231ED62C98031100625D19 /* GalleryViewCircleItem.swift */; };
+		B5231EF42C98031100625D19 /* GalleryViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231ED72C98031100625D19 /* GalleryViewController.swift */; };
+		B5231EF52C98031100625D19 /* CirclePreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231ED92C98031100625D19 /* CirclePreviewView.swift */; };
+		B5231EF62C98031100625D19 /* MapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EDA2C98031100625D19 /* MapView.swift */; };
+		B5231EF72C98031100625D19 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EDB2C98031100625D19 /* SignInView.swift */; };
+		B5231EF82C98031100625D19 /* ComiNaviApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EDF2C98031100625D19 /* ComiNaviApp.swift */; };
+		B5231EF92C98031100625D19 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5231EE02C98031100625D19 /* ContentView.swift */; };
 		B56526C92C976DD800C01713 /* Toast in Frameworks */ = {isa = PBXBuildFile; productRef = B56526C82C976DD800C01713 /* Toast */; };
 		B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AECE2C9357DA00742CE8 /* SwifterSwift */; };
 		B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AEDE2C942CC900742CE8 /* GRDB */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B5231EBD2C98031100625D19 /* CirclemsDataSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CirclemsDataSchema.swift; sourceTree = "<group>"; };
+		B5231EBE2C98031100625D19 /* CirclemsDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CirclemsDataSource.swift; sourceTree = "<group>"; };
+		B5231EBF2C98031100625D19 /* CirclemsFoundationalDataset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CirclemsFoundationalDataset.swift; sourceTree = "<group>"; };
+		B5231EC02C98031100625D19 /* CirclemsImageSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CirclemsImageSchema.swift; sourceTree = "<group>"; };
+		B5231EC22C98031100625D19 /* webcatalog104.db */ = {isa = PBXFileReference; lastKnownFileType = file; path = webcatalog104.db; sourceTree = "<group>"; };
+		B5231EC32C98031100625D19 /* webcatalog104Image1.db */ = {isa = PBXFileReference; lastKnownFileType = file; path = webcatalog104Image1.db; sourceTree = "<group>"; };
+		B5231EC62C98031100625D19 /* Extensions+URL.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extensions+URL.swift"; sourceTree = "<group>"; };
+		B5231EC72C98031100625D19 /* Image+Data.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Image+Data.swift"; sourceTree = "<group>"; };
+		B5231EC82C98031100625D19 /* ViewModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewModifier.swift; sourceTree = "<group>"; };
+		B5231ECE2C98031100625D19 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		B5231ED02C98031100625D19 /* DirectoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryManager.swift; sourceTree = "<group>"; };
+		B5231ED22C98031100625D19 /* CenteringScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CenteringScrollView.swift; sourceTree = "<group>"; };
+		B5231ED42C98031100625D19 /* CircleBlockGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleBlockGroup.swift; sourceTree = "<group>"; };
+		B5231ED52C98031100625D19 /* GalleryCollectionViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryCollectionViewController.swift; sourceTree = "<group>"; };
+		B5231ED62C98031100625D19 /* GalleryViewCircleItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryViewCircleItem.swift; sourceTree = "<group>"; };
+		B5231ED72C98031100625D19 /* GalleryViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryViewController.swift; sourceTree = "<group>"; };
+		B5231ED92C98031100625D19 /* CirclePreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CirclePreviewView.swift; sourceTree = "<group>"; };
+		B5231EDA2C98031100625D19 /* MapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapView.swift; sourceTree = "<group>"; };
+		B5231EDB2C98031100625D19 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+		B5231EDD2C98031100625D19 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B5231EDE2C98031100625D19 /* ComiNavi.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ComiNavi.entitlements; sourceTree = "<group>"; };
+		B5231EDF2C98031100625D19 /* ComiNaviApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComiNaviApp.swift; sourceTree = "<group>"; };
+		B5231EE02C98031100625D19 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B5231EE12C98031100625D19 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ComiNavi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
-
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		B5E9AEC72C93350D00742CE8 /* Exceptions for "ComiNavi" folder in "ComiNavi" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = B5E9AEB22C9333CD00742CE8 /* ComiNavi */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		B5E9AEB52C9333CD00742CE8 /* ComiNavi */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				B5E9AEC72C93350D00742CE8 /* Exceptions for "ComiNavi" folder in "ComiNavi" target */,
-			);
-			path = ComiNavi;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		B5E9AEB02C9333CD00742CE8 /* Frameworks */ = {
@@ -51,10 +76,145 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B5231EC12C98031100625D19 /* DataPipeline */ = {
+			isa = PBXGroup;
+			children = (
+				B5231EBD2C98031100625D19 /* CirclemsDataSchema.swift */,
+				B5231EBE2C98031100625D19 /* CirclemsDataSource.swift */,
+				B5231EBF2C98031100625D19 /* CirclemsFoundationalDataset.swift */,
+				B5231EC02C98031100625D19 /* CirclemsImageSchema.swift */,
+			);
+			path = DataPipeline;
+			sourceTree = "<group>";
+		};
+		B5231EC42C98031100625D19 /* DB */ = {
+			isa = PBXGroup;
+			children = (
+				B5231EC22C98031100625D19 /* webcatalog104.db */,
+				B5231EC32C98031100625D19 /* webcatalog104Image1.db */,
+			);
+			path = DB;
+			sourceTree = "<group>";
+		};
+		B5231EC52C98031100625D19 /* DevContent */ = {
+			isa = PBXGroup;
+			children = (
+				B5231EC42C98031100625D19 /* DB */,
+			);
+			path = DevContent;
+			sourceTree = "<group>";
+		};
+		B5231EC92C98031100625D19 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				B5231EC62C98031100625D19 /* Extensions+URL.swift */,
+				B5231EC72C98031100625D19 /* Image+Data.swift */,
+				B5231EC82C98031100625D19 /* ViewModifier.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		B5231ECA2C98031100625D19 /* Headers */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Headers;
+			sourceTree = "<group>";
+		};
+		B5231ECB2C98031100625D19 /* Local Podspecs */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "Local Podspecs";
+			sourceTree = "<group>";
+		};
+		B5231ECC2C98031100625D19 /* Target Support Files */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "Target Support Files";
+			sourceTree = "<group>";
+		};
+		B5231ECD2C98031100625D19 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				B5231ECA2C98031100625D19 /* Headers */,
+				B5231ECB2C98031100625D19 /* Local Podspecs */,
+				B5231ECC2C98031100625D19 /* Target Support Files */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
+		B5231ECF2C98031100625D19 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				B5231ECE2C98031100625D19 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		B5231ED12C98031100625D19 /* Support Files */ = {
+			isa = PBXGroup;
+			children = (
+				B5231ED02C98031100625D19 /* DirectoryManager.swift */,
+			);
+			path = "Support Files";
+			sourceTree = "<group>";
+		};
+		B5231ED32C98031100625D19 /* Support Views */ = {
+			isa = PBXGroup;
+			children = (
+				B5231ED22C98031100625D19 /* CenteringScrollView.swift */,
+			);
+			path = "Support Views";
+			sourceTree = "<group>";
+		};
+		B5231ED82C98031100625D19 /* Gallery */ = {
+			isa = PBXGroup;
+			children = (
+				B5231ED42C98031100625D19 /* CircleBlockGroup.swift */,
+				B5231ED52C98031100625D19 /* GalleryCollectionViewController.swift */,
+				B5231ED62C98031100625D19 /* GalleryViewCircleItem.swift */,
+				B5231ED72C98031100625D19 /* GalleryViewController.swift */,
+			);
+			path = Gallery;
+			sourceTree = "<group>";
+		};
+		B5231EDC2C98031100625D19 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B5231ED82C98031100625D19 /* Gallery */,
+				B5231ED92C98031100625D19 /* CirclePreviewView.swift */,
+				B5231EDA2C98031100625D19 /* MapView.swift */,
+				B5231EDB2C98031100625D19 /* SignInView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		B5231EE22C98031100625D19 /* ComiNavi */ = {
+			isa = PBXGroup;
+			children = (
+				B5231EC12C98031100625D19 /* DataPipeline */,
+				B5231EC52C98031100625D19 /* DevContent */,
+				B5231EC92C98031100625D19 /* Extensions */,
+				B5231ECD2C98031100625D19 /* Pods */,
+				B5231ECF2C98031100625D19 /* Preview Content */,
+				B5231ED12C98031100625D19 /* Support Files */,
+				B5231ED32C98031100625D19 /* Support Views */,
+				B5231EDC2C98031100625D19 /* Views */,
+				B5231EDD2C98031100625D19 /* Assets.xcassets */,
+				B5231EDE2C98031100625D19 /* ComiNavi.entitlements */,
+				B5231EDF2C98031100625D19 /* ComiNaviApp.swift */,
+				B5231EE02C98031100625D19 /* ContentView.swift */,
+				B5231EE12C98031100625D19 /* Info.plist */,
+			);
+			path = ComiNavi;
+			sourceTree = "<group>";
+		};
 		B5E9AEAA2C9333CD00742CE8 = {
 			isa = PBXGroup;
 			children = (
-				B5E9AEB52C9333CD00742CE8 /* ComiNavi */,
+				B5231EE22C98031100625D19 /* ComiNavi */,
 				B5E9AEB42C9333CD00742CE8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -81,9 +241,6 @@
 			buildRules = (
 			);
 			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				B5E9AEB52C9333CD00742CE8 /* ComiNavi */,
 			);
 			name = ComiNavi;
 			packageProductDependencies = (
@@ -140,6 +297,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B5231EE32C98031100625D19 /* webcatalog104.db in Resources */,
+				B5231EE42C98031100625D19 /* webcatalog104Image1.db in Resources */,
+				B5231EE52C98031100625D19 /* Preview Assets.xcassets in Resources */,
+				B5231EE62C98031100625D19 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -150,6 +311,24 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B5231EE82C98031100625D19 /* CirclemsDataSchema.swift in Sources */,
+				B5231EE92C98031100625D19 /* CirclemsDataSource.swift in Sources */,
+				B5231EEA2C98031100625D19 /* CirclemsFoundationalDataset.swift in Sources */,
+				B5231EEB2C98031100625D19 /* CirclemsImageSchema.swift in Sources */,
+				B5231EEC2C98031100625D19 /* Extensions+URL.swift in Sources */,
+				B5231EED2C98031100625D19 /* Image+Data.swift in Sources */,
+				B5231EEE2C98031100625D19 /* ViewModifier.swift in Sources */,
+				B5231EEF2C98031100625D19 /* DirectoryManager.swift in Sources */,
+				B5231EF02C98031100625D19 /* CenteringScrollView.swift in Sources */,
+				B5231EF12C98031100625D19 /* CircleBlockGroup.swift in Sources */,
+				B5231EF22C98031100625D19 /* GalleryCollectionViewController.swift in Sources */,
+				B5231EF32C98031100625D19 /* GalleryViewCircleItem.swift in Sources */,
+				B5231EF42C98031100625D19 /* GalleryViewController.swift in Sources */,
+				B5231EF52C98031100625D19 /* CirclePreviewView.swift in Sources */,
+				B5231EF62C98031100625D19 /* MapView.swift in Sources */,
+				B5231EF72C98031100625D19 /* SignInView.swift in Sources */,
+				B5231EF82C98031100625D19 /* ComiNaviApp.swift in Sources */,
+				B5231EF92C98031100625D19 /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
