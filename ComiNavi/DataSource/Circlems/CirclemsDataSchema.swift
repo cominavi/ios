@@ -311,3 +311,9 @@ enum CirclemsDataSchema {
         var rotate: Int?
     }
 }
+
+extension CirclemsDataSchema.ComiketCircleWC {
+    func sameCircle(as other: CirclemsDataSchema.ComiketCircleWC?) -> Bool {
+        return self.circleName == other?.circleName && self.penName == other?.penName
+    }
+}

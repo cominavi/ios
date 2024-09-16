@@ -28,9 +28,8 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
         guard let authURL = URL(string: "https://auth1-sandbox.circle.ms/OAuth2/?response_type=code&client_id=cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C&scope=circle_read%20favorite_read%20favorite_write%20user_info&state=0") else { return }
         let scheme = "cominavi"
 
-        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { responseURL, error in
+        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { responseURL, _ in
             // Handle the callback.
-            print("authentication outcome: \(responseURL) \(error)")
             guard let url = responseURL else { return }
             guard let accessToken = url.queryValue(for: "access_token") else { return }
             self.state = .authenticated(accessToken: accessToken)
@@ -84,7 +83,7 @@ struct SignInView: View {
                     Text("Authenticating...")
                         .foregroundStyle(.secondary)
                 }
-            case .authenticated(let accessToken):
+            case .authenticated:
                 VStack {
                     ProgressView()
 

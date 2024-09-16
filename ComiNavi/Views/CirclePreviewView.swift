@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CirclePreviewView: View {
-    var circle: Circle
+    var circle: CirclemsDataSchema.ComiketCircleWC
 
     var body: some View {
         VStack(alignment: .leading) {

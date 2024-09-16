@@ -1,0 +1,42 @@
+{
+  "sourceLanguage" : "ja",
+  "strings" : {
+    "%lld日目" : {
+
+    },
+    "Authenticated" : {
+
+    },
+    "Authenticating..." : {
+
+    },
+    "Day" : {
+
+    },
+    "Error: %@" : {
+
+    },
+    "Fetching user info..." : {
+
+    },
+    "Gallery" : {
+
+    },
+    "Hall" : {
+
+    },
+    "Initializing..." : {
+
+    },
+    "Login via circle.ms" : {
+
+    },
+    "Map" : {
+
+    },
+    "Pending..." : {
+
+    }
+  },
+  "version" : "1.0"
+}

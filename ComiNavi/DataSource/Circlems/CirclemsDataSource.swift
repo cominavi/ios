@@ -70,8 +70,6 @@ final class JapaneseTokenizer: FTS5WrapperTokenizer {
     }
 }
 
-typealias Circle = CirclemsDataSchema.ComiketCircleWC
-
 // There are 2 SQLite3 databases located under ComiNavi/DevContent/DB: webcatalog104.db, webcatalog104Image1.db
 // These files are the SQLite3 database files for the web catalog
 class CirclemsDataSource: ObservableObject {
@@ -83,6 +81,8 @@ class CirclemsDataSource: ObservableObject {
     public var comiket: Comiket!
     
     @Published var readiness: Readiness = .uninitialized
+    
+    var circles: [CirclemsDataSchema.ComiketCircleWC] = []
     
     private init() {
         self.initialize()
@@ -96,6 +96,7 @@ class CirclemsDataSource: ObservableObject {
                 try await self.initDatabaseConnections()
                 try self.preloadUFDData()
                 try await self.extractAndCacheCircleImages()
+                try await self.preloadCircles()
                 
                 DispatchQueue.main.async {
                     self.readiness = .ready
@@ -135,22 +136,22 @@ class CirclemsDataSource: ObservableObject {
         
         self.comiket = try self.sqliteMain.read { db in
             // Fetch ComiketInfoWC
-            let infoEntries = try CirclemsDataSchema.ComiketInfoWC.fetchAll(db, sql: "SELECT * FROM ComiketInfoWC")
+            let infoEntries = try CirclemsDataSchema.ComiketInfoWC.fetchAll(db)
             
             // Fetch ComiketDateWC
-            let dateEntries = try CirclemsDataSchema.ComiketDateWC.fetchAll(db, sql: "SELECT * FROM ComiketDateWC")
+            let dateEntries = try CirclemsDataSchema.ComiketDateWC.fetchAll(db)
             
             // Fetch ComiketAreaWC
-            let areaEntries = try CirclemsDataSchema.ComiketAreaWC.fetchAll(db, sql: "SELECT * FROM ComiketAreaWC")
+            let areaEntries = try CirclemsDataSchema.ComiketAreaWC.fetchAll(db)
             
             // Fetch ComiketFloorWC
-            let floorEntries = try CirclemsDataSchema.ComiketFloorWC.fetchAll(db, sql: "SELECT * FROM ComiketFloorWC")
+            let floorEntries = try CirclemsDataSchema.ComiketFloorWC.fetchAll(db)
             
             // Fetch ComiketMapWC
-            let mapEntries = try CirclemsDataSchema.ComiketMapWC.fetchAll(db, sql: "SELECT * FROM ComiketMapWC")
+            let mapEntries = try CirclemsDataSchema.ComiketMapWC.fetchAll(db)
             
             // Fetch ComiketBlockWC
-            let blockEntries = try CirclemsDataSchema.ComiketBlockWC.fetchAll(db, sql: "SELECT * FROM ComiketBlockWC")
+            let blockEntries = try CirclemsDataSchema.ComiketBlockWC.fetchAll(db)
             
             let coverImageData = coverImage?.image
             
@@ -274,16 +275,14 @@ class CirclemsDataSource: ObservableObject {
         }
     }
     
-    func getCircles() async -> [CirclemsDataSchema.ComiketCircleWC] {
-        do {
-            let circles = try await self.sqliteMain.read { db in
-                try CirclemsDataSchema.ComiketCircleWC.fetchAll(db)
-            }
-            
-            return circles
-        } catch {
-            return []
+    private func preloadCircles() async throws {
+        self.circles = try await self.sqliteMain.read { db in
+            try CirclemsDataSchema.ComiketCircleWC.fetchAll(db)
         }
+    }
+    
+    func getCircles() async -> [CirclemsDataSchema.ComiketCircleWC] {
+        return self.circles
     }
     
     func getDemoCircle() -> CirclemsDataSchema.ComiketCircleWC! {
@@ -342,8 +341,7 @@ class CirclemsDataSource: ObservableObject {
         
         do {
             let image = try await self.sqliteImage.read { db in
-                // FIXME: comiketNo = 104: hardcoded
-                try CirclemsImageSchema.ComiketCircleImage.fetchOne(db, sql: "SELECT * FROM ComiketCircleImage WHERE comiketNo = 104 AND id = ?", arguments: [circleId])
+                try CirclemsImageSchema.ComiketCircleImage.fetchOne(db, sql: "SELECT * FROM ComiketCircleImage WHERE comiketNo = ? AND id = ?", arguments: [self.comiket.number, circleId])
             }
             
             return image?.cutImage
@@ -355,8 +353,7 @@ class CirclemsDataSource: ObservableObject {
     func getCommonImage(name: String) async -> CirclemsImageSchema.ComiketCommonImage? {
         do {
             let image = try await self.sqliteImage.read { db in
-                // FIXME: comiketNo = 104: hardcoded
-                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = 104 AND name = ?", arguments: [name])
+                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [self.comiket.number, name])
             }
             
             return image
@@ -371,8 +368,7 @@ class CirclemsDataSource: ObservableObject {
         
         do {
             let image = try await self.sqliteImage.read { db in
-                // FIXME: comiketNo = 104: hardcoded
-                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = 104 AND name = ?", arguments: [name])
+                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [self.comiket.number, name])
             }
             
             return image

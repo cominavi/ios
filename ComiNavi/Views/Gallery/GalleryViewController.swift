@@ -9,18 +9,12 @@ import SwiftUI
 import UIKit
 
 class GalleryViewController: UINavigationController {
-    var circles: [Circle] = []
+    var circles: [CirclemsDataSchema.ComiketCircleWC] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        Task {
-            self.circles = await CirclemsDataSource.shared.getCircles()
-
-            DispatchQueue.main.async {
-                self.setViewControllers([GalleryCollectionViewController(circles: self.circles)], animated: false)
-            }
-        }
+        self.setViewControllers([GalleryCollectionViewController(circles: CirclemsDataSource.shared.circles)], animated: false)
     }
 }
 

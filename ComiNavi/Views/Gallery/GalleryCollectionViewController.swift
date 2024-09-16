@@ -5,6 +5,7 @@
 //  Created by Galvin Gao on 9/15/24.
 //
 
+import CoreGraphics
 import SwiftUI
 import UIKit
 
@@ -14,7 +15,7 @@ import UIKit
 class GalleryCollectionTitleView: UIView {
     var titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .preferredFont(forTextStyle: .headline)
+        label.font = .preferredFont(forTextStyle: .headline).bold
         label.textColor = .label
         label.translatesAutoresizingMaskIntoConstraints = false
         label.text = "Title"
@@ -23,7 +24,7 @@ class GalleryCollectionTitleView: UIView {
 
     var subtitleLabel: UILabel = {
         let label = UILabel()
-        label.font = .preferredFont(forTextStyle: .caption1)
+        label.font = .preferredFont(forTextStyle: .caption2)
         label.textColor = .secondaryLabel
         label.translatesAutoresizingMaskIntoConstraints = false
         label.text = "Subtitle"
@@ -63,9 +64,20 @@ class GalleryCollectionTitleView: UIView {
     }
 }
 
+class CircleCollectionViewEmptyCell: UICollectionViewCell {}
+
 class CircleCollectionViewCell: UICollectionViewCell {
-    private var imageView: UIImageView!
-    private var activeCircleId: Int?
+    enum Mergability {
+        case ineligible
+        case mergableLeading
+        case mergableTrailing
+    }
+
+    private var leftImageView: UIImageView!
+    private var rightImageView: UIImageView!
+
+    private var leftImageViewOneImageConstraint: NSLayoutConstraint!
+    private var leftImageViewTwoImageConstraint: NSLayoutConstraint!
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -80,34 +92,108 @@ class CircleCollectionViewCell: UICollectionViewCell {
     private func setupImageView() {
         contentView.backgroundColor = .darkGray
 
-        imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(imageView)
+        leftImageView = UIImageView()
+        leftImageView.contentMode = .scaleAspectFit
+        leftImageView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(leftImageView)
 
         NSLayoutConstraint.activate([
-            imageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            imageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            imageView.heightAnchor.constraint(lessThanOrEqualTo: contentView.heightAnchor),
-            imageView.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor)
+            leftImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            leftImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            leftImageView.heightAnchor.constraint(lessThanOrEqualTo: contentView.heightAnchor)
+        ])
+        leftImageViewOneImageConstraint = leftImageView.widthAnchor.constraint(equalTo: contentView.widthAnchor)
+        leftImageViewTwoImageConstraint = leftImageView.trailingAnchor.constraint(equalTo: contentView.centerXAnchor)
+
+        rightImageView = UIImageView()
+        rightImageView.contentMode = .scaleAspectFit
+        rightImageView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(rightImageView)
+
+        NSLayoutConstraint.activate([
+            rightImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            rightImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            rightImageView.heightAnchor.constraint(lessThanOrEqualTo: contentView.heightAnchor),
+            rightImageView.leftAnchor.constraint(equalTo: contentView.centerXAnchor)
         ])
     }
 
-    func configure(with circle: Circle) {
+    func configure(current: CirclemsDataSchema.ComiketCircleWC, next: CirclemsDataSchema.ComiketCircleWC?) {
         DispatchQueue.global(qos: .userInitiated).async {
             // read the image from the local cache in a background thread
-            let url = DirectoryManager.shared.cachesFor(comiketId: CirclemsDataSource.shared.comiket.number, .circlems, .images)
+            let leftUrl = DirectoryManager.shared.cachesFor(comiketId: CirclemsDataSource.shared.comiket.number, .circlems, .images)
                 .appendingPathComponent("circles")
-                .appendingPathComponent("\(circle.id).png")
+                .appendingPathComponent("\(current.id).png")
 
-            guard let imageData = try? Data(contentsOf: url), let image = UIImage(data: imageData) else { return }
+            guard let leftImageData = try? Data(contentsOf: leftUrl), var leftImage = UIImage(data: leftImageData) else { return }
 
-            // update the UI on the main thread
+            if let next = next {
+                let rightUrl = DirectoryManager.shared.cachesFor(comiketId: CirclemsDataSource.shared.comiket.number, .circlems, .images)
+                    .appendingPathComponent("circles")
+                    .appendingPathComponent("\(next.id).png")
+
+                guard let rightImageData = try? Data(contentsOf: rightUrl), var rightImage = UIImage(data: rightImageData) else { return }
+
+                func draw(image: UIImage, left: Bool) -> UIImage? {
+                    defer { UIGraphicsEndImageContext() }
+
+                    UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
+                    guard let context = UIGraphicsGetCurrentContext() else {
+                        return nil
+                    }
+                    image.draw(at: .zero)
+                    let width: CGFloat = 8.0
+                    let offset: CGFloat = 7.0
+                    var rectangle: CGRect!
+
+                    if !left {
+                        let extraOffset: CGFloat = 53.0
+                        rectangle = CGRect(x: 0, y: offset + extraOffset, width: width, height: image.size.height - 2 * offset - extraOffset)
+                    } else {
+                        rectangle = CGRect(x: image.size.width - width, y: offset, width: width, height: image.size.height - 2 * offset)
+                    }
+
+                    context.setFillColor(UIColor(white: 0.8, alpha: 1.0).cgColor)
+                    context.fill(rectangle)
+                    guard let newImage = UIGraphicsGetImageFromCurrentImageContext() else {
+                        return nil
+                    }
+
+                    return newImage
+                }
+
+                if let drawnLeftImage = draw(image: leftImage, left: true) {
+                    leftImage = drawnLeftImage
+                }
+                if let drawnRightImage = draw(image: rightImage, left: false) {
+                    rightImage = drawnRightImage
+                }
+
+                DispatchQueue.main.async {
+                    self.rightImageView.image = rightImage
+                    self.leftImageViewOneImageConstraint.isActive = false
+                    self.leftImageViewTwoImageConstraint.isActive = true
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.rightImageView.image = nil
+                    self.leftImageViewOneImageConstraint.isActive = true
+                    self.leftImageViewTwoImageConstraint.isActive = false
+                }
+            }
+
             DispatchQueue.main.async {
-                self.imageView.image = image
-                self.activeCircleId = circle.id
+                self.leftImageView.image = leftImage
             }
         }
+    }
+}
+
+extension CircleCollectionViewCell.Mergability {
+    static func from(current: CirclemsDataSchema.ComiketCircleWC, leading: CirclemsDataSchema.ComiketCircleWC?, trailing: CirclemsDataSchema.ComiketCircleWC?) -> CircleCollectionViewCell.Mergability {
+        if current.sameCircle(as: leading) { return .mergableLeading }
+        if current.sameCircle(as: trailing) { return .mergableTrailing }
+        return .ineligible
     }
 }
 
@@ -161,7 +247,7 @@ class CircleCollectionViewSectionHeader: UICollectionReusableView {
 }
 
 class GalleryCollectionViewController: UIViewController, UICollectionViewDelegateFlowLayout {
-    var circles: [Circle] = []
+    var circles: [CirclemsDataSchema.ComiketCircleWC] = []
     var circleGroups: [CircleBlockGroup] = []
 
     private var collectionView: UICollectionView!
@@ -170,7 +256,7 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
     private var titleView: GalleryCollectionTitleView!
     private var numberOfColumns: CGFloat = 6
 
-    init(circles: [Circle]) {
+    init(circles: [CirclemsDataSchema.ComiketCircleWC]) {
         self.circles = circles
         self.circleGroups = CircleBlockGroup.from(circles: circles)
         super.init(nibName: nil, bundle: nil)
@@ -192,6 +278,7 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.register(CircleCollectionViewCell.self, forCellWithReuseIdentifier: "CircleCell")
+        collectionView.register(CircleCollectionViewEmptyCell.self, forCellWithReuseIdentifier: "CircleEmptyCell")
         collectionView.register(CircleCollectionViewSectionHeader.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "CircleSectionHeader")
         view.addSubview(collectionView)
 
@@ -211,10 +298,10 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         titleView.subtitleLabel.text = "\(CirclemsDataSource.shared.comiket.name) | \(circleGroups.count) blocks"
         self.navigationItem.titleView = titleView
 
-        // add two right button items to navigation item that decreases/increases the number of columns
-        let decreaseButton = UIBarButtonItem(image: UIImage(systemName: "minus"), style: .plain, target: self, action: #selector(increaseColumns))
-        let increaseButton = UIBarButtonItem(image: UIImage(systemName: "plus"), style: .plain, target: self, action: #selector(decreaseColumns))
-        self.navigationItem.rightBarButtonItems = [increaseButton, decreaseButton]
+//        // add two right button items to navigation item that decreases/increases the number of columns
+//        let decreaseButton = UIBarButtonItem(image: UIImage(systemName: "minus"), style: .plain, target: self, action: #selector(increaseColumns))
+//        let increaseButton = UIBarButtonItem(image: UIImage(systemName: "plus"), style: .plain, target: self, action: #selector(decreaseColumns))
+//        self.navigationItem.rightBarButtonItems = [increaseButton, decreaseButton]
 
         searchController.obscuresBackgroundDuringPresentation = false
         searchController.searchBar.placeholder = "Search..."
@@ -222,38 +309,19 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         self.definesPresentationContext = true
     }
 
-    @objc private func decreaseColumns() {
-        self.numberOfColumns = max(2, numberOfColumns - 1)
-        updateCollectionViewLayout()
-    }
-
-    @objc private func increaseColumns() {
-        self.numberOfColumns = min(6, numberOfColumns + 1)
-        updateCollectionViewLayout()
-    }
-
-    private func updateCollectionViewLayout() {
-        let borderWidth: CGFloat = 0
-        let totalSpacing = (numberOfColumns - 1) * borderWidth
-        let width = (collectionView.bounds.width - totalSpacing) / numberOfColumns
-
-        // Calculate height based on the aspect ratio of 211x300
-        let aspectRatio: CGFloat = 300 / 211
-        let height = width * aspectRatio
-
-        UIView.animate(withDuration: 0.3) {
-            self.layout.itemSize = CGSize(width: width, height: height)
-        }
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        updateCollectionViewLayout()
-    }
+//    @objc private func decreaseColumns() {
+//        self.numberOfColumns = max(2, numberOfColumns - 1)
+//        updateCollectionViewLayout()
+//    }
+//
+//    @objc private func increaseColumns() {
+//        self.numberOfColumns = min(6, numberOfColumns + 1)
+//        updateCollectionViewLayout()
+//    }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let circle = circleGroups[indexPath.section].circles[indexPath.item]
-        let hostingController = UIHostingController(rootView: Text(circle.circleName ?? ""))
+        let circle = circleGroups[indexPath.section].unifiedCircles[indexPath.item]
+        let hostingController = UIHostingController(rootView: CirclePreviewView(circle: circle.circle))
 
         let destinationVC = UIViewController()
 
@@ -288,20 +356,44 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
     }
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return circleGroups[section].circles.count
+        return circleGroups[section].unifiedCircles.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let width = collectionView.bounds.width / numberOfColumns
+
+        // Calculate height based on the aspect ratio of 211x300
+        let aspectRatio: CGFloat = 300 / 211
+        let height = width * aspectRatio
+
+        let unifiedCircles = self.circleGroups[indexPath.section].unifiedCircles[indexPath.item]
+
+        if unifiedCircles.selfBeenMerged {
+            return .zero
+        }
+
+        return unifiedCircles.trailingItemMergable ? CGSize(width: width * 2, height: height) : CGSize(width: width, height: height)
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let circle = circleGroups[indexPath.section].unifiedCircles[indexPath.item]
+        if circle.selfBeenMerged {
+            return collectionView.dequeueReusableCell(withReuseIdentifier: "CircleEmptyCell", for: indexPath) as! CircleCollectionViewEmptyCell
+        }
+
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "CircleCell", for: indexPath) as! CircleCollectionViewCell
-        let circle = circleGroups[indexPath.section].circles[indexPath.item]
-        cell.configure(with: circle)
+        var next: CirclemsDataSchema.ComiketCircleWC? = nil
+        if circle.trailingItemMergable {
+            next = circleGroups[indexPath.section].unifiedCircles[indexPath.item + 1].circle
+        }
+        cell.configure(current: circle.circle, next: next)
         return cell
     }
 
     func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
         let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "CircleSectionHeader", for: indexPath) as! CircleCollectionViewSectionHeader
         header.nameLabel.text = circleGroups[indexPath.section].block.name
-        header.countLabel.text = circleGroups[indexPath.section].circles.count.string
+        header.countLabel.text = circleGroups[indexPath.section].unifiedCircles.count.string
         return header
     }
 
@@ -313,23 +405,23 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
 // - MARK: Context Menu (Preview)
 extension GalleryCollectionViewController {
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
-        let circle = self.circleGroups[indexPath.section].circles[indexPath.item]
+        let unifiedCircles = self.circleGroups[indexPath.section].unifiedCircles[indexPath.item]
         let config = UIContextMenuConfiguration(
             identifier: indexPath as NSIndexPath,
             previewProvider: { () -> UIViewController? in
-                let hostingController = UIHostingController(rootView: CirclePreviewView(circle: circle))
+                let hostingController = UIHostingController(rootView: CirclePreviewView(circle: unifiedCircles.circle))
                 hostingController.preferredContentSize = CGSize(width: 300, height: 400)
                 return hostingController
             },
             actionProvider: { _ in
-                self.circleContextMenu(circle: circle)
+                self.circleContextMenu(circle: unifiedCircles.circle)
             }
         )
 
         return config
     }
 
-    private func circleContextMenu(circle: Circle) -> UIMenu {
+    private func circleContextMenu(circle: CirclemsDataSchema.ComiketCircleWC) -> UIMenu {
         // Create "Add to Favorites" and "Show in Map"
         let addToFavorites = UIAction(title: "Add to Favorites", image: UIImage(systemName: "star")) { _ in
             // Add to favorites
