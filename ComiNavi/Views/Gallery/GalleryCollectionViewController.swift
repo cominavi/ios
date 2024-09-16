@@ -5,6 +5,7 @@
 //  Created by Galvin Gao on 9/15/24.
 //
 
+import AsyncDisplayKit
 import SwiftUI
 import UIKit
 
@@ -63,55 +64,38 @@ class GalleryCollectionTitleView: UIView {
     }
 }
 
-class CircleCollectionViewCell: UICollectionViewCell {
-    private var imageView: UIImageView!
+class CircleCollectionViewCellNode: ASCellNode {
+    var circle: Circle
+    private var imageNode = ASImageNode()
     private var activeCircleId: Int?
 
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setupImageView()
+    init(circle: Circle) {
+        self.circle = circle
+        super.init()
+        setupImageNode()
     }
 
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setupImageView()
+    private func setupImageNode() {
+        imageNode.backgroundColor = .darkGray
+        imageNode.contentMode = .scaleAspectFit
+        addSubnode(imageNode)
+
+        // read the image from the local cache in a background thread
+        let url = DirectoryManager.shared.cachesFor(comiketId: CirclemsDataSource.shared.comiket.number, .circlems, .images)
+            .appendingPathComponent("circles")
+            .appendingPathComponent("\(circle.id).png")
+
+        guard let imageData = try? Data(contentsOf: url), let image = UIImage(data: imageData) else { return }
+
+        self.imageNode.image = image
     }
 
-    private func setupImageView() {
-        contentView.backgroundColor = .darkGray
-
-        imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(imageView)
-
-        NSLayoutConstraint.activate([
-            imageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            imageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            imageView.heightAnchor.constraint(lessThanOrEqualTo: contentView.heightAnchor),
-            imageView.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor)
-        ])
-    }
-
-    func configure(with circle: Circle) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            // read the image from the local cache in a background thread
-            let url = DirectoryManager.shared.cachesFor(comiketId: CirclemsDataSource.shared.comiket.number, .circlems, .images)
-                .appendingPathComponent("circles")
-                .appendingPathComponent("\(circle.id).png")
-
-            guard let imageData = try? Data(contentsOf: url), let image = UIImage(data: imageData) else { return }
-
-            // update the UI on the main thread
-            DispatchQueue.main.async {
-                self.imageView.image = image
-                self.activeCircleId = circle.id
-            }
-        }
+    override func layoutSpecThatFits(_ constrainedSize: ASSizeRange) -> ASLayoutSpec {
+        return ASRatioLayoutSpec(ratio: 300 / 211, child: imageNode)
     }
 }
 
-class CircleCollectionViewSectionHeader: UICollectionReusableView {
+class CircleCollectionViewSectionHeaderView: UIView {
     var nameLabel: UILabel = {
         let label = UILabel()
         label.font = .preferredFont(forTextStyle: .headline)
@@ -160,11 +144,11 @@ class CircleCollectionViewSectionHeader: UICollectionReusableView {
     }
 }
 
-class GalleryCollectionViewController: UIViewController, UICollectionViewDelegateFlowLayout {
+class GalleryCollectionViewController: UIViewController, ASCollectionDelegateFlowLayout {
     var circles: [Circle] = []
     var circleGroups: [CircleBlockGroup] = []
 
-    private var collectionView: UICollectionView!
+    private var collectionNode: ASCollectionNode!
     private var layout: UICollectionViewFlowLayout! = UICollectionViewFlowLayout()
     private var searchController: UISearchController! = UISearchController()
     private var titleView: GalleryCollectionTitleView!
@@ -188,22 +172,14 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         layout.minimumLineSpacing = 0
         layout.sectionHeadersPinToVisibleBounds = true
 
-        collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.dataSource = self
-        collectionView.delegate = self
-        collectionView.register(CircleCollectionViewCell.self, forCellWithReuseIdentifier: "CircleCell")
-        collectionView.register(CircleCollectionViewSectionHeader.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "CircleSectionHeader")
-        view.addSubview(collectionView)
+        collectionNode = ASCollectionNode(frame: .zero, collectionViewLayout: layout)
+        collectionNode.dataSource = self
+        collectionNode.delegate = self
 
-        collectionView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        ])
+        collectionNode.backgroundColor = .systemBackground
 
-        collectionView.backgroundColor = .systemBackground
+        // make collectionView support safe areas
+        collectionNode.view.contentInsetAdjustmentBehavior = .always
 
         self.title = "Gallery"
         titleView = GalleryCollectionTitleView()
@@ -228,14 +204,15 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
     }
 
     @objc private func increaseColumns() {
-        self.numberOfColumns = min(6, numberOfColumns + 1)
+        self.numberOfColumns = min(10, numberOfColumns + 1)
         updateCollectionViewLayout()
     }
 
     private func updateCollectionViewLayout() {
         let borderWidth: CGFloat = 0
         let totalSpacing = (numberOfColumns - 1) * borderWidth
-        let width = (collectionView.bounds.width - totalSpacing) / numberOfColumns
+        let safeAreaInsets = collectionNode.safeAreaInsets.left + collectionNode.safeAreaInsets.right
+        let width = (collectionNode.frame.width - totalSpacing - safeAreaInsets) / numberOfColumns
 
         // Calculate height based on the aspect ratio of 211x300
         let aspectRatio: CGFloat = 300 / 211
@@ -251,9 +228,9 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         updateCollectionViewLayout()
     }
 
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+    func collectionNode(_ collectionNode: ASCollectionNode, didSelectItemAt indexPath: IndexPath) {
         let circle = circleGroups[indexPath.section].circles[indexPath.item]
-        let hostingController = UIHostingController(rootView: Text(circle.circleName ?? ""))
+        let hostingController = UIHostingController(rootView: CirclePreviewView(circle: circle))
 
         let destinationVC = UIViewController()
 
@@ -278,7 +255,7 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 }
 
 // - MARK: Collection View Data Source
-extension GalleryCollectionViewController: UICollectionViewDataSource {
+extension GalleryCollectionViewController: ASCollectionDataSource {
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         return circleGroups.count
     }
@@ -287,32 +264,37 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
         return circleGroups.map { $0.block.name }
     }
 
-    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+    func collectionNode(_ collectionNode: ASCollectionNode, numberOfItemsInSection section: Int) -> Int {
         return circleGroups[section].circles.count
     }
 
-    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "CircleCell", for: indexPath) as! CircleCollectionViewCell
+    func collectionNode(_ collectionNode: ASCollectionNode, nodeBlockForItemAt indexPath: IndexPath) -> (() -> ASCellNode) {
         let circle = circleGroups[indexPath.section].circles[indexPath.item]
-        cell.configure(with: circle)
-        return cell
+        return {
+            CircleCollectionViewCellNode(circle: circle)
+        }
     }
 
-    func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
-        let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "CircleSectionHeader", for: indexPath) as! CircleCollectionViewSectionHeader
-        header.nameLabel.text = circleGroups[indexPath.section].block.name
-        header.countLabel.text = circleGroups[indexPath.section].circles.count.string
-        return header
+    func collectionNode(_ collectionNode: ASCollectionNode, nodeBlockForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> ASCellNodeBlock {
+        let group = circleGroups[indexPath.section]
+        return {
+            ASCellNode {
+                let header = CircleCollectionViewSectionHeaderView()
+                header.nameLabel.text = group.block.name
+                header.countLabel.text = group.circles.count.string
+                return header
+            }
+        }
     }
 
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
-        return CGSize(width: collectionView.frame.width, height: 24)
+    func collectionNode(_ collectionNode: ASCollectionNode, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
+        return CGSize(width: collectionNode.frame.width, height: 24)
     }
 }
 
 // - MARK: Context Menu (Preview)
 extension GalleryCollectionViewController {
-    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+    func collectionNode(_ collectionNode: ASCollectionNode, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
         let circle = self.circleGroups[indexPath.section].circles[indexPath.item]
         let config = UIContextMenuConfiguration(
             identifier: indexPath as NSIndexPath,
@@ -340,7 +322,7 @@ extension GalleryCollectionViewController {
         return UIMenu(title: "Actions", children: [addToFavorites, showInMap])
     }
 
-    func collectionView(_ collectionView: UICollectionView, willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionCommitAnimating) {
+    func collectionNode(_ collectionNode: ASCollectionNode, willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionCommitAnimating) {
         guard let vc = animator.previewViewController else { return }
 
         animator.addCompletion {

@@ -3,10 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		150873205EF90CE0632A2828 /* Pods_ComiNavi.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7342F7309D4AE8A40F4F11A1 /* Pods_ComiNavi.framework */; };
 		B5231EE32C98031100625D19 /* webcatalog104.db in Resources */ = {isa = PBXBuildFile; fileRef = B5231EC22C98031100625D19 /* webcatalog104.db */; };
 		B5231EE42C98031100625D19 /* webcatalog104Image1.db in Resources */ = {isa = PBXBuildFile; fileRef = B5231EC32C98031100625D19 /* webcatalog104Image1.db */; };
 		B5231EE52C98031100625D19 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B5231ECE2C98031100625D19 /* Preview Assets.xcassets */; };
@@ -35,6 +36,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		56828D4DE392AD01719FDDBC /* Pods-ComiNavi.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ComiNavi.release.xcconfig"; path = "Target Support Files/Pods-ComiNavi/Pods-ComiNavi.release.xcconfig"; sourceTree = "<group>"; };
+		7342F7309D4AE8A40F4F11A1 /* Pods_ComiNavi.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_ComiNavi.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		B5231EBD2C98031100625D19 /* CirclemsDataSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CirclemsDataSchema.swift; sourceTree = "<group>"; };
 		B5231EBE2C98031100625D19 /* CirclemsDataSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CirclemsDataSource.swift; sourceTree = "<group>"; };
 		B5231EBF2C98031100625D19 /* CirclemsFoundationalDataset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CirclemsFoundationalDataset.swift; sourceTree = "<group>"; };
@@ -60,6 +63,7 @@
 		B5231EE02C98031100625D19 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B5231EE12C98031100625D19 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ComiNavi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E12AFF53F229BEE8878DE744 /* Pods-ComiNavi.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ComiNavi.debug.xcconfig"; path = "Target Support Files/Pods-ComiNavi/Pods-ComiNavi.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,12 +74,21 @@
 				B56526C92C976DD800C01713 /* Toast in Frameworks */,
 				B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */,
 				B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */,
+				150873205EF90CE0632A2828 /* Pods_ComiNavi.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B3C7C4556ED8F64A9EC62E43 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				7342F7309D4AE8A40F4F11A1 /* Pods_ComiNavi.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		B5231EC12C98031100625D19 /* DataPipeline */ = {
 			isa = PBXGroup;
 			children = (
@@ -216,6 +229,8 @@
 			children = (
 				B5231EE22C98031100625D19 /* ComiNavi */,
 				B5E9AEB42C9333CD00742CE8 /* Products */,
+				ED64F1A4FBF869056623FED8 /* Pods */,
+				B3C7C4556ED8F64A9EC62E43 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -227,6 +242,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		ED64F1A4FBF869056623FED8 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				E12AFF53F229BEE8878DE744 /* Pods-ComiNavi.debug.xcconfig */,
+				56828D4DE392AD01719FDDBC /* Pods-ComiNavi.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -234,9 +258,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = B5E9AEC32C9333CE00742CE8 /* Build configuration list for PBXNativeTarget "ComiNavi" */;
 			buildPhases = (
+				2B2504D481C6B9AEF1270EDB /* [CP] Check Pods Manifest.lock */,
 				B5E9AEAF2C9333CD00742CE8 /* Sources */,
 				B5E9AEB02C9333CD00742CE8 /* Frameworks */,
 				B5E9AEB12C9333CD00742CE8 /* Resources */,
+				7615C81B830CA22D80385F36 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -268,6 +294,7 @@
 				};
 			};
 			buildConfigurationList = B5E9AEAE2C9333CD00742CE8 /* Build configuration list for PBXProject "ComiNavi" */;
+			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -276,13 +303,11 @@
 				ja,
 			);
 			mainGroup = B5E9AEAA2C9333CD00742CE8;
-			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B5E9AECD2C9357DA00742CE8 /* XCRemoteSwiftPackageReference "SwifterSwift" */,
 				B5E9AEDD2C942CC900742CE8 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				B56526C72C976DD800C01713 /* XCRemoteSwiftPackageReference "toast-swift" */,
 			);
-			preferredProjectObjectVersion = 77;
 			productRefGroup = B5E9AEB42C9333CD00742CE8 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -305,6 +330,48 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		2B2504D481C6B9AEF1270EDB /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-ComiNavi-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		7615C81B830CA22D80385F36 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-ComiNavi/Pods-ComiNavi-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-ComiNavi/Pods-ComiNavi-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-ComiNavi/Pods-ComiNavi-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		B5E9AEAF2C9333CD00742CE8 /* Sources */ = {
@@ -372,7 +439,7 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -435,7 +502,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -456,6 +523,7 @@
 		};
 		B5E9AEC42C9333CE00742CE8 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = E12AFF53F229BEE8878DE744 /* Pods-ComiNavi.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -490,6 +558,7 @@
 		};
 		B5E9AEC52C9333CE00742CE8 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 56828D4DE392AD01719FDDBC /* Pods-ComiNavi.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
