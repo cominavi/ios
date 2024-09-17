@@ -93,7 +93,7 @@ class CircleCollectionViewCell: UICollectionViewCell {
         contentView.backgroundColor = .darkGray
 
         leftImageView = UIImageView()
-        leftImageView.contentMode = .scaleAspectFit
+        leftImageView.contentMode = .scaleAspectFill
         leftImageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(leftImageView)
 
@@ -321,7 +321,7 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let circle = circleGroups[indexPath.section].unifiedCircles[indexPath.item]
-        let hostingController = UIHostingController(rootView: CirclePreviewView(circle: circle.circle))
+        let hostingController = UIHostingController(rootView: CircleDetailView(circle: circle.circle))
 
         let destinationVC = UIViewController()
 
@@ -360,7 +360,8 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
     }
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let width = collectionView.bounds.width / numberOfColumns
+        let safeArea = collectionView.safeAreaInsets.left + collectionView.safeAreaInsets.right
+        let width = (collectionView.bounds.width - safeArea) / numberOfColumns
 
         // Calculate height based on the aspect ratio of 211x300
         let aspectRatio: CGFloat = 300 / 211
@@ -372,7 +373,8 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
             return .zero
         }
 
-        return unifiedCircles.trailingItemMergable ? CGSize(width: width * 2, height: height) : CGSize(width: width, height: height)
+        // FIXME: -0.1: hack
+        return unifiedCircles.trailingItemMergable ? CGSize(width: width * 2 - 0.1, height: height) : CGSize(width: width - 0.1, height: height)
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -409,7 +411,7 @@ extension GalleryCollectionViewController {
         let config = UIContextMenuConfiguration(
             identifier: indexPath as NSIndexPath,
             previewProvider: { () -> UIViewController? in
-                let hostingController = UIHostingController(rootView: CirclePreviewView(circle: unifiedCircles.circle))
+                let hostingController = UIHostingController(rootView: CirclePreviewView(circle: unifiedCircles.circle).padding())
                 hostingController.preferredContentSize = CGSize(width: 300, height: 400)
                 return hostingController
             },
