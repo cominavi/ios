@@ -1,5 +1,5 @@
 {
-  "originHash" : "0a55e360f81539fca8be82b1de643a87c8a36a34fb104172683284698f4cbebc",
+  "originHash" : "c63b7e4713f87553c36e879e230e7889a2b7a3e50d1534b4e93aab08fbffce49",
   "pins" : [
     {
       "identity" : "grdb.swift",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "2cf6c756e1e5ef6901ebae16576a7e4e4b834622",
         "version" : "6.29.3"
+      }
+    },
+    {
+      "identity" : "iglistkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Instagram/IGListKit",
+      "state" : {
+        "revision" : "baf38ea4d438ef3cc6c6deb8615e1910e03f02bb",
+        "version" : "5.0.0"
       }
     },
     {

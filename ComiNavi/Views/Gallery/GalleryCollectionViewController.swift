@@ -5,6 +5,7 @@
 //  Created by Galvin Gao on 9/15/24.
 //
 
+import Combine
 import CoreGraphics
 import SwiftUI
 import UIKit
@@ -247,19 +248,31 @@ class CircleCollectionViewSectionHeader: UICollectionReusableView {
 }
 
 class GalleryCollectionViewController: UIViewController, UICollectionViewDelegateFlowLayout {
-    var circles: [CirclemsDataSchema.ComiketCircleWC] = []
-    var circleGroups: [CircleBlockGroup] = []
+    private var viewModel: GalleryCollectionViewModel
 
-    private var collectionView: UICollectionView!
-    private var layout: UICollectionViewFlowLayout! = UICollectionViewFlowLayout()
-    private var searchController: UISearchController! = UISearchController()
-    private var titleView: GalleryCollectionTitleView!
+    private var layout: UICollectionViewFlowLayout = {
+        let layout = UICollectionViewFlowLayout()
+        layout.minimumInteritemSpacing = 0
+        layout.minimumLineSpacing = 0
+        layout.sectionHeadersPinToVisibleBounds = true
+        return layout
+    }()
+
+    private var collectionView: UICollectionView?
+    private var searchController: UISearchController = .init()
+    private var titleView: GalleryCollectionTitleView = .init()
     private var numberOfColumns: CGFloat = 6
+    private var cancellables: Set<AnyCancellable> = []
 
     init(circles: [CirclemsDataSchema.ComiketCircleWC]) {
-        self.circles = circles
-        self.circleGroups = CircleBlockGroup.from(circles: circles)
+        self.viewModel = GalleryCollectionViewModel(circles: circles)
         super.init(nibName: nil, bundle: nil)
+//        self.viewModel.$circleGroups
+//            .sink { [weak self] _ in
+//                self?.collectionView?.reloadData()
+//                self?.update()
+//            }
+//            .store(in: &cancellables)
     }
 
     @available(*, unavailable)
@@ -270,11 +283,9 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        layout.minimumInteritemSpacing = 0
-        layout.minimumLineSpacing = 0
-        layout.sectionHeadersPinToVisibleBounds = true
-
         collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        guard let collectionView = collectionView else { return }
+
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.register(CircleCollectionViewCell.self, forCellWithReuseIdentifier: "CircleCell")
@@ -293,9 +304,7 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         collectionView.backgroundColor = .systemBackground
 
         self.title = "Gallery"
-        titleView = GalleryCollectionTitleView()
         titleView.titleLabel.text = "Gallery"
-        titleView.subtitleLabel.text = "\(CirclemsDataSource.shared.comiket.name) | \(circleGroups.count) blocks"
         self.navigationItem.titleView = titleView
 
 //        // add two right button items to navigation item that decreases/increases the number of columns
@@ -305,8 +314,15 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 
         searchController.obscuresBackgroundDuringPresentation = false
         searchController.searchBar.placeholder = "Search..."
+        searchController.searchResultsUpdater = self
         self.navigationItem.searchController = searchController
         self.definesPresentationContext = true
+
+        update()
+    }
+
+    func update() {
+        titleView.subtitleLabel.text = "\(CirclemsDataSource.shared.comiket.name) | \(viewModel.circleGroups.count) blocks"
     }
 
 //    @objc private func decreaseColumns() {
@@ -320,7 +336,7 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 //    }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let circle = circleGroups[indexPath.section].unifiedCircles[indexPath.item]
+        let circle = viewModel.circleGroups[indexPath.section].unifiedCircles[indexPath.item]
         let hostingController = UIHostingController(rootView: CircleDetailView(circle: circle.circle))
 
         let destinationVC = UIViewController()
@@ -348,15 +364,15 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 // - MARK: Collection View Data Source
 extension GalleryCollectionViewController: UICollectionViewDataSource {
     func numberOfSections(in collectionView: UICollectionView) -> Int {
-        return circleGroups.count
+        return viewModel.circleGroups.count
     }
 
     func indexTitles(for collectionView: UICollectionView) -> [String]? {
-        return circleGroups.map { $0.block.name }
+        return viewModel.circleGroups.map { $0.block.name }
     }
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return circleGroups[section].unifiedCircles.count
+        return viewModel.circleGroups[section].unifiedCircles.count
     }
 
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
@@ -367,7 +383,7 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
         let aspectRatio: CGFloat = 300 / 211
         let height = width * aspectRatio
 
-        let unifiedCircles = self.circleGroups[indexPath.section].unifiedCircles[indexPath.item]
+        let unifiedCircles = self.viewModel.circleGroups[indexPath.section].unifiedCircles[indexPath.item]
 
         if unifiedCircles.selfBeenMerged {
             return .zero
@@ -378,7 +394,7 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let circle = circleGroups[indexPath.section].unifiedCircles[indexPath.item]
+        let circle = viewModel.circleGroups[indexPath.section].unifiedCircles[indexPath.item]
         if circle.selfBeenMerged {
             return collectionView.dequeueReusableCell(withReuseIdentifier: "CircleEmptyCell", for: indexPath) as! CircleCollectionViewEmptyCell
         }
@@ -386,7 +402,7 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "CircleCell", for: indexPath) as! CircleCollectionViewCell
         var next: CirclemsDataSchema.ComiketCircleWC? = nil
         if circle.trailingItemMergable {
-            next = circleGroups[indexPath.section].unifiedCircles[indexPath.item + 1].circle
+            next = viewModel.circleGroups[indexPath.section].unifiedCircles[indexPath.item + 1].circle
         }
         cell.configure(current: circle.circle, next: next)
         return cell
@@ -394,8 +410,8 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
         let header = collectionView.dequeueReusableSupplementaryView(ofKind: kind, withReuseIdentifier: "CircleSectionHeader", for: indexPath) as! CircleCollectionViewSectionHeader
-        header.nameLabel.text = circleGroups[indexPath.section].block.name
-        header.countLabel.text = circleGroups[indexPath.section].unifiedCircles.count.string
+        header.nameLabel.text = viewModel.circleGroups[indexPath.section].block.name
+        header.countLabel.text = viewModel.circleGroups[indexPath.section].unifiedCircles.count.string
         return header
     }
 
@@ -407,7 +423,7 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
 // - MARK: Context Menu (Preview)
 extension GalleryCollectionViewController {
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
-        let unifiedCircles = self.circleGroups[indexPath.section].unifiedCircles[indexPath.item]
+        let unifiedCircles = self.viewModel.circleGroups[indexPath.section].unifiedCircles[indexPath.item]
         let config = UIContextMenuConfiguration(
             identifier: indexPath as NSIndexPath,
             previewProvider: { () -> UIViewController? in
@@ -440,5 +456,14 @@ extension GalleryCollectionViewController {
         animator.addCompletion {
             self.navigationController?.pushViewController(vc, animated: true)
         }
+    }
+}
+
+// - MARK: Search Controller
+extension GalleryCollectionViewController: UISearchResultsUpdating {
+    func updateSearchResults(for searchController: UISearchController) {
+        guard let text = searchController.searchBar.text else { return }
+        self.viewModel.setSearchKeyword(text)
+        self.collectionView?.reloadData()
     }
 }

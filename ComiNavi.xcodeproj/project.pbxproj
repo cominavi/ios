@@ -10,6 +10,7 @@
 		B56526C92C976DD800C01713 /* Toast in Frameworks */ = {isa = PBXBuildFile; productRef = B56526C82C976DD800C01713 /* Toast */; };
 		B5B2737D2C9AB49800F2120A /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B5B273732C9AB49800F2120A /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B5B2738F2C9ABDD900F2120A /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B5B2738E2C9ABDD900F2120A /* GRDB */; };
+		B5C828582C9B47CC00986069 /* IGListKit in Frameworks */ = {isa = PBXBuildFile; productRef = B5C828572C9B47CC00986069 /* IGListKit */; };
 		B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AECE2C9357DA00742CE8 /* SwifterSwift */; };
 		B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AEDE2C942CC900742CE8 /* GRDB */; };
 /* End PBXBuildFile section */
@@ -112,6 +113,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B56526C92C976DD800C01713 /* Toast in Frameworks */,
+				B5C828582C9B47CC00986069 /* IGListKit in Frameworks */,
 				B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */,
 				B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */,
 			);
@@ -194,6 +196,7 @@
 				B5E9AECE2C9357DA00742CE8 /* SwifterSwift */,
 				B5E9AEDE2C942CC900742CE8 /* GRDB */,
 				B56526C82C976DD800C01713 /* Toast */,
+				B5C828572C9B47CC00986069 /* IGListKit */,
 			);
 			productName = ComiNavi;
 			productReference = B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */;
@@ -231,6 +234,7 @@
 				B5E9AECD2C9357DA00742CE8 /* XCRemoteSwiftPackageReference "SwifterSwift" */,
 				B5E9AEDD2C942CC900742CE8 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				B56526C72C976DD800C01713 /* XCRemoteSwiftPackageReference "toast-swift" */,
+				B5C828562C9B47CC00986069 /* XCRemoteSwiftPackageReference "IGListKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B5E9AEB42C9333CD00742CE8 /* Products */;
@@ -568,6 +572,14 @@
 				minimumVersion = 2.1.2;
 			};
 		};
+		B5C828562C9B47CC00986069 /* XCRemoteSwiftPackageReference "IGListKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Instagram/IGListKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.0.0;
+			};
+		};
 		B5E9AECD2C9357DA00742CE8 /* XCRemoteSwiftPackageReference "SwifterSwift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/SwifterSwift/SwifterSwift.git";
@@ -596,6 +608,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B5E9AEDD2C942CC900742CE8 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
+		};
+		B5C828572C9B47CC00986069 /* IGListKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B5C828562C9B47CC00986069 /* XCRemoteSwiftPackageReference "IGListKit" */;
+			productName = IGListKit;
 		};
 		B5E9AECE2C9357DA00742CE8 /* SwifterSwift */ = {
 			isa = XCSwiftPackageProductDependency;

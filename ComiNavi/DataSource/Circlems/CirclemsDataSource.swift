@@ -309,6 +309,20 @@ class CirclemsDataSource: ObservableObject {
         return self.circles
     }
     
+    func searchCircles(_ keyword: String) -> [CirclemsDataSchema.ComiketCircleWC] {
+        let keywords = keyword.split(separator: " ")
+        
+        return self.circles.filter { circle in
+            let penName = circle.penName ?? ""
+            let circleName = circle.circleName ?? ""
+            let description = circle.description ?? ""
+            
+            return keywords.allSatisfy { keyword in
+                penName.contains(keyword) || circleName.contains(keyword) || description.contains(keyword)
+            }
+        }
+    }
+    
     func getDemoCircle() -> CirclemsDataSchema.ComiketCircleWC! {
         do {
             let circle = try self.sqliteMain.read { db in
