@@ -8,12 +8,12 @@
 import Foundation
 import GRDB
 
-enum Readiness {
+enum Readiness: Equatable {
     case uninitialized
 //    case downloading(progressPercentage: Double)
-    case initializing
+    case initializing(state: String)
     case ready
-    case error(error: Error)
+    case error(error: String)
 }
 
 enum FloorMapLayer {
@@ -85,27 +85,43 @@ class CirclemsDataSource: ObservableObject {
     var circles: [CirclemsDataSchema.ComiketCircleWC] = []
     
     private init() {
-        self.initialize()
-    }
-    
-    private func initialize() {
-        self.readiness = .initializing
+        self.readiness = .initializing(state: "Pending...")
         
         Task {
             do {
-                try await self.initDatabaseConnections()
-                try self.preloadUFDData()
-                try await self.extractAndCacheCircleImages()
-                try await self.preloadCircles()
+                try await self.initialize()
                 
                 DispatchQueue.main.async {
                     self.readiness = .ready
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self.readiness = .error(error: error)
+                    self.readiness = .error(error: error.localizedDescription)
                 }
             }
+        }
+    }
+    
+    func asyncInit() async throws {
+        try await self.initialize()
+    }
+    
+    private func initialize() async throws {
+        try await self.initDatabaseConnections()
+        DispatchQueue.main.sync {
+            self.readiness = .initializing(state: "Preloading UFD Dataset...")
+        }
+        try self.preloadUFDData()
+        DispatchQueue.main.sync {
+            self.readiness = .initializing(state: "Extracting images...")
+        }
+        try await self.extractAndCacheCircleImages()
+        DispatchQueue.main.sync {
+            self.readiness = .initializing(state: "Fetching circles...")
+        }
+        try await self.preloadCircles()
+        DispatchQueue.main.sync {
+            self.readiness = .initializing(state: "Finalizing...")
         }
     }
     
@@ -256,7 +272,7 @@ class CirclemsDataSource: ObservableObject {
                     try self.sqliteImage.read { db in
                         let circleImages = try CirclemsImageSchema.ComiketCircleImage.fetchAll(db)
                         
-                        for image in circleImages {
+                        for (i, image) in circleImages.enumerated() {
                             guard let data = image.cutImage else { continue }
                             
                             let url = DirectoryManager.shared.cachesFor(comiketId: image.comiketNo, .circlems, .images, createIfNeeded: true)
@@ -264,6 +280,14 @@ class CirclemsDataSource: ObservableObject {
                                 .appendingPathComponent("\(image.id).png")
                             
                             try url.writeIfNotExists(data)
+                            
+                            // random 5% possibility
+                            if Int.random(in: 0 ..< 20) == 0 {
+                                let percentage = ((Double(i) / Double(circleImages.count)) * 100).rounded()
+                                DispatchQueue.main.async {
+                                    self.readiness = .initializing(state: "Extracting images \(Int(percentage))% (\(i)/\(circleImages.count))...")
+                                }
+                            }
                         }
                         
                         continuation.resume()
@@ -363,8 +387,7 @@ class CirclemsDataSource: ObservableObject {
     }
     
     func getFloorMap(layer: FloorMapLayer, day: Int, areaFileNameFragment: String) async -> CirclemsImageSchema.ComiketCommonImage? {
-        let name = ["L", layer.fileNameFragment, day.string, areaFileNameFragment].joined()
-        print("Fetching \(name)")
+        let name = ["L", layer.fileNameFragment, "\(day)", areaFileNameFragment].joined()
         
         do {
             let image = try await self.sqliteImage.read { db in

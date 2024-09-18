@@ -13,6 +13,10 @@ struct MapView: View {
     @State private var day: Int = CirclemsDataSource.shared.comiket.days.first?.dayIndex ?? 1
     @State private var area: String = CirclemsDataSource.shared.comiket.days.first?.halls.first?.mapName ?? ""
 
+    private var dayArea: String {
+        "\(day)_\(area)"
+    }
+
     @State private var image: Image?
 
     var halls: [UFDSchema.DayHall] {
@@ -22,7 +26,7 @@ struct MapView: View {
     func fetch() {
         Task {
             self.image = nil
-            print("Fetching \(day) \(area)")
+
             let image = await CirclemsDataSource.shared.getFloorMap(layer: .base, day: day, areaFileNameFragment: area)
             if let backgroundData = image?.image {
                 self.image = await Image.asyncInit(data: backgroundData)
@@ -48,23 +52,25 @@ struct MapView: View {
                 .pickerStyle(.segmented)
             }
 
-            ZoomableScrollView {
+            Group {
                 if let image = image {
-                    image
-                        .resizable()
-                        .scaledToFit()
+                    ZoomableScrollView {
+                        image
+                            .resizable()
+                            .scaledToFit()
+                    }
+                    .clipped()
+
                 } else {
                     ProgressView()
+                        .flexibleFrame()
                 }
             }
         }
-        .onAppear {
+        .onFirstAppear {
             fetch()
         }
-        .onChange(of: day) { _ in
-            fetch()
-        }
-        .onChange(of: area) { _ in
+        .onChange(of: dayArea) { _ in
             fetch()
         }
     }

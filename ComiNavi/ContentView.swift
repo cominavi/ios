@@ -14,47 +14,57 @@ struct ContentView: View {
     @StateObject var circle = CirclemsDataSource.shared
 
     var body: some View {
-        switch circle.readiness {
-        case .uninitialized:
-            VStack {
-                ProgressView()
-                Text("Pending...")
-                    .foregroundStyle(.secondary)
-            }
-        case .initializing:
-            VStack {
-                ProgressView()
-                Text("Initializing...")
-                    .foregroundStyle(.secondary)
-            }
-        case .ready:
-            TabView {
-                GalleryViewControllerWrappedView()
-                    .ignoresSafeArea()
-                    .tabItem {
-                        Label("Gallery", systemImage: "square.grid.2x2")
+        Group {
+            switch circle.readiness {
+            case .uninitialized:
+                VStack(spacing: 8) {
+                    ProgressView()
+                    Text("Pending...")
+                        .foregroundStyle(.secondary)
+                }
+            case .initializing(let state):
+                VStack(spacing: 8) {
+                    ProgressView()
+                    Text("Initializing...")
+                        .foregroundStyle(.secondary)
+                    
+                    Text(state)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                
+            case .ready:
+                TabView {
+                    GalleryViewControllerWrappedView()
+                        .ignoresSafeArea()
+                        .tabItem {
+                            Label("Gallery", systemImage: "square.grid.2x2")
+                        }
+                    
+                    NavigationView {
+                        MapView()
                     }
-
-                NavigationView {
-                    MapView()
+                    .tabItem {
+                        Label("Map", systemImage: "map")
+                    }
                 }
-                .tabItem {
-                    Label("Map", systemImage: "map")
+                
+            case .error(let error):
+                VStack(spacing: 8) {
+                    Image(systemName: "xmark.octagon.fill")
+                        .resizable()
+                        .frame(width: 32, height: 32)
+                        .foregroundStyle(.red)
+                    
+                    Text("Error: \(error)")
+                        .foregroundStyle(.secondary)
                 }
+                .padding()
             }
-
-        case .error(let error):
-            VStack {
-                Image(systemName: "xmark.octagon.fill")
-                    .resizable()
-                    .frame(width: 32, height: 32)
-                    .foregroundStyle(.red)
-
-                Text("Error: \(error.localizedDescription)")
-                    .foregroundStyle(.secondary)
-            }
-            .padding()
         }
+        .animation(.default, value: circle.readiness)
+            
     }
 }
 

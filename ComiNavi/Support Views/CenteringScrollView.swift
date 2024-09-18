@@ -107,6 +107,7 @@ private struct ZoomableScrollViewImpl<Content: View>: UIViewControllerRepresenta
             coordinator.hostingController.rootView = content
             scrollView.setNeedsUpdateConstraints()
             doubleTapCancellable = doubleTap.sink { [unowned self] in handleDoubleTap() }
+            scrollView.setZoomScale(1.0, animated: false)
         }
 
         func handleDoubleTap() {
@@ -123,7 +124,8 @@ private struct ZoomableScrollViewImpl<Content: View>: UIViewControllerRepresenta
         }
 
         override func viewDidAppear(_ animated: Bool) {
-            scrollView.zoom(to: hostedView.bounds, animated: false)
+            // removed as switching tabs causes positional issues.
+//            scrollView.zoom(to: hostedView.bounds, animated: false)
         }
 
         override func viewDidLayoutSubviews() {
@@ -149,6 +151,11 @@ private struct ZoomableScrollViewImpl<Content: View>: UIViewControllerRepresenta
 
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
             return hostedView
+        }
+
+        static func dismantleUIView(_ uiView: UIScrollView, coordinator: Coordinator) {
+            uiView.delegate = nil
+            coordinator.hostingController.view = nil
         }
     }
 

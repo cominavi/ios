@@ -8,15 +8,67 @@
 
 /* Begin PBXBuildFile section */
 		B56526C92C976DD800C01713 /* Toast in Frameworks */ = {isa = PBXBuildFile; productRef = B56526C82C976DD800C01713 /* Toast */; };
+		B5B2737D2C9AB49800F2120A /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B5B273732C9AB49800F2120A /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B5B2738F2C9ABDD900F2120A /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B5B2738E2C9ABDD900F2120A /* GRDB */; };
 		B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AECE2C9357DA00742CE8 /* SwifterSwift */; };
 		B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AEDE2C942CC900742CE8 /* GRDB */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		B5B2737B2C9AB49800F2120A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B5E9AEAB2C9333CD00742CE8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B5B273722C9AB49800F2120A;
+			remoteInfo = ShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B5B273822C9AB49800F2120A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B5B2737D2C9AB49800F2120A /* ShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		B5B273732C9AB49800F2120A /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ComiNavi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B5B273812C9AB49800F2120A /* Exceptions for "ShareExtension" folder in "ShareExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B5B273722C9AB49800F2120A /* ShareExtension */;
+		};
+		B5B2738B2C9ABD8700F2120A /* Exceptions for "ComiNavi" folder in "ShareExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				DataSource/Circlems/CirclemsDataSchema.swift,
+				DataSource/Circlems/CirclemsDataSource.swift,
+				DataSource/Circlems/CirclemsFoundationalDataset.swift,
+				DataSource/Circlems/CirclemsImageSchema.swift,
+				"Extensions/Extensions+URL.swift",
+				"Extensions/Image+Data.swift",
+				Extensions/ViewModifier.swift,
+				"Support Files/DirectoryManager.swift",
+				"Support Views/CenteringScrollView.swift",
+				Views/CirclePreviewView.swift,
+				Views/Gallery/GalleryViewCircleItem.swift,
+				Views/MapView.swift,
+			);
+			target = B5B273722C9AB49800F2120A /* ShareExtension */;
+		};
 		B5E9AEC72C93350D00742CE8 /* Exceptions for "ComiNavi" folder in "ComiNavi" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -27,10 +79,19 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		B5B273742C9AB49800F2120A /* ShareExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B5B273812C9AB49800F2120A /* Exceptions for "ShareExtension" folder in "ShareExtension" target */,
+			);
+			path = ShareExtension;
+			sourceTree = "<group>";
+		};
 		B5E9AEB52C9333CD00742CE8 /* ComiNavi */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				B5E9AEC72C93350D00742CE8 /* Exceptions for "ComiNavi" folder in "ComiNavi" target */,
+				B5B2738B2C9ABD8700F2120A /* Exceptions for "ComiNavi" folder in "ShareExtension" target */,
 			);
 			path = ComiNavi;
 			sourceTree = "<group>";
@@ -38,6 +99,14 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		B5B273702C9AB49800F2120A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B5B2738F2C9ABDD900F2120A /* GRDB in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B5E9AEB02C9333CD00742CE8 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -51,10 +120,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		B5B2738D2C9ABDD900F2120A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		B5E9AEAA2C9333CD00742CE8 = {
 			isa = PBXGroup;
 			children = (
 				B5E9AEB52C9333CD00742CE8 /* ComiNavi */,
+				B5B273742C9AB49800F2120A /* ShareExtension */,
+				B5B2738D2C9ABDD900F2120A /* Frameworks */,
 				B5E9AEB42C9333CD00742CE8 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,6 +141,7 @@
 			isa = PBXGroup;
 			children = (
 				B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */,
+				B5B273732C9AB49800F2120A /* ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +149,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		B5B273722C9AB49800F2120A /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B5B2737E2C9AB49800F2120A /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				B5B2736F2C9AB49800F2120A /* Sources */,
+				B5B273702C9AB49800F2120A /* Frameworks */,
+				B5B273712C9AB49800F2120A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B5B273742C9AB49800F2120A /* ShareExtension */,
+			);
+			name = ShareExtension;
+			packageProductDependencies = (
+				B5B2738E2C9ABDD900F2120A /* GRDB */,
+			);
+			productName = ShareExtension;
+			productReference = B5B273732C9AB49800F2120A /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		B5E9AEB22C9333CD00742CE8 /* ComiNavi */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B5E9AEC32C9333CE00742CE8 /* Build configuration list for PBXNativeTarget "ComiNavi" */;
@@ -77,10 +179,12 @@
 				B5E9AEAF2C9333CD00742CE8 /* Sources */,
 				B5E9AEB02C9333CD00742CE8 /* Frameworks */,
 				B5E9AEB12C9333CD00742CE8 /* Resources */,
+				B5B273822C9AB49800F2120A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B5B2737C2C9AB49800F2120A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B5E9AEB52C9333CD00742CE8 /* ComiNavi */,
@@ -105,6 +209,9 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					B5B273722C9AB49800F2120A = {
+						CreatedOnToolsVersion = 16.0;
+					};
 					B5E9AEB22C9333CD00742CE8 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -131,11 +238,19 @@
 			projectRoot = "";
 			targets = (
 				B5E9AEB22C9333CD00742CE8 /* ComiNavi */,
+				B5B273722C9AB49800F2120A /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		B5B273712C9AB49800F2120A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B5E9AEB12C9333CD00742CE8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -146,6 +261,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		B5B2736F2C9AB49800F2120A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B5E9AEAF2C9333CD00742CE8 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -155,7 +277,65 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		B5B2737C2C9AB49800F2120A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B5B273722C9AB49800F2120A /* ShareExtension */;
+			targetProxy = B5B2737B2C9AB49800F2120A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		B5B2737F2C9AB49800F2120A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SY8Y8N4TPM;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNavi.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B5B273802C9AB49800F2120A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SY8Y8N4TPM;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNavi.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		B5E9AEC12C9333CE00742CE8 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -282,6 +462,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = ComiNavi/ComiNavi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -316,6 +497,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = ComiNavi/ComiNavi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -348,6 +530,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		B5B2737E2C9AB49800F2120A /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B5B2737F2C9AB49800F2120A /* Debug */,
+				B5B273802C9AB49800F2120A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		B5E9AEAE2C9333CD00742CE8 /* Build configuration list for PBXProject "ComiNavi" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -400,6 +591,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B56526C72C976DD800C01713 /* XCRemoteSwiftPackageReference "toast-swift" */;
 			productName = Toast;
+		};
+		B5B2738E2C9ABDD900F2120A /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B5E9AEDD2C942CC900742CE8 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
 		};
 		B5E9AECE2C9357DA00742CE8 /* SwifterSwift */ = {
 			isa = XCSwiftPackageProductDependency;

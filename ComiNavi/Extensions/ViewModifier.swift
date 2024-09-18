@@ -30,3 +30,47 @@ extension View {
         )
     }
 }
+
+private struct OnFirstAppear: ViewModifier {
+    let perform: () -> Void
+    let `else`: () -> Void
+
+    @State private var firstTime = true
+
+    func body(content: Content) -> some View {
+        content.onAppear {
+            if firstTime {
+                firstTime = false
+                perform()
+            } else {
+                `else`()
+            }
+        }
+    }
+}
+
+private struct OnNotFirstAppear: ViewModifier {
+    let perform: () -> Void
+
+    @State private var firstTime = true
+
+    func body(content: Content) -> some View {
+        content.onAppear {
+            if firstTime {
+                firstTime = false
+            } else {
+                perform()
+            }
+        }
+    }
+}
+
+extension View {
+    func onFirstAppear(perform: @escaping () -> Void, else: @escaping () -> Void = {}) -> some View {
+        modifier(OnFirstAppear(perform: perform, else: `else`))
+    }
+
+    func onNotFirstAppear(perform: @escaping () -> Void) -> some View {
+        modifier(OnNotFirstAppear(perform: perform))
+    }
+}
