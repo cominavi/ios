@@ -149,9 +149,6 @@ class CirclemsDataSource: ObservableObject {
     }
     
     private func initialize() async throws {
-        DispatchQueue.main.sync {
-            self.readiness = .downloading(progressPercentage: 0.0)
-        }
         try await self.downloadDatabases()
         DispatchQueue.main.sync {
             self.readiness = .initializing(state: "Initializing databases...")

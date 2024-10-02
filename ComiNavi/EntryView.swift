@@ -31,7 +31,7 @@ struct EntryView: View {
 
     var body: some View {
         Group {
-            if !userState.isLoggedIn {
+            if userState.user?.userId == nil {
                 SignInView()
             } else if loadedMetadata {
                 ContentView()

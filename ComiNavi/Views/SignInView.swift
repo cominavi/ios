@@ -92,9 +92,9 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
 
     func populateUserInfo() async throws {
         let userInfo = try await CirclemsAPI.getUserInfo()
-        AppData.user?.userId = userInfo.response.id
-        AppData.user?.nickname = userInfo.response.name
-        AppData.user?.preferenceR18Enabled = userInfo.response.r18 == 1 ? true : false
+        AppData.userState.user?.userId = userInfo.response.pid
+        AppData.userState.user?.nickname = userInfo.response.nickname
+        AppData.userState.user?.preferenceR18Enabled = userInfo.response.r18 == 1 ? true : false
     }
 }
 

@@ -8,6 +8,18 @@
 import Alamofire
 import Foundation
 
+extension DataRequest {
+    func debugValidate() -> Self {
+        return self
+            .cURLDescription(calling: { print("[REQ]\n\n", $0) })
+            .validate { _, response, data in
+                print("[RESP HEAD]\n\n", response.statusCode, response.headers)
+                print("[RESP DATA]\n\n", String(data: data!, encoding: .utf8)!)
+                return .success(())
+            }
+    }
+}
+
 enum CirclemsAPI {
     public static let baseURL = "https://api1-sandbox.circle.ms"
     public static let authBaseURL = "https://auth1-sandbox.circle.ms"
@@ -125,8 +137,8 @@ enum CirclemsAPI {
     typealias UserInfoResponse = Response<UserInfoResponseData>
 
     struct UserInfoResponseData: Decodable {
-        let id: Int
-        let name: String
+        let pid: Int
+        let nickname: String
         let r18: Int
     }
     
@@ -192,7 +204,7 @@ enum CirclemsAPI {
     static func getEventList() async throws -> EventListResponse {
         let url = "\(baseURL)/WebCatalog/GetEventList"
         return try await AF.request(url, headers: await headers())
-            .validate()
+            .debugValidate()
             .serializingDecodable(EventListResponse.self, decoder: decoder)
             .value
     }
@@ -201,8 +213,7 @@ enum CirclemsAPI {
         let url = "\(baseURL)/CatalogBase/All/"
         let parameters: [String: Any] = ["event_Id": eventId]
         return try await AF.request(url, parameters: parameters, headers: await headers())
-            .validate()
-            .cURLDescription(calling: { print($0) })
+            .debugValidate()
             .serializingDecodable(CatalogBaseResponse.self, decoder: decoder)
             .value
     }
@@ -214,7 +225,7 @@ enum CirclemsAPI {
             parameters["circle_name"] = circleName
         }
         return try await AF.request(url, parameters: parameters, headers: await headers())
-            .validate()
+            .debugValidate()
             .serializingDecodable(FavoriteCirclesResponse.self, decoder: decoder)
             .value
     }
@@ -223,7 +234,7 @@ enum CirclemsAPI {
         let url = "\(baseURL)/WebCatalog/GetCircle"
         let parameters: [String: Any] = ["wcid": wcid]
         return try await AF.request(url, parameters: parameters, headers: await headers())
-            .validate()
+            .debugValidate()
             .serializingDecodable(CircleResponse.self, decoder: decoder)
             .value
     }
@@ -237,7 +248,7 @@ enum CirclemsAPI {
         if let sort = sort { parameters["sort"] = sort }
         if let lastUpdate = lastUpdate { parameters["lastupdate"] = lastUpdate }
         return try await AF.request(url, parameters: parameters, headers: await headers())
-            .validate()
+            .debugValidate()
             .serializingDecodable(CircleQueryResponse.self, decoder: decoder)
             .value
     }
@@ -249,7 +260,7 @@ enum CirclemsAPI {
         if let memo = memo { parameters["memo"] = memo }
         if let free = free { parameters["free"] = free }
         return try await AF.request(url, method: .post, parameters: parameters, headers: await headers())
-            .validate()
+            .debugValidate()
             .serializingDecodable(EmptyResponse.self, decoder: decoder)
             .value
     }
@@ -261,7 +272,7 @@ enum CirclemsAPI {
         if let memo = memo { parameters["memo"] = memo }
         if let free = free { parameters["free"] = free }
         return try await AF.request(url, method: .put, parameters: parameters, headers: await headers())
-            .validate()
+            .debugValidate()
             .serializingDecodable(EmptyResponse.self, decoder: decoder)
             .value
     }
@@ -270,7 +281,7 @@ enum CirclemsAPI {
         let url = "\(baseURL)/Readers/Favorite"
         let parameters: [String: Any] = ["wcid": wcid]
         return try await AF.request(url, method: .delete, parameters: parameters, headers: await headers())
-            .validate()
+            .debugValidate()
             .serializingDecodable(EmptyResponse.self, decoder: decoder)
             .value
     }
@@ -278,7 +289,7 @@ enum CirclemsAPI {
     static func getUserInfo() async throws -> UserInfoResponse {
         let url = "\(baseURL)/User/Info"
         return try await AF.request(url, headers: await headers())
-            .validate()
+            .debugValidate()
             .serializingDecodable(UserInfoResponse.self, decoder: decoder)
             .value
     }
@@ -295,7 +306,7 @@ enum CirclemsAPI {
         if let page = page { parameters["page"] = page }
         if let lastUpdate = lastUpdate { parameters["lastupdate"] = lastUpdate }
         return try await AF.request(url, parameters: parameters, headers: await headers())
-            .validate()
+            .debugValidate()
             .serializingDecodable(BookQueryResponse.self, decoder: decoder)
             .value
     }
