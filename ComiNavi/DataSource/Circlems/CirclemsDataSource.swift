@@ -102,7 +102,7 @@ struct CirclemsDataSourceDatabases {
 }
 
 class CirclemsDataSource: ObservableObject {
-    static let SHOULD_CHECK_DATABASE_EXISTS = false
+    static let SHOULD_CHECK_DATABASE_EXISTS = true
     
     private let databases: CirclemsDataSourceDatabases?
     

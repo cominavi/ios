@@ -80,7 +80,8 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
                 AppData.userState.user = User(
                     accessToken: accessToken,
                     accessTokenExpiresAt: Date().addingTimeInterval(TimeInterval(expiresInSeconds)),
-                    refreshToken: refreshToken)
+                    refreshToken: refreshToken
+                )
 
                 return continuation.resume()
             }
@@ -100,6 +101,8 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
 
 struct SignInView: View {
     @ObservedObject var vm = SignInViewModel()
+
+    @State var animationTrigger = false
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -154,6 +157,33 @@ struct SignInView: View {
             .opacity(vm.state == .authenticating ? 0.5 : 1)
         }
         .padding()
+        .background(
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(0 ..< 8) { colIdx in
+                    VStack(spacing: 8) {
+                        ForEach(0 ..< 8) { _ in
+                            Rectangle()
+                                .strokeBorder(.gray.opacity(0.25), lineWidth: 1)
+                                .frame(width: 90, height: 180)
+                        }
+                    }
+                    .padding(.top, colIdx % 2 == 0 ? 0 : (180 + 8) / 2)
+                }
+            }
+            .ignoresSafeArea()
+            // move it along y axis from 0 to 180 indefinitely
+            .animation(
+                Animation.linear(duration: 40)
+                    .repeatForever(autoreverses: false)
+            )
+            .offset(y: animationTrigger ? 0 : -((180 + 8) * 2))
+            .rotationEffect(.degrees(-30))
+            .allowsHitTesting(false)
+//                .scaleEffect(0.5)
+            .onAppear {
+                self.animationTrigger.toggle()
+            }
+        )
     }
 }
 
