@@ -10,21 +10,60 @@ import GRDB
 import Gzip
 
 enum Readiness: Equatable {
+    struct Progress: Equatable {
+        var type: CirclemsDataSourceDatabaseType
+        var totalBytes: Int64
+        var completedBytes: Int64
+        var fractionCompleted: Double {
+            return Double(completedBytes) / Double(totalBytes)
+        }
+    }
+    
+    typealias Progresses = [Progress]
+    
     case uninitialized
-    case downloading(progressPercentage: Double)
+    case downloading(progresses: Progresses)
     case initializing(state: String)
     case ready
     case error(error: String)
 }
 
-extension Readiness {
-    var progressPercentage: Double? {
-        switch self {
-        case .downloading(let progress):
-            return progress
-        default:
-            return nil
-        }
+extension Readiness.Progresses {
+    var totalBytes: Int64 {
+        return self.reduce(0) { $0 + $1.totalBytes }
+    }
+    
+    var completedBytes: Int64 {
+        return self.reduce(0) { $0 + $1.completedBytes }
+    }
+    
+    var fractionCompleted: Double {
+        return Double(completedBytes) / Double(totalBytes)
+    }
+    
+    // "(completedProgresses) / (totalProgresses)"
+    var summary: String {
+        let completedProgresses = self.filter { $0.completedBytes == $0.totalBytes }.count
+        let totalProgresses = self.count
+        return "\(completedProgresses) / \(totalProgresses)"
+    }
+}
+
+class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
+    var progressHandler: ((Int64, Int64) -> Void)?
+    
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        print(#function)
+    }
+    
+    func urlSession(_ session: URLSession,
+                    downloadTask: URLSessionDownloadTask,
+                    didWriteData bytesWritten: Int64,
+                    totalBytesWritten: Int64,
+                    totalBytesExpectedToWrite: Int64)
+    {
+        print("Downloaded \(totalBytesWritten) / \(totalBytesExpectedToWrite) bytes")
+        progressHandler?(totalBytesWritten, totalBytesExpectedToWrite)
     }
 }
 
@@ -44,44 +83,6 @@ extension FloorMapLayer {
     }
 }
 
-final class JapaneseTokenizer: FTS5WrapperTokenizer {
-    static let name = "cominavi_ja_tokenizer"
-    var wrappedTokenizer: any GRDB.FTS5Tokenizer
-    
-    // Kana to Romaji mapping
-    private let kanaToRomaji: [String: String] = [
-        "あ": "a", "い": "i", "う": "u", "え": "e", "お": "o",
-        "か": "ka", "き": "ki", "く": "ku", "け": "ke", "こ": "ko",
-        "さ": "sa", "し": "shi", "す": "su", "せ": "se", "そ": "so",
-        "た": "ta", "ち": "chi", "つ": "tsu", "て": "te", "と": "to",
-        "な": "na", "に": "ni", "ぬ": "nu", "ね": "ne", "の": "no",
-        "は": "ha", "ひ": "hi", "ふ": "fu", "へ": "he", "ほ": "ho",
-        "ま": "ma", "み": "mi", "む": "mu", "め": "me", "も": "mo",
-        "や": "ya", "ゆ": "yu", "よ": "yo",
-        "ら": "ra", "り": "ri", "る": "ru", "れ": "re", "ろ": "ro",
-        "わ": "wa", "を": "wo", "ん": "n"
-    ]
-    
-    func accept(token: String, flags: GRDB.FTS5TokenFlags, for tokenization: GRDB.FTS5Tokenization, tokenCallback: (String, GRDB.FTS5TokenFlags) throws -> Void) throws {
-        // Convert the token from Kana to Romaji
-        var romajiToken = ""
-        for character in token {
-            if let romaji = kanaToRomaji[String(character)] {
-                romajiToken += romaji
-            } else {
-                romajiToken += String(character) // If no mapping, keep the original character
-            }
-        }
-        
-        // Pass the converted token to the callback
-        try tokenCallback(romajiToken, flags)
-    }
-    
-    init(db: GRDB.Database, arguments: [String]) throws {
-        wrappedTokenizer = try db.makeTokenizer(.unicode61())
-    }
-}
-
 struct CirclemsDataSourceRemoteConfig {
     var digest: String
     var remoteUrl: String
@@ -92,7 +93,22 @@ struct CirclemsDataSourceInitializationParams {
     let image: CirclemsDataSourceRemoteConfig
 }
 
-struct CirclemsDataSourceDatabaseMetadata {
+enum CirclemsDataSourceDatabaseType {
+    case main
+    case image
+    
+    var estimatedBytes: Int64 {
+        switch self {
+        case .main:
+            return 4_880_130
+        case .image:
+            return 341_840_565
+        }
+    }
+}
+
+struct CirclemsDataSourceDatabaseMetadata: Equatable {
+    var type: CirclemsDataSourceDatabaseType
     var digest: String
     var remoteUrl: String
     var localPath: String
@@ -110,6 +126,8 @@ struct CirclemsDataSourceDatabases {
 }
 
 class CirclemsDataSource: ObservableObject {
+    static let SHOULD_CHECK_DATABASE_EXISTS = false
+    
     private let databases: CirclemsDataSourceDatabases?
     
     private var sqliteMain: DatabasePool!
@@ -123,8 +141,22 @@ class CirclemsDataSource: ObservableObject {
     
     init(params: CirclemsDataSourceInitializationParams, comiketId: String) {
         self.databases = CirclemsDataSourceDatabases(
-            main: CirclemsDataSourceDatabaseMetadata(digest: params.main.digest, remoteUrl: params.main.remoteUrl, localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases).appendingPathComponent("main.sqlite").path),
-            image: CirclemsDataSourceDatabaseMetadata(digest: params.image.digest, remoteUrl: params.image.remoteUrl, localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases).appendingPathComponent("image.sqlite").path)
+            main: CirclemsDataSourceDatabaseMetadata(
+                type: .main,
+                digest: params.main.digest,
+                remoteUrl: params.main.remoteUrl,
+                localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases)
+                    .appendingPathComponent("main.sqlite")
+                    .path
+            ),
+            image: CirclemsDataSourceDatabaseMetadata(
+                type: .image,
+                digest: params.image.digest,
+                remoteUrl: params.image.remoteUrl,
+                localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases)
+                    .appendingPathComponent("image.sqlite")
+                    .path
+            )
         )
         
         self.prepare()
@@ -172,72 +204,82 @@ class CirclemsDataSource: ObservableObject {
     }
     
     private func downloadDatabases() async throws {
-        NSLog("Downloading databases...")
         guard let databases = self.databases else {
             throw NSError(domain: "CirclemsDataSource", code: 1, userInfo: [NSLocalizedDescriptionKey: "No databases to download"])
         }
-            
-        let downloads = [databases.main, databases.image].map { metadata in
-            Task {
-                try await withCheckedThrowingContinuation { continuation in
-                    if FileManager.default.fileExists(atPath: metadata.localGzippedPath),
-                       let localDataDigest = URL(fileURLWithPath: metadata.localGzippedPath).md5Digest(),
-                       localDataDigest.hexEncodedString() == metadata.digest.lowercased()
-                    {
-                        NSLog("Database \(metadata.localGzippedPath) already exists and is valid. Skipping download. (Digest: \(localDataDigest.hexEncodedString()))")
-                        return continuation.resume()
-                    }
-                    
-                    let url = URL(string: metadata.remoteUrl)!
-                    let request = URLRequest(url: url)
-                    let task = URLSession.shared.downloadTask(with: request) { url, _, error in
-                        if let error = error {
-                            NSLog("Failed to download \(metadata.remoteUrl): \(error.localizedDescription)")
-                            continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to download \(metadata.remoteUrl): \(error.localizedDescription)"]))
-                        } else if let url = url {
-                            do {
-                                try FileManager.default.moveItem(at: url, to: URL(fileURLWithPath: metadata.localGzippedPath))
-                                // Decompress the file
-                                let data = try Data(contentsOf: URL(fileURLWithPath: metadata.localGzippedPath)).gunzipped()
-                                try data.write(to: URL(fileURLWithPath: metadata.localPath))
-                                continuation.resume()
-                            } catch {
-                                NSLog("Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)")
-                                continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)"]))
+        
+        let allDatabases = [databases.main, databases.image]
+        var databasesToDownload: [CirclemsDataSourceDatabaseMetadata] = []
+
+        for database in allDatabases {
+            if !self.shouldSkipDatabaseDownload(metadata: database) {
+                databasesToDownload.append(database)
+            }
+        }
+        
+        if databasesToDownload.isEmpty {
+            NSLog("All databases are up-to-date, skipping download all together")
+            return
+        }
+        
+        self.readiness = .downloading(progresses: databasesToDownload.map { db in
+            Readiness.Progress(type: db.type, totalBytes: db.type.estimatedBytes, completedBytes: 0)
+        })
+
+        // parallel download
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for database in databasesToDownload {
+                group.addTask {
+                    try await self.downloadDatabase(metadata: database) { [weak self] completedBytes, totalBytes in
+                        if case var .downloading(progresses) = self?.readiness {
+                            if let index = progresses.firstIndex(where: { $0.type == database.type }) {
+                                progresses[index].completedBytes = completedBytes
+                                progresses[index].totalBytes = totalBytes
+                                self?.readiness = .downloading(progresses: progresses)
                             }
                         }
                     }
-                    
-                    task.progress.observe(\.fractionCompleted) { progress, _ in
-                        print(metadata.remoteUrl, progress.fractionCompleted)
-                    }
-                    
-                    task.resume()
                 }
             }
-        }
             
-        // Wait for all downloads to complete
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for download in downloads {
-                group.addTask {
-                    try await download.value
-                }
-            }
-                
-            var completedDownloads = 0
-            for try await _ in group {
-                completedDownloads += 1
-                await self.updateOverallProgress(progress: 1.0, totalDownloads: downloads.count)
-            }
+            try await group.waitForAll()
         }
     }
+    
+    private func shouldSkipDatabaseDownload(metadata: CirclemsDataSourceDatabaseMetadata) -> Bool {
+        if CirclemsDataSource.SHOULD_CHECK_DATABASE_EXISTS,
+           FileManager.default.fileExists(atPath: metadata.localGzippedPath),
+           let localDataDigest = URL(fileURLWithPath: metadata.localGzippedPath).md5Digest(),
+           localDataDigest.hexEncodedString() == metadata.digest.lowercased()
+        {
+            return true
+        }
+        return false
+    }
+    
+    private func downloadDatabase(metadata: CirclemsDataSourceDatabaseMetadata, progressHandler: ((Int64, Int64) -> Void)? = nil) async throws {
+        let url = URL(string: metadata.remoteUrl)!
         
-    @MainActor
-    private func updateOverallProgress(progress: Double, totalDownloads: Int) {
-        let currentProgress = (self.readiness.progressPercentage ?? 0) / 100.0
-        let newProgress = (currentProgress * Double(totalDownloads - 1) + progress) / Double(totalDownloads)
-        self.readiness = .downloading(progressPercentage: newProgress * 100)
+        let delegate = DownloadDelegate()
+        delegate.progressHandler = progressHandler
+        
+        print("Downloading database from \(url) to \(metadata.localGzippedPath)...")
+        
+        let (downloadedURL, _) = try await URLSession.shared.download(from: url, delegate: delegate)
+        
+        do {
+            if FileManager.default.fileExists(atPath: metadata.localGzippedPath) {
+                try FileManager.default.removeItem(at: URL(fileURLWithPath: metadata.localGzippedPath))
+            }
+            try FileManager.default.moveItem(at: downloadedURL, to: URL(fileURLWithPath: metadata.localGzippedPath))
+            
+            // Decompress the file
+            let data = try Data(contentsOf: URL(fileURLWithPath: metadata.localGzippedPath)).gunzipped()
+            try data.write(to: URL(fileURLWithPath: metadata.localPath))
+        } catch {
+            NSLog("Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)")
+            throw NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)"])
+        }
     }
     
     private func initDatabaseConnections() async throws {

@@ -23,11 +23,10 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
             
-            case .downloading(progressPercentage: let progressPercentage):
+            case .downloading(progresses: let progresses):
                 VStack(spacing: 8) {
-                    ProgressView()
-                    
-                    ProgressView(value: progressPercentage, total: 100)
+                    ProgressView(value: progresses.fractionCompleted, total: 1.0)
+                        .tint(.accentColor)
                     
                     Text("Downloading databases, this may take a while...")
                         .foregroundStyle(.secondary)
