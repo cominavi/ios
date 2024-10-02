@@ -34,8 +34,8 @@ struct CirclePreviewView: View {
 
 struct CirclePreviewView_Previews: PreviewProvider {
     static var previews: some View {
-//    use CirclemsDataSource.shared.getDemoCircles() to get a list of demo circles
-        ForEach(CirclemsDataSource.shared.getDemoCircles(), id: \.id) { circle in
+//    use AppData.circlems.getDemoCircles() to get a list of demo circles
+        ForEach(AppData.circlems.getDemoCircles(), id: \.id) { circle in
             CirclePreviewView(circle: circle)
                 .padding()
                 .previewLayout(.sizeThatFits)

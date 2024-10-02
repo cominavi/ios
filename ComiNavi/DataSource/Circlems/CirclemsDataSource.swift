@@ -7,13 +7,25 @@
 
 import Foundation
 import GRDB
+import Gzip
 
 enum Readiness: Equatable {
     case uninitialized
-//    case downloading(progressPercentage: Double)
+    case downloading(progressPercentage: Double)
     case initializing(state: String)
     case ready
     case error(error: String)
+}
+
+extension Readiness {
+    var progressPercentage: Double? {
+        switch self {
+        case .downloading(let progress):
+            return progress
+        default:
+            return nil
+        }
+    }
 }
 
 enum FloorMapLayer {
@@ -70,13 +82,38 @@ final class JapaneseTokenizer: FTS5WrapperTokenizer {
     }
 }
 
-// There are 2 SQLite3 databases located under ComiNavi/DevContent/DB: webcatalog104.db, webcatalog104Image1.db
-// These files are the SQLite3 database files for the web catalog
+struct CirclemsDataSourceRemoteConfig {
+    var digest: String
+    var remoteUrl: String
+}
+
+struct CirclemsDataSourceInitializationParams {
+    let main: CirclemsDataSourceRemoteConfig
+    let image: CirclemsDataSourceRemoteConfig
+}
+
+struct CirclemsDataSourceDatabaseMetadata {
+    var digest: String
+    var remoteUrl: String
+    var localPath: String
+}
+
+extension CirclemsDataSourceDatabaseMetadata {
+    var localGzippedPath: String {
+        return localPath + ".gz"
+    }
+}
+
+struct CirclemsDataSourceDatabases {
+    let main: CirclemsDataSourceDatabaseMetadata
+    let image: CirclemsDataSourceDatabaseMetadata
+}
+
 class CirclemsDataSource: ObservableObject {
-    static let shared = CirclemsDataSource()
+    private let databases: CirclemsDataSourceDatabases?
     
-    public var sqliteMain: DatabasePool!
-    public var sqliteImage: DatabasePool!
+    private var sqliteMain: DatabasePool!
+    private var sqliteImage: DatabasePool!
     
     public var comiket: Comiket!
     
@@ -84,10 +121,19 @@ class CirclemsDataSource: ObservableObject {
     
     var circles: [CirclemsDataSchema.ComiketCircleWC] = []
     
-    private init() {
+    init(params: CirclemsDataSourceInitializationParams, comiketId: String) {
+        self.databases = CirclemsDataSourceDatabases(
+            main: CirclemsDataSourceDatabaseMetadata(digest: params.main.digest, remoteUrl: params.main.remoteUrl, localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases).appendingPathComponent("main.sqlite").path),
+            image: CirclemsDataSourceDatabaseMetadata(digest: params.image.digest, remoteUrl: params.image.remoteUrl, localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases).appendingPathComponent("image.sqlite").path)
+        )
+        
+        self.prepare()
+    }
+    
+    private func prepare() {
         self.readiness = .initializing(state: "Pending...")
         
-        Task {
+        Task(priority: .userInitiated) {
             do {
                 try await self.initialize()
                 
@@ -102,11 +148,14 @@ class CirclemsDataSource: ObservableObject {
         }
     }
     
-    func asyncInit() async throws {
-        try await self.initialize()
-    }
-    
     private func initialize() async throws {
+        DispatchQueue.main.sync {
+            self.readiness = .downloading(progressPercentage: 0.0)
+        }
+        try await self.downloadDatabases()
+        DispatchQueue.main.sync {
+            self.readiness = .initializing(state: "Initializing databases...")
+        }
         try await self.initDatabaseConnections()
         DispatchQueue.main.sync {
             self.readiness = .initializing(state: "Preloading UFD Dataset...")
@@ -125,24 +174,87 @@ class CirclemsDataSource: ObservableObject {
         }
     }
     
+    private func downloadDatabases() async throws {
+        NSLog("Downloading databases...")
+        guard let databases = self.databases else {
+            throw NSError(domain: "CirclemsDataSource", code: 1, userInfo: [NSLocalizedDescriptionKey: "No databases to download"])
+        }
+            
+        let downloads = [databases.main, databases.image].map { metadata in
+            Task {
+                try await withCheckedThrowingContinuation { continuation in
+                    if FileManager.default.fileExists(atPath: metadata.localGzippedPath),
+                       let localDataDigest = URL(fileURLWithPath: metadata.localGzippedPath).md5Digest(),
+                       localDataDigest.hexEncodedString() == metadata.digest.lowercased()
+                    {
+                        NSLog("Database \(metadata.localGzippedPath) already exists and is valid. Skipping download. (Digest: \(localDataDigest.hexEncodedString()))")
+                        return continuation.resume()
+                    }
+                    
+                    let url = URL(string: metadata.remoteUrl)!
+                    let request = URLRequest(url: url)
+                    let task = URLSession.shared.downloadTask(with: request) { url, _, error in
+                        if let error = error {
+                            NSLog("Failed to download \(metadata.remoteUrl): \(error.localizedDescription)")
+                            continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to download \(metadata.remoteUrl): \(error.localizedDescription)"]))
+                        } else if let url = url {
+                            do {
+                                try FileManager.default.moveItem(at: url, to: URL(fileURLWithPath: metadata.localGzippedPath))
+                                // Decompress the file
+                                let data = try Data(contentsOf: URL(fileURLWithPath: metadata.localGzippedPath)).gunzipped()
+                                try data.write(to: URL(fileURLWithPath: metadata.localPath))
+                                continuation.resume()
+                            } catch {
+                                NSLog("Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)")
+                                continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)"]))
+                            }
+                        }
+                    }
+                    
+                    task.progress.observe(\.fractionCompleted) { progress, _ in
+                        print(metadata.remoteUrl, progress.fractionCompleted)
+                    }
+                    
+                    task.resume()
+                }
+            }
+        }
+            
+        // Wait for all downloads to complete
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for download in downloads {
+                group.addTask {
+                    try await download.value
+                }
+            }
+                
+            var completedDownloads = 0
+            for try await _ in group {
+                completedDownloads += 1
+                await self.updateOverallProgress(progress: 1.0, totalDownloads: downloads.count)
+            }
+        }
+    }
+        
+    @MainActor
+    private func updateOverallProgress(progress: Double, totalDownloads: Int) {
+        let currentProgress = (self.readiness.progressPercentage ?? 0) / 100.0
+        let newProgress = (currentProgress * Double(totalDownloads - 1) + progress) / Double(totalDownloads)
+        self.readiness = .downloading(progressPercentage: newProgress * 100)
+    }
+    
     private func initDatabaseConnections() async throws {
         // Initialize the SQLite databases
         var configuration = Configuration()
         configuration.readonly = true
         
-        sqliteMain = try DatabasePool(path: Bundle.main.bundlePath + "/webcatalog104.db", configuration: configuration)
-        sqliteImage = try DatabasePool(path: Bundle.main.bundlePath + "/webcatalog104Image1.db", configuration: configuration)
+        guard let databases = databases else {
+            throw NSError(domain: "CirclemsDataSource", code: 1, userInfo: [NSLocalizedDescriptionKey: "No databases to initialize"])
+        }
         
-//        try await sqliteMain.write { db in
-//            try db.create(virtualTable: "ComiketCircleWC_ft", using: FTS5()) { t in
-//                t.tokenizer = JapaneseTokenizer.tokenizerDescriptor()
-//                t.column("comiketNo")
-//                t.column("id")
-//                t.column("penName")
-//                t.column("circleName")
-//                t.column("description")
-//            }
-//        }
+        NSLog("Initializing databases at \(databases.main.localPath) and \(databases.image.localPath)...")
+        sqliteMain = try DatabasePool(path: databases.main.localPath, configuration: configuration)
+        sqliteImage = try DatabasePool(path: databases.image.localPath, configuration: configuration)
     }
 
     private func preloadUFDData() throws {
@@ -178,7 +290,7 @@ class CirclemsDataSource: ObservableObject {
             // Save the Cover Image under (cachesDirectory)/(comiketNo)/circlems/cover.png, if it does not exist
             var coverImageURL: URL? = nil
             if let coverImageData = coverImageData {
-                coverImageURL = DirectoryManager.shared.cachesFor(comiketId: infoFirst.comiketNo, .circlems, .images, createIfNeeded: true)
+                coverImageURL = DirectoryManager.shared.cachesFor(comiketId: infoFirst.comiketNo.string, .circlems, .images, createIfNeeded: true)
                     .appendingPathComponent("cover.png")
                 try coverImageURL?.writeIfNotExists(coverImageData)
             }
@@ -275,7 +387,7 @@ class CirclemsDataSource: ObservableObject {
                         for (i, image) in circleImages.enumerated() {
                             guard let data = image.cutImage else { continue }
                             
-                            let url = DirectoryManager.shared.cachesFor(comiketId: image.comiketNo, .circlems, .images, createIfNeeded: true)
+                            let url = DirectoryManager.shared.cachesFor(comiketId: image.comiketNo.string, .circlems, .images, createIfNeeded: true)
                                 .appendingPathComponent("circles")
                                 .appendingPathComponent("\(image.id).png")
                             
@@ -352,7 +464,7 @@ class CirclemsDataSource: ObservableObject {
     
     private func getCircleImageFromCache(circleId: Int) -> Data? {
         do {
-            let url = DirectoryManager.shared.cachesFor(comiketId: comiket.number, .circlems, .images)
+            let url = DirectoryManager.shared.cachesFor(comiketId: comiket.number.string, .circlems, .images)
                 .appendingPathComponent("circles")
                 .appendingPathComponent("\(circleId).png")
             

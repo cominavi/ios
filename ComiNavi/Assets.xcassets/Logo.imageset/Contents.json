@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "cominavi-logo-any.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

@@ -11,7 +11,7 @@ import SwiftUI
 import UIKit
 
 struct ContentView: View {
-    @StateObject var circle = CirclemsDataSource.shared
+    @StateObject var circle = AppData.circlems
 
     var body: some View {
         Group {
@@ -22,6 +22,18 @@ struct ContentView: View {
                     Text("Pending...")
                         .foregroundStyle(.secondary)
                 }
+            
+            case .downloading(progressPercentage: let progressPercentage):
+                VStack(spacing: 8) {
+                    ProgressView()
+                    
+                    ProgressView(value: progressPercentage, total: 100)
+                    
+                    Text("Downloading databases, this may take a while...")
+                        .foregroundStyle(.secondary)
+                }
+                .padding()
+            
             case .initializing(let state):
                 VStack(spacing: 8) {
                     ProgressView()
@@ -64,7 +76,6 @@ struct ContentView: View {
             }
         }
         .animation(.default, value: circle.readiness)
-            
     }
 }
 

@@ -122,14 +122,14 @@ class CircleCollectionViewCell: UICollectionViewCell {
     func configure(current: CirclemsDataSchema.ComiketCircleWC, next: CirclemsDataSchema.ComiketCircleWC?) {
         DispatchQueue.global(qos: .userInitiated).async {
             // read the image from the local cache in a background thread
-            let leftUrl = DirectoryManager.shared.cachesFor(comiketId: CirclemsDataSource.shared.comiket.number, .circlems, .images)
+            let leftUrl = DirectoryManager.shared.cachesFor(comiketId: AppData.circlems.comiket.number.string, .circlems, .images)
                 .appendingPathComponent("circles")
                 .appendingPathComponent("\(current.id).png")
 
             guard let leftImageData = try? Data(contentsOf: leftUrl), var leftImage = UIImage(data: leftImageData) else { return }
 
             if let next = next {
-                let rightUrl = DirectoryManager.shared.cachesFor(comiketId: CirclemsDataSource.shared.comiket.number, .circlems, .images)
+                let rightUrl = DirectoryManager.shared.cachesFor(comiketId: AppData.circlems.comiket.number.string, .circlems, .images)
                     .appendingPathComponent("circles")
                     .appendingPathComponent("\(next.id).png")
 
@@ -303,8 +303,8 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 
         collectionView.backgroundColor = .systemBackground
 
-        self.title = "Gallery"
-        titleView.titleLabel.text = "Gallery"
+        self.title = NSLocalizedString("Gallery", comment: "Gallery")
+        titleView.titleLabel.text = NSLocalizedString("Gallery", comment: "Gallery")
         self.navigationItem.titleView = titleView
 
 //        // add two right button items to navigation item that decreases/increases the number of columns
@@ -313,7 +313,7 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 //        self.navigationItem.rightBarButtonItems = [increaseButton, decreaseButton]
 
         searchController.obscuresBackgroundDuringPresentation = false
-        searchController.searchBar.placeholder = "Search..."
+        searchController.searchBar.placeholder = NSLocalizedString("Search...", comment: "Search")
         searchController.searchResultsUpdater = self
         self.navigationItem.searchController = searchController
         self.definesPresentationContext = true
@@ -322,7 +322,7 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
     }
 
     func update() {
-        titleView.subtitleLabel.text = "\(CirclemsDataSource.shared.comiket.name) | \(viewModel.circleGroups.count) blocks"
+        titleView.subtitleLabel.text = NSLocalizedString("\(AppData.circlems.comiket.name) | \(viewModel.circleGroups.count) blocks", comment: "Comiket Name and Block Count")
     }
 
 //    @objc private func decreaseColumns() {
@@ -390,7 +390,7 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
         }
 
         // FIXME: -0.1: hack
-        return unifiedCircles.trailingItemMergable ? CGSize(width: width * 2 - 0.1, height: height) : CGSize(width: width - 0.1, height: height)
+        return unifiedCircles.trailingItemMergable ? CGSize(width: width * 2, height: height) : CGSize(width: width, height: height)
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -441,13 +441,13 @@ extension GalleryCollectionViewController {
 
     private func circleContextMenu(circle: CirclemsDataSchema.ComiketCircleWC) -> UIMenu {
         // Create "Add to Favorites" and "Show in Map"
-        let addToFavorites = UIAction(title: "Add to Favorites", image: UIImage(systemName: "star")) { _ in
+        let addToFavorites = UIAction(title: NSLocalizedString("Add to Favorites", comment: "Gallery Preview Action: Add to Favorites"), image: UIImage(systemName: "star")) { _ in
             // Add to favorites
         }
-        let showInMap = UIAction(title: "Show in Map", image: UIImage(systemName: "map")) { _ in
+        let showInMap = UIAction(title: NSLocalizedString("Show in Map", comment: "Gallery Preview Action: Show in Map"), image: UIImage(systemName: "map")) { _ in
             // Show in map
         }
-        return UIMenu(title: "Actions", children: [addToFavorites, showInMap])
+        return UIMenu(title: NSLocalizedString("Actions", comment: "Gallery Preview Action Title"), children: [addToFavorites, showInMap])
     }
 
     func collectionView(_ collectionView: UICollectionView, willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionCommitAnimating) {

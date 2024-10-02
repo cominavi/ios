@@ -15,6 +15,6 @@ class GalleryCollectionViewModel: ObservableObject {
     }
     
     func setSearchKeyword(_ keyword: String) {
-        self.circleGroups = CircleBlockGroup.from(circles: CirclemsDataSource.shared.searchCircles(keyword))
+        self.circleGroups = CircleBlockGroup.from(circles: AppData.circlems.searchCircles(keyword))
     }
 }

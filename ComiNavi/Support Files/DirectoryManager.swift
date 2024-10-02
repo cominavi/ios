@@ -16,6 +16,7 @@ class DirectoryManager {
 
     enum CacheType: String {
         case images
+        case databases
     }
 
     private init() {}
@@ -63,8 +64,10 @@ class DirectoryManager {
 
     // --
 
-    func cachesFor(comiketId: Int, _ scope: CacheScope, _ type: CacheType, createIfNeeded: Bool = false) -> URL {
-        let url = cachesDirectory
+    func cachesFor(comiketId: String, _ scope: CacheScope, _ type: CacheType, createIfNeeded: Bool = false) -> URL {
+        let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppIdentifier.assetsAppGroup)
+        let base = sharedContainerURL != nil ? sharedContainerURL! : cachesDirectory
+        let url = base
             .appendingPathComponent("comiket\(comiketId)", isDirectory: true)
             .appendingPathComponent(scope.rawValue, isDirectory: true)
             .appendingPathComponent(type.rawValue, isDirectory: true)

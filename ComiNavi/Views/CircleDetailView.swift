@@ -102,14 +102,6 @@ struct CircleDetailView: View {
 
     @State var circleExtend: CirclemsDataSchema.ComiketCircleExtend?
 
-    func fetch() {
-        Task {
-            self.circleExtend = try await CirclemsDataSource.shared.sqliteMain.read { db in
-                try CirclemsDataSchema.ComiketCircleExtend.fetchOne(db, sql: "SELECT * FROM ComiketCircleExtend WHERE id = ?", arguments: [circle.id])
-            }
-        }
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading) {
@@ -139,10 +131,9 @@ struct CircleDetailView: View {
                 $0.scrollIndicators(.automatic)
             }
         }
-        .onAppear(perform: fetch)
     }
 }
 
 #Preview {
-    CircleDetailView(circle: CirclemsDataSource.shared.getDemoCircles().first!)
+    CircleDetailView(circle: AppData.circlems.getDemoCircles().first!)
 }

@@ -16,7 +16,7 @@ struct GalleryViewCircleItem: View {
 
     func fetchImage() {
         self.fetchTask = Task {
-            if let imageData = await CirclemsDataSource.shared.getCircleImage(circleId: circle.id) {
+            if let imageData = await AppData.circlems.getCircleImage(circleId: circle.id) {
                 self.image = await Image.asyncInit(data: imageData)
             }
             self.fetchTask = nil
@@ -46,14 +46,14 @@ struct GalleryViewCircleItem: View {
 struct GalleryViewCircleItem_Previews: PreviewProvider {
     static var previews: some View {
         VStack {
-            GalleryViewCircleItem(circle: CirclemsDataSource.shared.getDemoCircle())
+            GalleryViewCircleItem(circle: AppData.circlems.getDemoCircle())
                 .padding()
                 .frame(width: 200)
 
-            GalleryViewCircleItem(circle: CirclemsDataSource.shared.getDemoCircle())
+            GalleryViewCircleItem(circle: AppData.circlems.getDemoCircle())
                 .padding()
 
-            GalleryViewCircleItem(circle: CirclemsDataSource.shared.getDemoCircle())
+            GalleryViewCircleItem(circle: AppData.circlems.getDemoCircle())
                 .padding()
                 .frame(width: 100)
         }

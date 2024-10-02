@@ -14,7 +14,7 @@ class GalleryViewController: UINavigationController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        self.setViewControllers([GalleryCollectionViewController(circles: CirclemsDataSource.shared.circles)], animated: false)
+        self.setViewControllers([GalleryCollectionViewController(circles: AppData.circlems.circles)], animated: false)
     }
 }
 

@@ -10,8 +10,8 @@ import SwiftUI
 struct MapView: View {
     @State private var background: CirclemsImageSchema.ComiketCommonImage?
 
-    @State private var day: Int = CirclemsDataSource.shared.comiket.days.first?.dayIndex ?? 1
-    @State private var area: String = CirclemsDataSource.shared.comiket.days.first?.halls.first?.mapName ?? ""
+    @State private var day: Int = AppData.circlems.comiket.days.first?.dayIndex ?? 1
+    @State private var area: String = AppData.circlems.comiket.days.first?.halls.first?.mapName ?? ""
 
     private var dayArea: String {
         "\(day)_\(area)"
@@ -20,14 +20,14 @@ struct MapView: View {
     @State private var image: Image?
 
     var halls: [UFDSchema.DayHall] {
-        CirclemsDataSource.shared.comiket.days.first(where: { $0.dayIndex == day })?.halls ?? []
+        AppData.circlems.comiket.days.first(where: { $0.dayIndex == day })?.halls ?? []
     }
 
     func fetch() {
         Task {
             self.image = nil
 
-            let image = await CirclemsDataSource.shared.getFloorMap(layer: .base, day: day, areaFileNameFragment: area)
+            let image = await AppData.circlems.getFloorMap(layer: .base, day: day, areaFileNameFragment: area)
             if let backgroundData = image?.image {
                 self.image = await Image.asyncInit(data: backgroundData)
             }
@@ -38,7 +38,7 @@ struct MapView: View {
         VStack {
             HStack {
                 Picker("Day", selection: $day) {
-                    ForEach(CirclemsDataSource.shared.comiket.days, id: \.self) { day in
+                    ForEach(AppData.circlems.comiket.days, id: \.self) { day in
                         Text("\(day.dayIndex)日目").tag(day.dayIndex)
                     }
                 }

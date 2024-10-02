@@ -8,12 +8,11 @@
 import AuthenticationServices
 import SwifterSwift
 import SwiftUI
+import Toast
 
 enum DemoState {
     case anonymous
     case authenticating
-    case authenticated(accessToken: String)
-    case userInfoFetched(userInfo: String)
 }
 
 class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentationContextProviding {
@@ -25,37 +24,35 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
 
     func signIn() {
         self.state = .authenticating
-        guard let authURL = URL(string: "https://auth1-sandbox.circle.ms/OAuth2/?response_type=code&client_id=cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C&scope=circle_read%20favorite_read%20favorite_write%20user_info&state=0") else { return }
+        let oauthState = String.random(ofLength: 16)
+        guard let authURL = URL(string: "https://auth1-sandbox.circle.ms/OAuth2/?response_type=code&client_id=cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C&scope=circle_read%20favorite_read%20favorite_write%20user_info&state=\(oauthState)") else {
+            Toast.showError("Failed to authenticate", subtitle: "Invalid auth URL")
+            return
+        }
         let scheme = "cominavi"
 
-        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { responseURL, _ in
+        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { responseURL, error in
             // Handle the callback.
-            guard let url = responseURL else { return }
+            guard error == nil else {
+                // see if it is a user cancelled error
+                if (error! as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                    self.state = .anonymous
+                    return
+                }
+                Toast.showError("Failed to authenticate", subtitle: error?.localizedDescription)
+                return
+            }
+            guard let url = responseURL else {
+                Toast.showError("Failed to authenticate", subtitle: "No response URL")
+                return
+            }
             guard let accessToken = url.queryValue(for: "access_token") else { return }
-            self.state = .authenticated(accessToken: accessToken)
-            self.fetchUserInfo()
+            guard oauthState == url.queryValue(for: "state") else { return }
+            AppData.user.accessToken = accessToken
         }
 
         session.presentationContextProvider = self
         session.start()
-    }
-
-    func fetchUserInfo() {
-        guard case .authenticated(let token) = self.state else { return }
-
-        // request using URLSession to get "https://api1-sandbox.circle.ms/User/Info/?access_token=" + token
-        // and update self.state to .userInfoFetched(userInfo: userInfo)
-        // implement below
-        let url = URL(string: "https://api1-sandbox.circle.ms/User/Info/?access_token=\(token)")!
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        URLSession.shared.dataTask(with: request) { data, _, _ in
-            guard let data = data else { return }
-            let userInfo = String(data: data, encoding: .utf8) ?? "Failed to parse user info"
-            DispatchQueue.main.async {
-                self.state = .userInfoFetched(userInfo: userInfo)
-            }
-        }.resume()
     }
 }
 
@@ -63,44 +60,59 @@ struct SignInView: View {
     @ObservedObject var vm = SignInViewModel()
 
     var body: some View {
-        Group {
-            switch self.vm.state {
-            case .anonymous:
-                Button {
-                    self.vm.signIn()
-                } label: {
-                    Text("Login via circle.ms")
-                        .foregroundStyle(.white)
-                        .padding(.horizontal)
-                        .padding(.vertical, 12)
-                        .background(.blue)
-                        .cornerRadius(8)
-                }
-            case .authenticating:
-                VStack {
-                    ProgressView()
+        VStack(alignment: .leading) {
+            Spacer()
 
-                    Text("Authenticating...")
-                        .foregroundStyle(.secondary)
-                }
-            case .authenticated:
-                VStack {
-                    ProgressView()
+            VStack(alignment: .leading, spacing: 0) {
+                Image(.logo)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 100, height: 100)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .shadow(color: .primary.opacity(0.15), radius: 5, y: 2)
+                    .padding(.bottom, 16)
 
-                    Text("Fetching user info...")
-                        .foregroundStyle(.secondary)
-                }
-            case .userInfoFetched(let userInfo):
-                VStack {
-                    Text("Authenticated")
-                        .foregroundStyle(.primary)
+                Text("Welcome to")
+                    .font(.title2)
+                    .foregroundStyle(.primary)
 
-                    Text(userInfo)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 8)
-                }
+                Text("ComiNavi!")
+                    .bold()
+                    .font(.title)
+                    .foregroundStyle(.accent)
             }
+            .padding(.top, 8)
+            .padding(.horizontal, 16)
+
+            Spacer()
+
+            Button {
+                self.vm.signIn()
+            } label: {
+                HStack {
+                    if vm.state == .authenticating {
+                        Group {
+                            ProgressView()
+                                .tint(.white)
+
+                            Text("Authenticating...")
+                        }
+                    } else {
+                        Text("Login via circle.ms")
+                            .bold()
+                    }
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal)
+                .flexibleFrame(.horizontal)
+                .padding(.vertical)
+                .background(vm.state == .authenticating ? .gray : .accent)
+                .cornerRadius(10)
+            }
+            .disabled(vm.state == .authenticating)
+            .opacity(vm.state == .authenticating ? 0.5 : 1)
         }
+        .padding()
     }
 }
 

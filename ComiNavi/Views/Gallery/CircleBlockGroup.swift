@@ -22,7 +22,7 @@ struct CircleBlockGroup {
 
         let blocks: [Int: [CirclemsDataSchema.ComiketCircleWC]] = Dictionary(grouping: circles, by: { $0.blockId ?? 0 })
         for blockId in blocks.keys.sorted() {
-            guard let block = CirclemsDataSource.shared.comiket.blocks.first(where: { $0.externalBlockId == blockId }) else {
+            guard let block = AppData.circlems.comiket.blocks.first(where: { $0.externalBlockId == blockId }) else {
                 continue
             }
 
