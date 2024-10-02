@@ -10,14 +10,35 @@ import Foundation
 enum AppData {
     // CirclemsDataSource shall be initialized by EntryView
     public static var circlems: CirclemsDataSource!
-    public static var user = UserState()
+
+    @UserDefaultsBacked("circlems.user")
+    static var user: User?
+
+    static var userState = UserState()
+
+    public static func getUserToken() async -> String {
+        // TODO: refresh user token before returning the header if it has already expired.
+        return AppData.userState.user?.accessToken ?? ""
+    }
+}
+
+struct User: Codable {
+    var accessToken: String?
+    var accessTokenExpiresAt: Date?
+    var refreshToken: String?
+    var userId: Int?
+    var nickname: String?
+    var preferenceR18Enabled: Bool?
 }
 
 class UserState: ObservableObject {
-    @Published var accessToken: String?
-    @Published var name: String?
+    @Published var user = AppData.user {
+        didSet {
+            AppData.user = user
+        }
+    }
 
     var isLoggedIn: Bool {
-        return accessToken != nil
+        return user?.accessToken != nil
     }
 }

@@ -7,42 +7,31 @@
 
 import Alamofire
 import SwiftUI
+import Toast
 
 struct EntryView: View {
-    @ObservedObject var user = AppData.user
+    @ObservedObject var userState = AppData.userState
     @State var loadedMetadata = false
 
-    func loadMetadata() async {
-        let response = await AF.request("https://api1-sandbox.circle.ms/CatalogBase/All/?event_Id=190", headers: [
-            "Authorization": "Bearer \(AppData.user.accessToken ?? "")"
-        ])
-        .validate()
-        .cURLDescription(calling: { cURL in
-            print(cURL)
-        })
-        .serializingDecodable(GetWebCatalogDBResponse.self)
-        .response
-
-        guard let result = try? response.result.get() else {
-            NSLog("Failed to load metadata: \(String(describing: response.error))")
-            return
-        }
+    func loadMetadata() async throws {
+        let response = try await CirclemsAPI.getCatalogBase(eventId: 190)
 
         AppData.circlems = CirclemsDataSource(
             params: .init(
                 main: .init(
-                    digest: result.response.md5.textdbSqlite3URLSSL,
-                    remoteUrl: result.response.url.textdbSqlite3URLSSL),
+                    digest: response.response.md5.textdbSqlite3UrlSsl,
+                    remoteUrl: response.response.url.textdbSqlite3UrlSsl),
                 image: .init(
-                    digest: result.response.md5.imagedb1URLSSL,
-                    remoteUrl: result.response.url.imagedb1URLSSL)), comiketId: "104")
+                    digest: response.response.md5.imagedb1UrlSsl,
+                    remoteUrl: response.response.url.imagedb1UrlSsl)),
+            comiketId: "104")
 
         loadedMetadata = true
     }
 
     var body: some View {
         Group {
-            if !user.isLoggedIn {
+            if !userState.isLoggedIn {
                 SignInView()
             } else if loadedMetadata {
                 ContentView()
@@ -55,7 +44,11 @@ struct EntryView: View {
                 }
                 .onAppear {
                     Task {
-                        await loadMetadata()
+                        do {
+                            try await loadMetadata()
+                        } catch {
+                            Toast.showError("Failed to fetch metadata", subtitle: "\(error.localizedDescription)")
+                        }
                     }
                 }
             }

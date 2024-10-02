@@ -24,35 +24,77 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
 
     func signIn() {
         self.state = .authenticating
+
+        Task {
+            do {
+                try await self.doSignIn()
+                try await self.populateUserInfo()
+            } catch {
+                self.state = .anonymous
+                AppData.userState.user = nil
+                Toast.showError("Failed to authenticate", subtitle: error.localizedDescription)
+            }
+        }
+    }
+
+    func doSignIn() async throws {
         let oauthState = String.random(ofLength: 16)
-        guard let authURL = URL(string: "https://auth1-sandbox.circle.ms/OAuth2/?response_type=code&client_id=cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C&scope=circle_read%20favorite_read%20favorite_write%20user_info&state=\(oauthState)") else {
-            Toast.showError("Failed to authenticate", subtitle: "Invalid auth URL")
-            return
+        guard let authURL = URL(string: "\(CirclemsAPI.authBaseURL)/OAuth2/?response_type=code&client_id=cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C&scope=circle_read%20favorite_read%20favorite_write%20user_info&state=\(oauthState)") else {
+            preconditionFailure("Failed to construct auth URL")
         }
         let scheme = "cominavi"
 
-        let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { responseURL, error in
-            // Handle the callback.
-            guard error == nil else {
-                // see if it is a user cancelled error
-                if (error! as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
-                    self.state = .anonymous
+        return try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { responseURL, error in
+                if let error = error {
+                    // see if it is a user cancelled error
+                    if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                        return
+                    }
+                    return continuation.resume(throwing: error)
+                }
+                guard let url = responseURL else {
+                    continuation.resume(throwing: URLError(.badURL))
                     return
                 }
-                Toast.showError("Failed to authenticate", subtitle: error?.localizedDescription)
-                return
-            }
-            guard let url = responseURL else {
-                Toast.showError("Failed to authenticate", subtitle: "No response URL")
-                return
-            }
-            guard let accessToken = url.queryValue(for: "access_token") else { return }
-            guard oauthState == url.queryValue(for: "state") else { return }
-            AppData.user.accessToken = accessToken
-        }
+                guard let status = url.queryValue(for: "status"), status == "succeeded" else {
+                    let errorCode = url.queryValue(for: "error") ?? "unknown"
+                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to authenticate: \(errorCode)"]))
+                }
+                guard oauthState == url.queryValue(for: "state") else {
+                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "OAuth state mismatch"]))
+                }
+                guard let tokenType = url.queryValue(for: "token_type"), tokenType == "Bearer" else {
+                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported token type"]))
+                }
+                guard let accessToken = url.queryValue(for: "access_token") else {
+                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to get access_token from redirected URL"]))
+                }
+                guard let refreshToken = url.queryValue(for: "refresh_token") else {
+                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to get refresh_token from redirected URL"]))
+                }
+                guard let expiresInSecondsStr = url.queryValue(for: "expires_in"), let expiresInSeconds = Int(expiresInSecondsStr) else {
+                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to get expires_in from redirected URL"]))
+                }
 
-        session.presentationContextProvider = self
-        session.start()
+                AppData.userState.user = User(
+                    accessToken: accessToken,
+                    accessTokenExpiresAt: Date().addingTimeInterval(TimeInterval(expiresInSeconds)),
+                    refreshToken: refreshToken)
+
+                return continuation.resume()
+            }
+
+            session.presentationContextProvider = self
+            session.start()
+        }
+    }
+
+    func populateUserInfo() async throws {
+        let userInfo = try await CirclemsAPI.getUserInfo()
+        AppData.user?.userId = userInfo.response.id
+        AppData.user?.nickname = userInfo.response.name
+        AppData.user?.preferenceR18Enabled = userInfo.response.r18 == 1 ? true : false
     }
 }
 
