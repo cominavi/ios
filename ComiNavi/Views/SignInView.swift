@@ -111,7 +111,6 @@ struct SignInView: View {
                     .scaledToFit()
                     .frame(width: 100, height: 100)
                     .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .shadow(color: .primary.opacity(0.15), radius: 5, y: 2)
                     .padding(.bottom, 16)
 
                 Text("Welcome to")

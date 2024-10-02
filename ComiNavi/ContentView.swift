@@ -25,8 +25,8 @@ struct ContentView: View {
             
             case .downloading(progresses: let progresses):
                 VStack(spacing: 8) {
-                    ProgressView(value: progresses.fractionCompleted, total: 1.0)
-                        .tint(.accentColor)
+                    DownloadProgressView(progresses: progresses)
+                        .padding(.horizontal)
                     
                     Text("Downloading databases, this may take a while...")
                         .foregroundStyle(.secondary)
@@ -65,7 +65,7 @@ struct ContentView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "xmark.octagon.fill")
                         .resizable()
-                        .frame(width: 32, height: 32)
+                        .frame(width: 32)
                         .foregroundStyle(.red)
                     
                     Text("Error: \(error)")

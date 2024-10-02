@@ -5,6 +5,7 @@
 //  Created by Galvin Gao on 9/13/24.
 //
 
+import Alamofire
 import Foundation
 import GRDB
 import Gzip
@@ -39,31 +40,6 @@ extension Readiness.Progresses {
     
     var fractionCompleted: Double {
         return Double(completedBytes) / Double(totalBytes)
-    }
-    
-    // "(completedProgresses) / (totalProgresses)"
-    var summary: String {
-        let completedProgresses = self.filter { $0.completedBytes == $0.totalBytes }.count
-        let totalProgresses = self.count
-        return "\(completedProgresses) / \(totalProgresses)"
-    }
-}
-
-class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
-    var progressHandler: ((Int64, Int64) -> Void)?
-    
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        print(#function)
-    }
-    
-    func urlSession(_ session: URLSession,
-                    downloadTask: URLSessionDownloadTask,
-                    didWriteData bytesWritten: Int64,
-                    totalBytesWritten: Int64,
-                    totalBytesExpectedToWrite: Int64)
-    {
-        print("Downloaded \(totalBytesWritten) / \(totalBytesExpectedToWrite) bytes")
-        progressHandler?(totalBytesWritten, totalBytesExpectedToWrite)
     }
 }
 
@@ -260,25 +236,35 @@ class CirclemsDataSource: ObservableObject {
     private func downloadDatabase(metadata: CirclemsDataSourceDatabaseMetadata, progressHandler: ((Int64, Int64) -> Void)? = nil) async throws {
         let url = URL(string: metadata.remoteUrl)!
         
-        let delegate = DownloadDelegate()
-        delegate.progressHandler = progressHandler
-        
         print("Downloading database from \(url) to \(metadata.localGzippedPath)...")
         
-        let (downloadedURL, _) = try await URLSession.shared.download(from: url, delegate: delegate)
+        let destination: DownloadRequest.Destination = { _, _ in
+            (URL(string: metadata.localGzippedPath)!, [.removePreviousFile])
+        }
         
-        do {
-            if FileManager.default.fileExists(atPath: metadata.localGzippedPath) {
-                try FileManager.default.removeItem(at: URL(fileURLWithPath: metadata.localGzippedPath))
-            }
-            try FileManager.default.moveItem(at: downloadedURL, to: URL(fileURLWithPath: metadata.localGzippedPath))
-            
-            // Decompress the file
-            let data = try Data(contentsOf: URL(fileURLWithPath: metadata.localGzippedPath)).gunzipped()
-            try data.write(to: URL(fileURLWithPath: metadata.localPath))
-        } catch {
-            NSLog("Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)")
-            throw NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)"])
+        return try await withCheckedThrowingContinuation { continuation in
+            AF.download(url)
+                .downloadProgress { progress in
+                    progressHandler?(progress.completedUnitCount, progress.totalUnitCount)
+                }
+                .validate()
+                .responseData { response in
+                    do {
+                        if FileManager.default.fileExists(atPath: metadata.localGzippedPath) {
+                            try FileManager.default.removeItem(at: URL(fileURLWithPath: metadata.localGzippedPath))
+                        }
+                        guard let data = try? response.result.get() else {
+                            throw NSError(domain: "CirclemsDataSource", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to download database from \(metadata.remoteUrl)"])
+                        }
+                        
+                        // Decompress the file
+                        try data.gunzipped().write(to: URL(fileURLWithPath: metadata.localPath))
+                        continuation.resume()
+                    } catch {
+                        NSLog("Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)")
+                        continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)"]))
+                    }
+                }
         }
     }
     
