@@ -107,15 +107,12 @@ struct SignInView: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            Spacer()
-
             VStack(alignment: .leading, spacing: 0) {
-                Image(.logo)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 100, height: 100)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .padding(.bottom, 16)
+                LogoShape()
+                    .frame(width: 52, height: 52)
+                    .padding(.leading, 2)
+
+                Spacer()
 
                 Text("Welcome to")
                     .font(.title2)
@@ -128,16 +125,17 @@ struct SignInView: View {
                         .bold()
                         +
                         Text("!")
+                        .font(.largeTitle)
                         .foregroundColor(.primary)
                         .bold()
                 }
                 .font(.title)
                 .foregroundStyle(.accent)
+
+                Spacer()
             }
             .padding(.top, 8)
             .padding(.horizontal, 16)
-
-            Spacer()
 
             Button {
                 self.vm.signIn()
