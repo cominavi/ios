@@ -39,7 +39,7 @@ struct EntryView: View {
                 VStack(spacing: 8) {
                     ProgressView()
 
-                    Text("Fetching metadata...")
+                    Text("Checking updates...")
                         .foregroundStyle(.secondary)
                 }
                 .onAppear {

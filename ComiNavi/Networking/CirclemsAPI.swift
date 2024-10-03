@@ -11,12 +11,13 @@ import Foundation
 extension DataRequest {
     func debugValidate() -> Self {
         return self
-            .cURLDescription(calling: { print("[REQ]\n\n", $0) })
-            .validate { _, response, data in
-                print("[RESP HEAD]\n\n", response.statusCode, response.headers)
-                print("[RESP DATA]\n\n", String(data: data!, encoding: .utf8)!)
-                return .success(())
-            }
+            .validate()
+//            .cURLDescription(calling: { print("[REQ]\n\n", $0) })
+//            .validate { _, response, data in
+//                print("[RESP HEAD]\n\n", response.statusCode, response.headers)
+//                print("[RESP DATA]\n\n", String(data: data!, encoding: .utf8)!)
+//                return .success(())
+//            }
     }
 }
 

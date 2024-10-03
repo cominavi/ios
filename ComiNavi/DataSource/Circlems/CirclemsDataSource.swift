@@ -90,12 +90,6 @@ struct CirclemsDataSourceDatabaseMetadata: Equatable {
     var localPath: String
 }
 
-extension CirclemsDataSourceDatabaseMetadata {
-    var localGzippedPath: String {
-        return localPath + ".gz"
-    }
-}
-
 struct CirclemsDataSourceDatabases {
     let main: CirclemsDataSourceDatabaseMetadata
     let image: CirclemsDataSourceDatabaseMetadata
@@ -223,10 +217,12 @@ class CirclemsDataSource: ObservableObject {
     }
     
     private func shouldSkipDatabaseDownload(metadata: CirclemsDataSourceDatabaseMetadata) -> Bool {
+        print(metadata.localPath, "is exist?", FileManager.default.fileExists(atPath: metadata.localPath))
+        print(metadata.localPath, "md5 check", UserDefaults.standard.string(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(metadata.localPath)")?.lowercased(), metadata.digest.lowercased())
         if CirclemsDataSource.SHOULD_CHECK_DATABASE_EXISTS,
-           FileManager.default.fileExists(atPath: metadata.localGzippedPath),
-           let localDataDigest = URL(fileURLWithPath: metadata.localGzippedPath).md5Digest(),
-           localDataDigest.hexEncodedString() == metadata.digest.lowercased()
+           FileManager.default.fileExists(atPath: metadata.localPath),
+           let localDataDigest = UserDefaults.standard.string(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(metadata.localPath)"),
+           localDataDigest.lowercased() == metadata.digest.lowercased()
         {
             return true
         }
@@ -236,11 +232,7 @@ class CirclemsDataSource: ObservableObject {
     private func downloadDatabase(metadata: CirclemsDataSourceDatabaseMetadata, progressHandler: ((Int64, Int64) -> Void)? = nil) async throws {
         let url = URL(string: metadata.remoteUrl)!
         
-        print("Downloading database from \(url) to \(metadata.localGzippedPath)...")
-        
-        let destination: DownloadRequest.Destination = { _, _ in
-            (URL(string: metadata.localGzippedPath)!, [.removePreviousFile])
-        }
+        print("Downloading database from \(url) to \(metadata.localPath)...")
         
         return try await withCheckedThrowingContinuation { continuation in
             AF.download(url)
@@ -250,19 +242,17 @@ class CirclemsDataSource: ObservableObject {
                 .validate()
                 .responseData { response in
                     do {
-                        if FileManager.default.fileExists(atPath: metadata.localGzippedPath) {
-                            try FileManager.default.removeItem(at: URL(fileURLWithPath: metadata.localGzippedPath))
-                        }
                         guard let data = try? response.result.get() else {
                             throw NSError(domain: "CirclemsDataSource", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to download database from \(metadata.remoteUrl)"])
                         }
                         
                         // Decompress the file
                         try data.gunzipped().write(to: URL(fileURLWithPath: metadata.localPath))
+                        // Mark the file as downloaded
+                        UserDefaults.standard.set(metadata.digest, forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(metadata.localPath)")
                         continuation.resume()
                     } catch {
-                        NSLog("Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)")
-                        continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to move downloaded file to \(metadata.localGzippedPath): \(error.localizedDescription)"]))
+                        continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to download database from \(metadata.remoteUrl): \(error)"]))
                     }
                 }
         }

@@ -59,6 +59,13 @@ struct ContentView: View {
                     .tabItem {
                         Label("Map", systemImage: "map")
                     }
+                    
+                    NavigationView {
+                        ProfileScreen()
+                    }
+                    .tabItem {
+                        Label("Profile", systemImage: "person.circle")
+                    }
                 }
                 
             case .error(let error):

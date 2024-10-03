@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "ja",
   "strings" : {
+    "!" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "!"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "へ！"
+          }
+        }
+      }
+    },
     "%@ / %@" : {
       "localizations" : {
         "ja" : {
@@ -27,13 +43,22 @@
         }
       }
     },
+    "Account" : {
+
+    },
     "Actions" : {
       "comment" : "Gallery Preview Action Title",
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Actions"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクション"
           }
         }
       }
@@ -71,18 +96,34 @@
         }
       }
     },
-    "ComiNavi!" : {
+    "Checking updates..." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "needs_review",
+            "value" : "Checking updates…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデートをチェックしています..."
+          }
+        }
+      }
+    },
+    "ComiNavi" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
             "value" : "ComiNavi"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ComiNavi"
+            "value" : "コミナビ"
           }
         }
       }
@@ -135,22 +176,6 @@
         }
       }
     },
-    "Fetching metadata..." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fetching metadata…"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "メタデータを取得しています..."
-          }
-        }
-      }
-    },
     "Gallery" : {
       "comment" : "Gallery",
       "localizations" : {
@@ -199,6 +224,15 @@
           }
         }
       }
+    },
+    "Log In" : {
+
+    },
+    "Log Out" : {
+
+    },
+    "Logged in as" : {
+
     },
     "Login via circle.ms" : {
       "localizations" : {
@@ -264,6 +298,9 @@
         }
       }
     },
+    "Profile" : {
+
+    },
     "Search..." : {
       "comment" : "Search",
       "localizations" : {
@@ -297,6 +334,9 @@
           }
         }
       }
+    },
+    "Tap to log in" : {
+
     },
     "Twitter Timeline" : {
       "localizations" : {

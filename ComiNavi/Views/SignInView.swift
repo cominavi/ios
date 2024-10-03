@@ -32,6 +32,11 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
             } catch {
                 self.state = .anonymous
                 AppData.userState.user = nil
+                // see if it is a user cancelled error
+                if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                    return
+                }
+
                 Toast.showError("Failed to authenticate", subtitle: error.localizedDescription)
             }
         }
@@ -47,10 +52,6 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
         return try await withCheckedThrowingContinuation { continuation in
             let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: scheme) { responseURL, error in
                 if let error = error {
-                    // see if it is a user cancelled error
-                    if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
-                        return
-                    }
                     return continuation.resume(throwing: error)
                 }
                 guard let url = responseURL else {
@@ -100,7 +101,7 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
 }
 
 struct SignInView: View {
-    @ObservedObject var vm = SignInViewModel()
+    @StateObject var vm = SignInViewModel()
 
     @State var animationTrigger = false
 
@@ -120,10 +121,18 @@ struct SignInView: View {
                     .font(.title2)
                     .foregroundStyle(.primary)
 
-                Text("ComiNavi!")
-                    .bold()
-                    .font(.title)
-                    .foregroundStyle(.accent)
+                Group {
+                    Text("ComiNavi")
+                        .font(.largeTitle)
+                        .foregroundColor(.accentColor)
+                        .bold()
+                        +
+                        Text("!")
+                        .foregroundColor(.primary)
+                        .bold()
+                }
+                .font(.title)
+                .foregroundStyle(.accent)
             }
             .padding(.top, 8)
             .padding(.horizontal, 16)
@@ -189,4 +198,5 @@ struct SignInView: View {
 
 #Preview {
     SignInView()
+        .environment(\.locale, .init(identifier: "ja"))
 }
