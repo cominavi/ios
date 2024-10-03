@@ -17,12 +17,19 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         SentrySDK.start { options in
             options.dsn = "https://36a7d7a2a5e4f350eef0142c1ec297e0@o4508052459225088.ingest.us.sentry.io/4508052462305280"
             options.tracesSampleRate = 0.5 // Sample 50% of transactions
+            #if DEBUG
+            options.enabled = false
+            #else
+            options.enabled = true
+            #endif
         }
 
+        #if !DEBUG
         PostHogSDK.shared.setup(
             PostHogConfig(
                 apiKey: "phc_fj1m73n4ngugOVGfueEqVvXaVhGUP0D8e0ZvR4w00Tr",
                 host: "https://us.i.posthog.com"))
+        #endif
 
         return true
     }
