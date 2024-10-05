@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import PostHog
+import Sentry
 
 enum AppData {
     // CirclemsDataSource shall be initialized by EntryView
@@ -35,6 +37,22 @@ class UserState: ObservableObject {
     @Published var user = AppData.user {
         didSet {
             AppData.user = user
+
+            if let user = user, let userId = user.userId, let nickname = user.nickname {
+                SentrySDK.configureScope { scope in
+                    let sentryUser = Sentry.User(userId: userId.string)
+                    sentryUser.name = nickname
+                    scope.setUser(sentryUser)
+                }
+
+                PostHogSDK.shared.identify(userId.string, userProperties: ["name": nickname, "r18": user.preferenceR18Enabled as Any])
+            } else {
+                SentrySDK.configureScope { scope in
+                    scope.setUser(nil)
+                }
+
+                PostHogSDK.shared.reset()
+            }
         }
     }
 

@@ -14,6 +14,7 @@ struct EntryView: View {
     @State var loadedMetadata = false
 
     func loadMetadata() async throws {
+        // FIXME: hardcoded eventId
         let response = try await CirclemsAPI.getCatalogBase(eventId: 190)
 
         AppData.circlems = CirclemsDataSource(
@@ -24,6 +25,7 @@ struct EntryView: View {
                 image: .init(
                     digest: response.response.md5.imagedb1UrlSsl,
                     remoteUrl: response.response.url.imagedb1UrlSsl)),
+            // FIXME: hardcoded comiketId
             comiketId: "104")
 
         loadedMetadata = true
@@ -31,6 +33,7 @@ struct EntryView: View {
 
     var body: some View {
         Group {
+            // TODO: this is to make sure we request the user info and catalog base API data sequentially, but it really shouldn't be done this way.
             if userState.user?.userId == nil {
                 SignInView()
             } else if loadedMetadata {

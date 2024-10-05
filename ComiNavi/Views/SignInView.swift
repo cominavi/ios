@@ -105,6 +105,13 @@ struct SignInView: View {
 
     @State var animationTrigger = false
 
+    // window corner-to-corner
+    var rotationAngle: Angle {
+        let screenSize = UIScreen.main.bounds.size
+        let diagonal = sqrt(pow(screenSize.width, 2) + pow(screenSize.height, 2))
+        return .radians(.pi / 2 + atan(screenSize.height / screenSize.width))
+    }
+
     var body: some View {
         VStack(alignment: .leading) {
             VStack(alignment: .leading, spacing: 0) {
@@ -165,28 +172,32 @@ struct SignInView: View {
         }
         .padding()
         .background(
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .top, spacing: 40) {
                 ForEach(0 ..< 8) { colIdx in
                     VStack(spacing: 8) {
                         ForEach(0 ..< 8) { _ in
                             Rectangle()
-                                .strokeBorder(.gray.opacity(0.25), lineWidth: 1)
-                                .frame(width: 90, height: 180)
+                                .strokeBorder(.gray.opacity(0.15), lineWidth: 1)
+                                .frame(width: 45, height: 180)
                         }
                     }
-                    .padding(.top, colIdx % 2 == 0 ? 0 : (180 + 8) / 2)
+                    .padding(.leading, colIdx % 2 == 0 ? 0 : 90)
+                    .offset(
+                        y:
+                        animationTrigger
+                            ? 0
+                            : (180 + 8))
                 }
             }
             .ignoresSafeArea()
             // move it along y axis from 0 to 180 indefinitely
             .animation(
-                Animation.linear(duration: 40)
-                    .repeatForever(autoreverses: false)
+                .linear(duration: 40).repeatForever(autoreverses: false),
+                value: animationTrigger
             )
-            .offset(y: animationTrigger ? 0 : -((180 + 8) * 2))
-            .rotationEffect(.degrees(-30))
+            .rotationEffect(rotationAngle)
             .allowsHitTesting(false)
-//                .scaleEffect(0.5)
+//            .scaleEffect(0.5)
             .onAppear {
                 self.animationTrigger.toggle()
             }

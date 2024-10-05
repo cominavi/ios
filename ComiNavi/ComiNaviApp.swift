@@ -27,7 +27,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         #if !DEBUG
         PostHogSDK.shared.setup(
             PostHogConfig(
-                apiKey: "phc_fj1m73n4ngugOVGfueEqVvXaVhGUP0D8e0ZvR4w00Tr",
+                apiKey: "phc_RFEZavxHTrPF8x3frBKZvO6rLNId8DEwq3y6YykY9uc",
                 host: "https://us.i.posthog.com"))
         #endif
 
