@@ -45,7 +45,10 @@ class UserState: ObservableObject {
                     scope.setUser(sentryUser)
                 }
 
-                PostHogSDK.shared.identify(userId.string, userProperties: ["name": nickname, "r18": user.preferenceR18Enabled as Any])
+                PostHogSDK.shared.identify(userId.string, userProperties: [
+                    "name": nickname,
+                    "circlems_preferences_r18enabled": user.preferenceR18Enabled as Any
+                ])
             } else {
                 SentrySDK.configureScope { scope in
                     scope.setUser(nil)

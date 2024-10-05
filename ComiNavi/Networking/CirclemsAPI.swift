@@ -139,8 +139,8 @@ enum CirclemsAPI {
 
     struct UserInfoResponseData: Decodable {
         let pid: Int
-        let nickname: String
         let r18: Int
+        let nickname: String
     }
     
     typealias BookQueryResponse = Response<BookQueryResponseData>
