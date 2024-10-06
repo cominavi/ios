@@ -25,11 +25,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
 
         #if !DEBUG
-        PostHogSDK.shared.setup(
-            PostHogConfig(
-                apiKey: "phc_RFEZavxHTrPF8x3frBKZvO6rLNId8DEwq3y6YykY9uc",
-                host: "https://us.i.posthog.com"))
+        var posthogConfig = PostHogConfig(
+            apiKey: "phc_RFEZavxHTrPF8x3frBKZvO6rLNId8DEwq3y6YykY9uc",
+            host: "https://us.i.posthog.com")
+        PostHogSDK.shared.setup(posthogConfig)
         #endif
+
+        AppTrack.user(AppData.userState.user)
 
         return true
     }
