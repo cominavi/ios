@@ -98,12 +98,13 @@ struct CirclemsDataSourceDatabases {
 class CirclemsDataSource: ObservableObject {
     static let SHOULD_CHECK_DATABASE_EXISTS = true
     
-    private let databases: CirclemsDataSourceDatabases?
+    private let databases: CirclemsDataSourceDatabases
     
     private var sqliteMain: DatabasePool!
     private var sqliteImage: DatabasePool!
     
     public var comiket: Comiket!
+    public var comiketId: String
     
     @Published var readiness: Readiness = .uninitialized
     
@@ -115,7 +116,7 @@ class CirclemsDataSource: ObservableObject {
                 type: .main,
                 digest: params.main.digest,
                 remoteUrl: params.main.remoteUrl,
-                localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases)
+                localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases, createIfNeeded: true)
                     .appendingPathComponent("main.sqlite")
                     .path
             ),
@@ -123,11 +124,12 @@ class CirclemsDataSource: ObservableObject {
                 type: .image,
                 digest: params.image.digest,
                 remoteUrl: params.image.remoteUrl,
-                localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases)
+                localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases, createIfNeeded: true)
                     .appendingPathComponent("image.sqlite")
                     .path
             )
         )
+        self.comiketId = comiketId
         
         self.prepare()
     }
@@ -174,11 +176,7 @@ class CirclemsDataSource: ObservableObject {
     }
     
     private func downloadDatabases() async throws {
-        guard let databases = self.databases else {
-            throw NSError(domain: "CirclemsDataSource", code: 1, userInfo: [NSLocalizedDescriptionKey: "No databases to download"])
-        }
-        
-        let allDatabases = [databases.main, databases.image]
+        let allDatabases = [self.databases.main, self.databases.image]
         var databasesToDownload: [CirclemsDataSourceDatabaseMetadata] = []
 
         for database in allDatabases {
@@ -217,11 +215,9 @@ class CirclemsDataSource: ObservableObject {
     }
     
     private func shouldSkipDatabaseDownload(metadata: CirclemsDataSourceDatabaseMetadata) -> Bool {
-        print(metadata.localPath, "is exist?", FileManager.default.fileExists(atPath: metadata.localPath))
-        print(metadata.localPath, "md5 check", UserDefaults.standard.string(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(metadata.localPath)")?.lowercased(), metadata.digest.lowercased())
         if CirclemsDataSource.SHOULD_CHECK_DATABASE_EXISTS,
            FileManager.default.fileExists(atPath: metadata.localPath),
-           let localDataDigest = UserDefaults.standard.string(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(metadata.localPath)"),
+           let localDataDigest = UserDefaults.standard.string(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(comiketId)-\(metadata.type)"),
            localDataDigest.lowercased() == metadata.digest.lowercased()
         {
             return true
@@ -249,7 +245,7 @@ class CirclemsDataSource: ObservableObject {
                         // Decompress the file
                         try data.gunzipped().write(to: URL(fileURLWithPath: metadata.localPath))
                         // Mark the file as downloaded
-                        UserDefaults.standard.set(metadata.digest, forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(metadata.localPath)")
+                        UserDefaults.standard.set(metadata.digest, forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(self.comiketId)-\(metadata.type)")
                         continuation.resume()
                     } catch {
                         continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to download database from \(metadata.remoteUrl): \(error)"]))
@@ -262,10 +258,6 @@ class CirclemsDataSource: ObservableObject {
         // Initialize the SQLite databases
         var configuration = Configuration()
         configuration.readonly = true
-        
-        guard let databases = databases else {
-            throw NSError(domain: "CirclemsDataSource", code: 1, userInfo: [NSLocalizedDescriptionKey: "No databases to initialize"])
-        }
         
         NSLog("Initializing databases at \(databases.main.localPath) and \(databases.image.localPath)...")
         sqliteMain = try DatabasePool(path: databases.main.localPath, configuration: configuration)
@@ -387,14 +379,18 @@ class CirclemsDataSource: ObservableObject {
     }
     
     private func extractAndCacheCircleImages() async throws {
-        if UserDefaults.standard.bool(forKey: "CirclemsDataSource.extractAndCacheCircleImages") {
+        if UserDefaults.standard.bool(forKey: "CirclemsDataSource.extractedAndCachedCircleImages.databaseDigest.\(self.databases.image.digest).extracted") {
             return
         }
         
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInteractive).async {
                 do {
-                    UserDefaults.standard.set(true, forKey: "CirclemsDataSource.extractAndCacheCircleImages")
+                    try FileManager.default.createDirectory(
+                        at: DirectoryManager.shared.cachesFor(comiketId: self.comiketId, .circlems, .images)
+                            .appendingPathComponent("circles"),
+                        withIntermediateDirectories: true, attributes: nil
+                    )
                     
                     try self.sqliteImage.read { db in
                         let circleImages = try CirclemsImageSchema.ComiketCircleImage.fetchAll(db)
@@ -402,11 +398,11 @@ class CirclemsDataSource: ObservableObject {
                         for (i, image) in circleImages.enumerated() {
                             guard let data = image.cutImage else { continue }
                             
-                            let url = DirectoryManager.shared.cachesFor(comiketId: image.comiketNo.string, .circlems, .images, createIfNeeded: true)
+                            let url = DirectoryManager.shared.cachesFor(comiketId: self.comiketId, .circlems, .images)
                                 .appendingPathComponent("circles")
                                 .appendingPathComponent("\(image.id).png")
                             
-                            try url.writeIfNotExists(data)
+                            try data.write(to: url)
                             
                             // random 5% possibility
                             if Int.random(in: 0 ..< 20) == 0 {
@@ -416,6 +412,8 @@ class CirclemsDataSource: ObservableObject {
                                 }
                             }
                         }
+                        
+                        UserDefaults.standard.set(true, forKey: "CirclemsDataSource.extractedAndCachedCircleImages.databaseDigest.\(self.databases.image.digest).extracted")
                         
                         continuation.resume()
                     }
@@ -506,7 +504,7 @@ class CirclemsDataSource: ObservableObject {
         
         do {
             let image = try await self.sqliteImage.read { db in
-                try CirclemsImageSchema.ComiketCircleImage.fetchOne(db, sql: "SELECT * FROM ComiketCircleImage WHERE comiketNo = ? AND id = ?", arguments: [self.comiket.number, circleId])
+                try CirclemsImageSchema.ComiketCircleImage.fetchOne(db, sql: "SELECT * FROM ComiketCircleImage WHERE comiketNo = ? AND id = ?", arguments: [self.comiketId, circleId])
             }
             
             return image?.cutImage
@@ -518,7 +516,7 @@ class CirclemsDataSource: ObservableObject {
     func getCommonImage(name: String) async -> CirclemsImageSchema.ComiketCommonImage? {
         do {
             let image = try await self.sqliteImage.read { db in
-                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [self.comiket.number, name])
+                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [self.comiketId, name])
             }
             
             return image
@@ -532,12 +530,21 @@ class CirclemsDataSource: ObservableObject {
         
         do {
             let image = try await self.sqliteImage.read { db in
-                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [self.comiket.number, name])
+                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [self.comiketId, name])
             }
             
             return image
         } catch {
             return nil
         }
+    }
+    
+    func cleanAllCaches() {
+        let url = DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .images)
+        try? FileManager.default.removeItem(at: url)
+        
+        UserDefaults.standard.removeObject(forKey: "CirclemsDataSource.extractedAndCachedCircleImages.databaseDigest.\(self.databases.image.digest).extracted")
+        UserDefaults.standard.removeObject(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(comiketId)-\(self.databases.main.type)")
+        UserDefaults.standard.removeObject(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(comiketId)-\(self.databases.image.type)")
     }
 }

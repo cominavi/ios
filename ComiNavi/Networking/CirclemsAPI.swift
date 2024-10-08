@@ -22,8 +22,8 @@ extension DataRequest {
 }
 
 enum CirclemsAPI {
-    public static let baseURL = "https://api1-sandbox.circle.ms"
-    public static let authBaseURL = "https://auth1-sandbox.circle.ms"
+    public static let baseURL = "https://api1.circle.ms"
+    public static let authBaseURL = "https://auth1.circle.ms"
     
     private struct APIError: Error, Decodable {
         let message: String

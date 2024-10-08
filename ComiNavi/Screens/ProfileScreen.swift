@@ -35,8 +35,12 @@ struct ProfileScreen: View {
 
             Section("Account") {
                 Button {
-                    withAnimation(.bouncy) {
+                    withAnimation {
                         userState.user = nil
+
+                        DispatchQueue.global(qos: .background).async {
+                            AppData.circlems.cleanAllCaches()
+                        }
                     }
                 } label: {
                     HStack {

@@ -115,7 +115,6 @@ struct SignInView: View {
     // window corner-to-corner
     var rotationAngle: Angle {
         let screenSize = UIScreen.main.bounds.size
-        let diagonal = sqrt(pow(screenSize.width, 2) + pow(screenSize.height, 2))
         return .radians(.pi / 2 + atan(screenSize.height / screenSize.width))
     }
 

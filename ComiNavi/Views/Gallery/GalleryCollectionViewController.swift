@@ -389,8 +389,7 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
             return .zero
         }
 
-        // FIXME: -0.1: hack
-        return unifiedCircles.trailingItemMergable ? CGSize(width: width * 2, height: height) : CGSize(width: width, height: height)
+        return unifiedCircles.trailingItemMergable ? CGSize(width: width * 2 - 0.01 * 2, height: height) : CGSize(width: width - 0.01, height: height)
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {

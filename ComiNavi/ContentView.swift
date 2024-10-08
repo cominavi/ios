@@ -72,7 +72,8 @@ struct ContentView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "xmark.octagon.fill")
                         .resizable()
-                        .frame(width: 32)
+                        .scaledToFit()
+                        .frame(width: 32, height: 32)
                         .foregroundStyle(.red)
                     
                     Text("Error: \(error)")
