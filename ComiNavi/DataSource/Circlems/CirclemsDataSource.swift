@@ -441,8 +441,8 @@ class CirclemsDataSource: ObservableObject {
             let penName = circle.penName ?? ""
             let circleName = circle.circleName ?? ""
             let description = circle.description ?? ""
-            
-            return keywords.allSatisfy { keyword in
+                
+            return keywords.any { keyword in
                 penName.contains(keyword) || circleName.contains(keyword) || description.contains(keyword)
             }
         }

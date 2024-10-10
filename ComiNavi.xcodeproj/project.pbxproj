@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		5625CF33AB7F4CF89953B2B5 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = CC3C71F91CD14381A99FD361 /* Sentry */; };
+		B5600A3D2CB775E200AD1074 /* DebugSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B5600A3C2CB775E200AD1074 /* DebugSwift */; };
 		B56209972CACFBC40017847D /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = B56209962CACFBC40017847D /* Alamofire */; };
 		B56526C92C976DD800C01713 /* Toast in Frameworks */ = {isa = PBXBuildFile; productRef = B56526C82C976DD800C01713 /* Toast */; };
 		B59B24852CAD36FF009FDFAE /* Gzip in Frameworks */ = {isa = PBXBuildFile; productRef = B59B24842CAD36FF009FDFAE /* Gzip */; };
@@ -65,6 +66,7 @@
 				B59B24852CAD36FF009FDFAE /* Gzip in Frameworks */,
 				B59B24DE2CAD4D78009FDFAE /* PostHog in Frameworks */,
 				B5C828582C9B47CC00986069 /* IGListKit in Frameworks */,
+				B5600A3D2CB775E200AD1074 /* DebugSwift in Frameworks */,
 				B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */,
 				B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */,
 				5625CF33AB7F4CF89953B2B5 /* Sentry in Frameworks */,
@@ -128,6 +130,7 @@
 				B59B24842CAD36FF009FDFAE /* Gzip */,
 				CC3C71F91CD14381A99FD361 /* Sentry */,
 				B59B24DD2CAD4D78009FDFAE /* PostHog */,
+				B5600A3C2CB775E200AD1074 /* DebugSwift */,
 			);
 			productName = ComiNavi;
 			productReference = B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */;
@@ -167,6 +170,7 @@
 				B59B24832CAD36FF009FDFAE /* XCRemoteSwiftPackageReference "GzipSwift" */,
 				A4022B3FC5F444AF831FA16C /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 				B59B24DC2CAD4D78009FDFAE /* XCRemoteSwiftPackageReference "posthog-ios" */,
+				B5600A3B2CB775E200AD1074 /* XCRemoteSwiftPackageReference "DebugSwift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B5E9AEB42C9333CD00742CE8 /* Products */;
@@ -444,6 +448,14 @@
 				minimumVersion = 8.0.0;
 			};
 		};
+		B5600A3B2CB775E200AD1074 /* XCRemoteSwiftPackageReference "DebugSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/DebugSwift/DebugSwift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.3.6;
+			};
+		};
 		B56209952CACFBC40017847D /* XCRemoteSwiftPackageReference "Alamofire" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Alamofire/Alamofire.git";
@@ -503,6 +515,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		B5600A3C2CB775E200AD1074 /* DebugSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B5600A3B2CB775E200AD1074 /* XCRemoteSwiftPackageReference "DebugSwift" */;
+			productName = DebugSwift;
+		};
 		B56209962CACFBC40017847D /* Alamofire */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B56209952CACFBC40017847D /* XCRemoteSwiftPackageReference "Alamofire" */;

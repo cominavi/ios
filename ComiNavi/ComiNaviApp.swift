@@ -5,6 +5,7 @@
 //  Created by Galvin Gao on 9/12/24.
 //
 
+import DebugSwift
 import PostHog
 import Sentry
 import SwiftData
@@ -29,6 +30,11 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             apiKey: "phc_RFEZavxHTrPF8x3frBKZvO6rLNId8DEwq3y6YykY9uc",
             host: "https://us.i.posthog.com")
         PostHogSDK.shared.setup(posthogConfig)
+        #endif
+
+        #if DEBUG
+        DebugSwift.setup()
+        DebugSwift.show()
         #endif
 
         AppTrack.user(AppData.userState.user)
