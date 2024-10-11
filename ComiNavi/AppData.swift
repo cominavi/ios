@@ -36,7 +36,7 @@ enum AppData {
             )
             return newTokenResponse.accessToken
         }
-        // TODO: refresh user token before returning the header if it has already expired.
+
         return AppData.userState.user?.accessToken ?? ""
     }
 }
