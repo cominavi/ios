@@ -12,6 +12,7 @@ extension Int64 {
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB, .useKB, .useBytes]
         formatter.countStyle = .file
+        formatter.zeroPadsFractionDigits = true
         return formatter.string(fromByteCount: self)
     }
 }
@@ -20,10 +21,11 @@ extension Double {
     var byteSizeString: String {
         return Int64(self).byteSizeString
     }
-    
+
     func percentString(decimalPlaces: Int = 1) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .percent
+        formatter.minimumFractionDigits = decimalPlaces
         formatter.maximumFractionDigits = decimalPlaces
         return formatter.string(from: NSNumber(value: self))!
     }

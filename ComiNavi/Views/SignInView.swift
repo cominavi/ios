@@ -109,105 +109,103 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
 
 struct SignInView: View {
     @StateObject var vm = SignInViewModel()
+    @State var screenSize = UIScreen.main.bounds.size
 
     @State var animationTrigger = false
 
-    // window corner-to-corner
-    var rotationAngle: Angle {
-        let screenSize = UIScreen.main.bounds.size
-        return .radians(.pi / 2 + atan(screenSize.height / screenSize.width))
-    }
-
     var body: some View {
-        VStack(alignment: .leading) {
-            VStack(alignment: .leading, spacing: 0) {
-                LogoShape()
-                    .frame(width: 52, height: 52)
-                    .padding(.leading, 2)
+        GeometryReader { proxy in
+            VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 0) {
+                    LogoShape()
+                        .frame(width: 52, height: 52)
+                        .padding(.leading, 2)
 
-                Spacer()
+                    Spacer()
 
-                Text("Welcome to")
-                    .font(.title2)
-                    .foregroundStyle(.primary)
+                    Text("Welcome to")
+                        .font(.title2)
+                        .foregroundStyle(.primary)
 
-                Group {
-                    Text("ComiNavi")
-                        .font(.largeTitle)
-                        .foregroundColor(.accentColor)
-                        .bold()
-                        +
-                        Text("!")
-                        .font(.largeTitle)
-                        .foregroundColor(.primary)
-                        .bold()
-                }
-                .font(.title)
-                .foregroundStyle(.accent)
-
-                Spacer()
-            }
-            .padding(.top, 8)
-            .padding(.horizontal, 16)
-
-            Button {
-                self.vm.signIn()
-            } label: {
-                HStack {
-                    if vm.state == .authenticating {
-                        Group {
-                            ProgressView()
-                                .tint(.white)
-
-                            Text("Authenticating...")
-                        }
-                    } else {
-                        Text("Login via circle.ms")
+                    Group {
+                        Text("ComiNavi")
+                            .font(.largeTitle)
+                            .foregroundColor(.accentColor)
+                            .bold()
+                            +
+                            Text("!")
+                            .font(.largeTitle)
+                            .foregroundColor(.primary)
                             .bold()
                     }
+                    .font(.title)
+                    .foregroundStyle(.accent)
+
+                    Spacer()
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal)
-                .flexibleFrame(.horizontal)
-                .padding(.vertical)
-                .background(vm.state == .authenticating ? .gray : .accent)
-                .cornerRadius(10)
-            }
-            .disabled(vm.state == .authenticating)
-            .opacity(vm.state == .authenticating ? 0.5 : 1)
-        }
-        .padding()
-        .background(
-            HStack(alignment: .top, spacing: 40) {
-                ForEach(0 ..< 8) { colIdx in
-                    VStack(spacing: 8) {
-                        ForEach(0 ..< 8) { _ in
-                            Rectangle()
-                                .strokeBorder(.gray.opacity(0.15), lineWidth: 1)
-                                .frame(width: 45, height: 180)
+                .padding(.top, 8)
+                .padding(.horizontal, 16)
+
+                Button {
+                    self.vm.signIn()
+                } label: {
+                    HStack {
+                        if vm.state == .authenticating {
+                            Group {
+                                ProgressView()
+                                    .tint(.white)
+
+                                Text("Authenticating...")
+                            }
+                        } else {
+                            Text("Login via circle.ms")
+                                .bold()
                         }
                     }
-                    .padding(.leading, colIdx % 2 == 0 ? 0 : 90)
-                    .offset(
-                        y:
-                        animationTrigger
-                            ? 0
-                            : (180 + 8))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal)
+                    .flexibleFrame(.horizontal)
+                    .padding(.vertical)
+                    .background(vm.state == .authenticating ? .gray : .accent)
+                    .cornerRadius(10)
                 }
+                .disabled(vm.state == .authenticating)
+                .opacity(vm.state == .authenticating ? 0.5 : 1)
             }
-            .ignoresSafeArea()
-            // move it along y axis from 0 to 180 indefinitely
-            .animation(
-                .linear(duration: 40).repeatForever(autoreverses: false),
-                value: animationTrigger
+            .padding()
+            .background(
+                HStack(alignment: .top, spacing: 40) {
+                    ForEach(0 ..< 12) { colIdx in
+                        VStack(spacing: 8) {
+                            ForEach(0 ..< 12) { _ in
+                                Rectangle()
+                                    .strokeBorder(.gray.opacity(0.15), lineWidth: 1)
+                                    .frame(width: 45, height: 180)
+                            }
+                        }
+                        .padding(.leading, colIdx % 2 == 0 ? 0 : 90)
+                        .offset(
+                            y:
+                            animationTrigger
+                                ? 0
+                                : (180 + 8))
+                    }
+                }
+                .ignoresSafeArea()
+                // move it along y axis from 0 to 180 indefinitely
+                .animation(
+                    .linear(duration: 40).repeatForever(autoreverses: false),
+                    value: animationTrigger
+                )
+                .rotationEffect(
+                    .radians(CGFloat.pi / 2 + atan(proxy.size.height / proxy.size.width))
+                )
+                .allowsHitTesting(false)
+                .onAppear {
+                    self.animationTrigger.toggle()
+                }
             )
-            .rotationEffect(rotationAngle)
-            .allowsHitTesting(false)
-//            .scaleEffect(0.5)
-            .onAppear {
-                self.animationTrigger.toggle()
-            }
-        )
+        }
     }
 }
 

@@ -24,13 +24,15 @@ struct ContentView: View {
                 }
             
             case .downloading(progresses: let progresses):
-                VStack(spacing: 8) {
+                VStack(spacing: 16) {
+                    ProgressView()
+                    
                     DownloadProgressView(progresses: progresses)
-                        .padding(.horizontal)
                     
                     Text("Downloading databases, this may take a while...")
                         .foregroundStyle(.secondary)
                 }
+                .padding(.horizontal)
                 .padding()
             
             case .initializing(let state):

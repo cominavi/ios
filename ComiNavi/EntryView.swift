@@ -36,6 +36,9 @@ struct EntryView: View {
             // TODO: this is to make sure we request the user info and catalog base API data sequentially, but it really shouldn't be done this way.
             if userState.user?.userId == nil {
                 SignInView()
+                    .onAppear {
+                        loadedMetadata = false
+                    }
             } else if loadedMetadata {
                 ContentView()
             } else {

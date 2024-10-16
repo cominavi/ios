@@ -18,6 +18,16 @@
 		B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AEDE2C942CC900742CE8 /* GRDB */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		B5B37D052CBEE5AB006C3F4A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B5E9AEAB2C9333CD00742CE8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B5E9AEB22C9333CD00742CE8;
+			remoteInfo = ComiNavi;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
 		B5B273822C9AB49800F2120A /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
@@ -32,6 +42,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		B5B37CFF2CBEE5AB006C3F4A /* ComiNaviUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ComiNaviUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ComiNavi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -46,6 +57,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		B5B37D002CBEE5AB006C3F4A /* ComiNaviUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ComiNaviUITests;
+			sourceTree = "<group>";
+		};
 		B5E9AEB52C9333CD00742CE8 /* ComiNavi */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -57,6 +73,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		B5B37CFC2CBEE5AB006C3F4A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B5E9AEB02C9333CD00742CE8 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -87,6 +110,7 @@
 			isa = PBXGroup;
 			children = (
 				B5E9AEB52C9333CD00742CE8 /* ComiNavi */,
+				B5B37D002CBEE5AB006C3F4A /* ComiNaviUITests */,
 				B5B2738D2C9ABDD900F2120A /* Frameworks */,
 				B5E9AEB42C9333CD00742CE8 /* Products */,
 			);
@@ -96,6 +120,7 @@
 			isa = PBXGroup;
 			children = (
 				B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */,
+				B5B37CFF2CBEE5AB006C3F4A /* ComiNaviUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -103,6 +128,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		B5B37CFE2CBEE5AB006C3F4A /* ComiNaviUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B5B37D092CBEE5AB006C3F4A /* Build configuration list for PBXNativeTarget "ComiNaviUITests" */;
+			buildPhases = (
+				B5B37CFB2CBEE5AB006C3F4A /* Sources */,
+				B5B37CFC2CBEE5AB006C3F4A /* Frameworks */,
+				B5B37CFD2CBEE5AB006C3F4A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B5B37D062CBEE5AB006C3F4A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				B5B37D002CBEE5AB006C3F4A /* ComiNaviUITests */,
+			);
+			name = ComiNaviUITests;
+			packageProductDependencies = (
+			);
+			productName = ComiNaviUITests;
+			productReference = B5B37CFF2CBEE5AB006C3F4A /* ComiNaviUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		B5E9AEB22C9333CD00742CE8 /* ComiNavi */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B5E9AEC32C9333CE00742CE8 /* Build configuration list for PBXNativeTarget "ComiNavi" */;
@@ -146,6 +194,10 @@
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
+					B5B37CFE2CBEE5AB006C3F4A = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = B5E9AEB22C9333CD00742CE8;
+					};
 					B5E9AEB22C9333CD00742CE8 = {
 						CreatedOnToolsVersion = 16.0;
 					};
@@ -178,11 +230,19 @@
 			projectRoot = "";
 			targets = (
 				B5E9AEB22C9333CD00742CE8 /* ComiNavi */,
+				B5B37CFE2CBEE5AB006C3F4A /* ComiNaviUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		B5B37CFD2CBEE5AB006C3F4A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B5E9AEB12C9333CD00742CE8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -211,6 +271,13 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		B5B37CFB2CBEE5AB006C3F4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B5E9AEAF2C9333CD00742CE8 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -220,7 +287,55 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		B5B37D062CBEE5AB006C3F4A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B5E9AEB22C9333CD00742CE8 /* ComiNavi */;
+			targetProxy = B5B37D052CBEE5AB006C3F4A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		B5B37D072CBEE5AB006C3F4A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SY8Y8N4TPM;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNaviUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ComiNavi;
+			};
+			name = Debug;
+		};
+		B5B37D082CBEE5AB006C3F4A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = SY8Y8N4TPM;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNaviUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ComiNavi;
+			};
+			name = Release;
+		};
 		B5E9AEC12C9333CE00742CE8 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -373,6 +488,9 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNavi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -410,6 +528,9 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNavi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -419,6 +540,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		B5B37D092CBEE5AB006C3F4A /* Build configuration list for PBXNativeTarget "ComiNaviUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B5B37D072CBEE5AB006C3F4A /* Debug */,
+				B5B37D082CBEE5AB006C3F4A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		B5E9AEAE2C9333CD00742CE8 /* Build configuration list for PBXProject "ComiNavi" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

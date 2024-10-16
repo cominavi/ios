@@ -5,7 +5,9 @@
 //  Created by Galvin Gao on 9/12/24.
 //
 
+#if DEBUG
 import DebugSwift
+#endif
 import PostHog
 import Sentry
 import SwiftData
