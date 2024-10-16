@@ -55,19 +55,15 @@ struct ContentView: View {
                             Label("Gallery", systemImage: "square.grid.2x2")
                         }
                     
-                    NavigationView {
-                        MapView()
-                    }
-                    .tabItem {
-                        Label("Map", systemImage: "map")
-                    }
+                    MapView()
+                        .tabItem {
+                            Label("Map", systemImage: "map")
+                        }
                     
-                    NavigationView {
-                        ProfileScreen()
-                    }
-                    .tabItem {
-                        Label("Profile", systemImage: "person.circle")
-                    }
+                    ProfileScreen()
+                        .tabItem {
+                            Label("Profile", systemImage: "person.circle")
+                        }
                 }
                 
             case .error(let error):
