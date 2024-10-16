@@ -164,7 +164,7 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "translated",
+            "state" : "needs_review",
             "value" : "Downloading databases, this may take a while..."
           }
         },

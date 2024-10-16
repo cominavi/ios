@@ -37,6 +37,7 @@ struct EntryView: View {
             if userState.user?.userId == nil {
                 SignInView()
                     .onAppear {
+                        print("loadedMetadata = false")
                         loadedMetadata = false
                     }
             } else if loadedMetadata {

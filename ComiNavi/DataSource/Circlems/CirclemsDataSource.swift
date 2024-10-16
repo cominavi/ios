@@ -540,11 +540,11 @@ class CirclemsDataSource: ObservableObject {
     }
     
     func cleanAllCaches() {
-        let url = DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .images)
-        try? FileManager.default.removeItem(at: url)
-        
         UserDefaults.standard.removeObject(forKey: "CirclemsDataSource.extractedAndCachedCircleImages.databaseDigest.\(self.databases.image.digest).extracted")
         UserDefaults.standard.removeObject(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(comiketId)-\(self.databases.main.type)")
         UserDefaults.standard.removeObject(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(comiketId)-\(self.databases.image.type)")
+        
+        let url = DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .images)
+        try? FileManager.default.removeItem(at: url)
     }
 }
