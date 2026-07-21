@@ -13,7 +13,6 @@
 		B56526C92C976DD800C01713 /* Toast in Frameworks */ = {isa = PBXBuildFile; productRef = B56526C82C976DD800C01713 /* Toast */; };
 		B59B24852CAD36FF009FDFAE /* Gzip in Frameworks */ = {isa = PBXBuildFile; productRef = B59B24842CAD36FF009FDFAE /* Gzip */; };
 		B59B24DE2CAD4D78009FDFAE /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = B59B24DD2CAD4D78009FDFAE /* PostHog */; };
-		B5C828582C9B47CC00986069 /* IGListKit in Frameworks */ = {isa = PBXBuildFile; productRef = B5C828572C9B47CC00986069 /* IGListKit */; };
 		B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AECE2C9357DA00742CE8 /* SwifterSwift */; };
 		B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AEDE2C942CC900742CE8 /* GRDB */; };
 /* End PBXBuildFile section */
@@ -88,7 +87,6 @@
 				B56526C92C976DD800C01713 /* Toast in Frameworks */,
 				B59B24852CAD36FF009FDFAE /* Gzip in Frameworks */,
 				B59B24DE2CAD4D78009FDFAE /* PostHog in Frameworks */,
-				B5C828582C9B47CC00986069 /* IGListKit in Frameworks */,
 				B5600A3D2CB775E200AD1074 /* DebugSwift in Frameworks */,
 				B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */,
 				B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */,
@@ -173,7 +171,6 @@
 				B5E9AECE2C9357DA00742CE8 /* SwifterSwift */,
 				B5E9AEDE2C942CC900742CE8 /* GRDB */,
 				B56526C82C976DD800C01713 /* Toast */,
-				B5C828572C9B47CC00986069 /* IGListKit */,
 				B56209962CACFBC40017847D /* Alamofire */,
 				B59B24842CAD36FF009FDFAE /* Gzip */,
 				CC3C71F91CD14381A99FD361 /* Sentry */,
@@ -217,7 +214,6 @@
 				B5E9AECD2C9357DA00742CE8 /* XCRemoteSwiftPackageReference "SwifterSwift" */,
 				B5E9AEDD2C942CC900742CE8 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				B56526C72C976DD800C01713 /* XCRemoteSwiftPackageReference "toast-swift" */,
-				B5C828562C9B47CC00986069 /* XCRemoteSwiftPackageReference "IGListKit" */,
 				B56209952CACFBC40017847D /* XCRemoteSwiftPackageReference "Alamofire" */,
 				B59B24832CAD36FF009FDFAE /* XCRemoteSwiftPackageReference "GzipSwift" */,
 				A4022B3FC5F444AF831FA16C /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
@@ -255,6 +251,7 @@
 /* Begin PBXShellScriptBuildPhase section */
 		E7552DAE64C94B5095C18F67 /* Upload Debug Symbols to Sentry */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -266,7 +263,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# This script is responsable to upload debug symbols and source context for Sentry.\nif which sentry-cli >/dev/null; then\nexport SENTRY_ORG=cominavi\nexport SENTRY_PROJECT=cominavi\nERROR=$(sentry-cli debug-files upload --include-sources \"$DWARF_DSYM_FOLDER_PATH\" 2>&1 >/dev/null)\nif [ ! $? -eq 0 ]; then\necho \"warning: sentry-cli - $ERROR\"\nfi\nelse\necho \"warning: sentry-cli not installed, download from https://github.com/getsentry/sentry-cli/releases\"\nfi\n";
+			shellScript = "# Upload release debug symbols and source context to Sentry.\nif [ \"$CONFIGURATION\" != \"Release\" ]; then\n    exit 0\nfi\n\nif [ \"$(uname -m)\" = \"arm64\" ]; then\n    export PATH=\"/opt/homebrew/bin:$PATH\"\nfi\n\nif which sentry-cli >/dev/null; then\n    export SENTRY_ORG=cominavi\n    export SENTRY_PROJECT=cominavi\n    ERROR=$(sentry-cli debug-files upload --include-sources \"$DWARF_DSYM_FOLDER_PATH\" 2>&1 >/dev/null)\n    if [ ! $? -eq 0 ]; then\n        echo \"warning: sentry-cli - $ERROR\"\n    fi\nelse\n    echo \"warning: sentry-cli not installed, download from https://github.com/getsentry/sentry-cli/releases\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -301,9 +298,9 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SY8Y8N4TPM;
+				DEVELOPMENT_TEAM = F25GFFJL49;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNaviUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -321,9 +318,9 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = SY8Y8N4TPM;
+				DEVELOPMENT_TEAM = F25GFFJL49;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNaviUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -463,12 +460,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = ComiNavi/ComiNavi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_ASSET_PATHS = "\"ComiNavi/Preview Content\"";
-				DEVELOPMENT_TEAM = SY8Y8N4TPM;
+				DEVELOPMENT_TEAM = F25GFFJL49;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -480,7 +476,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -503,12 +499,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
-				CODE_SIGN_ENTITLEMENTS = ComiNavi/ComiNavi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_ASSET_PATHS = "\"ComiNavi/Preview Content\"";
-				DEVELOPMENT_TEAM = SY8Y8N4TPM;
+				DEVELOPMENT_TEAM = F25GFFJL49;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -520,7 +515,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -618,14 +613,6 @@
 				minimumVersion = 3.12.6;
 			};
 		};
-		B5C828562C9B47CC00986069 /* XCRemoteSwiftPackageReference "IGListKit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/Instagram/IGListKit";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 5.0.0;
-			};
-		};
 		B5E9AECD2C9357DA00742CE8 /* XCRemoteSwiftPackageReference "SwifterSwift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/SwifterSwift/SwifterSwift.git";
@@ -669,11 +656,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B59B24DC2CAD4D78009FDFAE /* XCRemoteSwiftPackageReference "posthog-ios" */;
 			productName = PostHog;
-		};
-		B5C828572C9B47CC00986069 /* IGListKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B5C828562C9B47CC00986069 /* XCRemoteSwiftPackageReference "IGListKit" */;
-			productName = IGListKit;
 		};
 		B5E9AECE2C9357DA00742CE8 /* SwifterSwift */ = {
 			isa = XCSwiftPackageProductDependency;

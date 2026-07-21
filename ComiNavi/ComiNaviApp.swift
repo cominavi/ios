@@ -10,7 +10,6 @@ import DebugSwift
 #endif
 import PostHog
 import Sentry
-import SwiftData
 import SwiftUI
 
 class AppDelegate: NSObject, UIApplicationDelegate {

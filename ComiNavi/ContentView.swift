@@ -5,10 +5,7 @@
 //  Created by Galvin Gao on 9/12/24.
 //
 
-import AuthenticationServices
-import SwiftData
 import SwiftUI
-import UIKit
 
 struct ContentView: View {
     @StateObject var circle = AppData.circlems

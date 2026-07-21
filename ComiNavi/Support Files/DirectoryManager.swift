@@ -65,18 +65,14 @@ class DirectoryManager {
     // --
     
     func cachesFor(comiketId: String) -> URL {
-        let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppIdentifier.assetsAppGroup)
-        let base = sharedContainerURL != nil ? sharedContainerURL! : cachesDirectory
-        let url = base
+        let url = cachesDirectory
             .appendingPathComponent("comiket\(comiketId)", isDirectory: true)
         createDirectoryIfNeeded(at: url)
         return url
     }
 
     func cachesFor(comiketId: String, _ scope: CacheScope, _ type: CacheType, createIfNeeded: Bool = false) -> URL {
-        let sharedContainerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppIdentifier.assetsAppGroup)
-        let base = sharedContainerURL != nil ? sharedContainerURL! : cachesDirectory
-        let url = base
+        let url = cachesDirectory
             .appendingPathComponent("comiket\(comiketId)", isDirectory: true)
             .appendingPathComponent(scope.rawValue, isDirectory: true)
             .appendingPathComponent(type.rawValue, isDirectory: true)

@@ -1,5 +1,5 @@
 {
-  "originHash" : "10b8a24e71b54f0a6a09a2eb461e2a3768d71052279822c3bdeb5ee2a977a093",
+  "originHash" : "ffd65eb56bc611800b7afa8fb80aa2a942bded18955355bbdaf53935a27be97a",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -35,15 +35,6 @@
       "state" : {
         "revision" : "56bf51fdd2fe4b2cf254b2cf34aede3d7caccc6c",
         "version" : "6.1.0"
-      }
-    },
-    {
-      "identity" : "iglistkit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/Instagram/IGListKit",
-      "state" : {
-        "revision" : "baf38ea4d438ef3cc6c6deb8615e1910e03f02bb",
-        "version" : "5.0.0"
       }
     },
     {

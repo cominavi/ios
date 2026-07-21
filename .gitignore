@@ -1,3 +1,16 @@
-ComiNavi/DevContent/
+# macOS
+.DS_Store
 
+# Xcode user state and build products
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager local state
+.build/
+.swiftpm/
+
+# Local development configuration
 .sentryclirc
+ComiNavi/DevContent/
