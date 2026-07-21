@@ -2,16 +2,28 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ComiNaviBuildEnvironment</key>
+	<string>$(COMINAVI_BUILD_ENVIRONMENT)</string>
+	<key>ComiNaviCirclemsClientID</key>
+	<string>$(COMINAVI_CIRCLEMS_CLIENT_ID)</string>
+	<key>ComiNaviCirclemsEnvironment</key>
+	<string>$(COMINAVI_CIRCLEMS_ENVIRONMENT)</string>
+	<key>ComiNaviCirclemsTokenRefreshURL</key>
+	<string>$(COMINAVI_CIRCLEMS_TOKEN_REFRESH_URL)</string>
+	<key>ComiNaviOAuthCallbackScheme</key>
+	<string>$(COMINAVI_OAUTH_CALLBACK_SCHEME)</string>
+	<key>ComiNaviOAuthRedirectURL</key>
+	<string>$(COMINAVI_OAUTH_REDIRECT_URL)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>net.cominavi.cominavi</string>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>cominavi</string>
+				<string>$(COMINAVI_OAUTH_CALLBACK_SCHEME)</string>
 			</array>
 		</dict>
 	</array>

@@ -13,7 +13,7 @@ enum AppData {
     // CirclemsDataSource shall be initialized by EntryView
     public static var circlems: CirclemsDataSource!
 
-    @UserDefaultsBacked("circlems.user")
+    @UserDefaultsBacked("circlems.user.\(AppEnvironment.current.storageNamespace)")
     static var user: User?
 
     static var userState = UserState()

@@ -6,6 +6,7 @@
 //
 
 import Alamofire
+import CryptoKit
 import Foundation
 import GRDB
 import Gzip
@@ -69,7 +70,7 @@ struct CirclemsDataSourceInitializationParams {
     let image: CirclemsDataSourceRemoteConfig
 }
 
-enum CirclemsDataSourceDatabaseType {
+enum CirclemsDataSourceDatabaseType: String {
     case main
     case image
     
@@ -79,6 +80,15 @@ enum CirclemsDataSourceDatabaseType {
             return 4_880_130
         case .image:
             return 341_840_565
+        }
+    }
+
+    var requiredTables: Set<String> {
+        switch self {
+        case .main:
+            ["ComiketInfoWC", "ComiketCircleWC"]
+        case .image:
+            ["ComiketCircleImage", "ComiketCommonImage"]
         }
     }
 }
@@ -217,8 +227,9 @@ class CirclemsDataSource: ObservableObject {
     private func shouldSkipDatabaseDownload(metadata: CirclemsDataSourceDatabaseMetadata) -> Bool {
         if CirclemsDataSource.SHOULD_CHECK_DATABASE_EXISTS,
            FileManager.default.fileExists(atPath: metadata.localPath),
-           let localDataDigest = UserDefaults.standard.string(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(comiketId)-\(metadata.type)"),
-           localDataDigest.lowercased() == metadata.digest.lowercased()
+           hasSQLiteHeader(at: URL(fileURLWithPath: metadata.localPath)),
+           let localDataDigest = UserDefaults.standard.string(forKey: databaseDigestKey(for: metadata.type)),
+           localDataDigest.caseInsensitiveCompare(metadata.digest) == .orderedSame
         {
             return true
         }
@@ -226,7 +237,22 @@ class CirclemsDataSource: ObservableObject {
     }
     
     private func downloadDatabase(metadata: CirclemsDataSourceDatabaseMetadata, progressHandler: ((Int64, Int64) -> Void)? = nil) async throws {
-        let url = URL(string: metadata.remoteUrl)!
+        guard let url = URL(string: metadata.remoteUrl), url.scheme == "https" else {
+            throw NSError(
+                domain: "CirclemsDataSource",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Circle.ms returned an invalid non-HTTPS database URL."]
+            )
+        }
+
+        let downloadDirectory = DirectoryManager.shared.cachesFor(
+            comiketId: comiketId,
+            .circlems,
+            .downloads,
+            createIfNeeded: true
+        )
+        let temporaryDatabaseURL = downloadDirectory
+            .appendingPathComponent("\(metadata.type.rawValue)-\(UUID().uuidString).sqlite")
         
         print("Downloading database from \(url) to \(metadata.localPath)...")
         
@@ -241,17 +267,95 @@ class CirclemsDataSource: ObservableObject {
                         guard let data = try? response.result.get() else {
                             throw NSError(domain: "CirclemsDataSource", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to download database from \(metadata.remoteUrl)"])
                         }
-                        
-                        // Decompress the file
-                        try data.gunzipped().write(to: URL(fileURLWithPath: metadata.localPath))
-                        // Mark the file as downloaded
-                        UserDefaults.standard.set(metadata.digest, forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(self.comiketId)-\(metadata.type)")
+
+                        let downloadedDigest = Insecure.MD5.hash(data: data)
+                            .map { String(format: "%02x", $0) }
+                            .joined()
+                        guard downloadedDigest.caseInsensitiveCompare(metadata.digest) == .orderedSame else {
+                            throw NSError(
+                                domain: "CirclemsDataSource",
+                                code: 4,
+                                userInfo: [NSLocalizedDescriptionKey: "The downloaded \(metadata.type.rawValue) database failed its MD5 integrity check."]
+                            )
+                        }
+
+                        let uncompressedData = try data.gunzipped()
+                        try uncompressedData.write(to: temporaryDatabaseURL, options: .atomic)
+                        try self.validateDatabase(at: temporaryDatabaseURL, type: metadata.type)
+                        try self.installDatabase(
+                            from: temporaryDatabaseURL,
+                            to: URL(fileURLWithPath: metadata.localPath)
+                        )
+
+                        UserDefaults.standard.set(metadata.digest, forKey: self.databaseDigestKey(for: metadata.type))
                         continuation.resume()
                     } catch {
+                        try? FileManager.default.removeItem(at: temporaryDatabaseURL)
                         continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to download database from \(metadata.remoteUrl): \(error)"]))
                     }
                 }
         }
+    }
+
+    private func validateDatabase(at url: URL, type: CirclemsDataSourceDatabaseType) throws {
+        guard hasSQLiteHeader(at: url) else {
+            throw NSError(
+                domain: "CirclemsDataSource",
+                code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "The downloaded \(type.rawValue) file is not a SQLite 3 database."]
+            )
+        }
+
+        var configuration = Configuration()
+        configuration.readonly = true
+        let database = try DatabaseQueue(path: url.path, configuration: configuration)
+        try database.read { db in
+            let quickCheck = try String.fetchOne(db, sql: "PRAGMA quick_check")
+            guard quickCheck == "ok" else {
+                throw NSError(
+                    domain: "CirclemsDataSource",
+                    code: 6,
+                    userInfo: [NSLocalizedDescriptionKey: "SQLite integrity check failed for the \(type.rawValue) database."]
+                )
+            }
+
+            let tables = Set(try String.fetchAll(
+                db,
+                sql: "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ))
+            let missingTables = type.requiredTables.subtracting(tables)
+            guard missingTables.isEmpty else {
+                throw NSError(
+                    domain: "CirclemsDataSource",
+                    code: 7,
+                    userInfo: [NSLocalizedDescriptionKey: "The \(type.rawValue) database is missing required tables: \(missingTables.sorted().joined(separator: ", "))."]
+                )
+            }
+        }
+    }
+
+    private func installDatabase(from temporaryURL: URL, to destinationURL: URL) throws {
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            _ = try fileManager.replaceItemAt(destinationURL, withItemAt: temporaryURL)
+        } else {
+            try fileManager.moveItem(at: temporaryURL, to: destinationURL)
+        }
+    }
+
+    private func hasSQLiteHeader(at url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        let expectedHeader = Data("SQLite format 3\0".utf8)
+        return (try? handle.read(upToCount: expectedHeader.count)) == expectedHeader
+    }
+
+    private func databaseDigestKey(for type: CirclemsDataSourceDatabaseType) -> String {
+        "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(AppEnvironment.current.storageNamespace).comiket-\(comiketId).\(type.rawValue)"
+    }
+
+    private var extractedImagesKey: String {
+        "CirclemsDataSource.extractedAndCachedCircleImages.\(AppEnvironment.current.storageNamespace).comiket-\(comiketId).digest-\(databases.image.digest)"
     }
     
     private func initDatabaseConnections() async throws {
@@ -379,7 +483,7 @@ class CirclemsDataSource: ObservableObject {
     }
     
     private func extractAndCacheCircleImages() async throws {
-        if UserDefaults.standard.bool(forKey: "CirclemsDataSource.extractedAndCachedCircleImages.databaseDigest.\(self.databases.image.digest).extracted") {
+        if UserDefaults.standard.bool(forKey: extractedImagesKey) {
             return
         }
         
@@ -413,7 +517,7 @@ class CirclemsDataSource: ObservableObject {
                             }
                         }
                         
-                        UserDefaults.standard.set(true, forKey: "CirclemsDataSource.extractedAndCachedCircleImages.databaseDigest.\(self.databases.image.digest).extracted")
+                        UserDefaults.standard.set(true, forKey: self.extractedImagesKey)
                         
                         continuation.resume()
                     }
@@ -540,11 +644,9 @@ class CirclemsDataSource: ObservableObject {
     }
     
     func cleanAllCaches() {
-        UserDefaults.standard.removeObject(forKey: "CirclemsDataSource.extractedAndCachedCircleImages.databaseDigest.\(self.databases.image.digest).extracted")
-        UserDefaults.standard.removeObject(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(comiketId)-\(self.databases.main.type)")
-        UserDefaults.standard.removeObject(forKey: "CirclemsDataSource.databaseDownloaded.gzippedDigest.comiket\(comiketId)-\(self.databases.image.type)")
-        
-        let url = DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .images)
-        try? FileManager.default.removeItem(at: url)
+        UserDefaults.standard.removeObject(forKey: extractedImagesKey)
+        UserDefaults.standard.removeObject(forKey: databaseDigestKey(for: databases.main.type))
+        UserDefaults.standard.removeObject(forKey: databaseDigestKey(for: databases.image.type))
+        try? DirectoryManager.shared.removeCachesFor(comiketId: comiketId)
     }
 }

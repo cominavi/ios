@@ -22,8 +22,13 @@ extension DataRequest {
 }
 
 enum CirclemsAPI {
-    public static let baseURL = "https://api1.circle.ms"
-    public static let authBaseURL = "https://auth1.circle.ms"
+    public static var baseURL: String {
+        AppEnvironment.current.circlems.apiBaseURL.absoluteString
+    }
+
+    public static var authBaseURL: String {
+        AppEnvironment.current.circlems.authenticationBaseURL.absoluteString
+    }
     
     private struct APIError: Error, Decodable {
         let message: String
@@ -212,7 +217,7 @@ enum CirclemsAPI {
     
     static func getCatalogBase(eventId: Int) async throws -> CatalogBaseResponse {
         let url = "\(baseURL)/CatalogBase/All/"
-        let parameters: [String: Any] = ["event_Id": eventId]
+        let parameters: [String: Any] = ["event_id": eventId]
         return try await AF.request(url, parameters: parameters, headers: await headers())
             .debugValidate()
             .serializingDecodable(CatalogBaseResponse.self, decoder: decoder)
@@ -220,7 +225,7 @@ enum CirclemsAPI {
     }
     
     static func getFavoriteCircles(eventId: Int, circleName: String? = nil) async throws -> FavoriteCirclesResponse {
-        let url = "\(authBaseURL)/Readers/FavoriteCircles"
+        let url = "\(baseURL)/Readers/FavoriteCircles"
         var parameters: [String: Any] = ["event_id": eventId]
         if let circleName = circleName {
             parameters["circle_name"] = circleName
@@ -242,7 +247,7 @@ enum CirclemsAPI {
     
     static func queryCircles(eventId: Int, circleName: String? = nil, genre: String? = nil, floor: String? = nil, sort: String? = nil, lastUpdate: String? = nil) async throws -> CircleQueryResponse {
         let url = "\(baseURL)/WebCatalog/QueryCircle"
-        var parameters: [String: Any] = ["event_Id": eventId]
+        var parameters: [String: Any] = ["event_id": eventId]
         if let circleName = circleName { parameters["circle_name"] = circleName }
         if let genre = genre { parameters["genre"] = genre }
         if let floor = floor { parameters["floor"] = floor }
@@ -289,7 +294,7 @@ enum CirclemsAPI {
     
     static func getUserInfo() async throws -> UserInfoResponse {
         let url = "\(baseURL)/User/Info"
-        return try await AF.request(url, headers: await headers())
+        return try await AF.request(url, method: .post, headers: await headers())
             .debugValidate()
             .serializingDecodable(UserInfoResponse.self, decoder: decoder)
             .value
@@ -297,7 +302,7 @@ enum CirclemsAPI {
     
     static func queryBooks(eventId: Int, circleName: String? = nil, workName: String? = nil, workWord: String? = nil, genre: String? = nil, floor: String? = nil, sort: String? = nil, page: Int? = nil, lastUpdate: String? = nil) async throws -> BookQueryResponse {
         let url = "\(baseURL)/WebCatalog/QueryBook"
-        var parameters: [String: Any] = ["event_Id": eventId]
+        var parameters: [String: Any] = ["event_id": eventId]
         if let circleName = circleName { parameters["circle_name"] = circleName }
         if let workName = workName { parameters["work_name"] = workName }
         if let workWord = workWord { parameters["work_word"] = workWord }

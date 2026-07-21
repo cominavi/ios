@@ -24,7 +24,7 @@ enum CominaviAPI {
     }
 
     static func oauthCirclemsRefreshToken(refreshToken: String) async throws -> OAuthCirclesRefreshTokenResponse {
-        let url = URL(string: "https://cominavi.net/api/v1/oauth/circlems/refresh_token")!
+        let url = AppEnvironment.current.circlemsTokenRefreshURL
         let parameters = ["refresh_token": refreshToken]
         let headers: HTTPHeaders = [
             "Content-Type": "application/json"

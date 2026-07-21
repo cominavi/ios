@@ -192,6 +192,22 @@
         }
       }
     },
+    "Find circles. Plan your route." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Find circles. Plan your route."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを探して、当日のルートを計画。"
+          }
+        }
+      }
+    },
     "Gallery" : {
       "comment" : "Gallery",
       "localizations" : {

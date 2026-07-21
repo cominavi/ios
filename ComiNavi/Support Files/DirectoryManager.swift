@@ -17,6 +17,7 @@ class DirectoryManager {
     enum CacheType: String {
         case images
         case databases
+        case downloads
     }
 
     private init() {}
@@ -50,6 +51,15 @@ class DirectoryManager {
         return url
     }
 
+    var environmentCachesDirectory: URL {
+        let url = cachesDirectory
+            .appendingPathComponent("environments", isDirectory: true)
+            .appendingPathComponent(AppEnvironment.current.build.rawValue, isDirectory: true)
+            .appendingPathComponent(AppEnvironment.current.circlems.rawValue, isDirectory: true)
+        createDirectoryIfNeeded(at: url)
+        return url
+    }
+
     var applicationSupportDirectory: URL {
         let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         createDirectoryIfNeeded(at: url)
@@ -65,20 +75,30 @@ class DirectoryManager {
     // --
     
     func cachesFor(comiketId: String) -> URL {
-        let url = cachesDirectory
-            .appendingPathComponent("comiket\(comiketId)", isDirectory: true)
+        let url = environmentCachesDirectory
+            .appendingPathComponent("events", isDirectory: true)
+            .appendingPathComponent("comiket-\(comiketId)", isDirectory: true)
         createDirectoryIfNeeded(at: url)
         return url
     }
 
     func cachesFor(comiketId: String, _ scope: CacheScope, _ type: CacheType, createIfNeeded: Bool = false) -> URL {
-        let url = cachesDirectory
-            .appendingPathComponent("comiket\(comiketId)", isDirectory: true)
+        let url = environmentCachesDirectory
+            .appendingPathComponent("events", isDirectory: true)
+            .appendingPathComponent("comiket-\(comiketId)", isDirectory: true)
             .appendingPathComponent(scope.rawValue, isDirectory: true)
             .appendingPathComponent(type.rawValue, isDirectory: true)
         if createIfNeeded {
             createDirectoryIfNeeded(at: url)
         }
         return url
+    }
+
+    func removeCachesFor(comiketId: String) throws {
+        let url = environmentCachesDirectory
+            .appendingPathComponent("events", isDirectory: true)
+            .appendingPathComponent("comiket-\(comiketId)", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        try FileManager.default.removeItem(at: url)
     }
 }
