@@ -10,24 +10,17 @@ if [ "${CI_XCODE_CLOUD:-}" != "TRUE" ]; then
     exit 0
 fi
 
-resolved_rsync=$(command -v rsync)
-
-if ! "$resolved_rsync" --help 2>&1 | grep -q -- '--extended-attributes'; then
-    case "$resolved_rsync" in
-        /opt/homebrew/bin/rsync|/usr/local/bin/rsync)
-            echo "Unlinking incompatible Homebrew rsync at $resolved_rsync"
-            brew unlink rsync
-            ;;
-        *)
-            echo "error: Xcode Cloud resolved an incompatible rsync at $resolved_rsync"
-            exit 1
-            ;;
-    esac
+# Deployment preparation can prepend Homebrew after this script finishes, so
+# check the installed formula rather than trusting the current PATH alone.
+if command -v brew >/dev/null 2>&1 && brew list --versions rsync >/dev/null 2>&1; then
+    echo "Unlinking Homebrew rsync before Xcode Cloud deployment preparation"
+    brew unlink rsync
 fi
 
 resolved_rsync=$(command -v rsync)
 
-if [ "$resolved_rsync" != "/usr/bin/rsync" ]; then
+if [ "$resolved_rsync" != "/usr/bin/rsync" ] || \
+    ! "$resolved_rsync" --help 2>&1 | grep -q -- '--extended-attributes'; then
     echo "error: Xcode Cloud must use /usr/bin/rsync, resolved $resolved_rsync"
     exit 1
 fi
