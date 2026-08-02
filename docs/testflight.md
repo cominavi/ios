@@ -44,5 +44,12 @@ xcodebuild \
   -allowProvisioningUpdates
 ```
 
+The export keeps the dSYM in the `.xcarchive` but temporarily skips copying it
+into the App Store upload. Xcode 26.6 can otherwise fail its packaging step with
+`Copy failed` when a non-Apple `rsync` appears before `/usr/bin/rsync` in
+`PATH`. Xcode Cloud's post-clone script also unlinks an incompatible Homebrew
+`rsync` from its ephemeral worker before the archive starts. Keep the archive so
+the matching dSYM remains available for crash symbolication.
+
 Build `1.0 (2026072701)` is the first prepared TestFlight build. Increase
 `CURRENT_PROJECT_VERSION` for every subsequent upload.

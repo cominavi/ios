@@ -13,6 +13,6 @@
 	<key>teamID</key>
 	<string>F25GFFJL49</string>
 	<key>uploadSymbols</key>
-	<true/>
+	<false/>
 </dict>
 </plist>
