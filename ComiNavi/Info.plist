@@ -29,5 +29,7 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>ComiNavi uses your location while Where Am I is open to suggest the Tokyo Big Sight hall you are in.</string>
 </dict>
 </plist>

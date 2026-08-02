@@ -19,7 +19,7 @@ class GalleryCollectionTitleView: UIView {
         label.font = .preferredFont(forTextStyle: .headline).bold
         label.textColor = .label
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = "Title"
+        label.text = nil
         return label
     }()
 
@@ -28,7 +28,7 @@ class GalleryCollectionTitleView: UIView {
         label.font = .preferredFont(forTextStyle: .caption2)
         label.textColor = .secondaryLabel
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = "Subtitle"
+        label.text = nil
         return label
     }()
 
@@ -79,6 +79,8 @@ class CircleCollectionViewCell: UICollectionViewCell {
 
     private var leftImageViewOneImageConstraint: NSLayoutConstraint!
     private var leftImageViewTwoImageConstraint: NSLayoutConstraint!
+    private var imageTask: Task<Void, Never>?
+    private var representedCircleIDs: [Int] = []
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -88,6 +90,14 @@ class CircleCollectionViewCell: UICollectionViewCell {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupImageView()
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageTask?.cancel()
+        representedCircleIDs = []
+        leftImageView.image = nil
+        rightImageView.image = nil
     }
 
     private func setupImageView() {
@@ -119,73 +129,63 @@ class CircleCollectionViewCell: UICollectionViewCell {
         ])
     }
 
-    func configure(current: CirclemsDataSchema.ComiketCircleWC, next: CirclemsDataSchema.ComiketCircleWC?) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            // read the image from the local cache in a background thread
-            let leftUrl = DirectoryManager.shared.cachesFor(comiketId: AppData.circlems.comiket.number.string, .circlems, .images)
-                .appendingPathComponent("circles")
-                .appendingPathComponent("\(current.id).png")
+    func configure(
+        current: CirclemsDataSchema.ComiketCircleWC,
+        next: CirclemsDataSchema.ComiketCircleWC?,
+        dataSource: CirclemsDataSource
+    ) {
+        imageTask?.cancel()
+        representedCircleIDs = [current.id] + (next.map { [$0.id] } ?? [])
+        leftImageView.image = nil
+        rightImageView.image = nil
 
-            guard let leftImageData = try? Data(contentsOf: leftUrl), var leftImage = UIImage(data: leftImageData) else { return }
-
-            if let next = next {
-                let rightUrl = DirectoryManager.shared.cachesFor(comiketId: AppData.circlems.comiket.number.string, .circlems, .images)
-                    .appendingPathComponent("circles")
-                    .appendingPathComponent("\(next.id).png")
-
-                guard let rightImageData = try? Data(contentsOf: rightUrl), var rightImage = UIImage(data: rightImageData) else { return }
-
-                func draw(image: UIImage, left: Bool) -> UIImage? {
-                    defer { UIGraphicsEndImageContext() }
-
-                    UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
-                    guard let context = UIGraphicsGetCurrentContext() else {
-                        return nil
-                    }
-                    image.draw(at: .zero)
-                    let width: CGFloat = 8.0
-                    let offset: CGFloat = 7.0
-                    var rectangle: CGRect!
-
-                    if !left {
-                        let extraOffset: CGFloat = 53.0
-                        rectangle = CGRect(x: 0, y: offset + extraOffset, width: width, height: image.size.height - 2 * offset - extraOffset)
-                    } else {
-                        rectangle = CGRect(x: image.size.width - width, y: offset, width: width, height: image.size.height - 2 * offset)
-                    }
-
-                    context.setFillColor(UIColor(white: 0.8, alpha: 1.0).cgColor)
-                    context.fill(rectangle)
-                    guard let newImage = UIGraphicsGetImageFromCurrentImageContext() else {
-                        return nil
-                    }
-
-                    return newImage
-                }
-
-                if let drawnLeftImage = draw(image: leftImage, left: true) {
-                    leftImage = drawnLeftImage
-                }
-                if let drawnRightImage = draw(image: rightImage, left: false) {
-                    rightImage = drawnRightImage
-                }
-
-                DispatchQueue.main.async {
-                    self.rightImageView.image = rightImage
-                    self.leftImageViewOneImageConstraint.isActive = false
-                    self.leftImageViewTwoImageConstraint.isActive = true
-                }
+        let expectedIDs = representedCircleIDs
+        imageTask = Task { [weak self] in
+            let loadedLeftData = await dataSource.getCircleImage(circleId: current.id)
+            let loadedRightData: Data?
+            if let next {
+                loadedRightData = await dataSource.getCircleImage(circleId: next.id)
             } else {
-                DispatchQueue.main.async {
-                    self.rightImageView.image = nil
-                    self.leftImageViewOneImageConstraint.isActive = true
-                    self.leftImageViewTwoImageConstraint.isActive = false
-                }
+                loadedRightData = nil
             }
+            guard !Task.isCancelled else { return }
 
-            DispatchQueue.main.async {
-                self.leftImageView.image = leftImage
-            }
+            let hasNext = next != nil
+            let images = await Task.detached(priority: .userInitiated) {
+                var leftImage = loadedLeftData.flatMap(UIImage.init(data:))
+                var rightImage = loadedRightData.flatMap(UIImage.init(data:))
+
+                if hasNext {
+                    leftImage = leftImage.flatMap { Self.imageByAddingMergeEdge(to: $0, onLeft: false) }
+                    rightImage = rightImage.flatMap { Self.imageByAddingMergeEdge(to: $0, onLeft: true) }
+                }
+                return (leftImage, rightImage)
+            }.value
+
+            guard !Task.isCancelled, let self, self.representedCircleIDs == expectedIDs else { return }
+            self.leftImageView.image = images.0
+            self.rightImageView.image = images.1
+            self.leftImageViewOneImageConstraint.isActive = next == nil
+            self.leftImageViewTwoImageConstraint.isActive = next != nil
+        }
+    }
+
+    nonisolated private static func imageByAddingMergeEdge(to image: UIImage, onLeft: Bool) -> UIImage? {
+        let renderer = UIGraphicsImageRenderer(size: image.size)
+        return renderer.image { context in
+            image.draw(at: .zero)
+            let width: CGFloat = 8
+            let offset: CGFloat = 7
+            let extraTopOffset: CGFloat = onLeft ? 53 : 0
+            let x = onLeft ? 0 : image.size.width - width
+            let rectangle = CGRect(
+                x: x,
+                y: offset + extraTopOffset,
+                width: width,
+                height: image.size.height - 2 * offset - extraTopOffset
+            )
+            context.cgContext.setFillColor(UIColor(white: 0.8, alpha: 1).cgColor)
+            context.cgContext.fill(rectangle)
         }
     }
 }
@@ -249,6 +249,7 @@ class CircleCollectionViewSectionHeader: UICollectionReusableView {
 
 class GalleryCollectionViewController: UIViewController, UICollectionViewDelegateFlowLayout {
     private var viewModel: GalleryCollectionViewModel
+    private let dataSource: CirclemsDataSource
 
     private var layout: UICollectionViewFlowLayout = {
         let layout = UICollectionViewFlowLayout()
@@ -264,8 +265,12 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
     private var numberOfColumns: CGFloat = 6
     private var cancellables: Set<AnyCancellable> = []
 
-    init(circles: [CirclemsDataSchema.ComiketCircleWC]) {
-        self.viewModel = GalleryCollectionViewModel(circles: circles)
+    init(circles: [CirclemsDataSchema.ComiketCircleWC], dataSource: CirclemsDataSource) {
+        self.dataSource = dataSource
+        self.viewModel = GalleryCollectionViewModel(
+            circles: circles,
+            blocks: dataSource.comiket.blocks
+        )
         super.init(nibName: nil, bundle: nil)
 //        self.viewModel.$circleGroups
 //            .sink { [weak self] _ in
@@ -303,8 +308,8 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 
         collectionView.backgroundColor = .systemBackground
 
-        self.title = NSLocalizedString("Gallery", comment: "Gallery")
-        titleView.titleLabel.text = NSLocalizedString("Gallery", comment: "Gallery")
+        self.title = String(localized: "Gallery", comment: "Gallery")
+        titleView.titleLabel.text = String(localized: "Gallery", comment: "Gallery")
         self.navigationItem.titleView = titleView
 
 //        // add two right button items to navigation item that decreases/increases the number of columns
@@ -313,7 +318,7 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 //        self.navigationItem.rightBarButtonItems = [increaseButton, decreaseButton]
 
         searchController.obscuresBackgroundDuringPresentation = false
-        searchController.searchBar.placeholder = NSLocalizedString("Search...", comment: "Search")
+        searchController.searchBar.placeholder = String(localized: "Search...", comment: "Search")
         searchController.searchResultsUpdater = self
         self.navigationItem.searchController = searchController
         self.definesPresentationContext = true
@@ -322,7 +327,10 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
     }
 
     func update() {
-        titleView.subtitleLabel.text = NSLocalizedString("\(AppData.circlems.comiket.name) | \(viewModel.circleGroups.count) blocks", comment: "Comiket Name and Block Count")
+        titleView.subtitleLabel.text = String(
+            localized: "\(dataSource.comiket.name) | \(viewModel.circleGroups.count) blocks",
+            comment: "Comiket name followed by the number of visible blocks"
+        )
     }
 
 //    @objc private func decreaseColumns() {
@@ -337,7 +345,12 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let circle = viewModel.circleGroups[indexPath.section].unifiedCircles[indexPath.item]
-        let hostingController = UIHostingController(rootView: CircleDetailView(circle: circle.circle))
+        let hostingController = UIHostingController(
+            rootView: CircleDetailView(
+                circle: circle.circle,
+                dataSource: dataSource
+            )
+        )
 
         let destinationVC = UIViewController()
 
@@ -403,7 +416,7 @@ extension GalleryCollectionViewController: UICollectionViewDataSource {
         if circle.trailingItemMergable {
             next = viewModel.circleGroups[indexPath.section].unifiedCircles[indexPath.item + 1].circle
         }
-        cell.configure(current: circle.circle, next: next)
+        cell.configure(current: circle.circle, next: next, dataSource: dataSource)
         return cell
     }
 
@@ -440,13 +453,13 @@ extension GalleryCollectionViewController {
 
     private func circleContextMenu(circle: CirclemsDataSchema.ComiketCircleWC) -> UIMenu {
         // Create "Add to Favorites" and "Show in Map"
-        let addToFavorites = UIAction(title: NSLocalizedString("Add to Favorites", comment: "Gallery Preview Action: Add to Favorites"), image: UIImage(systemName: "star")) { _ in
+        let addToFavorites = UIAction(title: String(localized: "Add to Favorites", comment: "Gallery Preview Action: Add to Favorites"), image: UIImage(systemName: "star")) { _ in
             // Add to favorites
         }
-        let showInMap = UIAction(title: NSLocalizedString("Show in Map", comment: "Gallery Preview Action: Show in Map"), image: UIImage(systemName: "map")) { _ in
+        let showInMap = UIAction(title: String(localized: "Show in Map", comment: "Gallery Preview Action: Show in Map"), image: UIImage(systemName: "map")) { _ in
             // Show in map
         }
-        return UIMenu(title: NSLocalizedString("Actions", comment: "Gallery Preview Action Title"), children: [addToFavorites, showInMap])
+        return UIMenu(title: String(localized: "Actions", comment: "Gallery Preview Action Title"), children: [addToFavorites, showInMap])
     }
 
     func collectionView(_ collectionView: UICollectionView, willPerformPreviewActionForMenuWith configuration: UIContextMenuConfiguration, animator: UIContextMenuInteractionCommitAnimating) {

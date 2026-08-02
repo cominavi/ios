@@ -8,6 +8,24 @@
 import Alamofire
 import Foundation
 
+private extension KeyedDecodingContainer {
+    func decodeFlexibleInteger(forKey key: Key) throws -> Int {
+        if let value = try? decode(Int.self, forKey: key) {
+            return value
+        }
+
+        let value = try decode(String.self, forKey: key)
+        guard let integer = Int(value) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: key,
+                in: self,
+                debugDescription: "Expected an integer or a decimal integer string."
+            )
+        }
+        return integer
+    }
+}
+
 extension DataRequest {
     func debugValidate() -> Self {
         return self
@@ -30,15 +48,15 @@ enum CirclemsAPI {
         AppEnvironment.current.circlems.authenticationBaseURL.absoluteString
     }
     
-    private struct APIError: Error, Decodable {
+    private struct APIError: Error, Decodable, Sendable {
         let message: String
     }
-    
-    private static let decoder = { () -> JSONDecoder in
+
+    private static func makeDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
-    }()
+    }
     
     private static func headers() async -> HTTPHeaders {
         ["Authorization": "Bearer \(await AppData.getUserToken())"]
@@ -46,26 +64,39 @@ enum CirclemsAPI {
     
     // MARK: - Response Types
     
-    struct Response<T: Decodable>: Decodable {
+    struct Response<T: Decodable & Sendable>: Decodable, Sendable {
         let response: T
         let status: String
     }
 
     typealias EventListResponse = Response<EventListResponseData>
     
-    struct EventListResponseData: Decodable {
-        struct Event: Decodable {
-            let id: Int
-            let name: String
+    struct EventListResponseData: Decodable, Sendable {
+        struct Event: Decodable, Sendable {
+            let eventID: Int
+            let eventNumber: Int
+
+            private enum CodingKeys: String, CodingKey {
+                case eventID = "EventId"
+                case eventNumber = "EventNo"
+            }
         }
-        
-        let events: [Event]
+
+        let list: [Event]
+        let latestEventID: Int
+        let latestEventNumber: Int
+
+        private enum CodingKeys: String, CodingKey {
+            case list
+            case latestEventID = "LatestEventId"
+            case latestEventNumber = "LatestEventNo"
+        }
     }
     
     typealias CatalogBaseResponse = Response<CatalogBaseResponseData>
 
-    struct CatalogBaseResponseData: Decodable {
-        struct DBKeys: Decodable {
+    struct CatalogBaseResponseData: Decodable, Sendable {
+        struct DBKeys: Decodable, Sendable {
             let textdbSqlite3UrlSsl: String
             let imagedb1UrlSsl: String
         }
@@ -77,18 +108,34 @@ enum CirclemsAPI {
     
     typealias FavoriteCirclesResponse = Response<FavoriteCirclesResponseData>
 
-    struct FavoriteCirclesResponseData: Decodable {
-        let circles: [FavoriteCircle]
+    struct FavoriteCirclesResponseData: Decodable, Sendable {
+        let list: [FavoriteCircle]
     }
 
-    struct FavoriteCircle: Decodable {
-        let id: String
-        let name: String
+    struct FavoriteCircle: Decodable, Sendable {
+        let circle: FavoriteCircleSummary
+        let favorite: FavoriteInfoResponseData
+    }
+
+    struct FavoriteCircleSummary: Decodable, Sendable {
+        let wcid: Int
+        let updateId: Int
+
+        private enum CodingKeys: String, CodingKey {
+            case wcid
+            case updateId
+        }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            wcid = try container.decodeFlexibleInteger(forKey: .wcid)
+            updateId = try container.decodeFlexibleInteger(forKey: .updateId)
+        }
     }
     
     typealias CircleResponse = Response<CircleResponseData>
 
-    struct CircleResponseData: Decodable {
+    struct CircleResponseData: Decodable, Sendable {
         /// 公開サークルId
         let wcid: Int
         /// サークル名
@@ -128,7 +175,7 @@ enum CirclemsAPI {
         /// JST形式の最終更新日
         let updateDate: String
         
-        struct OnlineStore: Decodable {
+        struct OnlineStore: Decodable, Sendable {
             let name: String
             let link: String
         }
@@ -136,13 +183,44 @@ enum CirclemsAPI {
     
     typealias CircleQueryResponse = Response<CircleQueryResponseData>
 
-    struct CircleQueryResponseData: Decodable {
-        let circles: [CircleResponse]
+    struct CircleQueryResponseData: Decodable, Sendable {
+        struct Item: Decodable, Sendable {
+            let updateId: Int
+            let tag: String?
+
+            private enum CodingKeys: String, CodingKey {
+                case updateId
+                case tag
+            }
+
+            init(from decoder: any Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                updateId = try container.decodeFlexibleInteger(forKey: .updateId)
+                tag = try container.decodeIfPresent(String.self, forKey: .tag)
+            }
+        }
+
+        let count: Int
+        let maxCount: Int
+        let list: [Item]
+
+        private enum CodingKeys: String, CodingKey {
+            case count
+            case maxCount = "maxcount"
+            case list
+        }
+
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            count = try container.decodeFlexibleInteger(forKey: .count)
+            maxCount = try container.decodeFlexibleInteger(forKey: .maxCount)
+            list = try container.decode([Item].self, forKey: .list)
+        }
     }
     
     typealias UserInfoResponse = Response<UserInfoResponseData>
 
-    struct UserInfoResponseData: Decodable {
+    struct UserInfoResponseData: Decodable, Sendable {
         let pid: Int
         let r18: Int
         let nickname: String
@@ -150,11 +228,11 @@ enum CirclemsAPI {
     
     typealias BookQueryResponse = Response<BookQueryResponseData>
 
-    struct BookQueryResponseData: Decodable {
+    struct BookQueryResponseData: Decodable, Sendable {
         let books: [Book]
     }
 
-    struct Book: Decodable {
+    struct Book: Decodable, Sendable {
         /// 頒布物Id
         let workId: String
         /// 公開サークルId
@@ -187,7 +265,7 @@ enum CirclemsAPI {
     
     typealias FavoriteInfoResponse = Response<FavoriteInfoResponseData>
 
-    struct FavoriteInfoResponseData: Decodable {
+    struct FavoriteInfoResponseData: Decodable, Sendable {
         /// 公開サークルId
         let wcid: Int
         /// サークル名
@@ -197,13 +275,103 @@ enum CirclemsAPI {
         /// ユーザメモ情報
         let memo: String
         /// 自由入力データ
-        let free: String
+        let free: String?
         /// お気に入り情報のJST形式の最終更新日時
         let updateDate: String
     }
+
+    typealias FavoriteMutationResponse = Response<FavoriteMutationResponseData>
+
+    struct FavoriteMutationResponseData: Decodable, Sendable {
+        let favorite: FavoriteInfoResponseData
+        let circle: FavoriteCircleSummary
+    }
     
     // A placeholder for empty responses
-    struct EmptyResponse: Decodable {}
+    struct EmptyResponse: Decodable, Sendable {}
+
+    // MARK: - Request Types
+
+    private struct EventParameters: Encodable, Sendable {
+        let eventID: Int
+
+        enum CodingKeys: String, CodingKey {
+            case eventID = "event_id"
+        }
+    }
+
+    private struct FavoriteListParameters: Encodable, Sendable {
+        let eventID: Int
+        let circleName: String?
+        let page: Int
+        let lastUpdate: String?
+
+        enum CodingKeys: String, CodingKey {
+            case eventID = "event_id"
+            case circleName = "circle_name"
+            case page
+            case lastUpdate = "lastupdate"
+        }
+    }
+
+    private struct CircleParameters: Encodable, Sendable {
+        let wcid: String
+    }
+
+    private struct CircleQueryParameters: Encodable, Sendable {
+        let eventID: Int
+        let circleName: String?
+        let genre: String?
+        let floor: String?
+        let sort: String?
+        let page: Int?
+        let lastUpdate: String?
+
+        enum CodingKeys: String, CodingKey {
+            case eventID = "event_id"
+            case circleName = "circle_name"
+            case genre
+            case floor
+            case sort
+            case page
+            case lastUpdate = "lastupdate"
+        }
+    }
+
+    private struct FavoriteMutationParameters: Encodable, Sendable {
+        let wcid: Int
+        let color: Int
+        let memo: String
+        let free: String?
+    }
+
+    private struct FavoriteDeleteParameters: Encodable, Sendable {
+        let wcid: Int
+    }
+
+    private struct BookQueryParameters: Encodable, Sendable {
+        let eventID: Int
+        let circleName: String?
+        let workName: String?
+        let workWord: String?
+        let genre: String?
+        let floor: String?
+        let sort: String?
+        let page: Int?
+        let lastUpdate: String?
+
+        enum CodingKeys: String, CodingKey {
+            case eventID = "event_id"
+            case circleName = "circle_name"
+            case workName = "work_name"
+            case workWord = "work_word"
+            case genre
+            case floor
+            case sort
+            case page
+            case lastUpdate = "lastupdate"
+        }
+    }
 
     // MARK: - API Methods
     
@@ -211,84 +379,127 @@ enum CirclemsAPI {
         let url = "\(baseURL)/WebCatalog/GetEventList"
         return try await AF.request(url, headers: await headers())
             .debugValidate()
-            .serializingDecodable(EventListResponse.self, decoder: decoder)
+            .serializingDecodable(EventListResponse.self, decoder: makeDecoder())
             .value
     }
     
     static func getCatalogBase(eventId: Int) async throws -> CatalogBaseResponse {
         let url = "\(baseURL)/CatalogBase/All/"
-        let parameters: [String: Any] = ["event_id": eventId]
-        return try await AF.request(url, parameters: parameters, headers: await headers())
+        return try await AF.request(
+            url,
+            parameters: EventParameters(eventID: eventId),
+            encoder: URLEncodedFormParameterEncoder.default,
+            headers: await headers()
+        )
             .debugValidate()
-            .serializingDecodable(CatalogBaseResponse.self, decoder: decoder)
+            .serializingDecodable(CatalogBaseResponse.self, decoder: makeDecoder())
             .value
     }
     
-    static func getFavoriteCircles(eventId: Int, circleName: String? = nil) async throws -> FavoriteCirclesResponse {
+    static func getFavoriteCircles(
+        eventId: Int,
+        circleName: String? = nil,
+        page: Int = 1,
+        lastUpdate: String? = nil
+    ) async throws -> FavoriteCirclesResponse {
         let url = "\(baseURL)/Readers/FavoriteCircles"
-        var parameters: [String: Any] = ["event_id": eventId]
-        if let circleName = circleName {
-            parameters["circle_name"] = circleName
-        }
-        return try await AF.request(url, parameters: parameters, headers: await headers())
+        return try await AF.request(
+            url,
+            parameters: FavoriteListParameters(
+                eventID: eventId,
+                circleName: circleName,
+                page: page,
+                lastUpdate: lastUpdate
+            ),
+            encoder: URLEncodedFormParameterEncoder.default,
+            headers: await headers()
+        )
             .debugValidate()
-            .serializingDecodable(FavoriteCirclesResponse.self, decoder: decoder)
+            .serializingDecodable(FavoriteCirclesResponse.self, decoder: makeDecoder())
             .value
     }
     
     static func getCircle(wcid: String) async throws -> CircleResponse {
         let url = "\(baseURL)/WebCatalog/GetCircle"
-        let parameters: [String: Any] = ["wcid": wcid]
-        return try await AF.request(url, parameters: parameters, headers: await headers())
+        return try await AF.request(
+            url,
+            parameters: CircleParameters(wcid: wcid),
+            encoder: URLEncodedFormParameterEncoder.default,
+            headers: await headers()
+        )
             .debugValidate()
-            .serializingDecodable(CircleResponse.self, decoder: decoder)
+            .serializingDecodable(CircleResponse.self, decoder: makeDecoder())
             .value
     }
     
-    static func queryCircles(eventId: Int, circleName: String? = nil, genre: String? = nil, floor: String? = nil, sort: String? = nil, lastUpdate: String? = nil) async throws -> CircleQueryResponse {
+    static func queryCircles(
+        eventId: Int,
+        circleName: String? = nil,
+        genre: String? = nil,
+        floor: String? = nil,
+        sort: String? = nil,
+        page: Int? = nil,
+        lastUpdate: String? = nil
+    ) async throws -> CircleQueryResponse {
         let url = "\(baseURL)/WebCatalog/QueryCircle"
-        var parameters: [String: Any] = ["event_id": eventId]
-        if let circleName = circleName { parameters["circle_name"] = circleName }
-        if let genre = genre { parameters["genre"] = genre }
-        if let floor = floor { parameters["floor"] = floor }
-        if let sort = sort { parameters["sort"] = sort }
-        if let lastUpdate = lastUpdate { parameters["lastupdate"] = lastUpdate }
-        return try await AF.request(url, parameters: parameters, headers: await headers())
+        return try await AF.request(
+            url,
+            parameters: CircleQueryParameters(
+                eventID: eventId,
+                circleName: circleName,
+                genre: genre,
+                floor: floor,
+                sort: sort,
+                page: page,
+                lastUpdate: lastUpdate
+            ),
+            encoder: URLEncodedFormParameterEncoder.default,
+            headers: await headers()
+        )
             .debugValidate()
-            .serializingDecodable(CircleQueryResponse.self, decoder: decoder)
+            .serializingDecodable(CircleQueryResponse.self, decoder: makeDecoder())
             .value
     }
     
-    static func addFavorite(wcid: String, color: String? = nil, memo: String? = nil, free: String? = nil) async throws -> EmptyResponse {
+    static func addFavorite(wcid: Int, color: Int, memo: String, free: String? = nil) async throws -> FavoriteMutationResponse {
         let url = "\(baseURL)/Readers/Favorite"
-        var parameters: [String: Any] = ["wcid": wcid]
-        if let color = color { parameters["color"] = color }
-        if let memo = memo { parameters["memo"] = memo }
-        if let free = free { parameters["free"] = free }
-        return try await AF.request(url, method: .post, parameters: parameters, headers: await headers())
+        return try await AF.request(
+            url,
+            method: .post,
+            parameters: FavoriteMutationParameters(wcid: wcid, color: color, memo: memo, free: free),
+            encoder: URLEncodedFormParameterEncoder.default,
+            headers: await headers()
+        )
             .debugValidate()
-            .serializingDecodable(EmptyResponse.self, decoder: decoder)
+            .serializingDecodable(FavoriteMutationResponse.self, decoder: makeDecoder())
             .value
     }
     
-    static func editFavorite(wcid: String, color: String? = nil, memo: String? = nil, free: String? = nil) async throws -> EmptyResponse {
+    static func editFavorite(wcid: Int, color: Int, memo: String, free: String? = nil) async throws -> FavoriteMutationResponse {
         let url = "\(baseURL)/Readers/Favorite"
-        var parameters: [String: Any] = ["wcid": wcid]
-        if let color = color { parameters["color"] = color }
-        if let memo = memo { parameters["memo"] = memo }
-        if let free = free { parameters["free"] = free }
-        return try await AF.request(url, method: .put, parameters: parameters, headers: await headers())
+        return try await AF.request(
+            url,
+            method: .put,
+            parameters: FavoriteMutationParameters(wcid: wcid, color: color, memo: memo, free: free),
+            encoder: URLEncodedFormParameterEncoder.default,
+            headers: await headers()
+        )
             .debugValidate()
-            .serializingDecodable(EmptyResponse.self, decoder: decoder)
+            .serializingDecodable(FavoriteMutationResponse.self, decoder: makeDecoder())
             .value
     }
     
-    static func deleteFavorite(wcid: String) async throws -> EmptyResponse {
+    static func deleteFavorite(wcid: Int) async throws -> Response<EmptyResponse> {
         let url = "\(baseURL)/Readers/Favorite"
-        let parameters: [String: Any] = ["wcid": wcid]
-        return try await AF.request(url, method: .delete, parameters: parameters, headers: await headers())
+        return try await AF.request(
+            url,
+            method: .delete,
+            parameters: FavoriteDeleteParameters(wcid: wcid),
+            encoder: URLEncodedFormParameterEncoder.default,
+            headers: await headers()
+        )
             .debugValidate()
-            .serializingDecodable(EmptyResponse.self, decoder: decoder)
+            .serializingDecodable(Response<EmptyResponse>.self, decoder: makeDecoder())
             .value
     }
     
@@ -296,24 +507,30 @@ enum CirclemsAPI {
         let url = "\(baseURL)/User/Info"
         return try await AF.request(url, method: .post, headers: await headers())
             .debugValidate()
-            .serializingDecodable(UserInfoResponse.self, decoder: decoder)
+            .serializingDecodable(UserInfoResponse.self, decoder: makeDecoder())
             .value
     }
     
     static func queryBooks(eventId: Int, circleName: String? = nil, workName: String? = nil, workWord: String? = nil, genre: String? = nil, floor: String? = nil, sort: String? = nil, page: Int? = nil, lastUpdate: String? = nil) async throws -> BookQueryResponse {
         let url = "\(baseURL)/WebCatalog/QueryBook"
-        var parameters: [String: Any] = ["event_id": eventId]
-        if let circleName = circleName { parameters["circle_name"] = circleName }
-        if let workName = workName { parameters["work_name"] = workName }
-        if let workWord = workWord { parameters["work_word"] = workWord }
-        if let genre = genre { parameters["genre"] = genre }
-        if let floor = floor { parameters["floor"] = floor }
-        if let sort = sort { parameters["sort"] = sort }
-        if let page = page { parameters["page"] = page }
-        if let lastUpdate = lastUpdate { parameters["lastupdate"] = lastUpdate }
-        return try await AF.request(url, parameters: parameters, headers: await headers())
+        return try await AF.request(
+            url,
+            parameters: BookQueryParameters(
+                eventID: eventId,
+                circleName: circleName,
+                workName: workName,
+                workWord: workWord,
+                genre: genre,
+                floor: floor,
+                sort: sort,
+                page: page,
+                lastUpdate: lastUpdate
+            ),
+            encoder: URLEncodedFormParameterEncoder.default,
+            headers: await headers()
+        )
             .debugValidate()
-            .serializingDecodable(BookQueryResponse.self, decoder: decoder)
+            .serializingDecodable(BookQueryResponse.self, decoder: makeDecoder())
             .value
     }
 }

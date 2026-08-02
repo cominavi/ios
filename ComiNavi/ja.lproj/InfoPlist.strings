@@ -7,3 +7,4 @@
 */
 
 "CFBundleDisplayName" = "コミナビ";
+"NSLocationWhenInUseUsageDescription" = "「現在地を設定」を開いている間、東京ビッグサイト内の会場候補を表示するために位置情報を使用します。";

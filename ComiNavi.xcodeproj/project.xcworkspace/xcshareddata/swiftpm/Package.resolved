@@ -1,13 +1,13 @@
 {
-  "originHash" : "ffd65eb56bc611800b7afa8fb80aa2a942bded18955355bbdaf53935a27be97a",
+  "originHash" : "1b0c236a36c2839dbc4349d6e8dd64d0dd0a2e247d386227586217e44613191f",
   "pins" : [
     {
       "identity" : "alamofire",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Alamofire/Alamofire.git",
       "state" : {
-        "revision" : "f455c2975872ccd2d9c81594c658af65716e9b9a",
-        "version" : "5.9.1"
+        "revision" : "7595cbcf59809f9977c5f6378500de2ad73b7ddb",
+        "version" : "5.12.0"
       }
     },
     {
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/DebugSwift/DebugSwift.git",
       "state" : {
-        "revision" : "e2e24a76141532bf750be66d65eaec564168d948",
-        "version" : "0.3.6"
+        "revision" : "4bb3daceccecefe77502cac2cd148643e7917466",
+        "version" : "0.4.0"
       }
     },
     {
@@ -38,12 +38,21 @@
       }
     },
     {
+      "identity" : "maplibre-gl-native-distribution",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/maplibre/maplibre-gl-native-distribution.git",
+      "state" : {
+        "revision" : "84a79bc375a301169390ac110c868f06c857b83f",
+        "version" : "6.27.0"
+      }
+    },
+    {
       "identity" : "posthog-ios",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/PostHog/posthog-ios.git",
       "state" : {
-        "revision" : "1eba0e86ecb5fa06b463629fcd3a7d75f1f58494",
-        "version" : "3.12.6"
+        "revision" : "067ccbb5290517eb7362117879488f9286ffe299",
+        "version" : "3.67.0"
       }
     },
     {
@@ -51,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/getsentry/sentry-cocoa/",
       "state" : {
-        "revision" : "5575af93efb776414f243e93d6af9f6258dc539a",
-        "version" : "8.36.0"
+        "revision" : "f196cbb98e0388381d57908f2f5a9bdc385cde68",
+        "version" : "8.58.4"
       }
     },
     {
@@ -69,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/BastiaanJansen/toast-swift",
       "state" : {
-        "revision" : "9a40b722b6eeb9683d47e3584501e81525741291",
-        "version" : "2.1.2"
+        "revision" : "b8f0de845abca47eee747b6e671f1141ec4dcf3e",
+        "version" : "2.1.3"
       }
     }
   ],

@@ -1,0 +1,22 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version='0.6' generator='ComiNavi test' upload='never'>
+  <node id='-1' lat='35.6300000' lon='139.7960000'/>
+  <node id='-2' lat='35.6301000' lon='139.7961000'/>
+  <node id='-3' lat='35.6302000' lon='139.7962000'/>
+  <node id='-4' lat='35.6303000' lon='139.7963000'/>
+  <way id='-10'>
+    <nd ref='-1'/>
+    <nd ref='-2'/>
+    <tag k='highway' v='footway'/>
+    <tag k='cominavi:route' v='yes'/>
+    <tag k='level' v='1'/>
+    <tag k='indoor' v='yes'/>
+    <tag k='name' v='Locally authored aisle'/>
+  </way>
+  <way id='-11'>
+    <nd ref='-3'/>
+    <nd ref='-4'/>
+    <tag k='highway' v='footway'/>
+    <tag k='name' v='Unapproved nearby noise'/>
+  </way>
+</osm>

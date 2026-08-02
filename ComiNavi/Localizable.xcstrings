@@ -1,7 +1,191 @@
 {
-  "sourceLanguage" : "ja",
+  "sourceLanguage" : "en",
   "strings" : {
+    "" : {
+      "shouldTranslate" : false
+    },
+    "%lld m · About %lld min" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld m・約%2$lld分"
+          }
+        }
+      }
+    },
+    "%@, destination %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@、行き先 %2$@"
+          }
+        }
+      }
+    },
+    "Building walking route…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "徒歩経路を作成中…"
+          }
+        }
+      }
+    },
+    "Choose a destination using its Comiket address" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミケ住所から行き先を選択"
+          }
+        }
+      }
+    },
+    "Choose the block letter printed in the destination's Comiket address." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行き先のコミケ住所にあるブロック文字を選んでください。"
+          }
+        }
+      }
+    },
+    "Choose the venue containing the table you want to visit." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行きたいスペースがある会場を選んでください。"
+          }
+        }
+      }
+    },
+    "Clear destination" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行き先を消去"
+          }
+        }
+      }
+    },
+    "Enter a Comiket table address" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミケのスペース番号を入力"
+          }
+        }
+      }
+    },
+    "Enter the one- or two-digit space number from the destination's Comiket address." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行き先のコミケ住所にある1〜2桁のスペース番号を入力してください。"
+          }
+        }
+      }
+    },
+    "Going to %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@へ移動"
+          }
+        }
+      }
+    },
+    "Navigate" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "経路を表示"
+          }
+        }
+      }
+    },
+    "Path data incomplete · %lld m" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "経路データ不足・約%lld m"
+          }
+        }
+      }
+    },
+    "Set your current location to build the route" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を設定すると経路を表示できます"
+          }
+        }
+      }
+    },
+    "Show a walking route to this table" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このスペースまでの徒歩経路を表示"
+          }
+        }
+      }
+    },
+    "What is the destination number?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行き先の番号は？"
+          }
+        }
+      }
+    },
+    "Where To?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行き先を設定"
+          }
+        }
+      }
+    },
+    "Where do you want to go?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "どこへ行きますか？"
+          }
+        }
+      }
+    },
+    "Which letter is your destination?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行き先の文字は？"
+          }
+        }
+      }
+    },
     "!" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12,25 +196,224 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "へ！"
+            "value" : "！"
           }
         }
       }
     },
     "..." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "…"
+          }
+        }
+      }
+    },
+    "@%@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "@%@"
+          }
+        }
+      }
+    },
+    "%@ · Block %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@・%2$@ブロック"
+          }
+        }
+      }
     },
     "%@ / %@" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
-            "state" : "new",
+            "state" : "translated",
             "value" : "%1$@ / %2$@"
           }
         }
       }
     },
+    "%@ | %lld blocks" : {
+      "comment" : "Comiket name followed by the number of visible blocks",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ | %2$lld blocks"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@｜%2$lldブロック"
+          }
+        }
+      }
+    },
+    "%@ table spaces" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@スペース"
+          }
+        }
+      }
+    },
+    "%@, %lld circles" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld circles"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@、%2$lldサークル"
+          }
+        }
+      }
+    },
+    "%@, %lld table spaces" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@、%2$lldスペース"
+          }
+        }
+      }
+    },
+    "%@, user location %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, user location %2$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@、現在地%2$@"
+          }
+        }
+      }
+    },
+    "%@%lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@%2$lld"
+          }
+        }
+      }
+    },
+    "%lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
+    "%lld active" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld件の絞り込み"
+          }
+        }
+      }
+    },
+    "%lld circles" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lldサークル"
+          }
+        }
+      }
+    },
+    "%lld columns" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld列"
+          }
+        }
+      }
+    },
+    "%lld matching circles" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一致するサークル：%lld件"
+          }
+        }
+      }
+    },
+    "%lld of %lld circles" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lldサークル中%1$lld件"
+          }
+        }
+      }
+    },
+    "%lld of %lld shown" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld shown"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld件中%1$lld件を表示"
+          }
+        }
+      }
+    },
+    "%lld venues and %lld facilities, zoom %@ times" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld venues and %2$lld facilities, zoom %3$@ times"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場%1$lldか所、施設%2$lldか所、ズーム%3$@倍"
+          }
+        }
+      }
+    },
     "%lld日目" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -42,6 +425,126 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld日目"
+          }
+        }
+      }
+    },
+    "1F Room 102 · temporary care; ask staff for ambulance assistance" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1階102号室・臨時救護所（救急車が必要な場合はスタッフへ）"
+          }
+        }
+      }
+    },
+    "1F–2F" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1–2階"
+          }
+        }
+      }
+    },
+    "2F" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2階"
+          }
+        }
+      }
+    },
+    "2F Meeting Room B · ask staff for ambulance assistance" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2階 会議室B・救急車が必要な場合はスタッフへ"
+          }
+        }
+      }
+    },
+    "2F–3F" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2–3階"
+          }
+        }
+      }
+    },
+    "3F–4F" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3–4階"
+          }
+        }
+      }
+    },
+    "7-Eleven · Kokusai-tenjijo Station" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セブン‐イレブン・国際展示場駅"
+          }
+        }
+      }
+    },
+    "7-Eleven · TFT" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セブン‐イレブン・TFT"
+          }
+        }
+      }
+    },
+    "100 m grid" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "100 m方眼"
+          }
+        }
+      }
+    },
+    "a" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "a"
+          }
+        }
+      }
+    },
+    "About" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル情報"
+          }
+        }
+      }
+    },
+    "Accessible restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バリアフリートイレ"
           }
         }
       }
@@ -62,6 +565,16 @@
         }
       }
     },
+    "Accuracy about %lld meters. You always confirm the venue." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精度は約%lld mです。会場は必ずご自身で確認してください。"
+          }
+        }
+      }
+    },
     "Actions" : {
       "comment" : "Gallery Preview Action Title",
       "localizations" : {
@@ -74,7 +587,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アクション"
+            "value" : "操作"
           }
         }
       }
@@ -96,6 +609,146 @@
         }
       }
     },
+    "Add to route" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルートに追加"
+          }
+        }
+      }
+    },
+    "Afternoon" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "午後"
+          }
+        }
+      }
+    },
+    "Afternoon Entry & Wristband Sales" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "午後入場口・リストバンド販売"
+          }
+        }
+      }
+    },
+    "Afternoon; may change with weather or congestion" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "午後（天候や混雑状況により変更の場合あり）"
+          }
+        }
+      }
+    },
+    "All" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて"
+          }
+        }
+      }
+    },
+    "All circles" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのサークル"
+          }
+        }
+      }
+    },
+    "All genres" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのジャンル"
+          }
+        }
+      }
+    },
+    "All tags" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてのタグ"
+          }
+        }
+      }
+    },
+    "Any" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いずれか"
+          }
+        }
+      }
+    },
+    "Ariake Corridor Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有明連絡通路トイレ"
+          }
+        }
+      }
+    },
+    "Ariake Passenger Terminal" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有明客船ターミナル"
+          }
+        }
+      }
+    },
+    "Arrival" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到着・入場"
+          }
+        }
+      }
+    },
+    "Ask staff for ambulance assistance" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "救急車が必要な場合はスタッフへ"
+          }
+        }
+      }
+    },
+    "ATM available" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ATMあり"
+          }
+        }
+      }
+    },
     "Authenticating..." : {
       "localizations" : {
         "en" : {
@@ -107,12 +760,206 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "認証中..."
+            "value" : "認証中…"
+          }
+        }
+      }
+    },
+    "Authentication failed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "認証に失敗しました"
+          }
+        }
+      }
+    },
+    "Authentication failed: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "認証に失敗しました：%@"
+          }
+        }
+      }
+    },
+    "Automatically matched from public X posts. Check the confidence and booth before relying on it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているXの投稿から自動照合しています。利用前に確度とスペースを確認してください。"
+          }
+        }
+      }
+    },
+    "Available spaces: %lld through %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用できるスペース：%1$lld〜%2$lld"
+          }
+        }
+      }
+    },
+    "b" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "b"
+          }
+        }
+      }
+    },
+    "Before arrival" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "到着前"
+          }
+        }
+      }
+    },
+    "Block %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ブロック"
+          }
+        }
+      }
+    },
+    "Campus" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場全体"
+          }
+        }
+      }
+    },
+    "catalog" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログ"
+          }
+        }
+      }
+    },
+    "Catalog" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログ"
+          }
+        }
+      }
+    },
+    "catalog data" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログデータ"
+          }
+        }
+      }
+    },
+    "Catalog order" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログ順"
+          }
+        }
+      }
+    },
+    "Catalog switch failed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログを切り替えられませんでした"
+          }
+        }
+      }
+    },
+    "Catalog unavailable" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログを利用できません"
+          }
+        }
+      }
+    },
+    "Catalogs and saved route plans are stored separately for each event." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログと保存したルートは、イベントごとに分けて保存されます。"
+          }
+        }
+      }
+    },
+    "Catalogs unavailable" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用できるカタログがありません"
+          }
+        }
+      }
+    },
+    "Change Comiket and event day" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミケと開催日を変更"
+          }
+        }
+      }
+    },
+    "Change event day or Comiket" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開催日またはコミケを変更"
+          }
+        }
+      }
+    },
+    "Characters in Gojūon order, starting with あ on the left" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左端の「あ」から始まる五十音順の文字一覧"
           }
         }
       }
     },
     "Checking updates..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -123,7 +970,271 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アップデートをチェックしています..."
+            "value" : "更新を確認中…"
+          }
+        }
+      }
+    },
+    "Choose another catalog" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別のカタログを選ぶ"
+          }
+        }
+      }
+    },
+    "Choose the venue you are standing in. Location is only used to suggest an answer." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今いる会場を選んでください。位置情報は候補の表示にのみ使用します。"
+          }
+        }
+      }
+    },
+    "Choose your venue manually." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場を手動で選んでください。"
+          }
+        }
+      }
+    },
+    "Circle" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル"
+          }
+        }
+      }
+    },
+    "Circle details" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル詳細"
+          }
+        }
+      }
+    },
+    "Circle gallery" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルギャラリー"
+          }
+        }
+      }
+    },
+    "Circle, creator, description, or tag" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル名、作家名、説明、タグ"
+          }
+        }
+      }
+    },
+    "Circle, creator, or description" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル名、作家名、説明"
+          }
+        }
+      }
+    },
+    "Circle, creator, X handle, post, or tag" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル・作家・Xアカウント・投稿・タグ"
+          }
+        }
+      }
+    },
+    "Circle.ms" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms"
+          }
+        }
+      }
+    },
+    "Circle.ms did not return any currently viewable Comiket catalogs." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msから現在閲覧できるコミケットカタログが返されませんでした。"
+          }
+        }
+      }
+    },
+    "Circle.ms portal" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms ポータル"
+          }
+        }
+      }
+    },
+    "Circle.ms returned an invalid catalog database URL." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msから無効なカタログデータベースURLが返されました。"
+          }
+        }
+      }
+    },
+    "Circle.ms returned an invalid non-HTTPS database URL." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msから安全でないデータベースURLが返されました。"
+          }
+        }
+      }
+    },
+    "Circle.ms returned an unsupported login response." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msから未対応のログイン応答が返されました。"
+          }
+        }
+      }
+    },
+    "Clear" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリア"
+          }
+        }
+      }
+    },
+    "Clear filters" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "絞り込みを解除"
+          }
+        }
+      }
+    },
+    "Clear number" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "番号を消去"
+          }
+        }
+      }
+    },
+    "Clear search" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検索をクリア"
+          }
+        }
+      }
+    },
+    "Close" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じる"
+          }
+        }
+      }
+    },
+    "Close map search" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図検索を閉じる"
+          }
+        }
+      }
+    },
+    "Comic Market %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミックマーケット%lld"
+          }
+        }
+      }
+    },
+    "Comiket" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミケ"
+          }
+        }
+      }
+    },
+    "Comiket & day" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミケと開催日"
+          }
+        }
+      }
+    },
+    "Comiket catalog, %@" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミケットカタログ：%@"
+          }
+        }
+      }
+    },
+    "Comiket location" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地"
           }
         }
       }
@@ -144,7 +1255,301 @@
         }
       }
     },
+    "Compass heading · %lld° %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コンパスの方位・%1$lld° %2$@"
+          }
+        }
+      }
+    },
+    "Conference Tower" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会議棟"
+          }
+        }
+      }
+    },
+    "Conference Tower 1F" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会議棟1階"
+          }
+        }
+      }
+    },
+    "Conference Tower 6F" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会議棟6階"
+          }
+        }
+      }
+    },
+    "Conference Tower Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会議棟トイレ"
+          }
+        }
+      }
+    },
+    "Conference Tower Smoking Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会議棟喫煙所"
+          }
+        }
+      }
+    },
+    "Conference Tower Underground Parking" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会議棟地下駐車場"
+          }
+        }
+      }
+    },
+    "Connecting Bridge" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連絡ブリッジ"
+          }
+        }
+      }
+    },
+    "Copied" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーしました"
+          }
+        }
+      }
+    },
+    "Copied to clipboard" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリップボードにコピーしました"
+          }
+        }
+      }
+    },
+    "Copies the Comiket-formatted circle address" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミケ形式のサークル配置をコピーします"
+          }
+        }
+      }
+    },
+    "Copies the Comiket-formatted location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミケ形式の現在地をコピーします"
+          }
+        }
+      }
+    },
+    "Copy" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピー"
+          }
+        }
+      }
+    },
+    "Copy %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@をコピー"
+          }
+        }
+      }
+    },
+    "Copy location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地をコピー"
+          }
+        }
+      }
+    },
+    "Cosplay" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コスプレ"
+          }
+        }
+      }
+    },
+    "Cosplay Area · East 7 Antenna Site" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コスプレエリア・東7ホール アンテナサイト"
+          }
+        }
+      }
+    },
+    "Cosplay Area · East Hall 8" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コスプレエリア・東8ホール"
+          }
+        }
+      }
+    },
+    "Cosplay Area · Gardens" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コスプレエリア・庭園"
+          }
+        }
+      }
+    },
+    "Cosplay Area · Rooftop Exhibition Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コスプレエリア・屋上展示場"
+          }
+        }
+      }
+    },
+    "Cosplay Changing · Men" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コスプレ更衣室・男性"
+          }
+        }
+      }
+    },
+    "Cosplay Changing · Women" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コスプレ更衣室・女性"
+          }
+        }
+      }
+    },
+    "Cosplay Early Entry Exchange / Changing" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コスプレ先行入場リストバンド交換・更衣室"
+          }
+        }
+      }
+    },
+    "Could not load %@: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@を読み込めませんでした：%2$@"
+          }
+        }
+      }
+    },
+    "Crawl data" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クロールデータ"
+          }
+        }
+      }
+    },
+    "Crowd Flow" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人の流れ"
+          }
+        }
+      }
+    },
+    "Current event" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在のイベント"
+          }
+        }
+      }
+    },
+    "Daily Yamazaki · Ariake" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デイリーヤマザキ・有明"
+          }
+        }
+      }
+    },
+    "Data source" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データソース"
+          }
+        }
+      }
+    },
     "Day" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -155,12 +1560,174 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "日"
+            "value" : "日目"
+          }
+        }
+      }
+    },
+    "Day & Comiket" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開催日とコミケ"
+          }
+        }
+      }
+    },
+    "Day %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld日目"
+          }
+        }
+      }
+    },
+    "Day %lld · %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld日目・%2$@"
+          }
+        }
+      }
+    },
+    "Delete last digit" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最後の数字を削除"
+          }
+        }
+      }
+    },
+    "Demo data" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デモデータ"
+          }
+        }
+      }
+    },
+    "Direction is staff-controlled" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "進行方向はスタッフの誘導に従ってください"
+          }
+        }
+      }
+    },
+    "Direction may change with crowd control" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "混雑整理により進行方向が変わる場合があります"
+          }
+        }
+      }
+    },
+    "Discover" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "興味から探す"
+          }
+        }
+      }
+    },
+    "Discover interests" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "興味から探す"
+          }
+        }
+      }
+    },
+    "Do not walk; follow staff direction" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歩かず、スタッフの誘導に従ってください"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了"
+          }
+        }
+      }
+    },
+    "Double tap to filter by this interest" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダブルタップでこの興味に絞り込みます"
+          }
+        }
+      }
+    },
+    "Double tap to remove this interest" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダブルタップでこの興味を解除します"
+          }
+        }
+      }
+    },
+    "Double-tap to inspect a table. Press and hold to set your location." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダブルタップでスペースを確認できます。長押しすると現在地を設定できます。"
+          }
+        }
+      }
+    },
+    "Downloading\ndatabases" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データベースを\nダウンロード中"
+          }
+        }
+      }
+    },
+    "Downloading %@ databases…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@のデータベースをダウンロード中…"
           }
         }
       }
     },
     "Downloading databases, this may take a while..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -171,12 +1738,433 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "データベースをダウンロードするには時間がかかる場合がございます。"
+            "value" : "データベースをダウンロードしています。しばらくお待ちください…"
+          }
+        }
+      }
+    },
+    "Downloads catalogs supported by Circle.ms." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msが提供するカタログをダウンロードします。"
+          }
+        }
+      }
+    },
+    "Drag to move, pinch to zoom, rotate with two fingers, or tap a venue or table." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ドラッグで移動、ピンチで拡大・縮小、2本指で回転できます。会場やスペースをタップして選択できます。"
+          }
+        }
+      }
+    },
+    "E" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東"
+          }
+        }
+      }
+    },
+    "East %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東%@ホール"
+          }
+        }
+      }
+    },
+    "East 1 Elevator · East · Staff-directed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東1ホール エレベーター・東側・スタッフ誘導"
+          }
+        }
+      }
+    },
+    "East 1 Elevator · West · Staff-directed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東1ホール エレベーター・西側・スタッフ誘導"
+          }
+        }
+      }
+    },
+    "East 1 Escalator · East · Staff-directed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東1ホール エスカレーター・東側・スタッフ誘導"
+          }
+        }
+      }
+    },
+    "East 1 Escalator · West · Staff-directed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東1ホール エスカレーター・西側・スタッフ誘導"
+          }
+        }
+      }
+    },
+    "East 1 Galleria Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東1ホール ガレリア側トイレ"
+          }
+        }
+      }
+    },
+    "East 1 Outer Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東1ホール 外周側トイレ"
+          }
+        }
+      }
+    },
+    "East 1 Stairs · Staff-directed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東1ホール 階段・スタッフ誘導"
+          }
+        }
+      }
+    },
+    "East 1–3" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東1–3ホール"
+          }
+        }
+      }
+    },
+    "East 2 Galleria Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東2ホール ガレリア側トイレ"
+          }
+        }
+      }
+    },
+    "East 2 Outer Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東2ホール 外周側トイレ"
+          }
+        }
+      }
+    },
+    "East 3 Galleria Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東3ホール ガレリア側トイレ"
+          }
+        }
+      }
+    },
+    "East 3 Outer Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東3ホール 外周側トイレ"
+          }
+        }
+      }
+    },
+    "East 4–6" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東4–6ホール"
+          }
+        }
+      }
+    },
+    "East 7" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東7ホール"
+          }
+        }
+      }
+    },
+    "East Early / AM Waiting Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東地区 早朝・午前待機場所"
+          }
+        }
+      }
+    },
+    "East Entry / Exit / Re-entry · Early & Morning" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東地区 入場・退場・再入場口・早朝／午前"
+          }
+        }
+      }
+    },
+    "East Galleria circulation" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東ガレリア内移動ルート"
+          }
+        }
+      }
+    },
+    "East Galleria Food & Restaurants" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東ガレリア 飲食・レストラン"
+          }
+        }
+      }
+    },
+    "East Hall 7 Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東7ホール トイレ"
+          }
+        }
+      }
+    },
+    "East Hall 8 Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東8ホール トイレ"
+          }
+        }
+      }
+    },
+    "East Halls" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東ホール"
+          }
+        }
+      }
+    },
+    "East Halls 4–6 · Closed for construction" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東4–6ホール・改修工事のため閉鎖"
+          }
+        }
+      }
+    },
+    "East Parking Entrance" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東棟駐車場入口"
+          }
+        }
+      }
+    },
+    "East Waiting Area Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東待機場所 トイレ"
+          }
+        }
+      }
+    },
+    "Elevator · Staff-directed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エレベーター・スタッフ誘導"
+          }
+        }
+      }
+    },
+    "Elevators & Stairs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エレベーター・階段"
+          }
+        }
+      }
+    },
+    "Enter 1–2 digits" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1〜2桁の番号を入力"
+          }
+        }
+      }
+    },
+    "Enter the one- or two-digit space number printed beside the block letter." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブロック文字の横に書かれた1〜2桁のスペース番号を入力してください。"
+          }
+        }
+      }
+    },
+    "Entered number %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力した番号：%@"
+          }
+        }
+      }
+    },
+    "Entrance Hall 2F" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エントランスホール2階"
+          }
+        }
+      }
+    },
+    "Entrance Hall Cafes & Food" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エントランスホール カフェ・飲食"
+          }
+        }
+      }
+    },
+    "Entrance Hall Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エントランスホールトイレ"
+          }
+        }
+      }
+    },
+    "Entrance Plaza" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エントランスプラザ"
+          }
+        }
+      }
+    },
+    "Entrance Plaza · from 12:30" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エントランスプラザ・12:30以降"
+          }
+        }
+      }
+    },
+    "Entrance Plaza Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エントランスプラザ トイレ"
+          }
+        }
+      }
+    },
+    "Entrance Plaza Smoking Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エントランスプラザ喫煙所"
+          }
+        }
+      }
+    },
+    "Entrance Plaza to East Entry" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エントランスプラザから東地区入場口"
+          }
+        }
+      }
+    },
+    "Entry / Exit" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入退場口"
           }
         }
       }
     },
     "Error: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -187,7 +2175,160 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "エラー: %@"
+            "value" : "エラー：%@"
+          }
+        }
+      }
+    },
+    "Escalator · Staff-directed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エスカレーター・スタッフ誘導"
+          }
+        }
+      }
+    },
+    "Event" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "イベント"
+          }
+        }
+      }
+    },
+    "Event day" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開催日"
+          }
+        }
+      }
+    },
+    "Explore" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "探す"
+          }
+        }
+      }
+    },
+    "Explore C104 demo data" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C104のデモデータを見る"
+          }
+        }
+      }
+    },
+    "Explore C108 crawl data" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C108のクロールデータを見る"
+          }
+        }
+      }
+    },
+    "Failed to download the catalog database: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログデータベースをダウンロードできませんでした：%@"
+          }
+        }
+      }
+    },
+    "Failed to load the Comiket catalog information." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミケットのカタログ情報を読み込めませんでした。"
+          }
+        }
+      }
+    },
+    "FamilyMart · Ariake Frontier" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファミリーマート・有明フロンティア"
+          }
+        }
+      }
+    },
+    "FamilyMart · Conference Tower" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファミリーマート・会議棟"
+          }
+        }
+      }
+    },
+    "FamilyMart · Galleria" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ファミリーマート・ガレリア"
+          }
+        }
+      }
+    },
+    "Filter" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "絞り込み"
+          }
+        }
+      }
+    },
+    "Filter circles" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを絞り込む"
+          }
+        }
+      }
+    },
+    "Finalizing..." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仕上げ中…"
+          }
+        }
+      }
+    },
+    "Find a genre or tag" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンルまたはタグを検索"
           }
         }
       }
@@ -204,6 +2345,136 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "サークルを探して、当日のルートを計画。"
+          }
+        }
+      }
+    },
+    "Finding available catalogs…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用できるカタログを検索中…"
+          }
+        }
+      }
+    },
+    "Finding interests…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "興味を分析中…"
+          }
+        }
+      }
+    },
+    "Finding your location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を取得中"
+          }
+        }
+      }
+    },
+    "First Aid" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "救護"
+          }
+        }
+      }
+    },
+    "First Aid · East Hall 1" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "救護・東1ホール"
+          }
+        }
+      }
+    },
+    "First Aid & Emergency" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "救護・緊急対応"
+          }
+        }
+      }
+    },
+    "First Aid & Emergency Help · Conference Tower" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "救護・緊急対応・会議棟"
+          }
+        }
+      }
+    },
+    "First Aid & Emergency Help · South" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "救護・緊急対応・南地区"
+          }
+        }
+      }
+    },
+    "First Aid & Emergency Help · West Atrium" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "救護・緊急対応・西アトリウム"
+          }
+        }
+      }
+    },
+    "Follow staff routing; re-entry direction may change" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スタッフの誘導に従ってください。再入場の進行方向は変更される場合があります"
+          }
+        }
+      }
+    },
+    "Food" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "飲食"
+          }
+        }
+      }
+    },
+    "Food, Shops & Restrooms" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "飲食・売店・トイレ"
+          }
+        }
+      }
+    },
+    "Galleria" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ガレリア"
           }
         }
       }
@@ -225,7 +2496,88 @@
         }
       }
     },
+    "Gates & Tickets" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入退場口・チケット"
+          }
+        }
+      }
+    },
+    "General Information" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "総合案内"
+          }
+        }
+      }
+    },
+    "Genre" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンル"
+          }
+        }
+      }
+    },
+    "Genre colors" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンルの色分け"
+          }
+        }
+      }
+    },
+    "Genre overlay" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンル分布"
+          }
+        }
+      }
+    },
+    "Genres" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンル"
+          }
+        }
+      }
+    },
+    "Genres, tags, and words from circle descriptions" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンル・タグ・サークル説明のキーワード"
+          }
+        }
+      }
+    },
+    "GPS reference · about %lld m accuracy" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS参考値・精度約%lld m"
+          }
+        }
+      }
+    },
     "Hall" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -241,7 +2593,168 @@
         }
       }
     },
+    "Has shinagaki" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お品書きあり"
+          }
+        }
+      }
+    },
+    "Hide genre legend" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンル凡例を隠す"
+          }
+        }
+      }
+    },
+    "Hide genre overlay" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンル分布を隠す"
+          }
+        }
+      }
+    },
+    "Hide Optional Layers" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加レイヤーをすべて隠す"
+          }
+        }
+      }
+    },
+    "High confidence" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確度：高"
+          }
+        }
+      }
+    },
+    "High-confidence post and placement match" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "投稿と配置の照合確度は高です"
+          }
+        }
+      }
+    },
+    "High-confidence shinagaki" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確度の高いお品書き"
+          }
+        }
+      }
+    },
+    "image data" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像データ"
+          }
+        }
+      }
+    },
+    "Image unavailable" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を表示できません"
+          }
+        }
+      }
+    },
+    "Information" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "案内所"
+          }
+        }
+      }
+    },
+    "Information · East Hall 1" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "案内所・東1ホール"
+          }
+        }
+      }
+    },
+    "Information · East Hall 2" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "案内所・東2ホール"
+          }
+        }
+      }
+    },
+    "Information · East Hall 3" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "案内所・東3ホール"
+          }
+        }
+      }
+    },
+    "Information & Medical" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "案内・救護"
+          }
+        }
+      }
+    },
+    "Initializing %@…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を準備中…"
+          }
+        }
+      }
+    },
+    "Initializing databases..." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データベースを初期化中…"
+          }
+        }
+      }
+    },
     "Initializing..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -252,7 +2765,317 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "初期化中..."
+            "value" : "初期化中…"
+          }
+        }
+      }
+    },
+    "Interactive unified venue map" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場内統合マップ"
+          }
+        }
+      }
+    },
+    "Interactive venue map" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場内マップ"
+          }
+        }
+      }
+    },
+    "Interest matching" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "興味の組み合わせ"
+          }
+        }
+      }
+    },
+    "International Desk" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国際部デスク"
+          }
+        }
+      }
+    },
+    "International Desk · East Galleria" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国際部受付・東ガレリア"
+          }
+        }
+      }
+    },
+    "International Desk · West Atrium" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国際部受付・西アトリウム"
+          }
+        }
+      }
+    },
+    "Japan Post ATM · TFT" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゆうちょATM・TFT"
+          }
+        }
+      }
+    },
+    "Keyword" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "キーワード"
+          }
+        }
+      }
+    },
+    "Kokusai-tenjijo Station · Rinkai Line" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国際展示場駅・りんかい線"
+          }
+        }
+      }
+    },
+    "Kokusai-tenjijo Station Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国際展示場駅トイレ"
+          }
+        }
+      }
+    },
+    "Latest shinagaki" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お品書きの新着順"
+          }
+        }
+      }
+    },
+    "Lawson · Ariake Central Tower" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローソン・有明セントラルタワー"
+          }
+        }
+      }
+    },
+    "Lawson · Entrance Hall" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローソン・エントランスホール"
+          }
+        }
+      }
+    },
+    "Lawson · Kokusai-tenjijo Station" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローソン・国際展示場駅"
+          }
+        }
+      }
+    },
+    "Lawson · South Hall" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ローソン・南ホール"
+          }
+        }
+      }
+    },
+    "Layers" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "レイヤー"
+          }
+        }
+      }
+    },
+    "Layout" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示形式"
+          }
+        }
+      }
+    },
+    "Link Space" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンクスペース"
+          }
+        }
+      }
+    },
+    "Links" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リンク"
+          }
+        }
+      }
+    },
+    "List" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リスト"
+          }
+        }
+      }
+    },
+    "Loading campus…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場全体を読み込み中…"
+          }
+        }
+      }
+    },
+    "Loading Circle.ms tags…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msのタグを読み込み中…"
+          }
+        }
+      }
+    },
+    "Loading circles…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを読み込み中…"
+          }
+        }
+      }
+    },
+    "Loading genre colors…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンルの色分けを読み込み中…"
+          }
+        }
+      }
+    },
+    "Loading social data..." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ソーシャルデータを読み込み中…"
+          }
+        }
+      }
+    },
+    "Loading venue maps…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場マップを読み込み中…"
+          }
+        }
+      }
+    },
+    "Loading venue…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場マップを読み込み中…"
+          }
+        }
+      }
+    },
+    "Locate me" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ここに設定"
+          }
+        }
+      }
+    },
+    "Location is temporarily unavailable. Choose your venue manually." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を取得できません。会場を手動で選んでください。"
+          }
+        }
+      }
+    },
+    "Location suggests this venue. Double tap to select it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報から推定した会場です。ダブルタップで選択できます。"
+          }
+        }
+      }
+    },
+    "Location unavailable" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位置情報を利用できません"
           }
         }
       }
@@ -300,7 +3123,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ログイン中"
+            "value" : "ログイン中のアカウント"
           }
         }
       }
@@ -321,6 +3144,26 @@
         }
       }
     },
+    "Look for the large block letter nearest to you, then tap the same character below." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くにある大きなブロック文字を探し、同じ文字を下から選んでください。"
+          }
+        }
+      }
+    },
+    "Low confidence" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確度：低"
+          }
+        }
+      }
+    },
     "Map" : {
       "localizations" : {
         "en" : {
@@ -337,7 +3180,219 @@
         }
       }
     },
+    "Map %lld has invalid dimensions." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マップ%lldのサイズが無効です。"
+          }
+        }
+      }
+    },
+    "Map data attribution" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図データのクレジット"
+          }
+        }
+      }
+    },
+    "Map layers" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図レイヤー"
+          }
+        }
+      }
+    },
+    "Map unavailable" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図を表示できません"
+          }
+        }
+      }
+    },
+    "Match all" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべてに一致"
+          }
+        }
+      }
+    },
+    "Match any" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "いずれかに一致"
+          }
+        }
+      }
+    },
+    "Match interests" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "興味の組み合わせ"
+          }
+        }
+      }
+    },
+    "Meeting Plaza Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミーティングプラザ トイレ"
+          }
+        }
+      }
+    },
+    "Ministop · TFT" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ミニストップ・TFT"
+          }
+        }
+      }
+    },
+    "Mizuho ATM · TFT" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "みずほATM・TFT"
+          }
+        }
+      }
+    },
+    "N" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "北"
+          }
+        }
+      }
+    },
+    "NE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "北東"
+          }
+        }
+      }
+    },
+    "Near Kokusai-tenjijo Station" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国際展示場駅付近"
+          }
+        }
+      }
+    },
+    "No circle assigned" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルの配置がありません"
+          }
+        }
+      }
+    },
+    "No circles found" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルが見つかりません"
+          }
+        }
+      }
+    },
+    "No circles match the selected day, genre, and tag." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した日、ジャンル、タグに一致するサークルはありません。"
+          }
+        }
+      }
+    },
+    "No circles match the selected filters and interests." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択中の絞り込みや興味に一致するサークルはありません。"
+          }
+        }
+      }
+    },
+    "No crawl post could be matched confidently to this circle." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサークルに確度高く照合できるクロール投稿はありません。"
+          }
+        }
+      }
+    },
+    "No filters" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "絞り込みなし"
+          }
+        }
+      }
+    },
+    "No matched shinagaki" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "照合済みのお品書きはありません"
+          }
+        }
+      }
+    },
+    "No number entered" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "番号が入力されていません"
+          }
+        }
+      }
+    },
     "No Twitter timeline found." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -353,18 +3408,346 @@
         }
       }
     },
-    "Pending..." : {
+    "North Concourse" : {
       "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "Pending..."
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "初期化中..."
+            "value" : "北コンコース"
+          }
+        }
+      }
+    },
+    "North Concourse Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "北コンコース トイレ"
+          }
+        }
+      }
+    },
+    "North is up" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上が北です"
+          }
+        }
+      }
+    },
+    "Not logged in" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未ログイン"
+          }
+        }
+      }
+    },
+    "Not selected" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未選択"
+          }
+        }
+      }
+    },
+    "NW" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "北西"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "On-site" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場内"
+          }
+        }
+      }
+    },
+    "Open on Circle.ms" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msで開く"
+          }
+        }
+      }
+    },
+    "Open shinagaki on X" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xでお品書きを開く"
+          }
+        }
+      }
+    },
+    "Open the large-button venue locator. You can also press and hold the map." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大きなボタンで現在地を設定します。地図を長押しして設定することもできます。"
+          }
+        }
+      }
+    },
+    "Opening %@…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@を開いています…"
+          }
+        }
+      }
+    },
+    "Opening catalog…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログを開いています…"
+          }
+        }
+      }
+    },
+    "Opens an offline catalog without logging in" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログインせずにオフラインカタログを開きます"
+          }
+        }
+      }
+    },
+    "Opens in your browser" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザで開きます"
+          }
+        }
+      }
+    },
+    "Opens the bundled C104 catalog without a network connection." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同梱のC104カタログをオフラインで開きます。"
+          }
+        }
+      }
+    },
+    "Opens the bundled C108 placement and shinagaki archive without logging in" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログインせずに同梱のC108配置・お品書きアーカイブを開きます"
+          }
+        }
+      }
+    },
+    "Opens the bundled C108 placement catalog with crawled X and shinagaki data." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同梱のC108配置カタログを、収集したXとお品書きのデータとともに開きます。"
+          }
+        }
+      }
+    },
+    "Opens the image viewer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像ビューアを開きます"
+          }
+        }
+      }
+    },
+    "Opens the original public post" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元の公開投稿を開きます"
+          }
+        }
+      }
+    },
+    "Organizer office · ask staff for ambulance assistance" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主催者事務室・救急車が必要な場合はスタッフへ"
+          }
+        }
+      }
+    },
+    "Organizing circles…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを整理中…"
+          }
+        }
+      }
+    },
+    "Pedestrian walkway" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "歩行者通路"
+          }
+        }
+      }
+    },
+    "Pending sync" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期待ち"
+          }
+        }
+      }
+    },
+    "Pixiv" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pixiv"
+          }
+        }
+      }
+    },
+    "Place your position on the venue map" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場マップに現在地を設定します"
+          }
+        }
+      }
+    },
+    "Please try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "Positioned from your map press" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図の長押しで設定"
+          }
+        }
+      }
+    },
+    "Positioned with Where Am I" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「現在地を設定」で登録"
+          }
+        }
+      }
+    },
+    "Possible automated placement match" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動照合による配置候補です"
+          }
+        }
+      }
+    },
+    "Possible match" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "照合候補"
+          }
+        }
+      }
+    },
+    "Preloading map data..." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マップデータを事前読み込み中…"
+          }
+        }
+      }
+    },
+    "Preparing catalog…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログを準備中…"
+          }
+        }
+      }
+    },
+    "Press and hold the map to set your position" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図を長押しして現在地を設定"
           }
         }
       }
@@ -380,7 +3763,167 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "プロファイル"
+            "value" : "プロフィール"
+          }
+        }
+      }
+    },
+    "Publication" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発行物"
+          }
+        }
+      }
+    },
+    "QR Wristband Exchange · 8:00–12:30" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QRリストバンド交換所・8:00–12:30"
+          }
+        }
+      }
+    },
+    "QR Wristband Exchange · after 12:30" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QRリストバンド交換所・12:30以降"
+          }
+        }
+      }
+    },
+    "Quick Views" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クイック表示"
+          }
+        }
+      }
+    },
+    "Read down, then move right" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上から下へ、次は右へ"
+          }
+        }
+      }
+    },
+    "Refurbishment closure · Mar 30–Dec 31, 2026" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "改修工事による閉鎖・2026年3月30日〜12月31日"
+          }
+        }
+      }
+    },
+    "Remove %@ filter" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@の絞り込みを解除"
+          }
+        }
+      }
+    },
+    "Remove from route" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルートから削除"
+          }
+        }
+      }
+    },
+    "Reset map to north" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図を北向きに戻す"
+          }
+        }
+      }
+    },
+    "Rinkai Line to East AM waiting line" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "りんかい線から東午前待機列"
+          }
+        }
+      }
+    },
+    "Rinkai Line to West AM waiting line" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "りんかい線から西午前待機列"
+          }
+        }
+      }
+    },
+    "Route color" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルートの色"
+          }
+        }
+      }
+    },
+    "Route color %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルートの色%lld"
+          }
+        }
+      }
+    },
+    "S" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "南"
+          }
+        }
+      }
+    },
+    "SE" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "南東"
+          }
+        }
+      }
+    },
+    "Search circles" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを検索"
           }
         }
       }
@@ -402,6 +3945,158 @@
         }
       }
     },
+    "Select this block letter" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このブロック文字を選択"
+          }
+        }
+      }
+    },
+    "Select this venue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この会場を選択"
+          }
+        }
+      }
+    },
+    "Selected" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択中"
+          }
+        }
+      }
+    },
+    "Selected, %lld circles" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択中、%lldサークル"
+          }
+        }
+      }
+    },
+    "Set location at map center" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図の中心を現在地に設定"
+          }
+        }
+      }
+    },
+    "Seven Bank ATM · Station" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セブン銀行ATM・国際展示場駅"
+          }
+        }
+      }
+    },
+    "Seven Bank ATM · TFT" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セブン銀行ATM・TFT"
+          }
+        }
+      }
+    },
+    "Share location" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を共有"
+          }
+        }
+      }
+    },
+    "Shinagaki" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お品書き"
+          }
+        }
+      }
+    },
+    "Shinagaki · %@" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お品書き・%@"
+          }
+        }
+      }
+    },
+    "Shinagaki available" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お品書きあり"
+          }
+        }
+      }
+    },
+    "Shinagaki image by %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@さんのお品書き画像"
+          }
+        }
+      }
+    },
+    "Show All" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて表示"
+          }
+        }
+      }
+    },
+    "Show genre legend" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンル凡例を表示"
+          }
+        }
+      }
+    },
+    "Show genre overlay" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ジャンル分布を表示"
+          }
+        }
+      }
+    },
     "Show in Map" : {
       "comment" : "Gallery Preview Action: Show in Map",
       "localizations" : {
@@ -419,8 +4114,205 @@
         }
       }
     },
+    "Show less" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折りたたむ"
+          }
+        }
+      }
+    },
+    "Show more" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "さらに表示"
+          }
+        }
+      }
+    },
+    "Some Circle.ms tags are unavailable. Bundled tags still work offline." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一部のCircle.msタグを取得できません。収録済みのタグはオフラインでも利用できます。"
+          }
+        }
+      }
+    },
+    "Sort" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "並び順"
+          }
+        }
+      }
+    },
+    "Source" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取得元"
+          }
+        }
+      }
+    },
+    "South %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "南%@ホール"
+          }
+        }
+      }
+    },
+    "South Concourse" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "南コンコース"
+          }
+        }
+      }
+    },
+    "South Concourse Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "南コンコース トイレ"
+          }
+        }
+      }
+    },
+    "South Hall Food Square" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "南ホール フードスクエア"
+          }
+        }
+      }
+    },
+    "South Halls" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "南ホール"
+          }
+        }
+      }
+    },
+    "Stairs · Staff-directed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "階段・スタッフ誘導"
+          }
+        }
+      }
+    },
+    "Step %lld of 3" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3ステップ中%lld"
+          }
+        }
+      }
+    },
     "Step 1/3" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ステップ1/3"
+          }
+        }
+      }
+    },
+    "Suggested by last location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前回の位置情報から推定"
+          }
+        }
+      }
+    },
+    "Suggested by live location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の位置情報から推定"
+          }
+        }
+      }
+    },
+    "SW" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "南西"
+          }
+        }
+      }
+    },
+    "Tag" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグ"
+          }
+        }
+      }
+    },
+    "Tags" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグ"
+          }
+        }
+      }
+    },
+    "Tap a venue · Positions © OpenStreetMap contributors" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場をタップ・位置データ © OpenStreetMap contributors"
+          }
+        }
+      }
+    },
+    "Tap a venue to open its table map" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場をタップしてスペースマップを開きます"
+          }
+        }
+      }
     },
     "Tap to log in" : {
       "localizations" : {
@@ -438,7 +4330,310 @@
         }
       }
     },
+    "Temporary event-day location; follow staff signs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当日の仮設場所です。スタッフの案内に従ってください"
+          }
+        }
+      }
+    },
+    "TFT Restaurants" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TFT レストラン"
+          }
+        }
+      }
+    },
+    "TFT West 2F" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TFT西館2階"
+          }
+        }
+      }
+    },
+    "That space is not present in this block." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このブロックにそのスペース番号はありません。"
+          }
+        }
+      }
+    },
+    "The %@ database is damaged. Please try downloading it again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@データベースが破損しています。もう一度ダウンロードしてください。"
+          }
+        }
+      }
+    },
+    "The %@ database is missing required data: %@." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@データベースに必要なデータがありません：%2$@。"
+          }
+        }
+      }
+    },
+    "The catalog does not contain a recognized Tokyo Big Sight venue map." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このカタログには、認識できる東京ビッグサイトの会場マップが含まれていません。"
+          }
+        }
+      }
+    },
+    "The catalog does not contain map %lld." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログにマップ%lldが含まれていません。"
+          }
+        }
+      }
+    },
+    "The crawl catalog is missing %@. Run Scripts/prepare-crawl-catalog.sh before building." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クロールカタログに%@がありません。ビルド前にScripts/prepare-crawl-catalog.shを実行してください。"
+          }
+        }
+      }
+    },
+    "The demo catalog is missing %@. Run Scripts/prepare-demo-catalog.sh before building." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デモカタログに%@がありません。ビルド前にScripts/prepare-demo-catalog.shを実行してください。"
+          }
+        }
+      }
+    },
+    "The downloaded %@ database failed its integrity check." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロードした%@データベースの整合性を確認できませんでした。"
+          }
+        }
+      }
+    },
+    "The downloaded %@ file is not a valid catalog database." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロードした%@ファイルは有効なカタログデータベースではありません。"
+          }
+        }
+      }
+    },
+    "The login response could not be verified. Please try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログイン応答を確認できませんでした。もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "The login response did not include a refresh token." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログイン応答にリフレッシュトークンが含まれていません。"
+          }
+        }
+      }
+    },
+    "The login response did not include an access token." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログイン応答にアクセストークンが含まれていません。"
+          }
+        }
+      }
+    },
+    "The login response did not include an expiration time." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログイン応答に有効期限が含まれていません。"
+          }
+        }
+      }
+    },
+    "This catalog does not contain a recognized Tokyo Big Sight venue map." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このカタログには、認識可能な東京ビッグサイトの会場マップが含まれていません。"
+          }
+        }
+      }
+    },
+    "This event is not included in the crawl catalog." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この開催回はクロールカタログに含まれていません。"
+          }
+        }
+      }
+    },
+    "This event is not included in the demo catalog." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このイベントはデモカタログに含まれていません。"
+          }
+        }
+      }
+    },
+    "This follows the usual day, hall, block, two-digit space, and a/b format. “付近” means you are near that space." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "日・ホール・ブロック・2桁のスペース番号・a/bの順で表記します。「付近」は、そのスペースの近くにいることを示します。"
+          }
+        }
+      }
+    },
+    "This physical table has no public circle for the selected day." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択した日には、このスペースに公開サークルが配置されていません。"
+          }
+        }
+      }
+    },
+    "Ticket Exchange" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "チケット交換"
+          }
+        }
+      }
+    },
+    "Tokyo Big Sight ATM" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東京ビッグサイトATM"
+          }
+        }
+      }
+    },
+    "Tokyo Big Sight Bus Terminal" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東京ビッグサイト バスターミナル"
+          }
+        }
+      }
+    },
+    "Tokyo Big Sight campus overview" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東京ビッグサイト会場全体図"
+          }
+        }
+      }
+    },
+    "Tokyo Big Sight Station" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東京ビッグサイト駅"
+          }
+        }
+      }
+    },
+    "Tokyo Big Sight Taxi Stand" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東京ビッグサイト タクシー乗り場"
+          }
+        }
+      }
+    },
+    "Tokyo Big Sight unified campus map" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東京ビッグサイト統合会場マップ"
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度試す"
+          }
+        }
+      }
+    },
+    "Try another search or clear a filter." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別のキーワードで検索するか、絞り込みを解除してください。"
+          }
+        }
+      }
+    },
     "Twitter Timeline" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -454,7 +4649,212 @@
         }
       }
     },
+    "Unavailable" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "利用不可"
+          }
+        }
+      }
+    },
+    "unknown" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不明"
+          }
+        }
+      }
+    },
+    "Unmatched" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未照合"
+          }
+        }
+      }
+    },
+    "Unnamed circle" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名称未設定のサークル"
+          }
+        }
+      }
+    },
+    "Update" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        }
+      }
+    },
+    "Update location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を更新"
+          }
+        }
+      }
+    },
+    "Updating campus…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場全体を更新中…"
+          }
+        }
+      }
+    },
+    "Updating venue…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場を更新中…"
+          }
+        }
+      }
+    },
+    "Uppercase and lowercase letters identify different areas. Check the letter’s case carefully." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "大文字と小文字は別のエリアを表します。見えている文字が大文字か小文字か、よく確認してください。"
+          }
+        }
+      }
+    },
+    "Using last received location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最後に取得した位置情報を使用中"
+          }
+        }
+      }
+    },
+    "Using live location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の位置情報を使用中"
+          }
+        }
+      }
+    },
+    "Venue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場"
+          }
+        }
+      }
+    },
+    "Venues unavailable" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場を読み込めません"
+          }
+        }
+      }
+    },
+    "View and copy your current location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を確認・コピー"
+          }
+        }
+      }
+    },
+    "View, copy, or share your current location" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地の確認、コピー、共有ができます"
+          }
+        }
+      }
+    },
+    "View, copy, share, or update your current location" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地の確認、コピー、共有、再設定ができます"
+          }
+        }
+      }
+    },
+    "W" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西"
+          }
+        }
+      }
+    },
+    "Waiting Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "待機場所"
+          }
+        }
+      }
+    },
+    "Wanza Pharmacy · TFT" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ワンザ薬局・TFT"
+          }
+        }
+      }
+    },
+    "Website" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Webサイト"
+          }
+        }
+      }
+    },
     "Welcome to" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -470,8 +4870,258 @@
         }
       }
     },
+    "Welcome to ComiNavi!" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コミナビへようこそ！"
+          }
+        }
+      }
+    },
+    "West / South Entry / Exit / Re-entry · Early & Morning" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西・南地区 入場・退場・再入場口・早朝／午前"
+          }
+        }
+      }
+    },
+    "West %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西%@ホール"
+          }
+        }
+      }
+    },
+    "West Atrium" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西アトリウム"
+          }
+        }
+      }
+    },
+    "West Atrium Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西アトリウム トイレ"
+          }
+        }
+      }
+    },
+    "West Early / AM Waiting Area" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西地区 早朝・午前待機場所"
+          }
+        }
+      }
+    },
+    "West Hall Cafe" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西ホール カフェ"
+          }
+        }
+      }
+    },
+    "West Halls" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西ホール"
+          }
+        }
+      }
+    },
+    "West Information Desk" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西地区案内所"
+          }
+        }
+      }
+    },
+    "West Waiting Area Restroom" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西待機場所 トイレ"
+          }
+        }
+      }
+    },
+    "What number do you see?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見えている番号は？"
+          }
+        }
+      }
+    },
+    "Where Am I" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を設定"
+          }
+        }
+      }
+    },
+    "Where am I?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地を設定"
+          }
+        }
+      }
+    },
+    "Where are you?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今いる会場は？"
+          }
+        }
+      }
+    },
+    "Which letter do you see?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見えている文字は？"
+          }
+        }
+      }
+    },
+    "X profile" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xプロフィール"
+          }
+        }
+      }
+    },
+    "You are near %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@付近にいます"
+          }
+        }
+      }
+    },
+    "You can choose a venue while this updates." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新中も会場を選べます。"
+          }
+        }
+      }
+    },
+    "Your location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在地"
+          }
+        }
+      }
+    },
+    "Yurikamome arrival route" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゆりかもめ到着ルート"
+          }
+        }
+      }
+    },
+    "Zoom %@ times, %lld circle images, %lld route stops" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Zoom %1$@ times, %2$lld circle images, %3$lld route stops"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ズーム%1$@倍、サークル画像%2$lld件、経路上の立ち寄り先%3$lld件"
+          }
+        }
+      }
+    },
+    "Zoom in" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拡大"
+          }
+        }
+      }
+    },
+    "Zoom out" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "縮小"
+          }
+        }
+      }
+    },
     "データベースを\nダウンロード中" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading\ndatabases"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "データベースを\nダウンロード中"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

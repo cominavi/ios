@@ -8,7 +8,13 @@
 import SwiftUI
 
 struct ProfileScreen: View {
-    @ObservedObject var userState = AppData.userState
+    @State private var userState = AppData.userState
+    let catalogLibrary: CatalogLibrary
+
+    @MainActor
+    init(catalogLibrary: CatalogLibrary = AppData.catalogLibrary) {
+        self.catalogLibrary = catalogLibrary
+    }
 
     var body: some View {
         Form {
@@ -26,20 +32,45 @@ struct ProfileScreen: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
-                        Text(userState.user?.nickname ?? "Not Logged In")
+                        Text(userState.user?.nickname ?? String(localized: "Not logged in"))
                             .font(.title3)
                     }
                 }
                 .padding(.vertical, 8)
             }
 
+            Section("Data source") {
+                Menu {
+                    ForEach(catalogLibrary.availableModes, id: \.self) { mode in
+                        Button {
+                            catalogLibrary.selectMode(mode)
+                        } label: {
+                            if mode == catalogLibrary.mode {
+                                Label(mode.displayName, systemImage: "checkmark")
+                            } else {
+                                Text(mode.displayName)
+                            }
+                        }
+                    }
+                } label: {
+                    LabeledContent("Source", value: catalogLibrary.mode.displayName)
+                }
+                .disabled(catalogLibrary.availableModes.count < 2 || catalogLibrary.isSwitching)
+                .accessibilityIdentifier("profile-catalog-data-source")
+
+                Text(catalogLibrary.mode.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Account") {
                 Button {
                     withAnimation {
+                        let dataSource = AppData.circlems
                         userState.user = nil
-
-                        DispatchQueue.global(qos: .background).async {
-                            AppData.circlems.cleanAllCaches()
+                        catalogLibrary.reset()
+                        Task {
+                            await dataSource?.cleanAllCaches()
                         }
                     }
                 } label: {

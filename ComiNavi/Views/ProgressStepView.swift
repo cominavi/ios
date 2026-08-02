@@ -29,7 +29,7 @@ struct ProgressStepView: View {
                     .monospacedDigit()
 
                 Group {
-                    Text("データベースを\nダウンロード中")
+                    Text("Downloading\ndatabases")
                         .font(.largeTitle)
                         .foregroundColor(.accentColor)
                         .fontWeight(.semibold)
@@ -57,4 +57,3 @@ struct ProgressStepView: View {
     ProgressStepView()
         .environment(\.locale, .init(identifier: "ja"))
 }
-

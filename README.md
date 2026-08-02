@@ -38,8 +38,12 @@ xcodebuild \
 - The app and UI-test targets use automatic signing.
 - Debug builds disable Sentry and PostHog event delivery.
 - `.sentryclirc` is local-only and must not be committed.
-- The release-only Sentry symbol-upload phase intentionally disables Xcode user-script sandboxing.
+- The Staging and TestFlight Sentry symbol-upload phase intentionally disables Xcode user-script sandboxing.
   `sentry-cli --include-sources` reads the generated dSYM directory and source context,
   which are not completely modeled as build-phase inputs.
+- Use the shared `ComiNavi-TestFlight` scheme for App Store Connect archives.
+  It is release-optimized, uses the production bundle identifier with the
+  currently available Circle.ms sandbox credentials, and excludes non-production
+  SQLite fixtures. See `docs/testflight.md`.
 - Developer-specific debugger and breakpoint settings belong under ignored `xcuserdata`.
   The shared scheme keeps a non-debugger launch configuration for reproducible builds.

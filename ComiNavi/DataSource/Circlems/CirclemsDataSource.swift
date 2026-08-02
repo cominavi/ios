@@ -10,6 +10,7 @@ import CryptoKit
 import Foundation
 import GRDB
 import Gzip
+import Observation
 
 enum Readiness: Equatable {
     struct Progress: Equatable {
@@ -60,19 +61,54 @@ extension FloorMapLayer {
     }
 }
 
-struct CirclemsDataSourceRemoteConfig {
-    var digest: String
-    var remoteUrl: String
+enum CatalogDatabaseOrigin: Equatable, Sendable {
+    case remote(URL)
+    case local(URL)
 }
 
-struct CirclemsDataSourceInitializationParams {
-    let main: CirclemsDataSourceRemoteConfig
-    let image: CirclemsDataSourceRemoteConfig
+struct CatalogDatabaseConfiguration: Equatable, Sendable {
+    let digest: String
+    let origin: CatalogDatabaseOrigin
+}
+
+struct CatalogDataSourceConfiguration: Equatable, Sendable {
+    let eventID: Int
+    let eventNumber: Int
+    let main: CatalogDatabaseConfiguration
+    let image: CatalogDatabaseConfiguration
+    let enrichment: CatalogEnrichmentConfiguration?
+    let allowsBookmarkSync: Bool
+    let allowsRemoteMetadata: Bool
+
+    init(
+        eventID: Int,
+        eventNumber: Int,
+        main: CatalogDatabaseConfiguration,
+        image: CatalogDatabaseConfiguration,
+        enrichment: CatalogEnrichmentConfiguration? = nil,
+        allowsBookmarkSync: Bool,
+        allowsRemoteMetadata: Bool = true
+    ) {
+        self.eventID = eventID
+        self.eventNumber = eventNumber
+        self.main = main
+        self.image = image
+        self.enrichment = enrichment
+        self.allowsBookmarkSync = allowsBookmarkSync
+        self.allowsRemoteMetadata = allowsRemoteMetadata
+    }
 }
 
 enum CirclemsDataSourceDatabaseType: String {
     case main
     case image
+
+    var localizedName: String {
+        switch self {
+        case .main: String(localized: "catalog data")
+        case .image: String(localized: "image data")
+        }
+    }
     
     var estimatedBytes: Int64 {
         switch self {
@@ -96,8 +132,18 @@ enum CirclemsDataSourceDatabaseType: String {
 struct CirclemsDataSourceDatabaseMetadata: Equatable {
     var type: CirclemsDataSourceDatabaseType
     var digest: String
-    var remoteUrl: String
+    var origin: CatalogDatabaseOrigin
     var localPath: String
+
+    var remoteURL: URL? {
+        guard case .remote(let url) = origin else { return nil }
+        return url
+    }
+
+    var isLocalResource: Bool {
+        if case .local = origin { return true }
+        return false
+    }
 }
 
 struct CirclemsDataSourceDatabases {
@@ -105,98 +151,224 @@ struct CirclemsDataSourceDatabases {
     let image: CirclemsDataSourceDatabaseMetadata
 }
 
-class CirclemsDataSource: ObservableObject {
+@MainActor
+@Observable
+final class CirclemsDataSource {
     static let SHOULD_CHECK_DATABASE_EXISTS = true
     
     private let databases: CirclemsDataSourceDatabases
+    private let allowsBookmarkSync: Bool
+    private let enrichmentIsRequired: Bool
+    private let enrichmentStore: CatalogEnrichmentStore?
+    let allowsRemoteMetadata: Bool
     
-    private var sqliteMain: DatabasePool!
-    private var sqliteImage: DatabasePool!
+    private var sqliteMain: (any DatabaseReader)!
+    private var sqliteImage: (any DatabaseReader)!
+    private var preparationTask: Task<Void, Error>?
+
+    private(set) var mapCatalog: (any MapCatalog)!
+    private(set) var userPlanStore: any UserPlanStoring
+    private(set) var bookmarkSyncCoordinator: BookmarkSyncCoordinator!
     
     public var comiket: Comiket!
+    public let eventID: Int
     public var comiketId: String
     
-    @Published var readiness: Readiness = .uninitialized
+    var readiness: Readiness = .uninitialized
     
-    var circles: [CirclemsDataSchema.ComiketCircleWC] = []
-    
-    init(params: CirclemsDataSourceInitializationParams, comiketId: String) {
+    init(configuration: CatalogDataSourceConfiguration) {
+        let comiketId = String(configuration.eventNumber)
+        self.eventID = configuration.eventID
         self.databases = CirclemsDataSourceDatabases(
             main: CirclemsDataSourceDatabaseMetadata(
                 type: .main,
-                digest: params.main.digest,
-                remoteUrl: params.main.remoteUrl,
-                localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases, createIfNeeded: true)
-                    .appendingPathComponent("main.sqlite")
-                    .path
+                digest: configuration.main.digest,
+                origin: configuration.main.origin,
+                localPath: Self.localPath(
+                    for: configuration.main.origin,
+                    type: .main,
+                    eventID: configuration.eventID,
+                    comiketID: comiketId
+                )
             ),
             image: CirclemsDataSourceDatabaseMetadata(
                 type: .image,
-                digest: params.image.digest,
-                remoteUrl: params.image.remoteUrl,
-                localPath: DirectoryManager.shared.cachesFor(comiketId: comiketId, .circlems, .databases, createIfNeeded: true)
-                    .appendingPathComponent("image.sqlite")
-                    .path
+                digest: configuration.image.digest,
+                origin: configuration.image.origin,
+                localPath: Self.localPath(
+                    for: configuration.image.origin,
+                    type: .image,
+                    eventID: configuration.eventID,
+                    comiketID: comiketId
+                )
             )
         )
+        self.allowsBookmarkSync = configuration.allowsBookmarkSync
+        self.allowsRemoteMetadata = configuration.allowsRemoteMetadata
+        enrichmentIsRequired = configuration.enrichment?.isRequired == true
+        enrichmentStore = configuration.enrichment.map {
+            CatalogEnrichmentStore(resourceURL: $0.resourceURL)
+        }
         self.comiketId = comiketId
+
+        let userID = AppData.userState.user?.userId ?? 0
+        let userPlanURL = DirectoryManager.shared
+            .userDataFor(eventID: configuration.eventID, comiketId: comiketId, userID: userID)
+            .appendingPathComponent("user-plan.sqlite")
+        if let userPlanStore = try? SQLiteUserPlanStore(path: userPlanURL.path) {
+            self.userPlanStore = userPlanStore
+        } else {
+            self.userPlanStore = InMemoryUserPlanStore()
+        }
+
+        if !configuration.allowsBookmarkSync {
+            bookmarkSyncCoordinator = nil
+        }
         
         self.prepare()
     }
+
+    private static func localPath(
+        for origin: CatalogDatabaseOrigin,
+        type: CirclemsDataSourceDatabaseType,
+        eventID: Int,
+        comiketID: String
+    ) -> String {
+        switch origin {
+        case .local(let url):
+            url.path
+        case .remote:
+            DirectoryManager.shared
+                .cachesFor(
+                    eventID: eventID,
+                    comiketId: comiketID,
+                    .circlems,
+                    .databases,
+                    createIfNeeded: true
+                )
+                .appendingPathComponent("\(type.rawValue).sqlite")
+                .path
+        }
+    }
     
     private func prepare() {
-        self.readiness = .initializing(state: "Pending...")
-        
-        Task(priority: .userInitiated) {
+        self.readiness = .initializing(state: String(localized: "Preparing catalog…"))
+
+        preparationTask = Task(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
             do {
                 try await self.initialize()
-                
-                DispatchQueue.main.async {
-                    self.readiness = .ready
-                }
+                try Task.checkCancellation()
+
+                self.readiness = .ready
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
-                DispatchQueue.main.async {
-                    self.readiness = .error(error: error.localizedDescription)
-                }
+                self.readiness = .error(error: error.localizedDescription)
+                throw error
             }
         }
     }
-    
-    private func initialize() async throws {
-        try await self.downloadDatabases()
-        DispatchQueue.main.sync {
-            self.readiness = .initializing(state: "Initializing databases...")
-        }
-        try await self.initDatabaseConnections()
-        DispatchQueue.main.sync {
-            self.readiness = .initializing(state: "Preloading UFD Dataset...")
-        }
-        try self.preloadUFDData()
-        DispatchQueue.main.sync {
-            self.readiness = .initializing(state: "Extracting images...")
-        }
-        try await self.extractAndCacheCircleImages()
-        DispatchQueue.main.sync {
-            self.readiness = .initializing(state: "Fetching circles...")
-        }
-        try await self.preloadCircles()
-        DispatchQueue.main.sync {
-            self.readiness = .initializing(state: "Finalizing...")
-        }
+
+    func waitUntilReady() async throws {
+        guard let preparationTask else { throw CancellationError() }
+        try await preparationTask.value
+    }
+
+    func cancelPreparation() {
+        preparationTask?.cancel()
+        preparationTask = nil
     }
     
-    private func downloadDatabases() async throws {
+    private func initialize() async throws {
+        try Task.checkCancellation()
+        try await self.prepareDatabases()
+        try Task.checkCancellation()
+        self.readiness = .initializing(state: String(localized: "Initializing databases..."))
+        try await self.initDatabaseConnections()
+        try Task.checkCancellation()
+        self.readiness = .initializing(state: String(localized: "Preloading map data..."))
+        try self.preloadUFDData()
+        try Task.checkCancellation()
+        if let enrichmentStore {
+            self.readiness = .initializing(state: String(localized: "Loading social data..."))
+            do {
+                try await enrichmentStore.prepare()
+            } catch {
+                if enrichmentIsRequired {
+                    throw error
+                }
+                NSLog("Optional catalog enrichment could not be loaded: \(error)")
+            }
+        }
+        try Task.checkCancellation()
+        #if DEBUG
+        await runMapIndexProbeIfRequested()
+        #endif
+        self.readiness = .initializing(state: String(localized: "Finalizing..."))
+    }
+
+    #if DEBUG
+    private func runMapIndexProbeIfRequested() async {
+        guard ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-map-index-probe") else {
+            return
+        }
+
+        do {
+            let sceneID = CatalogMapScene.ID(day: 1, mapID: 1)
+            let placements = try await mapCatalog.circlePlacements(
+                in: CatalogMapViewport(
+                    sceneID: sceneID,
+                    mapRect: CGRect(x: 0, y: 0, width: 1_000, height: 1_000),
+                    renderedScale: CatalogMapViewport.circleArtworkThreshold
+                )
+            )
+            guard let placement = placements.first,
+                  let circle = try await mapCatalog.circles(
+                    day: 1,
+                    tableID: placement.tableID
+                  ).first,
+                  circle.circleName.count >= 3
+            else {
+                throw NSError(
+                    domain: "CirclemsDataSource.MapIndexProbe",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "No searchable circle was found in the probe viewport."]
+                )
+            }
+            let query = String(circle.circleName.prefix(3))
+            let matches = try await mapCatalog.search(day: 1, mapID: 1, query: query)
+            guard matches.contains(where: { $0.id == circle.id }) else {
+                throw NSError(
+                    domain: "CirclemsDataSource.MapIndexProbe",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "The derived index did not return its source circle."]
+                )
+            }
+            NSLog("Map index probe succeeded: \(placements.count) placements, query matched \(matches.count) circles")
+        } catch {
+            NSLog("Map index probe failed: \(error)")
+        }
+    }
+    #endif
+    
+    private func prepareDatabases() async throws {
         let allDatabases = [self.databases.main, self.databases.image]
         var databasesToDownload: [CirclemsDataSourceDatabaseMetadata] = []
 
         for database in allDatabases {
-            if !self.shouldSkipDatabaseDownload(metadata: database) {
+            if database.isLocalResource {
+                try Self.validateDatabase(
+                    at: URL(fileURLWithPath: database.localPath),
+                    type: database.type
+                )
+            } else if !self.shouldSkipDatabaseDownload(metadata: database) {
                 databasesToDownload.append(database)
             }
         }
         
         if databasesToDownload.isEmpty {
-            NSLog("All databases are up-to-date, skipping download all together")
+            NSLog("Catalog databases are ready; no download is required")
             return
         }
         
@@ -227,7 +399,7 @@ class CirclemsDataSource: ObservableObject {
     private func shouldSkipDatabaseDownload(metadata: CirclemsDataSourceDatabaseMetadata) -> Bool {
         if CirclemsDataSource.SHOULD_CHECK_DATABASE_EXISTS,
            FileManager.default.fileExists(atPath: metadata.localPath),
-           hasSQLiteHeader(at: URL(fileURLWithPath: metadata.localPath)),
+           Self.hasSQLiteHeader(at: URL(fileURLWithPath: metadata.localPath)),
            let localDataDigest = UserDefaults.standard.string(forKey: databaseDigestKey(for: metadata.type)),
            localDataDigest.caseInsensitiveCompare(metadata.digest) == .orderedSame
         {
@@ -236,16 +408,24 @@ class CirclemsDataSource: ObservableObject {
         return false
     }
     
-    private func downloadDatabase(metadata: CirclemsDataSourceDatabaseMetadata, progressHandler: ((Int64, Int64) -> Void)? = nil) async throws {
-        guard let url = URL(string: metadata.remoteUrl), url.scheme == "https" else {
+    private func downloadDatabase(
+        metadata: CirclemsDataSourceDatabaseMetadata,
+        progressHandler: (@MainActor @Sendable (Int64, Int64) -> Void)? = nil
+    ) async throws {
+        guard let url = metadata.remoteURL, url.scheme == "https" else {
             throw NSError(
                 domain: "CirclemsDataSource",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Circle.ms returned an invalid non-HTTPS database URL."]
+                userInfo: [
+                    NSLocalizedDescriptionKey: String(
+                        localized: "Circle.ms returned an invalid non-HTTPS database URL."
+                    ),
+                ]
             )
         }
 
         let downloadDirectory = DirectoryManager.shared.cachesFor(
+            eventID: eventID,
             comiketId: comiketId,
             .circlems,
             .downloads,
@@ -253,56 +433,78 @@ class CirclemsDataSource: ObservableObject {
         )
         let temporaryDatabaseURL = downloadDirectory
             .appendingPathComponent("\(metadata.type.rawValue)-\(UUID().uuidString).sqlite")
+        let digestKey = databaseDigestKey(for: metadata.type)
         
         print("Downloading database from \(url) to \(metadata.localPath)...")
         
-        return try await withCheckedThrowingContinuation { continuation in
-            AF.download(url)
-                .downloadProgress { progress in
+        let request = AF.download(url)
+            .downloadProgress { progress in
+                Task { @MainActor in
                     progressHandler?(progress.completedUnitCount, progress.totalUnitCount)
                 }
-                .validate()
-                .responseData { response in
-                    do {
-                        guard let data = try? response.result.get() else {
-                            throw NSError(domain: "CirclemsDataSource", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to download database from \(metadata.remoteUrl)"])
-                        }
+            }
+            .validate()
 
-                        let downloadedDigest = Insecure.MD5.hash(data: data)
-                            .map { String(format: "%02x", $0) }
-                            .joined()
-                        guard downloadedDigest.caseInsensitiveCompare(metadata.digest) == .orderedSame else {
-                            throw NSError(
-                                domain: "CirclemsDataSource",
-                                code: 4,
-                                userInfo: [NSLocalizedDescriptionKey: "The downloaded \(metadata.type.rawValue) database failed its MD5 integrity check."]
-                            )
-                        }
+        do {
+            // Alamofire's async serializer automatically cancels the request when
+            // the owning catalog task is cancelled during an event switch.
+            let data = try await request.serializingData().value
+            try Task.checkCancellation()
 
-                        let uncompressedData = try data.gunzipped()
-                        try uncompressedData.write(to: temporaryDatabaseURL, options: .atomic)
-                        try self.validateDatabase(at: temporaryDatabaseURL, type: metadata.type)
-                        try self.installDatabase(
-                            from: temporaryDatabaseURL,
-                            to: URL(fileURLWithPath: metadata.localPath)
-                        )
+            let downloadedDigest = Insecure.MD5.hash(data: data)
+                .map { String(format: "%02x", $0) }
+                .joined()
+            guard downloadedDigest.caseInsensitiveCompare(metadata.digest) == .orderedSame else {
+                throw NSError(
+                    domain: "CirclemsDataSource",
+                    code: 4,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: String(
+                            localized: "The downloaded \(metadata.type.localizedName) database failed its integrity check."
+                        ),
+                    ]
+                )
+            }
 
-                        UserDefaults.standard.set(metadata.digest, forKey: self.databaseDigestKey(for: metadata.type))
-                        continuation.resume()
-                    } catch {
-                        try? FileManager.default.removeItem(at: temporaryDatabaseURL)
-                        continuation.resume(throwing: NSError(domain: "CirclemsDataSource", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to download database from \(metadata.remoteUrl): \(error)"]))
-                    }
-                }
+            let uncompressedData = try data.gunzipped()
+            try uncompressedData.write(to: temporaryDatabaseURL, options: .atomic)
+            try Self.validateDatabase(at: temporaryDatabaseURL, type: metadata.type)
+            try Self.installDatabase(
+                from: temporaryDatabaseURL,
+                to: URL(fileURLWithPath: metadata.localPath)
+            )
+
+            UserDefaults.standard.set(metadata.digest, forKey: digestKey)
+        } catch {
+            try? FileManager.default.removeItem(at: temporaryDatabaseURL)
+            if Task.isCancelled {
+                throw CancellationError()
+            }
+            throw NSError(
+                domain: "CirclemsDataSource",
+                code: 3,
+                userInfo: [
+                    NSLocalizedDescriptionKey: String(
+                        localized: "Failed to download the catalog database: \(error.localizedDescription)"
+                    ),
+                ]
+            )
         }
     }
 
-    private func validateDatabase(at url: URL, type: CirclemsDataSourceDatabaseType) throws {
-        guard hasSQLiteHeader(at: url) else {
+    nonisolated private static func validateDatabase(
+        at url: URL,
+        type: CirclemsDataSourceDatabaseType
+    ) throws {
+        guard Self.hasSQLiteHeader(at: url) else {
             throw NSError(
                 domain: "CirclemsDataSource",
                 code: 5,
-                userInfo: [NSLocalizedDescriptionKey: "The downloaded \(type.rawValue) file is not a SQLite 3 database."]
+                userInfo: [
+                    NSLocalizedDescriptionKey: String(
+                        localized: "The downloaded \(type.localizedName) file is not a valid catalog database."
+                    ),
+                ]
             )
         }
 
@@ -315,7 +517,11 @@ class CirclemsDataSource: ObservableObject {
                 throw NSError(
                     domain: "CirclemsDataSource",
                     code: 6,
-                    userInfo: [NSLocalizedDescriptionKey: "SQLite integrity check failed for the \(type.rawValue) database."]
+                    userInfo: [
+                        NSLocalizedDescriptionKey: String(
+                            localized: "The \(type.localizedName) database is damaged. Please try downloading it again."
+                        ),
+                    ]
                 )
             }
 
@@ -328,13 +534,20 @@ class CirclemsDataSource: ObservableObject {
                 throw NSError(
                     domain: "CirclemsDataSource",
                     code: 7,
-                    userInfo: [NSLocalizedDescriptionKey: "The \(type.rawValue) database is missing required tables: \(missingTables.sorted().joined(separator: ", "))."]
+                    userInfo: [
+                        NSLocalizedDescriptionKey: String(
+                            localized: "The \(type.localizedName) database is missing required data: \(missingTables.sorted().joined(separator: ", "))."
+                        ),
+                    ]
                 )
             }
         }
     }
 
-    private func installDatabase(from temporaryURL: URL, to destinationURL: URL) throws {
+    nonisolated private static func installDatabase(
+        from temporaryURL: URL,
+        to destinationURL: URL
+    ) throws {
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: destinationURL.path) {
             _ = try fileManager.replaceItemAt(destinationURL, withItemAt: temporaryURL)
@@ -343,7 +556,7 @@ class CirclemsDataSource: ObservableObject {
         }
     }
 
-    private func hasSQLiteHeader(at url: URL) -> Bool {
+    nonisolated private static func hasSQLiteHeader(at url: URL) -> Bool {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
         defer { try? handle.close() }
         let expectedHeader = Data("SQLite format 3\0".utf8)
@@ -351,21 +564,61 @@ class CirclemsDataSource: ObservableObject {
     }
 
     private func databaseDigestKey(for type: CirclemsDataSourceDatabaseType) -> String {
-        "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(AppEnvironment.current.storageNamespace).comiket-\(comiketId).\(type.rawValue)"
+        "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(AppEnvironment.current.storageNamespace).event-\(eventID).comiket-\(comiketId).\(type.rawValue)"
     }
 
-    private var extractedImagesKey: String {
-        "CirclemsDataSource.extractedAndCachedCircleImages.\(AppEnvironment.current.storageNamespace).comiket-\(comiketId).digest-\(databases.image.digest)"
-    }
-    
     private func initDatabaseConnections() async throws {
         // Initialize the SQLite databases
         var configuration = Configuration()
         configuration.readonly = true
         
         NSLog("Initializing databases at \(databases.main.localPath) and \(databases.image.localPath)...")
-        sqliteMain = try DatabasePool(path: databases.main.localPath, configuration: configuration)
-        sqliteImage = try DatabasePool(path: databases.image.localPath, configuration: configuration)
+        if databases.main.isLocalResource {
+            // GRDB recommends a single read-only queue for immutable resources.
+            // A pool opens reader connections lazily, which can make SQLite try
+            // to create sidecar state beside a file in the read-only app bundle.
+            sqliteMain = try DatabaseQueue(
+                path: databases.main.localPath,
+                configuration: configuration
+            )
+        } else {
+            sqliteMain = try DatabasePool(
+                path: databases.main.localPath,
+                configuration: configuration
+            )
+        }
+        if databases.image.isLocalResource {
+            sqliteImage = try DatabaseQueue(
+                path: databases.image.localPath,
+                configuration: configuration
+            )
+        } else {
+            sqliteImage = try DatabasePool(
+                path: databases.image.localPath,
+                configuration: configuration
+            )
+        }
+        let mapIndexURL = DirectoryManager.shared
+            .cachesFor(eventID: eventID, comiketId: comiketId, .circlems, .databases, createIfNeeded: true)
+            .appendingPathComponent("map-index.sqlite")
+        let mapIndex = try? MapCatalogIndex(
+            sourceDatabase: sqliteMain,
+            cacheDatabasePath: mapIndexURL.path,
+            catalogDigest: databases.main.digest
+        )
+        mapCatalog = SQLiteMapCatalog(
+            mainDatabase: sqliteMain,
+            imageDatabase: sqliteImage,
+            index: mapIndex
+        )
+        if allowsBookmarkSync {
+            bookmarkSyncCoordinator = BookmarkSyncCoordinator(
+                eventID: eventID,
+                eventNumber: Int(comiketId) ?? 0,
+                catalog: mapCatalog,
+                localStore: userPlanStore
+            )
+        }
     }
 
     private func preloadUFDData() throws {
@@ -395,13 +648,21 @@ class CirclemsDataSource: ObservableObject {
             let coverImageData = coverImage?.image
             
             guard let infoFirst = infoEntries.first else {
-                throw NSError(domain: "CirclemsDataSource", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to load Comiket info"])
+                throw NSError(
+                    domain: "CirclemsDataSource",
+                    code: 2,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: String(
+                            localized: "Failed to load the Comiket catalog information."
+                        ),
+                    ]
+                )
             }
             
             // Save the Cover Image under (cachesDirectory)/(comiketNo)/circlems/cover.png, if it does not exist
             var coverImageURL: URL? = nil
             if let coverImageData = coverImageData {
-                coverImageURL = DirectoryManager.shared.cachesFor(comiketId: infoFirst.comiketNo.string, .circlems, .images, createIfNeeded: true)
+                coverImageURL = DirectoryManager.shared.cachesFor(eventID: eventID, comiketId: infoFirst.comiketNo.string, .circlems, .images, createIfNeeded: true)
                     .appendingPathComponent("cover.png")
                 try coverImageURL?.writeIfNotExists(coverImageData)
             }
@@ -482,74 +743,83 @@ class CirclemsDataSource: ObservableObject {
         }
     }
     
-    private func extractAndCacheCircleImages() async throws {
-        if UserDefaults.standard.bool(forKey: extractedImagesKey) {
-            return
-        }
-        
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInteractive).async {
-                do {
-                    try FileManager.default.createDirectory(
-                        at: DirectoryManager.shared.cachesFor(comiketId: self.comiketId, .circlems, .images)
-                            .appendingPathComponent("circles"),
-                        withIntermediateDirectories: true, attributes: nil
-                    )
-                    
-                    try self.sqliteImage.read { db in
-                        let circleImages = try CirclemsImageSchema.ComiketCircleImage.fetchAll(db)
-                        
-                        for (i, image) in circleImages.enumerated() {
-                            guard let data = image.cutImage else { continue }
-                            
-                            let url = DirectoryManager.shared.cachesFor(comiketId: self.comiketId, .circlems, .images)
-                                .appendingPathComponent("circles")
-                                .appendingPathComponent("\(image.id).png")
-                            
-                            try data.write(to: url)
-                            
-                            // random 5% possibility
-                            if Int.random(in: 0 ..< 20) == 0 {
-                                let percentage = ((Double(i) / Double(circleImages.count)) * 100).rounded()
-                                DispatchQueue.main.async {
-                                    self.readiness = .initializing(state: "Extracting images \(Int(percentage))% (\(i)/\(circleImages.count))...")
-                                }
-                            }
-                        }
-                        
-                        UserDefaults.standard.set(true, forKey: self.extractedImagesKey)
-                        
-                        continuation.resume()
-                    }
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
-    }
-    
-    private func preloadCircles() async throws {
-        self.circles = try await self.sqliteMain.read { db in
-            try CirclemsDataSchema.ComiketCircleWC.fetchAll(db)
-        }
-    }
-    
     func getCircles() async -> [CirclemsDataSchema.ComiketCircleWC] {
-        return self.circles
-    }
-    
-    func searchCircles(_ keyword: String) -> [CirclemsDataSchema.ComiketCircleWC] {
-        let keywords = keyword.split(separator: " ")
-        
-        return self.circles.filter { circle in
-            let penName = circle.penName ?? ""
-            let circleName = circle.circleName ?? ""
-            let description = circle.description ?? ""
-                
-            return keywords.any { keyword in
-                penName.contains(keyword) || circleName.contains(keyword) || description.contains(keyword)
+        do {
+            return try await sqliteMain.read { database in
+                try CirclemsDataSchema.ComiketCircleWC.fetchAll(database)
             }
+        } catch {
+            return []
         }
+    }
+
+    func getGenres() async -> [CirclemsDataSchema.ComiketGenreWC] {
+        do {
+            return try await sqliteMain.read { database in
+                try CirclemsDataSchema.ComiketGenreWC.fetchAll(database)
+            }
+        } catch {
+            return []
+        }
+    }
+
+    func getCircleExtensions() async -> [CirclemsDataSchema.ComiketCircleExtend] {
+        do {
+            return try await sqliteMain.read { database in
+                try CirclemsDataSchema.ComiketCircleExtend.fetchAll(database)
+            }
+        } catch {
+            return []
+        }
+    }
+
+    func getCircleDetails(circleID: Int) async -> CatalogCircleDetails {
+        let comiketNumber = Int(comiketId) ?? 0
+        let extensionRecord = try? await sqliteMain.read { database in
+            try CirclemsDataSchema.ComiketCircleExtend.fetchOne(
+                database,
+                sql: "SELECT * FROM ComiketCircleExtend WHERE comiketNo = ? AND id = ?",
+                arguments: [comiketNumber, circleID]
+            )
+        }
+        let enrichment: CatalogCircleEnrichment?
+        if let enrichmentStore {
+            enrichment = try? await enrichmentStore.details(
+                circleID: circleID,
+                publicCircleID: extensionRecord?.WCId
+            )
+        } else {
+            enrichment = nil
+        }
+        return CatalogCircleDetails(
+            extensionRecord: extensionRecord,
+            enrichment: enrichment
+        )
+    }
+
+    func getCircleEnrichments() async -> [Int: CatalogCircleEnrichment] {
+        guard let enrichmentStore else { return [:] }
+        let extensions = await getCircleExtensions()
+        let publicCircleIDsByCircleID = Dictionary(
+            uniqueKeysWithValues: extensions.map { ($0.id, $0.WCId) }
+        )
+        do {
+            return try await enrichmentStore.all(
+                publicCircleIDsByCircleID: publicCircleIDsByCircleID
+            )
+        } catch {
+            NSLog("Catalog enrichment lookup failed: \(error)")
+            return [:]
+        }
+    }
+
+    func enrichmentStatistics() async -> (
+        selectedPosts: Int,
+        mappedPosts: Int,
+        mappedCircles: Int
+    )? {
+        guard let enrichmentStore else { return nil }
+        return try? await enrichmentStore.statistics()
     }
     
     func getDemoCircle() -> CirclemsDataSchema.ComiketCircleWC! {
@@ -579,18 +849,6 @@ class CirclemsDataSource: ObservableObject {
         }
     }
     
-    private func getCircleImageFromCache(circleId: Int) -> Data? {
-        do {
-            let url = DirectoryManager.shared.cachesFor(comiketId: comiket.number.string, .circlems, .images)
-                .appendingPathComponent("circles")
-                .appendingPathComponent("\(circleId).png")
-            
-            return try Data(contentsOf: url)
-        } catch {
-            return nil
-        }
-    }
-    
     func getBlocks() -> [CirclemsDataSchema.ComiketBlockWC] {
         do {
             return try self.sqliteMain.read { db in
@@ -602,13 +860,10 @@ class CirclemsDataSource: ObservableObject {
     }
     
     func getCircleImage(circleId: Int) async -> Data? {
-        if let image = self.getCircleImageFromCache(circleId: circleId) {
-            return image
-        }
-        
+        let comiketId = comiketId
         do {
             let image = try await self.sqliteImage.read { db in
-                try CirclemsImageSchema.ComiketCircleImage.fetchOne(db, sql: "SELECT * FROM ComiketCircleImage WHERE comiketNo = ? AND id = ?", arguments: [self.comiketId, circleId])
+                try CirclemsImageSchema.ComiketCircleImage.fetchOne(db, sql: "SELECT * FROM ComiketCircleImage WHERE comiketNo = ? AND id = ?", arguments: [comiketId, circleId])
             }
             
             return image?.cutImage
@@ -618,9 +873,10 @@ class CirclemsDataSource: ObservableObject {
     }
     
     func getCommonImage(name: String) async -> CirclemsImageSchema.ComiketCommonImage? {
+        let comiketId = comiketId
         do {
             let image = try await self.sqliteImage.read { db in
-                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [self.comiketId, name])
+                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [comiketId, name])
             }
             
             return image
@@ -631,10 +887,11 @@ class CirclemsDataSource: ObservableObject {
     
     func getFloorMap(layer: FloorMapLayer, day: Int, areaFileNameFragment: String) async -> CirclemsImageSchema.ComiketCommonImage? {
         let name = ["L", layer.fileNameFragment, "\(day)", areaFileNameFragment].joined()
+        let comiketId = comiketId
         
         do {
             let image = try await self.sqliteImage.read { db in
-                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [self.comiketId, name])
+                try CirclemsImageSchema.ComiketCommonImage.fetchOne(db, sql: "SELECT * FROM ComiketCommonImage WHERE comiketNo = ? AND name = ?", arguments: [comiketId, name])
             }
             
             return image
@@ -643,10 +900,17 @@ class CirclemsDataSource: ObservableObject {
         }
     }
     
-    func cleanAllCaches() {
-        UserDefaults.standard.removeObject(forKey: extractedImagesKey)
-        UserDefaults.standard.removeObject(forKey: databaseDigestKey(for: databases.main.type))
-        UserDefaults.standard.removeObject(forKey: databaseDigestKey(for: databases.image.type))
-        try? DirectoryManager.shared.removeCachesFor(comiketId: comiketId)
+    func cleanAllCaches() async {
+        if !databases.main.isLocalResource {
+            UserDefaults.standard.removeObject(forKey: databaseDigestKey(for: databases.main.type))
+        }
+        if !databases.image.isLocalResource {
+            UserDefaults.standard.removeObject(forKey: databaseDigestKey(for: databases.image.type))
+        }
+        let comiketId = comiketId
+        let eventID = eventID
+        await Task.detached(priority: .utility) {
+            try? DirectoryManager.shared.removeCachesFor(eventID: eventID, comiketId: comiketId)
+        }.value
     }
 }

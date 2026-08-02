@@ -1,0 +1,409 @@
+import CoreGraphics
+import Foundation
+
+struct WhereAmIVenueOption: Identifiable, Equatable, Sendable {
+    var id: Int { placement.id }
+
+    let displayName: String
+    let placement: BigSightVenuePlacement
+}
+
+struct WhereAmILocationReading: Equatable, Sendable {
+    let coordinate: GeographicCoordinate
+    let horizontalAccuracy: Double
+    let timestamp: Date
+
+    func isLive(at date: Date = .now) -> Bool {
+        horizontalAccuracy >= 0 && abs(date.timeIntervalSince(timestamp)) <= 15
+    }
+}
+
+struct ComiketSpaceAddress: Equatable, Sendable {
+    let day: Int
+    let hallName: String
+    let blockName: String
+    let spaceNumber: Int
+    let subspace: Int?
+
+    var spaceCode: String {
+        let number = String(format: "%02d", spaceNumber)
+        let side = subspace.map { $0 == 0 ? "a" : "b" } ?? ""
+        return "\(blockName)\(number)\(side)"
+    }
+
+    var canonicalText: String {
+        "\(day)日目 \(Self.canonicalHallName(hallName)) \(spaceCode)"
+    }
+
+    var nearbyText: String { "\(canonicalText)付近" }
+
+    func selecting(subspace: Int?) -> Self {
+        Self(
+            day: day,
+            hallName: hallName,
+            blockName: blockName,
+            spaceNumber: spaceNumber,
+            subspace: subspace
+        )
+    }
+
+    static func canonicalHallName(_ value: String) -> String {
+        let normalized = value.unicodeScalars.reduce(into: "") { result, scalar in
+            if (0xFF10 ... 0xFF19).contains(scalar.value),
+               let asciiDigit = UnicodeScalar(scalar.value - 0xFEE0)
+            {
+                result.unicodeScalars.append(asciiDigit)
+            } else if scalar != " " {
+                result.unicodeScalars.append(scalar)
+            }
+        }
+        return normalized.hasSuffix("ホール") ? normalized : "\(normalized)ホール"
+    }
+}
+
+struct LocatedMapUser: Identifiable, Equatable, Sendable {
+    enum Source: Equatable, Sendable {
+        case guidedLocator
+        case mapLongPress
+    }
+
+    let sceneID: CatalogMapScene.ID
+    let tableID: CatalogMapTable.ID
+    let blockName: String
+    let subspace: Int?
+    let venueDisplayName: String
+    let canonicalVenueName: String
+    let point: CGPoint
+    let headingDegrees: Double?
+    let venueRotationRadians: Double
+    let locationReading: WhereAmILocationReading?
+    let source: Source
+    let placedAt: Date
+
+    var id: Date { placedAt }
+
+    var mapHeadingRadians: Double? {
+        headingDegrees.map { $0 * .pi / 180 - venueRotationRadians }
+    }
+
+    var spaceCode: String {
+        address.spaceCode
+    }
+
+    var canonicalLocationText: String {
+        address.nearbyText
+    }
+
+    private var address: ComiketSpaceAddress {
+        ComiketSpaceAddress(
+            day: sceneID.day,
+            hallName: canonicalVenueName,
+            blockName: blockName,
+            spaceNumber: tableID.spaceNumber,
+            subspace: subspace
+        )
+    }
+}
+
+struct MapNavigationDestination: Identifiable, Equatable, Sendable {
+    let sceneID: CatalogMapScene.ID
+    let tableID: CatalogMapTable.ID
+    let blockName: String
+    let venueDisplayName: String
+    let canonicalVenueName: String
+    let point: CGPoint
+    let selectedAt: Date
+
+    var id: Date { selectedAt }
+
+    var spaceCode: String { address.spaceCode }
+
+    var canonicalLocationText: String { address.canonicalText }
+
+    private var address: ComiketSpaceAddress {
+        ComiketSpaceAddress(
+            day: sceneID.day,
+            hallName: canonicalVenueName,
+            blockName: blockName,
+            spaceNumber: tableID.spaceNumber,
+            subspace: nil
+        )
+    }
+}
+
+struct WhereAmICharacterLayout: Equatable, Sendable {
+    enum Mode: Equatable, Sendable {
+        case kana(columns: [KanaColumn])
+        case alphabet([String])
+    }
+
+    struct KanaColumn: Identifiable, Equatable, Sendable {
+        let id: String
+        let cells: [KanaCell]
+    }
+
+    struct KanaCell: Identifiable, Equatable, Sendable {
+        let id: Int
+        let character: String?
+    }
+
+    let mode: Mode
+
+    var usesOnlyLatinAlphabet: Bool {
+        guard case .alphabet(let characters) = mode, !characters.isEmpty else { return false }
+        return characters.allSatisfy(Self.isLatinAlphabetCharacter)
+    }
+
+    static func make(availableCharacters: [String]) -> WhereAmICharacterLayout {
+        let available = Set(availableCharacters.filter { !$0.isEmpty })
+        let hiragana = kanaColumns(using: hiraganaColumns, available: available)
+        let katakana = kanaColumns(using: katakanaColumns, available: available)
+
+        if !hiragana.isEmpty || !katakana.isEmpty {
+            return WhereAmICharacterLayout(mode: .kana(columns: hiragana + katakana))
+        }
+
+        return WhereAmICharacterLayout(
+            mode: .alphabet(available.sorted(by: alphabeticallyPrecedes))
+        )
+    }
+
+    private static let hiraganaColumns: [[String?]] = [
+        ["あ", "い", "う", "え", "お"],
+        ["か", "き", "く", "け", "こ"],
+        ["さ", "し", "す", "せ", "そ"],
+        ["た", "ち", "つ", "て", "と"],
+        ["な", "に", "ぬ", "ね", "の"],
+        ["は", "ひ", "ふ", "へ", "ほ"],
+        ["ま", "み", "む", "め", "も"],
+        ["や", nil, "ゆ", nil, "よ"],
+        ["ら", "り", "る", "れ", "ろ"],
+        ["わ", nil, nil, nil, "を"],
+        ["ん", nil, nil, nil, nil],
+    ]
+
+    private static let katakanaColumns: [[String?]] = [
+        ["ア", "イ", "ウ", "エ", "オ"],
+        ["カ", "キ", "ク", "ケ", "コ"],
+        ["サ", "シ", "ス", "セ", "ソ"],
+        ["タ", "チ", "ツ", "テ", "ト"],
+        ["ナ", "ニ", "ヌ", "ネ", "ノ"],
+        ["ハ", "ヒ", "フ", "ヘ", "ホ"],
+        ["マ", "ミ", "ム", "メ", "モ"],
+        ["ヤ", nil, "ユ", nil, "ヨ"],
+        ["ラ", "リ", "ル", "レ", "ロ"],
+        ["ワ", nil, nil, nil, "ヲ"],
+        ["ン", nil, nil, nil, nil],
+    ]
+
+    private static func kanaColumns(
+        using template: [[String?]],
+        available: Set<String>
+    ) -> [KanaColumn] {
+        template.compactMap { column in
+            let filtered = column.map { character in
+                character.flatMap { available.contains($0) ? $0 : nil }
+            }
+            guard filtered.contains(where: { $0 != nil }),
+                  let id = filtered.compactMap({ $0 }).first
+            else {
+                return nil
+            }
+            return KanaColumn(
+                id: id,
+                cells: filtered.enumerated().map { index, character in
+                    KanaCell(id: index, character: character)
+                }
+            )
+        }
+    }
+
+    private static func alphabeticallyPrecedes(_ lhs: String, _ rhs: String) -> Bool {
+        normalizedLatin(lhs).localizedStandardCompare(normalizedLatin(rhs)) == .orderedAscending
+    }
+
+    private static func normalizedLatin(_ value: String) -> String {
+        value.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? value
+    }
+
+    private static func isLatinAlphabetCharacter(_ value: String) -> Bool {
+        let normalized = normalizedLatin(value)
+        guard !normalized.isEmpty else { return false }
+        return normalized.unicodeScalars.allSatisfy { scalar in
+            (65 ... 90).contains(scalar.value) || (97 ... 122).contains(scalar.value)
+        }
+    }
+}
+
+enum WhereAmIResolver {
+    static func nearestVenue(
+        to reading: WhereAmILocationReading,
+        venues: [WhereAmIVenueOption]
+    ) -> WhereAmIVenueOption? {
+        guard reading.horizontalAccuracy >= 0, reading.horizontalAccuracy < 2_000 else { return nil }
+
+        let nearest = venues.min { lhs, rhs in
+            distance(from: reading.coordinate, to: lhs.placement.coordinate)
+                < distance(from: reading.coordinate, to: rhs.placement.coordinate)
+        }
+        guard let nearest else { return nil }
+
+        let maximumUsefulDistance = max(700, reading.horizontalAccuracy * 2)
+        return distance(from: reading.coordinate, to: nearest.placement.coordinate) <= maximumUsefulDistance
+            ? nearest
+            : nil
+    }
+
+    static func table(
+        blockName: String,
+        number: Int,
+        in scene: CatalogMapScene
+    ) -> CatalogMapTable? {
+        scene.tables.first {
+            $0.blockName == blockName && $0.id.spaceNumber == number
+        }
+    }
+
+    static func locatedUser(
+        at table: CatalogMapTable,
+        in venue: WhereAmIVenueOption,
+        subspace: Int?,
+        point: CGPoint? = nil,
+        headingDegrees: Double?,
+        locationReading: WhereAmILocationReading?,
+        source: LocatedMapUser.Source = .guidedLocator,
+        placedAt: Date = .now
+    ) -> LocatedMapUser {
+        LocatedMapUser(
+            sceneID: venue.placement.scene.id,
+            tableID: table.id,
+            blockName: table.blockName,
+            subspace: subspace,
+            venueDisplayName: venue.displayName,
+            canonicalVenueName: table.hallName
+                ?? canonicalVenueName(for: venue.placement.kind),
+            point: point ?? CGPoint(
+                x: table.origin.x + venue.placement.scene.tableSize.width / 2,
+                y: table.origin.y + venue.placement.scene.tableSize.height / 2
+            ),
+            headingDegrees: headingDegrees,
+            venueRotationRadians: Double(venue.placement.rotation),
+            locationReading: locationReading,
+            source: source,
+            placedAt: placedAt
+        )
+    }
+
+    static func navigationDestination(
+        at table: CatalogMapTable,
+        in venue: WhereAmIVenueOption,
+        selectedAt: Date = .now
+    ) -> MapNavigationDestination {
+        MapNavigationDestination(
+            sceneID: venue.placement.scene.id,
+            tableID: table.id,
+            blockName: table.blockName,
+            venueDisplayName: venue.displayName,
+            canonicalVenueName: table.hallName
+                ?? canonicalVenueName(for: venue.placement.kind),
+            point: CGPoint(
+                x: table.origin.x + venue.placement.scene.tableSize.width / 2,
+                y: table.origin.y + venue.placement.scene.tableSize.height / 2
+            ),
+            selectedAt: selectedAt
+        )
+    }
+
+    static func nearestTable(
+        to point: CGPoint,
+        in scene: CatalogMapScene
+    ) -> CatalogMapTable? {
+        scene.tables.min { lhs, rhs in
+            distance(from: point, to: tableRect(lhs, in: scene))
+                < distance(from: point, to: tableRect(rhs, in: scene))
+        }
+    }
+
+    static func subspace(
+        at point: CGPoint,
+        in table: CatalogMapTable,
+        scene: CatalogMapScene
+    ) -> Int {
+        let rect = tableRect(table, in: scene)
+        return switch table.orientation {
+        case .aLeft: point.x < rect.midX ? 0 : 1
+        case .aBottom: point.y >= rect.midY ? 0 : 1
+        case .aRight: point.x >= rect.midX ? 0 : 1
+        case .aTop: point.y < rect.midY ? 0 : 1
+        }
+    }
+
+    static func canonicalVenueName(for kind: BigSightVenuePlacement.Kind) -> String {
+        switch kind {
+        case .east123: "東1–3ホール"
+        case .east456: "東4–6ホール"
+        case .east7: "東7ホール"
+        case .west: "西ホール"
+        case .south: "南ホール"
+        }
+    }
+
+    static func venueDisplayName(for hallName: String) -> String {
+        let normalized = hallName.folding(
+            options: [.caseInsensitive, .widthInsensitive],
+            locale: Locale(identifier: "ja_JP")
+        )
+        let digits = normalized.filter(\.isNumber)
+        let range: String
+        if let first = digits.first, let last = digits.last, digits.count > 1 {
+            range = "\(first)–\(last)"
+        } else {
+            range = String(digits)
+        }
+
+        if normalized.contains("東") || normalized.uppercased().contains("EAST") {
+            return range.isEmpty
+                ? String(localized: "East Halls")
+                : String(localized: "East \(range)")
+        }
+        if normalized.contains("西") || normalized.uppercased().contains("WEST") {
+            return range.isEmpty
+                ? String(localized: "West Halls")
+                : String(localized: "West \(range)")
+        }
+        if normalized.contains("南") || normalized.uppercased().contains("SOUTH") {
+            return range.isEmpty
+                ? String(localized: "South Halls")
+                : String(localized: "South \(range)")
+        }
+        return hallName
+    }
+
+    private static func distance(
+        from lhs: GeographicCoordinate,
+        to rhs: GeographicCoordinate
+    ) -> Double {
+        let earthRadius = 6_378_137.0
+        let latitudeDelta = (rhs.latitude - lhs.latitude) * .pi / 180
+        let longitudeDelta = (rhs.longitude - lhs.longitude) * .pi / 180
+        let lhsLatitude = lhs.latitude * .pi / 180
+        let rhsLatitude = rhs.latitude * .pi / 180
+        let haversine = sin(latitudeDelta / 2) * sin(latitudeDelta / 2)
+            + cos(lhsLatitude) * cos(rhsLatitude)
+                * sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
+        return earthRadius * 2 * atan2(sqrt(haversine), sqrt(1 - haversine))
+    }
+
+    private static func tableRect(
+        _ table: CatalogMapTable,
+        in scene: CatalogMapScene
+    ) -> CGRect {
+        CGRect(origin: table.origin, size: scene.tableSize)
+    }
+
+    private static func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {
+        let dx = max(max(rect.minX - point.x, 0), point.x - rect.maxX)
+        let dy = max(max(rect.minY - point.y, 0), point.y - rect.maxY)
+        return hypot(dx, dy)
+    }
+}

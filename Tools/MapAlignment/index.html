@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ComiNavi Venue Alignment</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.css">
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      --panel: #111412;
+      --panel-raised: #191d1a;
+      --border: #303630;
+      --muted: #9ba49d;
+      --text: #f5f7f5;
+      --accent: #9de000;
+      --accent-dark: #213000;
+      --danger: #ff6b67;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body, #app { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+
+    body { background: #0b0d0c; color: var(--text); }
+
+    button, input { font: inherit; }
+
+    button { color: inherit; }
+
+    #app {
+      display: grid;
+      grid-template-columns: 330px minmax(0, 1fr);
+    }
+
+    aside {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      min-height: 0;
+      flex-direction: column;
+      background: color-mix(in srgb, var(--panel) 97%, transparent);
+      border-right: 1px solid var(--border);
+      box-shadow: 14px 0 36px rgb(0 0 0 / 0.25);
+    }
+
+    .sidebar-scroll {
+      min-height: 0;
+      overflow: auto;
+      padding: 18px 16px 24px;
+    }
+
+    header { margin-bottom: 18px; }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1 { margin: 0; font-size: 21px; letter-spacing: -0.02em; }
+
+    .intro {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 28px;
+      margin-top: 12px;
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      flex: none;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px rgb(157 224 0 / 0.12);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 18px 0 8px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .venue-list { display: grid; gap: 6px; }
+
+    .venue-row {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr) 28px;
+      align-items: center;
+      width: 100%;
+      min-height: 48px;
+      padding: 5px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .venue-row:hover { background: #1c211d; }
+
+    .venue-row.selected {
+      border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
+      background: var(--accent-dark);
+    }
+
+    .venue-swatch {
+      width: 22px;
+      height: 22px;
+      margin-left: 2px;
+      border: 2px solid var(--venue-color);
+      border-radius: 5px;
+      background: color-mix(in srgb, var(--venue-color) 22%, transparent);
+    }
+
+    .venue-name { display: block; font-size: 13px; font-weight: 680; }
+    .venue-meta { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+
+    .visibility {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .visibility:hover { background: rgb(255 255 255 / 0.08); }
+    .visibility.off { color: #626963; }
+
+    .control-card {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel-raised);
+    }
+
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 8px; }
+
+    label { display: grid; gap: 5px; color: var(--muted); font-size: 10px; }
+
+    label.full { grid-column: 1 / -1; }
+
+    .input-with-unit { position: relative; }
+
+    input[type="number"] {
+      width: 100%;
+      height: 34px;
+      padding: 0 30px 0 9px;
+      border: 1px solid #3a413b;
+      border-radius: 7px;
+      outline: none;
+      background: #0d100e;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      font-size: 12px;
+    }
+
+    input[type="number"]:focus { border-color: var(--accent); }
+
+    .unit {
+      position: absolute;
+      right: 8px;
+      bottom: 9px;
+      color: #737c75;
+      font-size: 9px;
+      pointer-events: none;
+    }
+
+    .range-row { display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: center; gap: 8px; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .range-value { color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 32px;
+      color: var(--text);
+      font-size: 11px;
+    }
+
+    .check-row input { accent-color: var(--accent); }
+
+    .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 11px; }
+
+    .button {
+      min-height: 34px;
+      padding: 7px 10px;
+      border: 1px solid #3a413b;
+      border-radius: 8px;
+      background: #222723;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .button:hover { border-color: #59615a; background: #292f2a; }
+    .button.primary { border-color: var(--accent); background: var(--accent); color: #121800; }
+    .button.primary:hover { background: #b0f515; }
+    .button:disabled { cursor: not-allowed; opacity: 0.45; }
+
+    .sidebar-footer {
+      display: grid;
+      gap: 7px;
+      padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border);
+      background: #0e110f;
+    }
+
+    .keyboard-help {
+      margin: 12px 0 0;
+      color: #7f8881;
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    kbd {
+      padding: 1px 4px;
+      border: 1px solid #414741;
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      background: #202421;
+      color: #d8ddd9;
+      font-size: 9px;
+    }
+
+    main { position: relative; min-width: 0; min-height: 0; }
+    #map, #overlay, #handles { position: absolute; inset: 0; }
+    #map { background: #dbe0da; }
+    #overlay { z-index: 2; width: 100%; height: 100%; pointer-events: none; }
+    #handles { z-index: 3; width: 100%; height: 100%; pointer-events: none; }
+
+    .handle {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      margin: -8px 0 0 -8px;
+      border: 2px solid #0d120b;
+      border-radius: 4px;
+      background: var(--accent);
+      box-shadow: 0 1px 5px rgb(0 0 0 / 0.55);
+      cursor: nwse-resize;
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .handle[data-corner="tr"], .handle[data-corner="bl"] { cursor: nesw-resize; }
+
+    .handle.center {
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      border-radius: 999px;
+      cursor: move;
+    }
+
+    .handle.center::after {
+      position: absolute;
+      inset: 5px;
+      border: 1px solid #182000;
+      border-radius: 999px;
+      content: "";
+    }
+
+    .handle.rotate {
+      width: 22px;
+      height: 22px;
+      margin: -11px 0 0 -11px;
+      border-radius: 999px;
+      background: #fff;
+      color: #101410;
+      cursor: grab;
+    }
+
+    .handle.rotate::before {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      content: "↻";
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .map-badge {
+      position: absolute;
+      z-index: 4;
+      top: 12px;
+      left: 12px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 9px;
+      border: 1px solid rgb(255 255 255 / 0.65);
+      border-radius: 9px;
+      background: rgb(18 22 19 / 0.86);
+      box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+      font-size: 11px;
+      backdrop-filter: blur(12px);
+    }
+
+    .map-badge strong { color: var(--accent); }
+
+    .toast {
+      position: fixed;
+      z-index: 20;
+      right: 18px;
+      bottom: 18px;
+      max-width: 360px;
+      padding: 11px 13px;
+      border: 1px solid #4a534b;
+      border-radius: 10px;
+      background: #121512;
+      box-shadow: 0 10px 40px rgb(0 0 0 / 0.35);
+      font-size: 12px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: 160ms ease;
+      pointer-events: none;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.error { border-color: var(--danger); color: #ffd2d0; }
+
+    .maplibregl-ctrl-bottom-right { right: 8px; bottom: 6px; }
+    .maplibregl-ctrl-attrib { font-size: 9px; }
+
+    @media (max-width: 760px) {
+      #app { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) 300px; }
+      main { grid-row: 1; }
+      aside { grid-row: 2; border-top: 1px solid var(--border); border-right: 0; }
+      .sidebar-scroll { padding-top: 12px; }
+      header, .keyboard-help { display: none; }
+      .venue-list { grid-template-columns: repeat(2, 1fr); }
+      .section-title { margin-top: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside>
+      <div class="sidebar-scroll">
+        <header>
+          <p class="eyebrow" id="eventTitle">Calibration</p>
+          <h1>Venue alignment</h1>
+          <p class="intro">Place each authored floor image over its real building. Every venue can move, resize, and rotate independently.</p>
+          <div class="status"><span class="status-dot"></span><span id="statusText">Loading local artwork…</span></div>
+        </header>
+
+        <div class="section-title"><span>Venues</span><button class="button" id="fitCampus" type="button">Fit campus</button></div>
+        <div class="venue-list" id="venueList"></div>
+
+        <div class="section-title"><span id="controlTitle">Selected venue</span></div>
+        <section class="control-card">
+          <div class="field-grid">
+            <label>Latitude
+              <div class="input-with-unit"><input id="latitude" type="number" step="0.0000001"><span class="unit">°</span></div>
+            </label>
+            <label>Longitude
+              <div class="input-with-unit"><input id="longitude" type="number" step="0.0000001"><span class="unit">°</span></div>
+            </label>
+            <label>Width
+              <div class="input-with-unit"><input id="widthMeters" type="number" min="1" step="0.1"><span class="unit">m</span></div>
+            </label>
+            <label>Height
+              <div class="input-with-unit"><input id="heightMeters" type="number" min="1" step="0.1"><span class="unit">m</span></div>
+            </label>
+            <label class="full">Rotation
+              <div class="input-with-unit"><input id="rotationDegrees" type="number" step="0.1"><span class="unit">°</span></div>
+            </label>
+            <label class="full">Artwork opacity
+              <div class="range-row"><input id="opacity" type="range" min="0.05" max="1" step="0.01"><span class="range-value" id="opacityValue"></span></div>
+            </label>
+          </div>
+          <label class="check-row"><span>Preserve image aspect ratio</span><input id="lockAspect" type="checkbox"></label>
+          <label class="check-row"><span>Show every boundary</span><input id="showAllBoundaries" type="checkbox" checked></label>
+          <div class="button-row">
+            <button class="button" id="fitVenue" type="button">Fit selected</button>
+            <button class="button" id="resetVenue" type="button">Reset selected</button>
+          </div>
+        </section>
+
+        <p class="keyboard-help">
+          Drag the center, corners, or rotation handle. Use <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> to nudge 0.25 m and <kbd>[</kbd><kbd>]</kbd> to rotate 0.1°. Hold Shift for larger steps.
+        </p>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="button primary" id="save" type="button">Save to repo</button>
+        <div class="button-row" style="margin: 0">
+          <button class="button" id="copySwift" type="button">Copy Swift values</button>
+          <button class="button" id="download" type="button">Download JSON</button>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <div id="map"></div>
+      <canvas id="overlay"></canvas>
+      <div id="handles"></div>
+      <div class="map-badge"><strong id="selectedBadge">—</strong><span>Drag handles to align</span></div>
+    </main>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.js"></script>
+  <script>
+    const EARTH_RADIUS = 6378137;
+    const COLORS = ["#9de000", "#42d3ff", "#ff9a44", "#d777ff"];
+    const canvas = document.querySelector("#overlay");
+    const context = canvas.getContext("2d");
+    const handlesRoot = document.querySelector("#handles");
+    const inputs = {
+      latitude: document.querySelector("#latitude"),
+      longitude: document.querySelector("#longitude"),
+      widthMeters: document.querySelector("#widthMeters"),
+      heightMeters: document.querySelector("#heightMeters"),
+      rotationDegrees: document.querySelector("#rotationDegrees"),
+      opacity: document.querySelector("#opacity")
+    };
+
+    let venues = [];
+    let defaults = [];
+    let selectedID = null;
+    let currentEvent = { number: 104 };
+    let activeDrag = null;
+    let toastTimer = null;
+
+    const map = new maplibregl.Map({
+      container: "map",
+      center: [139.7968, 35.6308],
+      zoom: 16.25,
+      minZoom: 14,
+      maxZoom: 21,
+      pitch: 0,
+      maxPitch: 0,
+      dragRotate: false,
+      touchPitch: false,
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            minzoom: 0,
+            maxzoom: 19,
+            attribution: "© OpenStreetMap contributors"
+          }
+        },
+        layers: [
+          { id: "background", type: "background", paint: { "background-color": "#dfe4de" } },
+          { id: "osm", type: "raster", source: "osm", paint: { "raster-saturation": -0.65, "raster-contrast": 0.04 } }
+        ]
+      }
+    });
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.on("render", draw);
+    map.on("resize", draw);
+    map.on("click", selectVenueAtMapPoint);
+
+    function radians(degrees) { return degrees * Math.PI / 180; }
+    function degrees(radiansValue) { return radiansValue * 180 / Math.PI; }
+
+    function normalizeDegrees(value) {
+      let result = ((value + 180) % 360 + 360) % 360 - 180;
+      return Math.abs(result + 180) < 1e-9 ? 180 : result;
+    }
+
+    function localOffsetToLngLat(venue, localX, localY) {
+      const angle = radians(venue.rotationDegrees);
+      const east = Math.cos(angle) * localX - Math.sin(angle) * localY;
+      const south = Math.sin(angle) * localX + Math.cos(angle) * localY;
+      return {
+        lat: venue.latitude - degrees(south / EARTH_RADIUS),
+        lng: venue.longitude + degrees(east / (EARTH_RADIUS * Math.cos(radians(venue.latitude))))
+      };
+    }
+
+    function metersBetween(origin, target) {
+      const meanLatitude = radians((origin.lat + target.lat) / 2);
+      return {
+        east: radians(target.lng - origin.lng) * EARTH_RADIUS * Math.cos(meanLatitude),
+        south: -radians(target.lat - origin.lat) * EARTH_RADIUS
+      };
+    }
+
+    function offsetLngLat(origin, east, south) {
+      return {
+        lat: origin.lat - degrees(south / EARTH_RADIUS),
+        lng: origin.lng + degrees(east / (EARTH_RADIUS * Math.cos(radians(origin.lat))))
+      };
+    }
+
+    function venueCorners(venue) {
+      const halfWidth = venue.widthMeters / 2;
+      const halfHeight = venue.heightMeters / 2;
+      return {
+        tl: localOffsetToLngLat(venue, -halfWidth, -halfHeight),
+        tr: localOffsetToLngLat(venue, halfWidth, -halfHeight),
+        br: localOffsetToLngLat(venue, halfWidth, halfHeight),
+        bl: localOffsetToLngLat(venue, -halfWidth, halfHeight)
+      };
+    }
+
+    function projectedCorners(venue) {
+      const corners = venueCorners(venue);
+      return Object.fromEntries(Object.entries(corners).map(([key, value]) => [key, map.project(value)]));
+    }
+
+    function selectedVenue() { return venues.find((venue) => venue.id === selectedID); }
+
+    function resizeCanvas() {
+      const rectangle = canvas.getBoundingClientRect();
+      const scale = window.devicePixelRatio || 1;
+      if (canvas.width !== Math.round(rectangle.width * scale) || canvas.height !== Math.round(rectangle.height * scale)) {
+        canvas.width = Math.round(rectangle.width * scale);
+        canvas.height = Math.round(rectangle.height * scale);
+      }
+      context.setTransform(scale, 0, 0, scale, 0, 0);
+      context.clearRect(0, 0, rectangle.width, rectangle.height);
+      return rectangle;
+    }
+
+    function draw() {
+      resizeCanvas();
+      const showAll = document.querySelector("#showAllBoundaries").checked;
+      venues.forEach((venue, index) => {
+        if (!venue.visible) return;
+        const points = projectedCorners(venue);
+        if (venue.image?.complete && venue.image.naturalWidth > 0) {
+          context.save();
+          context.globalAlpha = venue.opacity;
+          context.setTransform(
+            (points.tr.x - points.tl.x) / venue.image.naturalWidth * (window.devicePixelRatio || 1),
+            (points.tr.y - points.tl.y) / venue.image.naturalWidth * (window.devicePixelRatio || 1),
+            (points.bl.x - points.tl.x) / venue.image.naturalHeight * (window.devicePixelRatio || 1),
+            (points.bl.y - points.tl.y) / venue.image.naturalHeight * (window.devicePixelRatio || 1),
+            points.tl.x * (window.devicePixelRatio || 1),
+            points.tl.y * (window.devicePixelRatio || 1)
+          );
+          context.drawImage(venue.image, 0, 0);
+          context.restore();
+        }
+        if (showAll || venue.id === selectedID) {
+          context.save();
+          context.strokeStyle = COLORS[index % COLORS.length];
+          context.lineWidth = venue.id === selectedID ? 2.5 : 1.25;
+          context.setLineDash(venue.id === selectedID ? [] : [5, 4]);
+          context.beginPath();
+          context.moveTo(points.tl.x, points.tl.y);
+          context.lineTo(points.tr.x, points.tr.y);
+          context.lineTo(points.br.x, points.br.y);
+          context.lineTo(points.bl.x, points.bl.y);
+          context.closePath();
+          context.stroke();
+          context.restore();
+        }
+      });
+      positionHandles();
+    }
+
+    function positionHandles() {
+      const venue = selectedVenue();
+      if (!venue || !venue.visible) {
+        handlesRoot.replaceChildren();
+        return;
+      }
+      ensureHandles();
+      const points = projectedCorners(venue);
+      Object.entries(points).forEach(([corner, point]) => placeHandle(`[data-corner="${corner}"]`, point));
+      placeHandle(".center", map.project({ lng: venue.longitude, lat: venue.latitude }));
+      const rotatePoint = map.project(localOffsetToLngLat(venue, 0, -venue.heightMeters / 2 - 28));
+      placeHandle(".rotate", rotatePoint);
+    }
+
+    function placeHandle(selector, point) {
+      const element = handlesRoot.querySelector(selector);
+      if (!element) return;
+      element.style.left = `${point.x}px`;
+      element.style.top = `${point.y}px`;
+    }
+
+    function ensureHandles() {
+      if (handlesRoot.childElementCount) return;
+      ["tl", "tr", "br", "bl"].forEach((corner) => {
+        const handle = document.createElement("div");
+        handle.className = "handle";
+        handle.dataset.corner = corner;
+        handle.title = `Resize from ${corner.toUpperCase()}`;
+        handle.addEventListener("pointerdown", (event) => beginDrag(event, "corner", corner));
+        handlesRoot.append(handle);
+      });
+      const center = document.createElement("div");
+      center.className = "handle center";
+      center.title = "Move venue";
+      center.addEventListener("pointerdown", (event) => beginDrag(event, "center"));
+      handlesRoot.append(center);
+      const rotate = document.createElement("div");
+      rotate.className = "handle rotate";
+      rotate.title = "Rotate venue";
+      rotate.addEventListener("pointerdown", (event) => beginDrag(event, "rotate"));
+      handlesRoot.append(rotate);
+    }
+
+    function beginDrag(event, type, corner = null) {
+      event.preventDefault();
+      event.stopPropagation();
+      const venue = selectedVenue();
+      if (!venue) return;
+      const corners = venueCorners(venue);
+      const opposite = { tl: "br", tr: "bl", br: "tl", bl: "tr" };
+      activeDrag = {
+        type,
+        corner,
+        original: structuredClone(serializableVenue(venue)),
+        fixed: corner ? corners[opposite[corner]] : null,
+        pointerID: event.pointerId
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      map.dragPan.disable();
+      window.addEventListener("pointermove", continueDrag);
+      window.addEventListener("pointerup", endDrag, { once: true });
+      window.addEventListener("pointercancel", endDrag, { once: true });
+    }
+
+    function continueDrag(event) {
+      if (!activeDrag || event.pointerId !== activeDrag.pointerID) return;
+      const venue = selectedVenue();
+      const mapRectangle = document.querySelector("main").getBoundingClientRect();
+      const pointer = map.unproject([event.clientX - mapRectangle.left, event.clientY - mapRectangle.top]);
+      if (activeDrag.type === "center") {
+        venue.latitude = pointer.lat;
+        venue.longitude = pointer.lng;
+      } else if (activeDrag.type === "rotate") {
+        const vector = metersBetween({ lat: venue.latitude, lng: venue.longitude }, pointer);
+        venue.rotationDegrees = normalizeDegrees(degrees(Math.atan2(vector.east, -vector.south)));
+      } else {
+        resizeFromCorner(venue, pointer, event.shiftKey || document.querySelector("#lockAspect").checked);
+      }
+      markChanged();
+    }
+
+    function resizeFromCorner(venue, pointer, lockAspect) {
+      const signs = { tl: [-1, -1], tr: [1, -1], br: [1, 1], bl: [-1, 1] }[activeDrag.corner];
+      const vector = metersBetween(activeDrag.fixed, pointer);
+      const angle = radians(activeDrag.original.rotationDegrees);
+      const localX = Math.cos(angle) * vector.east + Math.sin(angle) * vector.south;
+      const localY = -Math.sin(angle) * vector.east + Math.cos(angle) * vector.south;
+      let width = Math.max(5, signs[0] * localX);
+      let height = Math.max(5, signs[1] * localY);
+
+      if (lockAspect) {
+        const aspect = activeDrag.original.widthMeters / activeDrag.original.heightMeters;
+        if (width / height > aspect) height = width / aspect;
+        else width = height * aspect;
+      }
+
+      const desiredLocal = { x: signs[0] * width, y: signs[1] * height };
+      const desiredWorld = {
+        east: Math.cos(angle) * desiredLocal.x - Math.sin(angle) * desiredLocal.y,
+        south: Math.sin(angle) * desiredLocal.x + Math.cos(angle) * desiredLocal.y
+      };
+      const center = offsetLngLat(activeDrag.fixed, desiredWorld.east / 2, desiredWorld.south / 2);
+      venue.latitude = center.lat;
+      venue.longitude = center.lng;
+      venue.widthMeters = width;
+      venue.heightMeters = height;
+    }
+
+    function endDrag(event) {
+      if (!activeDrag || (event.pointerId !== undefined && event.pointerId !== activeDrag.pointerID)) return;
+      activeDrag = null;
+      map.dragPan.enable();
+      window.removeEventListener("pointermove", continueDrag);
+      updateControls();
+      renderVenueList();
+      draw();
+    }
+
+    function serializableVenue(venue) {
+      const { image, color, ...result } = venue;
+      return { ...result };
+    }
+
+    function selectVenue(identifier, fit = false) {
+      selectedID = identifier;
+      handlesRoot.replaceChildren();
+      renderVenueList();
+      updateControls();
+      if (fit) fitSelectedVenue();
+      draw();
+    }
+
+    function renderVenueList() {
+      const root = document.querySelector("#venueList");
+      root.replaceChildren();
+      venues.forEach((venue, index) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = `venue-row${venue.id === selectedID ? " selected" : ""}`;
+        row.style.setProperty("--venue-color", COLORS[index % COLORS.length]);
+        row.innerHTML = `
+          <span class="venue-swatch" aria-hidden="true"></span>
+          <span><span class="venue-name">${venue.name}</span><span class="venue-meta">${venue.widthMeters.toFixed(1)} × ${venue.heightMeters.toFixed(1)} m · ${venue.rotationDegrees.toFixed(1)}°</span></span>
+          <span class="visibility ${venue.visible ? "" : "off"}" role="button" aria-label="${venue.visible ? "Hide" : "Show"} ${venue.name}" title="${venue.visible ? "Hide" : "Show"}">${venue.visible ? "◉" : "○"}</span>`;
+        row.addEventListener("click", () => selectVenue(venue.id));
+        row.querySelector(".visibility").addEventListener("click", (event) => {
+          event.stopPropagation();
+          venue.visible = !venue.visible;
+          markChanged();
+        });
+        root.append(row);
+      });
+    }
+
+    function updateControls() {
+      const venue = selectedVenue();
+      if (!venue) return;
+      document.querySelector("#controlTitle").textContent = venue.name;
+      document.querySelector("#selectedBadge").textContent = venue.name;
+      inputs.latitude.value = venue.latitude.toFixed(7);
+      inputs.longitude.value = venue.longitude.toFixed(7);
+      inputs.widthMeters.value = venue.widthMeters.toFixed(2);
+      inputs.heightMeters.value = venue.heightMeters.toFixed(2);
+      inputs.rotationDegrees.value = venue.rotationDegrees.toFixed(3);
+      inputs.opacity.value = venue.opacity;
+      document.querySelector("#opacityValue").textContent = `${Math.round(venue.opacity * 100)}%`;
+    }
+
+    function updateVenueFromInput(key, input) {
+      const venue = selectedVenue();
+      if (!venue) return;
+      if (input.value === "" || input.value === "-" || input.value === ".") return;
+      const value = Number(input.value);
+      if (!Number.isFinite(value)) return;
+      venue[key] = key === "rotationDegrees" ? normalizeDegrees(value) : value;
+      if (key === "opacity") {
+        document.querySelector("#opacityValue").textContent = `${Math.round(value * 100)}%`;
+      }
+      markChanged(false);
+      renderVenueList();
+      draw();
+    }
+
+    Object.entries(inputs).forEach(([key, input]) => {
+      input.addEventListener("input", () => updateVenueFromInput(key, input));
+      input.addEventListener("change", updateControls);
+    });
+    document.querySelector("#showAllBoundaries").addEventListener("change", draw);
+    document.querySelector("#fitVenue").addEventListener("click", fitSelectedVenue);
+    document.querySelector("#fitCampus").addEventListener("click", fitCampus);
+
+    document.querySelector("#resetVenue").addEventListener("click", () => {
+      const index = venues.findIndex((venue) => venue.id === selectedID);
+      if (index < 0) return;
+      const image = venues[index].image;
+      venues[index] = { ...structuredClone(defaults[index]), image };
+      markChanged();
+      fitSelectedVenue();
+    });
+
+    function fitSelectedVenue() {
+      const venue = selectedVenue();
+      if (!venue) return;
+      fitLngLats(Object.values(venueCorners(venue)), 90);
+    }
+
+    function fitCampus() {
+      fitLngLats(venues.filter((venue) => venue.visible).flatMap((venue) => Object.values(venueCorners(venue))), 70);
+    }
+
+    function fitLngLats(points, padding) {
+      if (!points.length) return;
+      const bounds = points.reduce(
+        (result, point) => result.extend([point.lng, point.lat]),
+        new maplibregl.LngLatBounds([points[0].lng, points[0].lat], [points[0].lng, points[0].lat])
+      );
+      map.fitBounds(bounds, { padding, duration: 450, maxZoom: 19 });
+    }
+
+    function selectVenueAtMapPoint(event) {
+      const point = event.point;
+      const hit = [...venues].reverse().find((venue) => {
+        if (!venue.visible) return false;
+        const corners = projectedCorners(venue);
+        return pointInPolygon(point, [corners.tl, corners.tr, corners.br, corners.bl]);
+      });
+      if (hit) selectVenue(hit.id);
+    }
+
+    function pointInPolygon(point, polygon) {
+      let inside = false;
+      for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
+        const first = polygon[index];
+        const second = polygon[previous];
+        const intersects = first.y > point.y !== second.y > point.y
+          && point.x < (second.x - first.x) * (point.y - first.y) / (second.y - first.y) + first.x;
+        if (intersects) inside = !inside;
+      }
+      return inside;
+    }
+
+    function markChanged(refresh = true) {
+      document.querySelector("#statusText").textContent = "Unsaved changes";
+      if (refresh) {
+        updateControls();
+        renderVenueList();
+        draw();
+      } else {
+        draw();
+      }
+    }
+
+    async function saveCalibration() {
+      const button = document.querySelector("#save");
+      button.disabled = true;
+      try {
+        const response = await fetch("/api/calibration", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ venues: venues.map(serializableVenue) })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || "Save failed");
+        document.querySelector("#statusText").textContent = `Saved · ${new Date(result.savedAt).toLocaleTimeString()}`;
+        showToast(`Saved ${result.path}`);
+      } catch (error) {
+        showToast(error.message, true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function calibrationJSON() {
+      return JSON.stringify({ event: currentEvent.number, venues: venues.map(serializableVenue) }, null, 2) + "\n";
+    }
+
+    function swiftValues() {
+      return venues.map((venue) => `.${venue.id}: .init(
+    latitude: ${venue.latitude.toFixed(7)},
+    longitude: ${venue.longitude.toFixed(7)},
+    widthMeters: ${venue.widthMeters.toFixed(3)},
+    heightMeters: ${venue.heightMeters.toFixed(3)},
+    rotationDegrees: ${venue.rotationDegrees.toFixed(4)}
+)`).join(",\n");
+    }
+
+    document.querySelector("#save").addEventListener("click", saveCalibration);
+    document.querySelector("#copySwift").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(swiftValues());
+        showToast("Copied Swift calibration values");
+      } catch {
+        showToast("Clipboard access was unavailable", true);
+      }
+    });
+    document.querySelector("#download").addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([calibrationJSON()], { type: "application/json" }));
+      link.download = `cominavi-c${currentEvent.number}-map-calibration.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
+
+    function showToast(message, isError = false) {
+      const toast = document.querySelector("#toast");
+      toast.textContent = message;
+      toast.className = `toast show${isError ? " error" : ""}`;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toast.className = "toast"; }, 2600);
+    }
+
+    window.addEventListener("keydown", (event) => {
+      if (event.target instanceof HTMLInputElement) return;
+      const venue = selectedVenue();
+      if (!venue) return;
+      const nudge = event.shiftKey ? 1 : 0.25;
+      const rotationNudge = event.shiftKey ? 1 : 0.1;
+      let east = 0;
+      let south = 0;
+      if (event.key === "ArrowLeft") east = -nudge;
+      else if (event.key === "ArrowRight") east = nudge;
+      else if (event.key === "ArrowUp") south = -nudge;
+      else if (event.key === "ArrowDown") south = nudge;
+      else if (event.key === "[") venue.rotationDegrees = normalizeDegrees(venue.rotationDegrees - rotationNudge);
+      else if (event.key === "]") venue.rotationDegrees = normalizeDegrees(venue.rotationDegrees + rotationNudge);
+      else return;
+      event.preventDefault();
+      if (east || south) {
+        const result = offsetLngLat({ lat: venue.latitude, lng: venue.longitude }, east, south);
+        venue.latitude = result.lat;
+        venue.longitude = result.lng;
+      }
+      markChanged();
+    });
+
+    async function initialize() {
+      try {
+        const response = await fetch("/api/config");
+        if (!response.ok) throw new Error("Could not load local calibration data");
+        const configuration = await response.json();
+        currentEvent.number = configuration.event;
+        document.querySelector("#eventTitle").textContent = `C${configuration.event} · Calibration`;
+        venues = configuration.venues.map((venue, index) => {
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = draw;
+          image.onerror = () => showToast(`Could not load ${venue.imageName}`, true);
+          image.src = `/api/image/${encodeURIComponent(venue.imageName)}`;
+          return { ...venue, image, color: COLORS[index % COLORS.length] };
+        });
+        defaults = venues.map((venue) => serializableVenue(venue));
+        selectedID = venues[0]?.id ?? null;
+        document.querySelector("#statusText").textContent = configuration.savedAt
+          ? `Loaded saved values · ${new Date(configuration.savedAt).toLocaleString()}`
+          : "Loaded defaults · not saved";
+        renderVenueList();
+        updateControls();
+        const finishInitialRender = () => {
+          fitCampus();
+          draw();
+        };
+        if (map.loaded()) finishInitialRender();
+        else map.once("load", finishInitialRender);
+      } catch (error) {
+        document.querySelector("#statusText").textContent = error.message;
+        showToast(error.message, true);
+      }
+    }
+
+    initialize();
+  </script>
+</body>
+</html>

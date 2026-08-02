@@ -6,6 +6,10 @@ DerivedData/
 build/
 xcuserdata/
 *.xcuserstate
+*.xcarchive/
+*.ipa
+__pycache__/
+*.pyc
 
 # Swift Package Manager local state
 .build/
@@ -14,3 +18,5 @@ xcuserdata/
 # Local development configuration
 .sentryclirc
 ComiNavi/DevContent/
+*.sqlite.preparing-*
+ComiNavi/Resources/DemoCatalogs/C104/demo-c104.sqlite

@@ -7,44 +7,6 @@
 
 import SwiftUI
 
-class DownloadProgressViewRateEstimator: ObservableObject {
-    @Published
-    var estimatedRate: Double = 0
-    
-    var recentSamples: [Double] = []
-    let samplesCount = 10
-    let updateInterval = 1.0
-    var timer: Timer?
-    
-    init() {
-        timer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
-            self?.estimatedRate = self?.recentSamples.reduce(0, +) ?? 0 / Double(self?.recentSamples.count ?? 1)
-        }
-    }
-    
-    func addSample(_ absoluteValue: Int64) {
-        let sample = Double(absoluteValue)
-        
-        recentSamples.append(sample)
-        
-        if recentSamples.count > samplesCount {
-            recentSamples.removeFirst()
-        }
-        
-        estimatedRate = recentSamples.reduce(0, +) / Double(recentSamples.count)
-        
-        if timer == nil {
-            timer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
-                self?.estimatedRate = self?.recentSamples.reduce(0, +) ?? 0 / Double(self?.recentSamples.count ?? 1)
-            }
-        }
-    }
-    
-    deinit {
-        timer?.invalidate()
-    }
-}
-
 struct DownloadProgressView: View {
     var progresses: Readiness.Progresses
 
@@ -67,7 +29,6 @@ struct DownloadProgressView: View {
                     .monospacedDigit()
             }
         }
-        .animation(.none)
     }
 }
 

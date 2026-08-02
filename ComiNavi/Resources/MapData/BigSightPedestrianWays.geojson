@@ -1,0 +1,1411 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "source": "OpenStreetMap contributors",
+    "source_url": "https://www.openstreetmap.org/copyright",
+    "generated_on": "2026-07-23",
+    "site_relation": 7743566,
+    "filter": "footway or steps; no sidewalk/crossing/private/no; venue footprint or explicit on-site indoor/level/covered"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "way/168573479",
+      "properties": {
+        "osm_id": 168573479,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7990355,
+            35.6327779
+          ],
+          [
+            139.7990073,
+            35.6328781
+          ],
+          [
+            139.7990352,
+            35.6328831
+          ],
+          [
+            139.7990635,
+            35.6327826
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/181086822",
+      "properties": {
+        "osm_id": 181086822,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7915542,
+            35.6307731
+          ],
+          [
+            139.791617,
+            35.6308048
+          ],
+          [
+            139.7917267,
+            35.6306425
+          ],
+          [
+            139.7918108,
+            35.6305428
+          ],
+          [
+            139.7918643,
+            35.6304828
+          ],
+          [
+            139.7918774,
+            35.6304667
+          ],
+          [
+            139.7919006,
+            35.6304379
+          ],
+          [
+            139.7919974,
+            35.630314
+          ],
+          [
+            139.79221,
+            35.6304311
+          ],
+          [
+            139.7930169,
+            35.6302979
+          ],
+          [
+            139.7930711,
+            35.630289
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/243799266",
+      "properties": {
+        "osm_id": 243799266,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7955905,
+            35.6321626
+          ],
+          [
+            139.7957767,
+            35.6319368
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381682010",
+      "properties": {
+        "osm_id": 381682010,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7943206,
+            35.6293859
+          ],
+          [
+            139.7943136,
+            35.6293469
+          ],
+          [
+            139.7941205,
+            35.6293704
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381682014",
+      "properties": {
+        "osm_id": 381682014,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7934584,
+            35.6306814
+          ],
+          [
+            139.7934389,
+            35.6307037
+          ],
+          [
+            139.7929363,
+            35.6313606
+          ],
+          [
+            139.7928999,
+            35.6314008
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381682018",
+      "properties": {
+        "osm_id": 381682018,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7992015,
+            35.6325621
+          ],
+          [
+            139.7966873,
+            35.6311961
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381682019",
+      "properties": {
+        "osm_id": 381682019,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7939083,
+            35.6292887
+          ],
+          [
+            139.7940957,
+            35.6292619
+          ],
+          [
+            139.7941205,
+            35.6293704
+          ],
+          [
+            139.7941828,
+            35.6296403
+          ],
+          [
+            139.7940702,
+            35.6297847
+          ],
+          [
+            139.7940623,
+            35.6297946
+          ],
+          [
+            139.7939863,
+            35.6298895
+          ],
+          [
+            139.7938547,
+            35.6300554
+          ],
+          [
+            139.7937737,
+            35.6301515
+          ],
+          [
+            139.7933878,
+            35.6306443
+          ],
+          [
+            139.7933097,
+            35.6306049
+          ],
+          [
+            139.7927543,
+            35.6312659
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381682021",
+      "properties": {
+        "osm_id": 381682021,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7939863,
+            35.6298895
+          ],
+          [
+            139.794221,
+            35.6298495
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381682023",
+      "properties": {
+        "osm_id": 381682023,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7938353,
+            35.6289436
+          ],
+          [
+            139.793893,
+            35.6292165
+          ],
+          [
+            139.7939083,
+            35.6292887
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381863133",
+      "properties": {
+        "osm_id": 381863133,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7949837,
+            35.631654
+          ],
+          [
+            139.7949443,
+            35.6314864
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381863143",
+      "properties": {
+        "osm_id": 381863143,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7943986,
+            35.631264
+          ],
+          [
+            139.7942858,
+            35.6311296
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381863149",
+      "properties": {
+        "osm_id": 381863149,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7953386,
+            35.6317044
+          ],
+          [
+            139.7952066,
+            35.6317178
+          ],
+          [
+            139.795241,
+            35.6318839
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873489",
+      "properties": {
+        "osm_id": 381873489,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7941848,
+            35.6302906
+          ],
+          [
+            139.7942175,
+            35.6302514
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873491",
+      "properties": {
+        "osm_id": 381873491,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7966873,
+            35.6311961
+          ],
+          [
+            139.7965804,
+            35.6311392
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873492",
+      "properties": {
+        "osm_id": 381873492,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7947386,
+            35.6293149
+          ],
+          [
+            139.7949216,
+            35.6302241
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873494",
+      "properties": {
+        "osm_id": 381873494,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7938565,
+            35.6301184
+          ],
+          [
+            139.7935799,
+            35.6304651
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873495",
+      "properties": {
+        "osm_id": 381873495,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7948225,
+            35.6307134
+          ],
+          [
+            139.7950197,
+            35.6306879
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873496",
+      "properties": {
+        "osm_id": 381873496,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7962755,
+            35.6313412
+          ],
+          [
+            139.7963499,
+            35.631384
+          ],
+          [
+            139.7964363,
+            35.6312923
+          ],
+          [
+            139.7964723,
+            35.6312541
+          ],
+          [
+            139.7964845,
+            35.6312411
+          ],
+          [
+            139.7964957,
+            35.6312292
+          ],
+          [
+            139.7965674,
+            35.631153
+          ],
+          [
+            139.7965804,
+            35.6311392
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873498",
+      "properties": {
+        "osm_id": 381873498,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7948538,
+            35.6308777
+          ],
+          [
+            139.7948225,
+            35.6307134
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873500",
+      "properties": {
+        "osm_id": 381873500,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.793198,
+            35.6301688
+          ],
+          [
+            139.7930047,
+            35.6300656
+          ],
+          [
+            139.7931466,
+            35.6300111
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873501",
+      "properties": {
+        "osm_id": 381873501,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7942175,
+            35.6302514
+          ],
+          [
+            139.7938547,
+            35.6300554
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873503",
+      "properties": {
+        "osm_id": 381873503,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7951156,
+            35.6311069
+          ],
+          [
+            139.7951524,
+            35.6312465
+          ],
+          [
+            139.7951652,
+            35.6313049
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873507",
+      "properties": {
+        "osm_id": 381873507,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7949443,
+            35.6314864
+          ],
+          [
+            139.7949078,
+            35.6313475
+          ],
+          [
+            139.7951652,
+            35.6313049
+          ],
+          [
+            139.7952546,
+            35.6312886
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873510",
+      "properties": {
+        "osm_id": 381873510,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7934197,
+            35.6299176
+          ],
+          [
+            139.793372,
+            35.6299717
+          ],
+          [
+            139.793198,
+            35.6301688
+          ],
+          [
+            139.7931029,
+            35.6302821
+          ],
+          [
+            139.7930551,
+            35.6303385
+          ],
+          [
+            139.7930015,
+            35.6304129
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873511",
+      "properties": {
+        "osm_id": 381873511,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7937896,
+            35.6308517
+          ],
+          [
+            139.7938233,
+            35.630869
+          ],
+          [
+            139.7938106,
+            35.6308846
+          ],
+          [
+            139.7937299,
+            35.6308417
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873512",
+      "properties": {
+        "osm_id": 381873512,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.79537,
+            35.631716
+          ],
+          [
+            139.7952546,
+            35.6312886
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873515",
+      "properties": {
+        "osm_id": 381873515,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7965804,
+            35.6311392
+          ],
+          [
+            139.7963032,
+            35.6311331
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381873516",
+      "properties": {
+        "osm_id": 381873516,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7938565,
+            35.6301184
+          ],
+          [
+            139.7939559,
+            35.6301684
+          ],
+          [
+            139.7940188,
+            35.6302025
+          ],
+          [
+            139.7939577,
+            35.6302781
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381908103",
+      "properties": {
+        "osm_id": 381908103,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7930129,
+            35.6303563
+          ],
+          [
+            139.7929596,
+            35.6304187
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/381908106",
+      "properties": {
+        "osm_id": 381908106,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7939024,
+            35.6307234
+          ],
+          [
+            139.7937896,
+            35.6308517
+          ],
+          [
+            139.7934584,
+            35.6306814
+          ],
+          [
+            139.7933097,
+            35.6306049
+          ],
+          [
+            139.7930452,
+            35.630466
+          ],
+          [
+            139.793099,
+            35.6304023
+          ],
+          [
+            139.7930129,
+            35.6303563
+          ],
+          [
+            139.7930711,
+            35.630289
+          ],
+          [
+            139.7932505,
+            35.6300679
+          ],
+          [
+            139.7936505,
+            35.6295766
+          ],
+          [
+            139.7940623,
+            35.6297946
+          ],
+          [
+            139.7942606,
+            35.6298995
+          ],
+          [
+            139.7942267,
+            35.6299374
+          ],
+          [
+            139.7942084,
+            35.6299279
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/385355910",
+      "properties": {
+        "osm_id": 385355910,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false,
+        "name": "動く歩道"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7963032,
+            35.6311331
+          ],
+          [
+            139.7962054,
+            35.6311951
+          ],
+          [
+            139.7953806,
+            35.6311787
+          ],
+          [
+            139.7953135,
+            35.6311113
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/385355911",
+      "properties": {
+        "osm_id": 385355911,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false,
+        "name": "動く歩道"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7953135,
+            35.6311113
+          ],
+          [
+            139.7953934,
+            35.6310681
+          ],
+          [
+            139.7962181,
+            35.6310845
+          ],
+          [
+            139.7963032,
+            35.6311331
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/385356175",
+      "properties": {
+        "osm_id": 385356175,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7966719,
+            35.6312109
+          ],
+          [
+            139.7965674,
+            35.631153
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/385356176",
+      "properties": {
+        "osm_id": 385356176,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7966683,
+            35.6313195
+          ],
+          [
+            139.7965614,
+            35.6312626
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/385356177",
+      "properties": {
+        "osm_id": 385356177,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7966569,
+            35.6313304
+          ],
+          [
+            139.7965492,
+            35.6312739
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/385356179",
+      "properties": {
+        "osm_id": 385356179,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7966442,
+            35.631344
+          ],
+          [
+            139.7965371,
+            35.6312875
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/385356181",
+      "properties": {
+        "osm_id": 385356181,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7964957,
+            35.6312292
+          ],
+          [
+            139.7965614,
+            35.6312626
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/385356182",
+      "properties": {
+        "osm_id": 385356182,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7964845,
+            35.6312411
+          ],
+          [
+            139.7965492,
+            35.6312739
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/385356184",
+      "properties": {
+        "osm_id": 385356184,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7964723,
+            35.6312541
+          ],
+          [
+            139.7965371,
+            35.6312875
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/395023335",
+      "properties": {
+        "osm_id": 395023335,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7941956,
+            35.6300174
+          ],
+          [
+            139.7942245,
+            35.6299836
+          ],
+          [
+            139.7941423,
+            35.6299431
+          ],
+          [
+            139.7940892,
+            35.6300066
+          ],
+          [
+            139.7939559,
+            35.6301684
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/395023345",
+      "properties": {
+        "osm_id": 395023345,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7940188,
+            35.6302025
+          ],
+          [
+            139.7941848,
+            35.6302906
+          ],
+          [
+            139.7939772,
+            35.6305388
+          ],
+          [
+            139.7937568,
+            35.6308086
+          ],
+          [
+            139.7937299,
+            35.6308417
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/438218053",
+      "properties": {
+        "osm_id": 438218053,
+        "kind": "steps",
+        "indoor": false,
+        "covered": true
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7947544,
+            35.6303702
+          ],
+          [
+            139.7943994,
+            35.6301812
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/618364223",
+      "properties": {
+        "osm_id": 618364223,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7963355,
+            35.6305972
+          ],
+          [
+            139.7963738,
+            35.630655
+          ],
+          [
+            139.7961812,
+            35.6309244
+          ],
+          [
+            139.796367,
+            35.6310161
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/642798317",
+      "properties": {
+        "osm_id": 642798317,
+        "kind": "steps",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7923201,
+            35.6303354
+          ],
+          [
+            139.7923281,
+            35.6303648
+          ],
+          [
+            139.7923442,
+            35.6303629
+          ],
+          [
+            139.7923236,
+            35.6302884
+          ],
+          [
+            139.792244,
+            35.6303883
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/679785026",
+      "properties": {
+        "osm_id": 679785026,
+        "kind": "footway",
+        "level": "2",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7953135,
+            35.6311113
+          ],
+          [
+            139.7951156,
+            35.6311069
+          ],
+          [
+            139.7950197,
+            35.6306879
+          ],
+          [
+            139.7949216,
+            35.6302241
+          ],
+          [
+            139.794221,
+            35.6298495
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/679785027",
+      "properties": {
+        "osm_id": 679785027,
+        "kind": "footway",
+        "level": "1",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7963032,
+            35.6311331
+          ],
+          [
+            139.7953135,
+            35.6311113
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "way/1127507757",
+      "properties": {
+        "osm_id": 1127507757,
+        "kind": "footway",
+        "indoor": false,
+        "covered": false
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            139.7936505,
+            35.6295766
+          ],
+          [
+            139.7931539,
+            35.6293104
+          ],
+          [
+            139.7955462,
+            35.6263367
+          ]
+        ]
+      }
+    }
+  ]
+}

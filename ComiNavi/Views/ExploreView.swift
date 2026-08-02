@@ -1,0 +1,1001 @@
+import SwiftUI
+
+enum ExploreLayoutMetrics {
+    static let horizontalContentInset: CGFloat = 16
+    static let listArtworkWidth: CGFloat = 76
+    static let circleArtworkAspectRatio = CGFloat(211) / CGFloat(300)
+
+    static func artworkPixelSize(
+        width: CGFloat,
+        displayScale: CGFloat
+    ) -> ExploreArtworkPixelSize {
+        ExploreArtworkPixelSize(
+            width: Int(ceil(width * displayScale)),
+            height: Int(ceil(width / circleArtworkAspectRatio * displayScale))
+        )
+    }
+}
+
+struct ExploreView<EventDayHeader: View>: View {
+    @Binding private var selectedDay: Int
+    @State private var model: ExploreModel
+    @State private var showsFilters = false
+    private let eventDayHeader: EventDayHeader
+
+    init(
+        dataSource: CirclemsDataSource,
+        selectedDay: Binding<Int>,
+        @ViewBuilder eventDayHeader: () -> EventDayHeader
+    ) {
+        _selectedDay = selectedDay
+        _model = State(initialValue: ExploreModel(
+            dataSource: dataSource,
+            selectedDay: selectedDay.wrappedValue
+        ))
+        self.eventDayHeader = eventDayHeader()
+    }
+
+    var body: some View {
+        @Bindable var model = model
+
+        NavigationStack {
+            Group {
+                if model.isLoading, model.allCircles.isEmpty {
+                    ProgressView("Organizing circles…")
+                } else if model.visibleCircles.isEmpty {
+                    ContentUnavailableView {
+                        Label("No circles found", systemImage: "sparkle.magnifyingglass")
+                    } description: {
+                        Text(emptyMessage)
+                    } actions: {
+                        if activeFilterCount > 0 {
+                            Button("Clear filters") {
+                                model.clearFilters()
+                            }
+                        }
+                    }
+                } else {
+                    results
+                }
+            }
+            .navigationTitle("Explore")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button("Filter", systemImage: activeFilterCount == 0 ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill") {
+                        showsFilters = true
+                    }
+                    .accessibilityValue(activeFilterCount == 0 ? "No filters" : "\(activeFilterCount) active")
+                    .accessibilityIdentifier("explore-filter-button")
+                    .id(activeFilterCount)
+
+                    Menu {
+                        Section("Layout") {
+                            Picker("Layout", selection: $model.layout) {
+                                ForEach(ExploreLayout.allCases) { layout in
+                                    Label(layout.title, systemImage: layout.systemImage)
+                                        .tag(layout)
+                                }
+                            }
+                        }
+
+                        Section("Sort") {
+                            Picker("Sort", selection: $model.sort) {
+                                ForEach(ExploreSort.allCases) { sort in
+                                    Label(sort.title, systemImage: sort.systemImage)
+                                        .tag(sort)
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Layout", systemImage: model.layout.systemImage)
+                    }
+                    .accessibilityValue(model.layout.title)
+                    .accessibilityIdentifier("explore-layout-button")
+                }
+            }
+            .sheet(isPresented: $showsFilters) {
+                ExploreFilterSheet(model: model)
+            }
+        }
+        .task {
+            model.select(day: selectedDay)
+            await model.load()
+        }
+        .onChange(of: selectedDay) { _, day in
+            model.select(day: day)
+        }
+        .accessibilityIdentifier("explore-screen")
+    }
+
+    @ViewBuilder
+    private var results: some View {
+        switch model.layout {
+        case .gallery:
+            ExploreGallery(
+                circles: model.visibleCircles,
+                model: model,
+                headerLayoutVersion: galleryHeaderLayoutVersion
+            ) {
+                scrollingHeader(horizontalPadding: ExploreLayoutMetrics.horizontalContentInset)
+            }
+            .ignoresSafeArea(.container, edges: .bottom)
+        case .list:
+            ExploreList(circles: model.visibleCircles, model: model) {
+                scrollingHeader(horizontalPadding: ExploreLayoutMetrics.horizontalContentInset)
+            }
+            .ignoresSafeArea(.container, edges: .bottom)
+        }
+    }
+
+    private func scrollingHeader(horizontalPadding: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            eventDayHeader
+
+            ExploreSearchField(model: model)
+
+            ExploreResultsHeader(
+                visibleCount: model.visibleCircles.count,
+                totalCount: model.selectedDayCircleCount,
+                selectedGenre: model.genreFacets.first { $0.id == model.selectedGenreID }?.name,
+                selectedTag: model.selectedTag,
+                selectedShinagakiFilter: model.shinagakiFilter == .all
+                    ? nil
+                    : String(localized: model.shinagakiFilter.title),
+                horizontalPadding: horizontalPadding,
+                onClearGenre: { model.selectedGenreID = nil },
+                onClearTag: { model.selectedTag = nil },
+                onClearShinagaki: { model.shinagakiFilter = .all }
+            )
+
+            ExploreDiscoveryCloud(model: model, horizontalPadding: horizontalPadding)
+        }
+    }
+
+    private var activeFilterCount: Int {
+        (model.selectedGenreID == nil ? 0 : 1)
+            + (model.selectedTag == nil ? 0 : 1)
+            + model.selectedDiscoveryTermIDs.count
+            + (model.shinagakiFilter == .all ? 0 : 1)
+    }
+
+    private var galleryHeaderLayoutVersion: Int {
+        let hasFilterChipRow = model.selectedGenreID != nil
+            || model.selectedTag != nil
+            || model.shinagakiFilter != .all
+        let showsDiscoveryMatchMenu = model.selectedDiscoveryTermIDs.count > 1
+        return (hasFilterChipRow ? 1 : 0) | (showsDiscoveryMatchMenu ? 2 : 0)
+    }
+
+    private var emptyMessage: String {
+        if !model.searchQuery.isEmpty {
+            return String(localized: "Try another search or clear a filter.")
+        }
+        return String(localized: "No circles match the selected filters and interests.")
+    }
+}
+
+private struct ExploreSearchField: View {
+    let model: ExploreModel
+
+    var body: some View {
+        @Bindable var model = model
+
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.body.weight(.medium))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            TextField(
+                "Circle, creator, X handle, post, or tag",
+                text: $model.searchQuery
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.search)
+            .accessibilityIdentifier("explore-search-field")
+
+            if !model.searchQuery.isEmpty {
+                Button("Clear search", systemImage: "xmark.circle.fill") {
+                    model.searchQuery = ""
+                }
+                .labelStyle(.iconOnly)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("explore-search-clear-button")
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 44)
+        .background(Color(uiColor: .secondarySystemBackground), in: .capsule)
+        .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
+        .padding(.vertical, 12)
+    }
+}
+
+private struct ExploreDiscoveryCloud: View {
+    let model: ExploreModel
+    let horizontalPadding: CGFloat
+
+    var body: some View {
+        @Bindable var model = model
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Discover")
+                        .font(.headline)
+                    Text("Genres, tags, and words from circle descriptions")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 8)
+
+                if model.selectedDiscoveryTermIDs.count > 1 {
+                    Menu {
+                        Picker("Match interests", selection: $model.discoveryMatchMode) {
+                            ForEach(ExploreDiscoveryMatchMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                    } label: {
+                        Label(model.discoveryMatchMode.shortTitle, systemImage: "slider.horizontal.3")
+                            .labelStyle(.titleAndIcon)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .accessibilityLabel("Interest matching")
+                    .accessibilityValue(Text(model.discoveryMatchMode.title))
+                    .accessibilityIdentifier("explore-discovery-match-mode")
+                }
+            }
+            .padding(.horizontal, horizontalPadding)
+
+            if model.discoveryTerms.isEmpty, model.isDiscoveryLoading {
+                ExploreDiscoverySkeleton(horizontalPadding: horizontalPadding)
+            } else {
+                ScrollView(.horizontal) {
+                    HorizontalStaggeredLayout(spacing: 8) {
+                        ForEach(model.discoveryTerms) { term in
+                            ExploreDiscoveryTermButton(
+                                term: term,
+                                isSelected: model.selectedDiscoveryTermIDs.contains(term.id),
+                                action: { model.toggleDiscoveryTerm(term.id) }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, horizontalPadding)
+                }
+                .scrollIndicators(.hidden)
+                .frame(height: 96)
+            }
+        }
+        .padding(.top, 6)
+        .padding(.bottom, 10)
+        .background(Color(uiColor: .systemBackground))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Discover interests")
+        .accessibilityIdentifier("explore-discovery-cloud")
+    }
+}
+
+private struct ExploreDiscoverySkeleton: View {
+    private struct Item: Identifiable, Sendable {
+        let id: Int
+        let width: CGFloat
+    }
+
+    private static let items = [
+        Item(id: 0, width: 132),
+        Item(id: 1, width: 104),
+        Item(id: 2, width: 148),
+        Item(id: 3, width: 118),
+        Item(id: 4, width: 164),
+        Item(id: 5, width: 96),
+        Item(id: 6, width: 140),
+        Item(id: 7, width: 110),
+        Item(id: 8, width: 152),
+        Item(id: 9, width: 122),
+    ]
+
+    let horizontalPadding: CGFloat
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HorizontalStaggeredLayout(spacing: 8) {
+                ForEach(Self.items) { item in
+                    ExploreDiscoverySkeletonChip(width: item.width)
+                }
+            }
+            .padding(.horizontal, horizontalPadding)
+        }
+        .scrollDisabled(true)
+        .scrollIndicators(.hidden)
+        .frame(height: 96)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Finding interests…")
+        .accessibilityIdentifier("explore-discovery-loading")
+    }
+}
+
+private struct ExploreDiscoverySkeletonChip: View {
+    let width: CGFloat
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(Color(uiColor: .quaternaryLabel))
+                .frame(width: 16, height: 16)
+
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color(uiColor: .quaternaryLabel))
+                .frame(width: width - 56, height: 10)
+        }
+        .padding(.horizontal, 12)
+        .frame(width: width, alignment: .leading)
+        .frame(minHeight: 44, alignment: .leading)
+        .background(
+            Color(uiColor: .secondarySystemBackground),
+            in: .capsule
+        )
+        .overlay {
+            Capsule()
+                .stroke(
+                    Color(uiColor: .separator).opacity(0.14),
+                    lineWidth: 0.5
+                )
+        }
+    }
+}
+
+/// Two independent horizontal lanes for intrinsically-sized discovery chips.
+/// Unlike `LazyHGrid`, a long label in one lane does not reserve the same
+/// horizontal column width in the other lane.
+private struct HorizontalStaggeredLayout: Layout {
+    private struct Placement {
+        let row: Int
+        let x: CGFloat
+        let size: CGSize
+    }
+
+    private struct Arrangement {
+        let placements: [Placement]
+        let firstRowHeight: CGFloat
+        let size: CGSize
+    }
+
+    let spacing: CGFloat
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        arrangement(for: subviews).size
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        let arrangement = arrangement(for: subviews)
+        let secondRowY = bounds.minY + arrangement.firstRowHeight + spacing
+
+        for (subview, placement) in zip(subviews, arrangement.placements) {
+            subview.place(
+                at: CGPoint(
+                    x: bounds.minX + placement.x,
+                    y: placement.row == 0 ? bounds.minY : secondRowY
+                ),
+                anchor: UnitPoint.topLeading,
+                proposal: ProposedViewSize(
+                    width: placement.size.width,
+                    height: placement.size.height
+                )
+            )
+        }
+    }
+
+    private func arrangement(for subviews: Subviews) -> Arrangement {
+        var rowWidths = [CGFloat.zero, .zero]
+        var rowHeights = [CGFloat.zero, .zero]
+        var placements: [Placement] = []
+        placements.reserveCapacity(subviews.count)
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            let row = rowWidths[0] <= rowWidths[1] ? 0 : 1
+            let x = rowWidths[row] == 0 ? 0 : rowWidths[row] + spacing
+            placements.append(Placement(row: row, x: x, size: size))
+            rowWidths[row] = x + size.width
+            rowHeights[row] = max(rowHeights[row], size.height)
+        }
+
+        let hasSecondRow = rowHeights[1] > 0
+        return Arrangement(
+            placements: placements,
+            firstRowHeight: rowHeights[0],
+            size: CGSize(
+                width: rowWidths.max() ?? 0,
+                height: rowHeights[0] + (hasSecondRow ? spacing + rowHeights[1] : 0)
+            )
+        )
+    }
+}
+
+private struct ExploreDiscoveryTermButton: View {
+    let term: ExploreDiscoveryTerm
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(term.title, systemImage: term.kind.systemImage)
+                .font(font)
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .background(
+                    isSelected ? Color.accentColor : Color(uiColor: .secondarySystemBackground),
+                    in: .capsule
+                )
+                .overlay {
+                    if !isSelected {
+                        Capsule()
+                            .stroke(Color(uiColor: .separator).opacity(0.28), lineWidth: 0.5)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(term.title)
+        .accessibilityValue("\(term.kind.title), \(term.count) circles")
+        .accessibilityHint(isSelected ? "Double tap to remove this interest" : "Double tap to filter by this interest")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("explore-discovery-term-\(term.id)")
+    }
+
+    private var font: Font {
+        switch term.prominence {
+        case 2: .headline
+        case 1: .subheadline.weight(.semibold)
+        default: .subheadline
+        }
+    }
+}
+
+private struct ExploreResultsHeader: View {
+    let visibleCount: Int
+    let totalCount: Int
+    let selectedGenre: String?
+    let selectedTag: String?
+    let selectedShinagakiFilter: String?
+    let horizontalPadding: CGFloat
+    let onClearGenre: () -> Void
+    let onClearTag: () -> Void
+    let onClearShinagaki: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Group {
+                if visibleCount == totalCount {
+                    Text("\(totalCount) circles")
+                } else {
+                    Text("\(visibleCount) of \(totalCount) circles")
+                }
+            }
+            .font(.subheadline.monospacedDigit().weight(.semibold))
+            .foregroundStyle(.secondary)
+
+            if selectedGenre != nil || selectedTag != nil || selectedShinagakiFilter != nil {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        if let selectedGenre {
+                            FilterChip(title: selectedGenre, systemImage: "theatermasks", onRemove: onClearGenre)
+                        }
+                        if let selectedTag {
+                            FilterChip(title: selectedTag, systemImage: "tag", onRemove: onClearTag)
+                        }
+                        if let selectedShinagakiFilter {
+                            FilterChip(
+                                title: selectedShinagakiFilter,
+                                systemImage: "doc.richtext",
+                                onRemove: onClearShinagaki
+                            )
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(uiColor: .systemBackground))
+    }
+}
+
+private struct FilterChip: View {
+    let title: String
+    let systemImage: String
+    let onRemove: () -> Void
+
+    var body: some View {
+        Button(action: onRemove) {
+            Label {
+                Text(title)
+                    .lineLimit(1)
+            } icon: {
+                Image(systemName: systemImage)
+            }
+            .font(.subheadline.weight(.semibold))
+            .padding(.horizontal, 12)
+            .frame(minHeight: 38)
+            .background(Color.accentColor.opacity(0.12), in: .capsule)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Remove \(title) filter")
+    }
+}
+
+private struct ExploreGallery<Header: View>: View {
+    let circles: [ExploreCircle]
+    let model: ExploreModel
+    let headerLayoutVersion: Int
+    let header: Header
+    @State private var selectedCircleID: Int?
+
+    init(
+        circles: [ExploreCircle],
+        model: ExploreModel,
+        headerLayoutVersion: Int,
+        @ViewBuilder header: () -> Header
+    ) {
+        self.circles = circles
+        self.model = model
+        self.headerLayoutVersion = headerLayoutVersion
+        self.header = header()
+    }
+
+    var body: some View {
+        ExploreGalleryCollection(
+            circles: circles,
+            model: model,
+            onSelect: { selectedCircleID = $0 },
+            headerLayoutVersion: headerLayoutVersion,
+            header: { header }
+        )
+        .navigationDestination(isPresented: Binding(
+            get: { selectedCircleID != nil },
+            set: { isPresented in
+                if !isPresented {
+                    selectedCircleID = nil
+                }
+            }
+        )) {
+            if let selectedCircle, let dataSource = model.catalogDataSource {
+                CircleDetailView(
+                    circle: selectedCircle.circle,
+                    dataSource: dataSource
+                )
+            }
+        }
+    }
+
+    private var selectedCircle: ExploreCircle? {
+        guard let selectedCircleID else { return nil }
+        return circles.first { $0.id == selectedCircleID }
+    }
+}
+
+enum ExploreGalleryCardDetail: Equatable {
+    case full
+    case title
+    case artworkOnly
+}
+
+struct ExploreGalleryCard: View {
+    let circle: ExploreCircle
+    let model: ExploreModel
+    let artworkPixelSize: ExploreArtworkPixelSize
+    var detail: ExploreGalleryCardDetail = .full
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ExploreCircleArtwork(
+                circle: circle,
+                model: model,
+                targetPixelSize: artworkPixelSize
+            )
+                .overlay(alignment: .bottomLeading) {
+                    if detail != .artworkOnly {
+                        Text(circle.spaceLabel)
+                            .font(.caption.monospaced().weight(.bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(.thickMaterial, in: .capsule)
+                            .padding(8)
+                        }
+                }
+
+            if detail != .artworkOnly {
+                Text(circle.displayName)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+            }
+
+            if detail == .full, let genreName = circle.genreName {
+                Text(genreName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var accessibilityLabel: String {
+        [circle.displayName, circle.penName, circle.spaceLabel, circle.genreName]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+    }
+}
+
+private struct ExploreList<Header: View>: View {
+    let circles: [ExploreCircle]
+    let model: ExploreModel
+    let header: Header
+
+    init(
+        circles: [ExploreCircle],
+        model: ExploreModel,
+        @ViewBuilder header: () -> Header
+    ) {
+        self.circles = circles
+        self.model = model
+        self.header = header()
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                header
+
+                ForEach(circles) { circle in
+                    NavigationLink {
+                        if let dataSource = model.catalogDataSource {
+                            CircleDetailView(
+                                circle: circle.circle,
+                                dataSource: dataSource
+                            )
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            ExploreCircleRow(circle: circle, model: model)
+
+                            Image(systemName: "chevron.forward")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                        .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
+                        .padding(.vertical, 8)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("explore-list-circle-\(circle.id)")
+
+                    Divider()
+                        .padding(.leading, ExploreLayoutMetrics.horizontalContentInset + artworkWidth + 12)
+                }
+            }
+        }
+        .accessibilityIdentifier("explore-list")
+    }
+
+    @ScaledMetric(relativeTo: .body)
+    private var artworkWidth = ExploreLayoutMetrics.listArtworkWidth
+}
+
+private struct ExploreCircleRow: View {
+    let circle: ExploreCircle
+    let model: ExploreModel
+
+    @ScaledMetric(relativeTo: .body)
+    private var artworkWidth = ExploreLayoutMetrics.listArtworkWidth
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ExploreCircleArtwork(
+                circle: circle,
+                model: model,
+                targetPixelSize: ExploreLayoutMetrics
+                    .artworkPixelSize(
+                        width: artworkWidth,
+                        displayScale: displayScale
+                    )
+            )
+                .frame(width: artworkWidth)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(circle.displayName)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                Text(circle.spaceLabel)
+                    .font(.subheadline.monospaced().weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                if let penName = circle.penName {
+                    Text(penName)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if let genreName = circle.genreName {
+                    Text(genreName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if !circle.tags.isEmpty {
+                    Text(circle.tags.prefix(3).map { "#\($0)" }.joined(separator: "  "))
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                        .lineLimit(2)
+                } else if let description = circle.description {
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ExploreCircleArtwork: View {
+    let circle: ExploreCircle
+    let model: ExploreModel
+    let targetPixelSize: ExploreArtworkPixelSize
+
+    @State private var image: Image?
+
+    var body: some View {
+        Group {
+            if let image {
+                image
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Rectangle()
+                    .fill(Color(uiColor: .secondarySystemFill))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .font(.title2)
+                            .foregroundStyle(.tertiary)
+                    }
+            }
+        }
+        .aspectRatio(
+            ExploreLayoutMetrics.circleArtworkAspectRatio,
+            contentMode: .fit
+        )
+        .clipShape(.rect(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
+        }
+        .overlay(alignment: .topTrailing) {
+            if circle.preferredCoverURL != nil {
+                Image(systemName: "doc.richtext.fill")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(Color.accentColor, in: .circle)
+                    .padding(6)
+                    .accessibilityHidden(true)
+            }
+        }
+        .task(id: artworkTaskID) {
+            image = nil
+            let data = await model.coverImageData(
+                for: circle,
+                targetPixelSize: targetPixelSize
+            )
+            guard !Task.isCancelled else { return }
+            let decodedImage = await Image.asyncInit(data: data)
+            guard !Task.isCancelled else { return }
+            image = decodedImage
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var artworkTaskID: String {
+        "cover-\(circle.id)-\(circle.preferredCoverURL?.absoluteString ?? "circle")-\(targetPixelSize.cacheKey)"
+    }
+}
+
+private struct ExploreFilterSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let model: ExploreModel
+    @State private var query = ""
+
+    var body: some View {
+        @Bindable var model = model
+
+        NavigationStack {
+            List {
+                Section("Shinagaki") {
+                    filterButton(
+                        title: String(localized: ExploreShinagakiFilter.all.title),
+                        count: model.selectedDayCircleCount,
+                        selected: model.shinagakiFilter == .all,
+                        identifier: "explore-shinagaki-all"
+                    ) {
+                        model.shinagakiFilter = .all
+                    }
+                    filterButton(
+                        title: String(localized: ExploreShinagakiFilter.available.title),
+                        count: model.shinagakiCircleCount,
+                        selected: model.shinagakiFilter == .available,
+                        identifier: "explore-shinagaki-available"
+                    ) {
+                        model.shinagakiFilter = .available
+                    }
+                    filterButton(
+                        title: String(localized: ExploreShinagakiFilter.highConfidence.title),
+                        count: model.highConfidenceShinagakiCircleCount,
+                        selected: model.shinagakiFilter == .highConfidence,
+                        identifier: "explore-shinagaki-high-confidence"
+                    ) {
+                        model.shinagakiFilter = .highConfidence
+                    }
+                }
+
+                Section("Genres") {
+                    filterButton(
+                        title: String(localized: "All genres"),
+                        count: model.selectedDayCircleCount,
+                        selected: model.selectedGenreID == nil,
+                        identifier: "explore-genre-all"
+                    ) {
+                        model.selectedGenreID = nil
+                    }
+
+                    ForEach(filteredGenres) { genre in
+                        filterButton(
+                            title: genre.name,
+                            count: genre.count,
+                            selected: model.selectedGenreID == genre.id,
+                            identifier: "explore-genre-\(genre.id)"
+                        ) {
+                            model.selectedGenreID = genre.id
+                        }
+                    }
+                }
+
+                Section("Tags") {
+                    filterButton(
+                        title: String(localized: "All tags"),
+                        count: model.tagFacets.count,
+                        selected: model.selectedTag == nil,
+                        identifier: "explore-tag-all"
+                    ) {
+                        model.selectedTag = nil
+                    }
+
+                    switch model.tagState {
+                    case .idle, .loading:
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            Text("Loading Circle.ms tags…")
+                                .foregroundStyle(.secondary)
+                        }
+                    case .unavailable:
+                        Label(
+                            "Some Circle.ms tags are unavailable. Bundled tags still work offline.",
+                            systemImage: "wifi.exclamationmark"
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    case .ready:
+                        EmptyView()
+                    }
+
+                    ForEach(filteredTags) { tag in
+                        filterButton(
+                            title: tag.name,
+                            count: tag.count,
+                            selected: model.selectedTag == tag.name,
+                            identifier: nil
+                        ) {
+                            model.selectedTag = tag.name
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Filter circles")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $query, prompt: "Find a genre or tag")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if model.selectedGenreID != nil
+                        || model.selectedTag != nil
+                        || model.shinagakiFilter != .all
+                    {
+                        Button("Clear") {
+                            model.clearFilters()
+                        }
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .accessibilityIdentifier("explore-filter-sheet")
+    }
+
+    private var filteredGenres: [ExploreGenreFacet] {
+        guard !query.isEmpty else { return model.genreFacets }
+        return model.genreFacets.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var filteredTags: [ExploreTagFacet] {
+        guard !query.isEmpty else { return model.tagFacets }
+        return model.tagFacets.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
+    private func filterButton(
+        title: String,
+        count: Int,
+        selected: Bool,
+        identifier: String?,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 12)
+                Text(count, format: .number)
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44)
+            .contentShape(.rect)
+        }
+        .accessibilityValue(selected ? "Selected, \(count) circles" : "\(count) circles")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .apply { view in
+            if let identifier {
+                view.accessibilityIdentifier(identifier)
+            } else {
+                view
+            }
+        }
+    }
+}

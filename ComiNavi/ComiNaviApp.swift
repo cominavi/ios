@@ -27,14 +27,15 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
 
         #if !DEBUG
-        var posthogConfig = PostHogConfig(
-            apiKey: "phc_RFEZavxHTrPF8x3frBKZvO6rLNId8DEwq3y6YykY9uc",
+        let posthogConfig = PostHogConfig(
+            projectToken: "phc_RFEZavxHTrPF8x3frBKZvO6rLNId8DEwq3y6YykY9uc",
             host: "https://us.i.posthog.com")
         PostHogSDK.shared.setup(posthogConfig)
         #endif
 
         #if DEBUG
         DebugSwift.setup()
+        DebugSwift.Debugger.feedbackEnable = false
         DebugSwift.show()
         #endif
 

@@ -9,10 +9,55 @@ import AuthenticationServices
 import SpriteKit
 import SwiftUI
 import Toast
+import UIKit
 
 enum DemoState {
     case anonymous
     case authenticating
+}
+
+struct ConventionFloorBlockCoordinate: Hashable {
+    let column: Int
+    let row: Int
+
+    func distance(to other: Self) -> Int {
+        abs(column - other.column) + abs(row - other.row)
+    }
+}
+
+enum ConventionFloorRoutePlanning {
+    static let targetBlockDistance = 2
+
+    static func distance(
+        fromIntersectionColumn column: Int,
+        row: Int,
+        to block: ConventionFloorBlockCoordinate
+    ) -> Int {
+        let adjacentBlocks = [
+            ConventionFloorBlockCoordinate(column: column, row: row),
+            ConventionFloorBlockCoordinate(column: column + 1, row: row),
+            ConventionFloorBlockCoordinate(column: column, row: row + 1),
+            ConventionFloorBlockCoordinate(column: column + 1, row: row + 1),
+        ]
+        return 1 + (adjacentBlocks.map { $0.distance(to: block) }.min() ?? 0)
+    }
+
+    static func preferredCandidateIndices(
+        for distances: [Int],
+        targetDistance: Int = targetBlockDistance
+    ) -> [Int] {
+        let exactMatches = distances.indices.filter { distances[$0] == targetDistance }
+        if !exactMatches.isEmpty {
+            return exactMatches
+        }
+
+        let fartherDistances = distances.filter { $0 > targetDistance }
+        if let nearestFallback = fartherDistances.min() {
+            return distances.indices.filter { distances[$0] == nearestFallback }
+        }
+
+        return Array(distances.indices)
+    }
 }
 
 class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentationContextProviding {
@@ -38,7 +83,10 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
                     return
                 }
 
-                Toast.showError("Failed to authenticate", subtitle: error.localizedDescription)
+                Toast.showError(
+                    String(localized: "Authentication failed"),
+                    subtitle: error.localizedDescription
+                )
             }
         }
     }
@@ -83,22 +131,70 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
                 }
                 guard let status = url.queryValue(for: "status"), status == "succeeded" else {
                     let errorCode = url.queryValue(for: "error") ?? "unknown"
-                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to authenticate: \(errorCode)"]))
+                    return continuation.resume(throwing: NSError(
+                        domain: "SignInViewModel",
+                        code: 1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "Authentication failed: \(errorCode)"
+                            ),
+                        ]
+                    ))
                 }
                 guard oauthState == url.queryValue(for: "state") else {
-                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "OAuth state mismatch"]))
+                    return continuation.resume(throwing: NSError(
+                        domain: "SignInViewModel",
+                        code: 1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "The login response could not be verified. Please try again."
+                            ),
+                        ]
+                    ))
                 }
                 guard let tokenType = url.queryValue(for: "token_type"), tokenType == "Bearer" else {
-                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unsupported token type"]))
+                    return continuation.resume(throwing: NSError(
+                        domain: "SignInViewModel",
+                        code: 1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "Circle.ms returned an unsupported login response."
+                            ),
+                        ]
+                    ))
                 }
                 guard let accessToken = url.queryValue(for: "access_token") else {
-                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to get access_token from redirected URL"]))
+                    return continuation.resume(throwing: NSError(
+                        domain: "SignInViewModel",
+                        code: 1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "The login response did not include an access token."
+                            ),
+                        ]
+                    ))
                 }
                 guard let refreshToken = url.queryValue(for: "refresh_token") else {
-                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to get refresh_token from redirected URL"]))
+                    return continuation.resume(throwing: NSError(
+                        domain: "SignInViewModel",
+                        code: 1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "The login response did not include a refresh token."
+                            ),
+                        ]
+                    ))
                 }
                 guard let expiresInSecondsStr = url.queryValue(for: "expires_in"), let expiresInSeconds = Int(expiresInSecondsStr) else {
-                    return continuation.resume(throwing: NSError(domain: "SignInViewModel", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to get expires_in from redirected URL"]))
+                    return continuation.resume(throwing: NSError(
+                        domain: "SignInViewModel",
+                        code: 1,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "The login response did not include an expiration time."
+                            ),
+                        ]
+                    ))
                 }
 
                 AppData.userState.user = User(
@@ -135,6 +231,16 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
 struct SignInView: View {
     @ScaledMetric(relativeTo: .title) private var logoSize = 60.0
     @StateObject private var vm = SignInViewModel()
+    private let onUseDemoData: (() -> Void)?
+    private let onUseCrawlData: (() -> Void)?
+
+    init(
+        onUseDemoData: (() -> Void)? = nil,
+        onUseCrawlData: (() -> Void)? = nil
+    ) {
+        self.onUseDemoData = onUseDemoData
+        self.onUseCrawlData = onUseCrawlData
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -148,6 +254,34 @@ struct SignInView: View {
 
                     loginButton
                         .padding(.top, 48)
+
+                    #if DEBUG || COMINAVI_STAGING
+                    if let onUseDemoData {
+                        Button(action: onUseDemoData) {
+                            Label("Explore C104 demo data", systemImage: "externaldrive")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.roundedRectangle(radius: 16))
+                        .padding(.top, 12)
+                        .accessibilityHint("Opens an offline catalog without logging in")
+                        .accessibilityIdentifier("sign-in-demo-data")
+                    }
+
+                    if let onUseCrawlData {
+                        Button(action: onUseCrawlData) {
+                            Label("Explore C108 crawl data", systemImage: "antenna.radiowaves.left.and.right")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.roundedRectangle(radius: 16))
+                        .padding(.top, 10)
+                        .accessibilityHint("Opens the bundled C108 placement and shinagaki archive without logging in")
+                        .accessibilityIdentifier("sign-in-crawl-data")
+                    }
+                    #endif
                 }
                 .frame(maxWidth: 620, minHeight: max(0, proxy.size.height - 48), alignment: .topLeading)
                 .frame(maxWidth: .infinity)
@@ -174,18 +308,9 @@ struct SignInView: View {
 
     private var hero: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Welcome to")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            Group {
-                Text("ComiNavi")
-                    .foregroundStyle(Color.accentColor)
-                    +
-                    Text("!")
-                    .foregroundStyle(.primary)
-            }
-            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+            Text("Welcome to ComiNavi!")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .foregroundStyle(Color.accentColor)
 
             Text("Find circles. Plan your route.")
                 .font(.title3)
@@ -244,22 +369,38 @@ struct SignInView: View {
 private struct ConventionFloorBackdrop: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @State private var scene = ConventionFloorScene()
+
+    private var isSimulationPaused: Bool {
+        accessibilityReduceMotion || scenePhase != .active
+    }
 
     var body: some View {
         SpriteView(
             scene: scene,
-            isPaused: accessibilityReduceMotion,
             preferredFramesPerSecond: 30,
             options: [
                 .allowsTransparency,
                 .ignoresSiblingOrder,
                 .shouldCullNonVisibleNodes,
-            ]
+            ],
+            shouldRender: { _ in
+                UIApplication.shared.applicationState == .active
+            }
         )
         .allowsHitTesting(false)
         .accessibilityHidden(true)
         .ignoresSafeArea()
+        .onAppear {
+            scene.setSimulationPaused(isSimulationPaused)
+        }
+        .onDisappear {
+            scene.setSimulationPaused(true)
+        }
+        .onChange(of: isSimulationPaused) { _, isPaused in
+            scene.setSimulationPaused(isPaused)
+        }
         .onChange(of: colorScheme, initial: true) { _, newColorScheme in
             scene.setVeilColor(for: newColorScheme)
         }
@@ -285,6 +426,7 @@ private final class ConventionFloorScene: SKScene {
         let tableSpacing: CGFloat
         let tablesPerBank: Int
         let deskColumnsPerBlock: Int
+        let bankLength: CGFloat
         let endCapGap: CGFloat
         let narrowAisle: CGFloat
         let bigAisle: CGFloat
@@ -305,9 +447,9 @@ private final class ConventionFloorScene: SKScene {
             bigAisle = tableLongSide * 3.25
             blockWidth = tableLongSide * 2 + endCapGap
 
-            let bankLength = CGFloat(tablesPerBank) * tableLongSide
+            bankLength = CGFloat(tablesPerBank) * tableLongSide
                 + CGFloat(tablesPerBank - 1) * tableSpacing
-            blockHeight = bankLength + (tableShortSide + tableSpacing) * 2
+            blockHeight = bankLength + tableShortSide * 2
             horizontalStride = blockWidth + narrowAisle
             verticalStride = blockHeight + bigAisle
         }
@@ -352,6 +494,11 @@ private final class ConventionFloorScene: SKScene {
     private enum UserSegmentCompletion {
         case arrived(column: Int, row: Int, incoming: WalkDirection)
         case exited(column: Int, row: Int, outgoing: WalkDirection)
+        case enteredDestinationCorridor(DeskRoute)
+        case reachedDestinationLane(DeskRoute)
+        case reachedDestination(DeskRoute)
+        case returnedToAisle(DeskRoute)
+        case returnedToIntersection(column: Int, row: Int, incoming: WalkDirection)
     }
 
     private struct UserSegment {
@@ -363,9 +510,21 @@ private final class ConventionFloorScene: SKScene {
     }
 
     private struct DeskStop {
+        let id: Int
+        let block: ConventionFloorBlockCoordinate
         let aisleCenterX: CGFloat
         let y: CGFloat
         let stopPoint: CGPoint
+        let tableRect: CGRect
+    }
+
+    private struct DeskRoute {
+        let destination: DeskStop
+        let aisleColumn: Int
+        let approachRow: Int
+        let approachDirection: WalkDirection
+        let outboundLanePoint: CGPoint
+        let returnLanePoint: CGPoint
     }
 
     private struct CrowdContinuation {
@@ -424,6 +583,13 @@ private final class ConventionFloorScene: SKScene {
     private var trackedUserSegment: UserSegment?
     private var trackedUserSegmentDistance: CGFloat = 0
     private var trackedUserTangent = CGVector(dx: 1, dy: 0)
+    private var trackedUserDwellRemaining: TimeInterval = 0
+    private var currentDeskRoute: DeskRoute?
+    private var plannedDirections: [WalkDirection] = []
+    private var plannedDeskStops: [DeskStop] = []
+    private var routeCandidateStops: [DeskStop] = []
+    private var visitedDeskIDs: Set<Int> = []
+    private var plannedDeskHighlights: [SKShapeNode] = []
     private var intersectionXs: [CGFloat] = []
     private var intersectionYs: [CGFloat] = []
     private var allowedUserColumns: ClosedRange<Int> = 0 ... 0
@@ -476,6 +642,12 @@ private final class ConventionFloorScene: SKScene {
         updateCamera(deltaTime: deltaTime)
     }
 
+    func setSimulationPaused(_ isPaused: Bool) {
+        guard self.isPaused != isPaused else { return }
+        self.isPaused = isPaused
+        previousUpdateTime = nil
+    }
+
     private func configureScene() {
         backgroundColor = .clear
         scaleMode = .resizeFill
@@ -489,6 +661,13 @@ private final class ConventionFloorScene: SKScene {
         previousUpdateTime = nil
         trackedUserSegment = nil
         trackedUserSegmentDistance = 0
+        trackedUserDwellRemaining = 0
+        currentDeskRoute = nil
+        plannedDirections.removeAll(keepingCapacity: true)
+        plannedDeskStops.removeAll(keepingCapacity: true)
+        routeCandidateStops.removeAll(keepingCapacity: true)
+        visitedDeskIDs.removeAll(keepingCapacity: true)
+        plannedDeskHighlights.removeAll(keepingCapacity: true)
         cameraHasSettled = false
         floorRoot = SKNode()
         floorRoot.position = CGPoint(x: size.width / 2, y: size.height / 2)
@@ -538,8 +717,10 @@ private final class ConventionFloorScene: SKScene {
             intersectionBandY += metrics.verticalStride
         }
 
+        var blockRow = 0
         var bandY = bounds.minY
         while bandY < bounds.maxY {
+            var blockColumn = 0
             var blockX = bounds.minX
 
             while blockX < bounds.maxX {
@@ -547,11 +728,17 @@ private final class ConventionFloorScene: SKScene {
                 addBoothBlock(
                     to: deskPath,
                     origin: origin,
+                    block: ConventionFloorBlockCoordinate(
+                        column: blockColumn,
+                        row: blockRow
+                    ),
                     metrics: metrics
                 )
+                blockColumn += 1
                 blockX += metrics.horizontalStride
             }
 
+            blockRow += 1
             bandY += metrics.verticalStride
         }
 
@@ -569,58 +756,72 @@ private final class ConventionFloorScene: SKScene {
     private func addBoothBlock(
         to path: CGMutablePath,
         origin: CGPoint,
+        block: ConventionFloorBlockCoordinate,
         metrics: Metrics
     ) {
         let rightBankX = origin.x + metrics.blockWidth - metrics.tableShortSide
-        let bankStartY = origin.y + metrics.tableShortSide + metrics.tableSpacing
+        let bankStartY = origin.y + metrics.tableShortSide
 
         for table in 0 ..< metrics.tablesPerBank {
             let tableY = bankStartY
                 + CGFloat(table) * (metrics.tableLongSide + metrics.tableSpacing)
-            path.addRect(
-                CGRect(
-                    x: origin.x,
-                    y: tableY,
-                    width: metrics.tableShortSide,
-                    height: metrics.tableLongSide
-                )
+            let leftTableRect = CGRect(
+                x: origin.x,
+                y: tableY,
+                width: metrics.tableShortSide,
+                height: metrics.tableLongSide
             )
-            path.addRect(
-                CGRect(
-                    x: rightBankX,
-                    y: tableY,
-                    width: metrics.tableShortSide,
-                    height: metrics.tableLongSide
-                )
+            let rightTableRect = CGRect(
+                x: rightBankX,
+                y: tableY,
+                width: metrics.tableShortSide,
+                height: metrics.tableLongSide
             )
+            path.addRect(leftTableRect)
+            path.addRect(rightTableRect)
 
             let tableCenterY = tableY + metrics.tableLongSide / 2
             deskStops.append(
                 DeskStop(
+                    id: deskStops.count,
+                    block: block,
                     aisleCenterX: origin.x - metrics.narrowAisle / 2,
                     y: tableCenterY,
                     stopPoint: CGPoint(
                         x: origin.x - tableStopOffset,
                         y: tableCenterY
-                    )
+                    ),
+                    tableRect: leftTableRect
                 )
             )
             deskStops.append(
                 DeskStop(
+                    id: deskStops.count,
+                    block: block,
                     aisleCenterX: origin.x + metrics.blockWidth + metrics.narrowAisle / 2,
                     y: tableCenterY,
                     stopPoint: CGPoint(
                         x: rightBankX + metrics.tableShortSide + tableStopOffset,
                         y: tableCenterY
-                    )
+                    ),
+                    tableRect: rightTableRect
                 )
             )
         }
 
+        let endCapPairWidth = metrics.tableLongSide * 2
+        let endCapPairX = origin.x + (metrics.blockWidth - endCapPairWidth) / 2
+        let sideBankMidpointX = (
+            origin.x + metrics.tableShortSide + rightBankX
+        ) / 2
+        assert(
+            abs(endCapPairX + endCapPairWidth / 2 - sideBankMidpointX) < 0.001,
+            "The joined end-cap pair must remain centered between the side banks."
+        )
         for endY in [origin.y, origin.y + metrics.blockHeight - metrics.tableShortSide] {
             path.addRect(
                 CGRect(
-                    x: origin.x,
+                    x: endCapPairX,
                     y: endY,
                     width: metrics.tableLongSide,
                     height: metrics.tableShortSide
@@ -628,7 +829,7 @@ private final class ConventionFloorScene: SKScene {
             )
             path.addRect(
                 CGRect(
-                    x: origin.x + metrics.blockWidth - metrics.tableLongSide,
+                    x: endCapPairX + metrics.tableLongSide,
                     y: endY,
                     width: metrics.tableLongSide,
                     height: metrics.tableShortSide
@@ -1213,10 +1414,10 @@ private final class ConventionFloorScene: SKScene {
 
         let centerColumn = nearestIndex(to: 0, in: intersectionXs)
         let centerRow = nearestIndex(to: 0, in: intersectionYs)
-        allowedUserColumns = max(0, centerColumn - 1)
-            ... min(intersectionXs.count - 1, centerColumn + 1)
-        allowedUserRows = max(0, centerRow - 1)
-            ... min(intersectionYs.count - 1, centerRow + 1)
+        allowedUserColumns = max(0, centerColumn - 2)
+            ... min(intersectionXs.count - 1, centerColumn + 2)
+        allowedUserRows = max(0, centerRow - 2)
+            ... min(intersectionYs.count - 1, centerRow + 2)
         turnRadius = min(metrics.narrowAisle * 0.34, metrics.bigAisle * 0.14)
 
         cameraNode = SKCameraNode()
@@ -1240,31 +1441,41 @@ private final class ConventionFloorScene: SKScene {
         trackedUserNode.zPosition = 101
         floorRoot.addChild(trackedUserNode)
 
-        let initialDirection = [WalkDirection.east, .north, .west, .south]
-            .first { canTravel(fromColumn: centerColumn, row: centerRow, toward: $0) }
-            ?? .east
-        trackedUserNode.position = corridorEntryPoint(
+        let initialIncoming = WalkDirection.east
+        trackedUserNode.position = corridorExitPoint(
             atColumn: centerColumn,
             row: centerRow,
-            traveling: initialDirection,
-            laneSeed: trackedLaneSeed(for: initialDirection),
+            traveling: initialIncoming,
+            laneSeed: trackedLaneSeed(for: initialIncoming),
             metrics: metrics,
             forceLeft: true
         )
-        trackedUserTangent = initialDirection.vector
-        startCorridor(
-            fromColumn: centerColumn,
-            row: centerRow,
-            direction: initialDirection
-        )
+        trackedUserTangent = initialIncoming.vector
 
         let userScenePoint = floorRoot.convert(trackedUserNode.position, to: self)
         cameraNode.position = userScenePoint
         cameraHasSettled = false
+
+        configurePlannedDeskStops(fromColumn: centerColumn, row: centerRow)
+        beginNextDeskRoute(
+            fromColumn: centerColumn,
+            row: centerRow,
+            incoming: initialIncoming
+        )
     }
 
     private func updateTrackedUser(deltaTime: TimeInterval) {
-        guard deltaTime > 0, trackedUserSegment != nil else { return }
+        guard deltaTime > 0 else { return }
+
+        if trackedUserDwellRemaining > 0 {
+            trackedUserDwellRemaining = max(0, trackedUserDwellRemaining - deltaTime)
+            if trackedUserDwellRemaining == 0 {
+                finishCurrentDeskVisit()
+            }
+            return
+        }
+
+        guard trackedUserSegment != nil else { return }
 
         var travelRemaining = trackedUserSpeed * CGFloat(deltaTime)
         var transitions = 0
@@ -1327,11 +1538,393 @@ private final class ConventionFloorScene: SKScene {
     private func handle(_ completion: UserSegmentCompletion) {
         switch completion {
         case let .arrived(column, row, incoming):
-            startTurn(atColumn: column, row: row, incoming: incoming)
+            continuePlannedRoute(atColumn: column, row: row, incoming: incoming)
 
         case let .exited(column, row, outgoing):
             startCorridor(fromColumn: column, row: row, direction: outgoing)
+
+        case let .enteredDestinationCorridor(route):
+            startDestinationCorridor(route)
+
+        case let .reachedDestinationLane(route):
+            startDeskApproach(route)
+
+        case let .reachedDestination(route):
+            trackedUserSegment = nil
+            trackedUserSegmentDistance = 0
+            trackedUserDwellRemaining = 5
+            currentDeskRoute = route
+
+        case let .returnedToAisle(route):
+            startReturnCorridor(route)
+
+        case let .returnedToIntersection(column, row, incoming):
+            currentDeskRoute = nil
+            beginNextDeskRoute(fromColumn: column, row: row, incoming: incoming)
         }
+    }
+
+    private func configurePlannedDeskStops(
+        fromColumn column: Int,
+        row: Int
+    ) {
+        guard !intersectionXs.isEmpty, !intersectionYs.isEmpty else { return }
+
+        let viewport = CGRect(
+            x: cameraNode.position.x - size.width / 2,
+            y: cameraNode.position.y - size.height / 2,
+            width: size.width,
+            height: size.height
+        ).insetBy(dx: 18, dy: 32)
+        let minimumRouteY = intersectionYs[allowedUserRows.lowerBound]
+        let maximumRouteY = intersectionYs[allowedUserRows.upperBound]
+
+        routeCandidateStops = deskStops.filter { stop in
+            let aisleColumn = nearestIndex(to: stop.aisleCenterX, in: intersectionXs)
+            guard allowedUserColumns.contains(aisleColumn),
+                  minimumRouteY < stop.y,
+                  stop.y < maximumRouteY
+            else { return false }
+
+            let scenePoint = floorRoot.convert(stop.stopPoint, to: self)
+            return viewport.contains(scenePoint)
+        }
+
+        if routeCandidateStops.isEmpty {
+            routeCandidateStops = deskStops.filter { stop in
+                let aisleColumn = nearestIndex(to: stop.aisleCenterX, in: intersectionXs)
+                return allowedUserColumns.contains(aisleColumn)
+                    && minimumRouteY < stop.y
+                    && stop.y < maximumRouteY
+            }
+        }
+
+        let distances = routeCandidateStops.map { stop in
+            ConventionFloorRoutePlanning.distance(
+                fromIntersectionColumn: column,
+                row: row,
+                to: stop.block
+            )
+        }
+        let preferredCandidates = ConventionFloorRoutePlanning
+            .preferredCandidateIndices(for: distances)
+            .map { routeCandidateStops[$0] }
+
+        guard let firstDestination = preferredCandidates.randomElement() else { return }
+        plannedDeskStops = [firstDestination]
+        ensurePlanLookahead()
+        refreshPlannedDeskHighlights()
+    }
+
+    private func ensurePlanLookahead() {
+        while plannedDeskStops.count < 2 {
+            guard let reference = plannedDeskStops.last else { return }
+            let excludedIDs = visitedDeskIDs.union(plannedDeskStops.map(\.id))
+            var candidates = routeCandidateStops.filter { !excludedIDs.contains($0.id) }
+
+            if candidates.isEmpty {
+                visitedDeskIDs.subtract(plannedDeskStops.map(\.id))
+                let plannedIDs = Set(plannedDeskStops.map(\.id))
+                candidates = routeCandidateStops.filter { !plannedIDs.contains($0.id) }
+            }
+
+            let distances = candidates.map { reference.block.distance(to: $0.block) }
+            let preferredCandidates = ConventionFloorRoutePlanning
+                .preferredCandidateIndices(for: distances)
+                .map { candidates[$0] }
+
+            guard let next = preferredCandidates.min(by: {
+                estimatedWalkingDistance(from: reference, to: $0)
+                    < estimatedWalkingDistance(from: reference, to: $1)
+            }) else { return }
+            plannedDeskStops.append(next)
+        }
+    }
+
+    private func estimatedWalkingDistance(from source: DeskStop, to destination: DeskStop) -> CGFloat {
+        guard let metrics = activeMetrics else { return .greatestFiniteMagnitude }
+        let sourceColumn = nearestIndex(to: source.aisleCenterX, in: intersectionXs)
+        let destinationColumn = nearestIndex(to: destination.aisleCenterX, in: intersectionXs)
+        var shortest = CGFloat.greatestFiniteMagnitude
+
+        for sourceRow in approachRows(for: source) {
+            for destinationRow in approachRows(for: destination) {
+                let gridDistance = CGFloat(abs(sourceColumn - destinationColumn))
+                        * metrics.horizontalStride
+                    + CGFloat(abs(sourceRow - destinationRow)) * metrics.verticalStride
+                let approachDistance = abs(source.y - intersectionYs[sourceRow])
+                    + abs(destination.y - intersectionYs[destinationRow])
+                shortest = min(shortest, gridDistance + approachDistance)
+            }
+        }
+        return shortest
+    }
+
+    private func approachRows(for stop: DeskStop) -> [Int] {
+        let rows = allowedUserRows.filter { row in
+            if row == allowedUserRows.lowerBound {
+                return stop.y > intersectionYs[row]
+            }
+            if row == allowedUserRows.upperBound {
+                return stop.y < intersectionYs[row]
+            }
+            return true
+        }
+        return rows.sorted {
+            abs(stop.y - intersectionYs[$0]) < abs(stop.y - intersectionYs[$1])
+        }
+    }
+
+    private func refreshPlannedDeskHighlights() {
+        plannedDeskHighlights.forEach { $0.removeFromParent() }
+        plannedDeskHighlights.removeAll(keepingCapacity: true)
+
+        let accent = UIColor(named: "AccentColor") ?? .systemGreen
+        for (index, stop) in plannedDeskStops.prefix(2).enumerated() {
+            let highlight = SKShapeNode(
+                rect: stop.tableRect,
+                cornerRadius: min(stop.tableRect.width, stop.tableRect.height) * 0.18
+            )
+            highlight.fillColor = accent.withAlphaComponent(index == 0 ? 0.24 : 0.09)
+            highlight.strokeColor = accent.withAlphaComponent(index == 0 ? 0.95 : 0.58)
+            highlight.lineWidth = index == 0 ? 2.1 : 1.35
+            highlight.zPosition = 100.5
+            floorRoot.addChild(highlight)
+            plannedDeskHighlights.append(highlight)
+        }
+    }
+
+    private func beginNextDeskRoute(
+        fromColumn column: Int,
+        row: Int,
+        incoming: WalkDirection
+    ) {
+        ensurePlanLookahead()
+        refreshPlannedDeskHighlights()
+
+        guard let destination = plannedDeskStops.first,
+              let route = makeDeskRoute(
+                  to: destination,
+                  fromColumn: column,
+                  row: row
+              )
+        else {
+            currentDeskRoute = nil
+            plannedDirections.removeAll(keepingCapacity: true)
+            startTurn(atColumn: column, row: row, incoming: incoming)
+            return
+        }
+
+        currentDeskRoute = route
+        plannedDirections = gridDirections(
+            fromColumn: column,
+            row: row,
+            toColumn: route.aisleColumn,
+            row: route.approachRow,
+            incoming: incoming
+        )
+        continuePlannedRoute(atColumn: column, row: row, incoming: incoming)
+    }
+
+    private func makeDeskRoute(
+        to destination: DeskStop,
+        fromColumn column: Int,
+        row: Int
+    ) -> DeskRoute? {
+        guard let metrics = activeMetrics else { return nil }
+        let aisleColumn = nearestIndex(to: destination.aisleCenterX, in: intersectionXs)
+        guard allowedUserColumns.contains(aisleColumn),
+              let approachRow = approachRows(for: destination).min(by: { lhs, rhs in
+                  let lhsDistance = CGFloat(abs(column - aisleColumn)) * metrics.horizontalStride
+                      + CGFloat(abs(row - lhs)) * metrics.verticalStride
+                      + abs(destination.y - intersectionYs[lhs])
+                  let rhsDistance = CGFloat(abs(column - aisleColumn)) * metrics.horizontalStride
+                      + CGFloat(abs(row - rhs)) * metrics.verticalStride
+                      + abs(destination.y - intersectionYs[rhs])
+                  return lhsDistance < rhsDistance
+              })
+        else { return nil }
+
+        let approachDirection: WalkDirection = destination.y > intersectionYs[approachRow]
+            ? .north
+            : .south
+        let outboundOffset = trafficLaneOffset(
+            toward: approachDirection,
+            seed: trackedLaneSeed(for: approachDirection),
+            metrics: metrics,
+            forceLeft: true
+        )
+        let returnDirection = approachDirection.opposite
+        let returnOffset = trafficLaneOffset(
+            toward: returnDirection,
+            seed: trackedLaneSeed(for: returnDirection),
+            metrics: metrics,
+            forceLeft: true
+        )
+
+        return DeskRoute(
+            destination: destination,
+            aisleColumn: aisleColumn,
+            approachRow: approachRow,
+            approachDirection: approachDirection,
+            outboundLanePoint: CGPoint(
+                x: intersectionXs[aisleColumn] + outboundOffset.dx,
+                y: destination.y
+            ),
+            returnLanePoint: CGPoint(
+                x: intersectionXs[aisleColumn] + returnOffset.dx,
+                y: destination.y
+            )
+        )
+    }
+
+    private func gridDirections(
+        fromColumn column: Int,
+        row: Int,
+        toColumn destinationColumn: Int,
+        row destinationRow: Int,
+        incoming: WalkDirection
+    ) -> [WalkDirection] {
+        let horizontalDirection: WalkDirection = destinationColumn >= column ? .east : .west
+        let verticalDirection: WalkDirection = destinationRow >= row ? .north : .south
+        let horizontal = Array(
+            repeating: horizontalDirection,
+            count: abs(destinationColumn - column)
+        )
+        let vertical = Array(
+            repeating: verticalDirection,
+            count: abs(destinationRow - row)
+        )
+        let candidates = [horizontal + vertical, vertical + horizontal]
+        return candidates.min {
+            turnCost(for: $0, incoming: incoming) < turnCost(for: $1, incoming: incoming)
+        } ?? []
+    }
+
+    private func turnCost(
+        for directions: [WalkDirection],
+        incoming: WalkDirection
+    ) -> Int {
+        var previous = incoming
+        return directions.reduce(into: 0) { cost, direction in
+            if direction == previous.opposite {
+                cost += 2
+            } else if direction != previous {
+                cost += 1
+            }
+            previous = direction
+        }
+    }
+
+    private func continuePlannedRoute(
+        atColumn column: Int,
+        row: Int,
+        incoming: WalkDirection
+    ) {
+        if let route = currentDeskRoute,
+           plannedDirections.isEmpty,
+           column == route.aisleColumn,
+           row == route.approachRow {
+            startDestinationTurn(route, incoming: incoming)
+        } else {
+            startTurn(atColumn: column, row: row, incoming: incoming)
+        }
+    }
+
+    private func startDestinationTurn(
+        _ route: DeskRoute,
+        incoming _: WalkDirection
+    ) {
+        guard let metrics = activeMetrics else { return }
+        let intersection = intersectionPoint(
+            column: route.aisleColumn,
+            row: route.approachRow
+        )
+        let destination = corridorEntryPoint(
+            atColumn: route.aisleColumn,
+            row: route.approachRow,
+            traveling: route.approachDirection,
+            laneSeed: trackedLaneSeed(for: route.approachDirection),
+            metrics: metrics,
+            forceLeft: true
+        )
+        let start = trackedUserNode.position
+        trackedUserSegment = UserSegment(
+            start: start,
+            control: intersection,
+            end: destination,
+            length: quadraticLength(from: start, control: intersection, to: destination),
+            completion: .enteredDestinationCorridor(route)
+        )
+        trackedUserSegmentDistance = 0
+    }
+
+    private func startDestinationCorridor(_ route: DeskRoute) {
+        let start = trackedUserNode.position
+        trackedUserSegment = UserSegment(
+            start: start,
+            control: nil,
+            end: route.outboundLanePoint,
+            length: distance(from: start, to: route.outboundLanePoint),
+            completion: .reachedDestinationLane(route)
+        )
+        trackedUserSegmentDistance = 0
+    }
+
+    private func startDeskApproach(_ route: DeskRoute) {
+        let start = trackedUserNode.position
+        trackedUserSegment = UserSegment(
+            start: start,
+            control: nil,
+            end: route.destination.stopPoint,
+            length: distance(from: start, to: route.destination.stopPoint),
+            completion: .reachedDestination(route)
+        )
+        trackedUserSegmentDistance = 0
+    }
+
+    private func finishCurrentDeskVisit() {
+        guard let route = currentDeskRoute else { return }
+        visitedDeskIDs.insert(route.destination.id)
+        plannedDeskStops.removeAll { $0.id == route.destination.id }
+        ensurePlanLookahead()
+        refreshPlannedDeskHighlights()
+
+        let start = trackedUserNode.position
+        trackedUserSegment = UserSegment(
+            start: start,
+            control: nil,
+            end: route.returnLanePoint,
+            length: distance(from: start, to: route.returnLanePoint),
+            completion: .returnedToAisle(route)
+        )
+        trackedUserSegmentDistance = 0
+    }
+
+    private func startReturnCorridor(_ route: DeskRoute) {
+        guard let metrics = activeMetrics else { return }
+        let returnDirection = route.approachDirection.opposite
+        let destination = corridorExitPoint(
+            atColumn: route.aisleColumn,
+            row: route.approachRow,
+            traveling: returnDirection,
+            laneSeed: trackedLaneSeed(for: returnDirection),
+            metrics: metrics,
+            forceLeft: true
+        )
+        let start = trackedUserNode.position
+        trackedUserSegment = UserSegment(
+            start: start,
+            control: nil,
+            end: destination,
+            length: distance(from: start, to: destination),
+            completion: .returnedToIntersection(
+                column: route.aisleColumn,
+                row: route.approachRow,
+                incoming: returnDirection
+            )
+        )
+        trackedUserSegmentDistance = 0
     }
 
     private func startCorridor(
@@ -1375,7 +1968,9 @@ private final class ConventionFloorScene: SKScene {
         incoming: WalkDirection
     ) {
         guard let metrics = activeMetrics else { return }
-        let outgoing = chooseDirection(fromColumn: column, row: row, incoming: incoming)
+        let outgoing = plannedDirections.isEmpty
+            ? chooseDirection(fromColumn: column, row: row, incoming: incoming)
+            : plannedDirections.removeFirst()
         let intersection = intersectionPoint(column: column, row: row)
         let destination = corridorEntryPoint(
             atColumn: column,
@@ -1537,7 +2132,15 @@ private final class ConventionFloorScene: SKScene {
         )
         assert(
             abs(metrics.endCapGap - metrics.tableShortSide * 2) < 0.001,
-            "The two end-cap tables must retain a two-table-wide opening."
+            "The attached end-cap pair must retain a two-table-wide opening beside it."
+        )
+        assert(
+            abs(metrics.blockWidth - metrics.tableLongSide * 2 - metrics.endCapGap) < 0.001,
+            "The two end-cap tables must remain attached as one pair."
+        )
+        assert(
+            abs(metrics.blockHeight - metrics.bankLength - metrics.tableShortSide * 2) < 0.001,
+            "End-cap tables must sit flush against both ends of each straight run."
         )
         assert(
             tableStopOffset - maximumVisitorRadius > deskInset,

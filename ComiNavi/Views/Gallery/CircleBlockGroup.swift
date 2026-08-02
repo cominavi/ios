@@ -17,12 +17,15 @@ struct CircleBlockGroup {
     var block: UFDSchema.Block
     var unifiedCircles: [UnifiedCircle]
 
-    static func from(circles: [CirclemsDataSchema.ComiketCircleWC]) -> [CircleBlockGroup] {
+    static func from(
+        circles: [CirclemsDataSchema.ComiketCircleWC],
+        blocks catalogBlocks: [UFDSchema.Block]
+    ) -> [CircleBlockGroup] {
         var groupedCircles: [CircleBlockGroup] = []
 
         let blocks: [Int: [CirclemsDataSchema.ComiketCircleWC]] = Dictionary(grouping: circles, by: { $0.blockId ?? 0 })
         for blockId in blocks.keys.sorted() {
-            guard let block = AppData.circlems.comiket.blocks.first(where: { $0.externalBlockId == blockId }) else {
+            guard let block = catalogBlocks.first(where: { $0.externalBlockId == blockId }) else {
                 continue
             }
 

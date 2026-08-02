@@ -1,0 +1,54 @@
+{
+  "event": 104,
+  "savedAt": "2026-07-22T11:36:57.219242+00:00",
+  "venues": [
+    {
+      "id": "east123",
+      "name": "East 1–3",
+      "imageName": "LWMP1E123",
+      "latitude": 35.631057820055005,
+      "longitude": 139.79794721575166,
+      "widthMeters": 275.8224542031329,
+      "heightMeters": 99.01318868830411,
+      "rotationDegrees": 146.462,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "east456",
+      "name": "East 4–6",
+      "imageName": "LWMP1E456",
+      "latitude": 35.63237082511334,
+      "longitude": 139.7975145453659,
+      "widthMeters": 271.05487926318995,
+      "heightMeters": 97.30175153037587,
+      "rotationDegrees": -33.53800000000001,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "east7",
+      "name": "East 7",
+      "imageName": "LWMP1E7",
+      "latitude": 35.633471367816355,
+      "longitude": 139.7994204284449,
+      "widthMeters": 113.01855361967942,
+      "heightMeters": 122.28236949014496,
+      "rotationDegrees": -33.40707083299674,
+      "opacity": 1,
+      "visible": true
+    },
+    {
+      "id": "west",
+      "name": "West Halls",
+      "imageName": "LWMP1W12",
+      "latitude": 35.62877144202331,
+      "longitude": 139.79501092499783,
+      "widthMeters": 205.27930023717607,
+      "heightMeters": 145.97639127976964,
+      "rotationDegrees": 146.97977914964463,
+      "opacity": 1,
+      "visible": true
+    }
+  ]
+}

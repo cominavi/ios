@@ -35,6 +35,17 @@
             parallelizable = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C0D100000000000000000006"
+               BuildableName = "ComiNaviTests.xctest"
+               BlueprintName = "ComiNaviTests"
+               ReferencedContainer = "container:ComiNavi.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "B5B37CFE2CBEE5AB006C3F4A"
                BuildableName = "ComiNaviUITests.xctest"
                BlueprintName = "ComiNaviUITests"

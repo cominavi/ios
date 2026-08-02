@@ -15,10 +15,18 @@
 		B59B24DE2CAD4D78009FDFAE /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = B59B24DD2CAD4D78009FDFAE /* PostHog */; };
 		B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AECE2C9357DA00742CE8 /* SwifterSwift */; };
 		B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AEDE2C942CC900742CE8 /* GRDB */; };
+		C0D200000000000000000003 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = C0D200000000000000000002 /* MapLibre */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		B5B37D052CBEE5AB006C3F4A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B5E9AEAB2C9333CD00742CE8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B5E9AEB22C9333CD00742CE8;
+			remoteInfo = ComiNavi;
+		};
+		C0D100000000000000000007 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = B5E9AEAB2C9333CD00742CE8 /* Project object */;
 			proxyType = 1;
@@ -43,6 +51,7 @@
 /* Begin PBXFileReference section */
 		B5B37CFF2CBEE5AB006C3F4A /* ComiNaviUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ComiNaviUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ComiNavi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0D100000000000000000001 /* ComiNaviTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ComiNaviTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -69,6 +78,11 @@
 			path = ComiNavi;
 			sourceTree = "<group>";
 		};
+		C0D100000000000000000002 /* ComiNaviTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ComiNaviTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +105,14 @@
 				B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */,
 				B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */,
 				5625CF33AB7F4CF89953B2B5 /* Sentry in Frameworks */,
+				C0D200000000000000000003 /* MapLibre in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0D100000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -108,6 +130,7 @@
 			isa = PBXGroup;
 			children = (
 				B5E9AEB52C9333CD00742CE8 /* ComiNavi */,
+				C0D100000000000000000002 /* ComiNaviTests */,
 				B5B37D002CBEE5AB006C3F4A /* ComiNaviUITests */,
 				B5B2738D2C9ABDD900F2120A /* Frameworks */,
 				B5E9AEB42C9333CD00742CE8 /* Products */,
@@ -118,6 +141,7 @@
 			isa = PBXGroup;
 			children = (
 				B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */,
+				C0D100000000000000000001 /* ComiNaviTests.xctest */,
 				B5B37CFF2CBEE5AB006C3F4A /* ComiNaviUITests.xctest */,
 			);
 			name = Products;
@@ -176,10 +200,34 @@
 				CC3C71F91CD14381A99FD361 /* Sentry */,
 				B59B24DD2CAD4D78009FDFAE /* PostHog */,
 				B5600A3C2CB775E200AD1074 /* DebugSwift */,
+				C0D200000000000000000002 /* MapLibre */,
 			);
 			productName = ComiNavi;
 			productReference = B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */;
 			productType = "com.apple.product-type.application";
+		};
+		C0D100000000000000000006 /* ComiNaviTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0D10000000000000000000B /* Build configuration list for PBXNativeTarget "ComiNaviTests" */;
+			buildPhases = (
+				C0D100000000000000000004 /* Sources */,
+				C0D100000000000000000003 /* Frameworks */,
+				C0D100000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C0D100000000000000000008 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C0D100000000000000000002 /* ComiNaviTests */,
+			);
+			name = ComiNaviTests;
+			packageProductDependencies = (
+			);
+			productName = ComiNaviTests;
+			productReference = C0D100000000000000000001 /* ComiNaviTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -197,6 +245,10 @@
 					};
 					B5E9AEB22C9333CD00742CE8 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					C0D100000000000000000006 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = B5E9AEB22C9333CD00742CE8;
 					};
 				};
 			};
@@ -219,6 +271,7 @@
 				A4022B3FC5F444AF831FA16C /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 				B59B24DC2CAD4D78009FDFAE /* XCRemoteSwiftPackageReference "posthog-ios" */,
 				B5600A3B2CB775E200AD1074 /* XCRemoteSwiftPackageReference "DebugSwift" */,
+				C0D200000000000000000001 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B5E9AEB42C9333CD00742CE8 /* Products */;
@@ -226,6 +279,7 @@
 			projectRoot = "";
 			targets = (
 				B5E9AEB22C9333CD00742CE8 /* ComiNavi */,
+				C0D100000000000000000006 /* ComiNaviTests */,
 				B5B37CFE2CBEE5AB006C3F4A /* ComiNaviUITests */,
 			);
 		};
@@ -240,6 +294,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B5E9AEB12C9333CD00742CE8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0D100000000000000000005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -263,7 +324,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Upload staging debug symbols and source context to Sentry.\nif [ \"$CONFIGURATION\" != \"Staging\" ]; then\n    exit 0\nfi\n\nif [ \"$(uname -m)\" = \"arm64\" ]; then\n    export PATH=\"/opt/homebrew/bin:$PATH\"\nfi\n\nif which sentry-cli >/dev/null; then\n    export SENTRY_ORG=cominavi\n    export SENTRY_PROJECT=cominavi\n    ERROR=$(sentry-cli debug-files upload --include-sources \"$DWARF_DSYM_FOLDER_PATH\" 2>&1 >/dev/null)\n    if [ ! $? -eq 0 ]; then\n        echo \"warning: sentry-cli - $ERROR\"\n    fi\nelse\n    echo \"warning: sentry-cli not installed, download from https://github.com/getsentry/sentry-cli/releases\"\nfi\n";
+			shellScript = "# Upload distribution debug symbols and source context to Sentry.\ncase \"$CONFIGURATION\" in\n    Staging|TestFlight) ;;\n    *) exit 0 ;;\nesac\n\nif [ \"$PLATFORM_NAME\" != \"iphoneos\" ]; then\n    exit 0\nfi\n\nif [ \"$(uname -m)\" = \"arm64\" ]; then\n    export PATH=\"/opt/homebrew/bin:$PATH\"\nfi\n\nif which sentry-cli >/dev/null; then\n    export SENTRY_ORG=cominavi\n    export SENTRY_PROJECT=cominavi\n    ERROR=$(sentry-cli debug-files upload --include-sources \"$DWARF_DSYM_FOLDER_PATH\" 2>&1 >/dev/null)\n    if [ ! $? -eq 0 ]; then\n        echo \"warning: sentry-cli - $ERROR\"\n    fi\nelse\n    echo \"warning: sentry-cli not installed, download from https://github.com/getsentry/sentry-cli/releases\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -282,6 +343,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0D100000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -289,6 +357,11 @@
 			isa = PBXTargetDependency;
 			target = B5E9AEB22C9333CD00742CE8 /* ComiNavi */;
 			targetProxy = B5B37D052CBEE5AB006C3F4A /* PBXContainerItemProxy */;
+		};
+		C0D100000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B5E9AEB22C9333CD00742CE8 /* ComiNavi */;
+			targetProxy = C0D100000000000000000007 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -302,12 +375,12 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNavi.debug.UITests;
+				PRODUCT_BUNDLE_IDENTIFIER = llc.mikunet.cominavi.debug.UITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = ComiNavi;
 			};
@@ -322,12 +395,12 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNavi.staging.UITests;
+				PRODUCT_BUNDLE_IDENTIFIER = llc.mikunet.cominavi.staging.UITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = ComiNavi;
 			};
@@ -432,6 +505,8 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_CODE_COVERAGE = NO;
+				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -448,8 +523,8 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
-				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "COMINAVI_STAGING $(inherited)";
+				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -489,13 +564,13 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNavi.debug;
+				PRODUCT_BUNDLE_IDENTIFIER = llc.mikunet.cominavi.debug;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -534,16 +609,211 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = net.cominavi.ComiNavi.staging;
+				PRODUCT_BUNDLE_IDENTIFIER = llc.mikunet.cominavi.staging;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Staging;
+		};
+		C0D100000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F25GFFJL49;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = llc.mikunet.cominavi.debug.Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ComiNavi.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ComiNavi";
+			};
+			name = Debug;
+		};
+		C0D10000000000000000000A /* Staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F25GFFJL49;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = llc.mikunet.cominavi.staging.Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ComiNavi.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ComiNavi";
+			};
+			name = Staging;
+		};
+		C0D300000000000000000001 /* TestFlight */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_CODE_COVERAGE = NO;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "COMINAVI_TESTFLIGHT $(inherited)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = TestFlight;
+		};
+		C0D300000000000000000002 /* TestFlight */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COMINAVI_BUILD_ENVIRONMENT = testflight;
+				COMINAVI_CIRCLEMS_CLIENT_ID = cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C;
+				COMINAVI_CIRCLEMS_ENVIRONMENT = testing;
+				COMINAVI_CIRCLEMS_TOKEN_REFRESH_URL = "https://cominavi.net/api/v1/oauth/circlems/refresh_token";
+				COMINAVI_OAUTH_CALLBACK_SCHEME = cominavi;
+				COMINAVI_OAUTH_REDIRECT_URL = "https://cominavi.net/oauth/circlems/landing";
+				CURRENT_PROJECT_VERSION = 2026072701;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = F25GFFJL49;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				EXCLUDED_SOURCE_FILE_NAMES = (
+					"demo-c104.sqlite",
+					"demo-c104-images.sqlite",
+					"demo-c104-main.sqlite",
+					"demo-c104-main.sqlite.preparing-shm",
+					"crawl-c108-images.sqlite",
+					"crawl-c108-main.sqlite",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ComiNavi/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ComiNavi;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = llc.mikunet.cominavi;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = TestFlight;
+		};
+		C0D300000000000000000003 /* TestFlight */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2026072701;
+				DEVELOPMENT_TEAM = F25GFFJL49;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = llc.mikunet.cominavi.Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ComiNavi.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ComiNavi";
+			};
+			name = TestFlight;
+		};
+		C0D300000000000000000004 /* TestFlight */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2026072701;
+				DEVELOPMENT_TEAM = F25GFFJL49;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = llc.mikunet.cominavi.UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ComiNavi;
+			};
+			name = TestFlight;
 		};
 /* End XCBuildConfiguration section */
 
@@ -553,6 +823,7 @@
 			buildConfigurations = (
 				B5B37D072CBEE5AB006C3F4A /* Debug */,
 				B5B37D082CBEE5AB006C3F4A /* Staging */,
+				C0D300000000000000000004 /* TestFlight */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Staging;
@@ -562,6 +833,7 @@
 			buildConfigurations = (
 				B5E9AEC12C9333CE00742CE8 /* Debug */,
 				B5E9AEC22C9333CE00742CE8 /* Staging */,
+				C0D300000000000000000001 /* TestFlight */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Staging;
@@ -571,6 +843,17 @@
 			buildConfigurations = (
 				B5E9AEC42C9333CE00742CE8 /* Debug */,
 				B5E9AEC52C9333CE00742CE8 /* Staging */,
+				C0D300000000000000000002 /* TestFlight */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Staging;
+		};
+		C0D10000000000000000000B /* Build configuration list for PBXNativeTarget "ComiNaviTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0D100000000000000000009 /* Debug */,
+				C0D10000000000000000000A /* Staging */,
+				C0D300000000000000000003 /* TestFlight */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Staging;
@@ -599,7 +882,7 @@
 			repositoryURL = "https://github.com/Alamofire/Alamofire.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 5.9.1;
+				minimumVersion = 5.11.0;
 			};
 		};
 		B56526C72C976DD800C01713 /* XCRemoteSwiftPackageReference "toast-swift" */ = {
@@ -642,6 +925,14 @@
 				minimumVersion = 6.29.3;
 			};
 		};
+		C0D200000000000000000001 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/maplibre/maplibre-gl-native-distribution.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.26.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -679,6 +970,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B5E9AEDD2C942CC900742CE8 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
+		};
+		C0D200000000000000000002 /* MapLibre */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0D200000000000000000001 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */;
+			productName = MapLibre;
 		};
 		CC3C71F91CD14381A99FD361 /* Sentry */ = {
 			isa = XCSwiftPackageProductDependency;

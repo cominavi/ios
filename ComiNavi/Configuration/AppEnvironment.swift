@@ -8,6 +8,7 @@ import Foundation
 enum AppBuildEnvironment: String, Sendable {
     case debug
     case staging
+    case testFlight = "testflight"
 }
 
 enum CirclemsServiceEnvironment: String, Sendable {
@@ -48,12 +49,14 @@ struct AppEnvironment: Sendable {
     }
 
     private static var compiledBuild: AppBuildEnvironment {
-        #if COMINAVI_STAGING
+        #if COMINAVI_TESTFLIGHT
+        .testFlight
+        #elseif COMINAVI_STAGING
         .staging
         #elseif DEBUG
         .debug
         #else
-        #error("ComiNavi supports Debug and Staging builds only.")
+        #error("ComiNavi requires an explicit Debug, Staging, or TestFlight build environment.")
         #endif
     }
 
