@@ -53,6 +53,59 @@ struct CatalogTagProvenance: Hashable, Sendable {
     let url: String?
 }
 
+struct CatalogRecordProvenance: Identifiable, Hashable, Sendable {
+    let sourceID: String?
+    let sourceKind: String?
+    let recordID: String?
+    let url: URL?
+    let retrievedAt: String?
+    let payloadSHA256: String?
+    let observationKey: String?
+    let fields: [String]
+
+    var id: String {
+        [
+            sourceID ?? "",
+            sourceKind ?? "",
+            recordID ?? "",
+            url?.absoluteString ?? "",
+            retrievedAt ?? "",
+            payloadSHA256 ?? "",
+            observationKey ?? "",
+            fields.joined(separator: ","),
+        ]
+        .joined(separator: "\u{1f}")
+    }
+}
+
+enum CatalogAttendanceStatus: String, Sendable {
+    case attending
+    case withdrawn
+    case unknown
+}
+
+struct CatalogAttendanceClaim: Identifiable, Hashable, Sendable {
+    let id: String
+    let status: CatalogAttendanceStatus
+    let confidence: CatalogConfidence
+    let reasons: [String]
+    let policyID: String?
+    let postURL: URL
+    let text: String
+    let createdAt: Date?
+    let authorHandle: String
+    let authorName: String?
+    let matchingPolicyID: String?
+    let matchScore: Int
+    let matchReasons: [String]
+    let provenance: [CatalogRecordProvenance]
+    let matchedCircleProvenance: [CatalogRecordProvenance]
+
+    var isReportableWithdrawal: Bool {
+        status == .withdrawn && [.high, .medium].contains(confidence)
+    }
+}
+
 struct CatalogEnrichmentTag: Identifiable, Hashable, Sendable {
     let termID: String?
     let canonicalLabel: String
@@ -83,6 +136,50 @@ struct CatalogShinagakiPost: Identifiable, Hashable, Sendable {
     let placementConfidence: CatalogConfidence
     let matchScore: Int
     let matchReasons: [String]
+    let matchingPolicyID: String?
+    let postReasons: [String]
+    let provenance: [CatalogRecordProvenance]
+    let matchedCircleProvenance: [CatalogRecordProvenance]
+
+    init(
+        id: String,
+        postURL: URL,
+        text: String,
+        createdAt: Date?,
+        authorHandle: String,
+        authorName: String?,
+        authorBio: String?,
+        authorProfileImageURL: URL?,
+        media: [CatalogShinagakiMedia],
+        tags: [CatalogEnrichmentTag],
+        postConfidence: CatalogConfidence,
+        placementConfidence: CatalogConfidence,
+        matchScore: Int,
+        matchReasons: [String],
+        matchingPolicyID: String? = nil,
+        postReasons: [String] = [],
+        provenance: [CatalogRecordProvenance] = [],
+        matchedCircleProvenance: [CatalogRecordProvenance] = []
+    ) {
+        self.id = id
+        self.postURL = postURL
+        self.text = text
+        self.createdAt = createdAt
+        self.authorHandle = authorHandle
+        self.authorName = authorName
+        self.authorBio = authorBio
+        self.authorProfileImageURL = authorProfileImageURL
+        self.media = media
+        self.tags = tags
+        self.postConfidence = postConfidence
+        self.placementConfidence = placementConfidence
+        self.matchScore = matchScore
+        self.matchReasons = matchReasons
+        self.matchingPolicyID = matchingPolicyID
+        self.postReasons = postReasons
+        self.provenance = provenance
+        self.matchedCircleProvenance = matchedCircleProvenance
+    }
 
     var authorProfileURL: URL? {
         URL(string: "https://x.com/\(authorHandle)")
@@ -95,10 +192,15 @@ struct CatalogShinagakiPost: Identifiable, Hashable, Sendable {
 
 struct CatalogCircleEnrichment: Equatable, Sendable {
     let posts: [CatalogShinagakiPost]
+    let attendanceClaims: [CatalogAttendanceClaim]
     let tags: [CatalogEnrichmentTag]
 
-    init(posts: [CatalogShinagakiPost]) {
+    init(
+        posts: [CatalogShinagakiPost],
+        attendanceClaims: [CatalogAttendanceClaim] = []
+    ) {
         self.posts = posts
+        self.attendanceClaims = attendanceClaims
         tags = Self.mergedTags(posts.flatMap(\.tags))
     }
 
@@ -116,6 +218,10 @@ struct CatalogCircleEnrichment: Equatable, Sendable {
 
     var hasHighConfidencePost: Bool {
         posts.contains(where: \.isHighConfidence)
+    }
+
+    var withdrawalClaims: [CatalogAttendanceClaim] {
+        attendanceClaims.filter(\.isReportableWithdrawal)
     }
 
     var searchableText: String {
@@ -136,7 +242,15 @@ struct CatalogCircleEnrichment: Equatable, Sendable {
             ]
             .compactMap { $0 }
         }
-        return (postText + tagText).joined(separator: "\n")
+        let attendanceText = attendanceClaims.flatMap { claim in
+            [
+                claim.authorHandle,
+                claim.authorName,
+                claim.text,
+            ]
+            .compactMap { $0 }
+        }
+        return (postText + tagText + attendanceText).joined(separator: "\n")
     }
 
     private static func mergedTags(
@@ -249,6 +363,8 @@ struct CatalogCircleDetails {
 struct CatalogEnrichmentIndex: Sendable {
     private let postsByPublicCircleID: [Int: [CatalogShinagakiPost]]
     private let postsBySeedCircleID: [Int: [CatalogShinagakiPost]]
+    private let attendanceByPublicCircleID: [Int: [CatalogAttendanceClaim]]
+    private let attendanceBySeedCircleID: [Int: [CatalogAttendanceClaim]]
 
     let selectedPostCount: Int
     let mappedPostCount: Int
@@ -261,31 +377,63 @@ struct CatalogEnrichmentIndex: Sendable {
 
         var postsByPublicCircleID: [Int: [CatalogShinagakiPost]] = [:]
         var postsBySeedCircleID: [Int: [CatalogShinagakiPost]] = [:]
+        var attendanceByPublicCircleID: [Int: [CatalogAttendanceClaim]] = [:]
+        var attendanceBySeedCircleID: [Int: [CatalogAttendanceClaim]] = [:]
         var mappedPosts: Set<String> = []
 
         for sourcePost in sourcePosts {
+            var didMapSourcePost = false
+
+            for match in sourcePost.matchedCircles {
+                guard let claim = sourcePost.catalogAttendanceClaim(match: match) else {
+                    continue
+                }
+                if let publicCircleID = match.wcId {
+                    attendanceByPublicCircleID[publicCircleID, default: []].append(claim)
+                } else {
+                    attendanceBySeedCircleID[match.circleId, default: []].append(claim)
+                }
+                didMapSourcePost = true
+            }
+
             guard let bestScore = sourcePost.matchedCircles.map(\.score).max() else {
+                if didMapSourcePost {
+                    mappedPosts.insert(sourcePost.tweetId)
+                }
                 continue
             }
 
             let strongestMatches = sourcePost.matchedCircles.filter { $0.score == bestScore }
             guard !strongestMatches.isEmpty else { continue }
-            mappedPosts.insert(sourcePost.tweetId)
 
             for match in strongestMatches {
                 guard let post = sourcePost.catalogPost(match: match) else { continue }
                 if let publicCircleID = match.wcId {
                     postsByPublicCircleID[publicCircleID, default: []].append(post)
+                } else {
+                    postsBySeedCircleID[match.circleId, default: []].append(post)
                 }
-                postsBySeedCircleID[match.circleId, default: []].append(post)
+                didMapSourcePost = true
+            }
+
+            if didMapSourcePost {
+                mappedPosts.insert(sourcePost.tweetId)
             }
         }
 
         self.postsByPublicCircleID = postsByPublicCircleID.mapValues(Self.sortedAndUniqued)
         self.postsBySeedCircleID = postsBySeedCircleID.mapValues(Self.sortedAndUniqued)
+        self.attendanceByPublicCircleID = attendanceByPublicCircleID.mapValues(
+            Self.sortedAndUniquedAttendance
+        )
+        self.attendanceBySeedCircleID = attendanceBySeedCircleID.mapValues(
+            Self.sortedAndUniquedAttendance
+        )
         selectedPostCount = sourcePosts.count
         mappedPostCount = mappedPosts.count
-        mappedPublicCircleCount = postsByPublicCircleID.count
+        mappedPublicCircleCount = Set(postsByPublicCircleID.keys)
+            .union(attendanceByPublicCircleID.keys)
+            .count
     }
 
     func enrichment(
@@ -297,8 +445,18 @@ struct CatalogEnrichmentIndex: Sendable {
         } else {
             postsBySeedCircleID[circleID] ?? []
         }
+        let attendanceClaims = if let publicCircleID {
+            attendanceByPublicCircleID[publicCircleID] ?? []
+        } else {
+            attendanceBySeedCircleID[circleID] ?? []
+        }
         let uniquePosts = Self.sortedAndUniqued(posts)
-        return uniquePosts.isEmpty ? nil : CatalogCircleEnrichment(posts: uniquePosts)
+        let uniqueAttendance = Self.sortedAndUniquedAttendance(attendanceClaims)
+        guard !uniquePosts.isEmpty || !uniqueAttendance.isEmpty else { return nil }
+        return CatalogCircleEnrichment(
+            posts: uniquePosts,
+            attendanceClaims: uniqueAttendance
+        )
     }
 
     func enrichments(
@@ -306,6 +464,7 @@ struct CatalogEnrichmentIndex: Sendable {
     ) -> [Int: CatalogCircleEnrichment] {
         let circleIDs = Set(publicCircleIDsByCircleID.keys)
             .union(postsBySeedCircleID.keys)
+            .union(attendanceBySeedCircleID.keys)
 
         return Dictionary(
             uniqueKeysWithValues: circleIDs.compactMap { circleID in
@@ -341,6 +500,38 @@ struct CatalogEnrichmentIndex: Sendable {
         }
         if lhs.placementConfidence.rank != rhs.placementConfidence.rank {
             return lhs.placementConfidence.rank > rhs.placementConfidence.rank
+        }
+        if lhs.matchScore != rhs.matchScore {
+            return lhs.matchScore > rhs.matchScore
+        }
+        return (lhs.createdAt ?? .distantPast) > (rhs.createdAt ?? .distantPast)
+    }
+
+    private static func sortedAndUniquedAttendance(
+        _ claims: [CatalogAttendanceClaim]
+    ) -> [CatalogAttendanceClaim] {
+        var claimsByID: [String: CatalogAttendanceClaim] = [:]
+        for claim in claims {
+            if let current = claimsByID[claim.id] {
+                claimsByID[claim.id] = isPreferredAttendance(claim, over: current)
+                    ? claim
+                    : current
+            } else {
+                claimsByID[claim.id] = claim
+            }
+        }
+        return claimsByID.values.sorted(by: isPreferredAttendance)
+    }
+
+    private static func isPreferredAttendance(
+        _ lhs: CatalogAttendanceClaim,
+        over rhs: CatalogAttendanceClaim
+    ) -> Bool {
+        if lhs.confidence.rank != rhs.confidence.rank {
+            return lhs.confidence.rank > rhs.confidence.rank
+        }
+        if lhs.status != rhs.status {
+            return lhs.status == .withdrawn
         }
         if lhs.matchScore != rhs.matchScore {
             return lhs.matchScore > rhs.matchScore
@@ -412,14 +603,21 @@ private struct CollectorPost: Decodable {
     let authorName: String?
     let author: CollectorAuthor?
     let media: [CollectorMedia]
+    let postReasons: [String]?
     let postConfidence: CatalogConfidence
     let placementConfidence: CatalogConfidence
     let matchedCircles: [CollectorCircleMatch]
+    let matchingPolicyId: String?
+    let attendance: CollectorAttendance?
+    let provenance: [CollectorRecordProvenance]?
     let enrichment: CollectorPostEnrichment?
 
     func catalogPost(
         match: CollectorCircleMatch
     ) -> CatalogShinagakiPost? {
+        guard postConfidence.rank >= CatalogConfidence.medium.rank else {
+            return nil
+        }
         let fallbackURL = "https://x.com/\(authorHandle)/status/\(tweetId)"
         guard let postURL = Self.secureURL(tweetUrl ?? fallbackURL) else {
             return nil
@@ -439,11 +637,60 @@ private struct CollectorPost: Decodable {
             postConfidence: postConfidence,
             placementConfidence: placementConfidence,
             matchScore: match.score,
-            matchReasons: match.reasons
+            matchReasons: match.reasons,
+            matchingPolicyID: matchingPolicyId?.nilIfBlank,
+            postReasons: postReasons ?? [],
+            provenance: Self.catalogProvenance(provenance),
+            matchedCircleProvenance: Self.catalogProvenance(match.provenance)
         )
     }
 
-    private static func secureURL(_ value: String?) -> URL? {
+    func catalogAttendanceClaim(
+        match: CollectorCircleMatch
+    ) -> CatalogAttendanceClaim? {
+        guard let attendance,
+              [.high, .medium].contains(attendance.confidence)
+        else { return nil }
+
+        let status = CatalogAttendanceStatus(rawValue: attendance.status) ?? .unknown
+        guard status != .unknown else { return nil }
+
+        let fallbackURL = "https://x.com/\(authorHandle)/status/\(tweetId)"
+        guard let postURL = Self.secureURL(tweetUrl ?? fallbackURL) else {
+            return nil
+        }
+
+        return CatalogAttendanceClaim(
+            id: tweetId,
+            status: status,
+            confidence: attendance.confidence,
+            reasons: attendance.reasons ?? [],
+            policyID: attendance.policyId?.nilIfBlank,
+            postURL: postURL,
+            text: text,
+            createdAt: Self.date(from: createdAt),
+            authorHandle: authorHandle,
+            authorName: authorName ?? author?.name,
+            matchingPolicyID: matchingPolicyId?.nilIfBlank,
+            matchScore: match.score,
+            matchReasons: match.reasons,
+            provenance: Self.catalogProvenance(
+                (provenance ?? []) + (attendance.provenance ?? [])
+            ),
+            matchedCircleProvenance: Self.catalogProvenance(match.provenance)
+        )
+    }
+
+    private static func catalogProvenance(
+        _ provenance: [CollectorRecordProvenance]?
+    ) -> [CatalogRecordProvenance] {
+        var seen: Set<CatalogRecordProvenance> = []
+        return (provenance ?? []).compactMap(\.catalogProvenance).filter {
+            seen.insert($0).inserted
+        }
+    }
+
+    fileprivate static func secureURL(_ value: String?) -> URL? {
         guard let value,
               let url = URL(string: value),
               url.scheme?.lowercased() == "https"
@@ -503,6 +750,52 @@ private struct CollectorCircleMatch: Decodable {
     let wcId: Int?
     let score: Int
     let reasons: [String]
+    let provenance: [CollectorRecordProvenance]?
+}
+
+private struct CollectorAttendance: Decodable {
+    let status: String
+    let confidence: CatalogConfidence
+    let reasons: [String]?
+    let provenance: [CollectorRecordProvenance]?
+    let policyId: String?
+}
+
+private struct CollectorRecordProvenance: Decodable {
+    let sourceId: String?
+    let sourceKind: String?
+    let recordId: String?
+    let url: String?
+    let retrievedAt: String?
+    let payloadSha256: String?
+    let observationKey: String?
+    let fields: [String]?
+
+    var catalogProvenance: CatalogRecordProvenance? {
+        let sourceID = sourceId?.nilIfBlank
+        let sourceKind = sourceKind?.nilIfBlank
+        let recordID = recordId?.nilIfBlank
+        let observationKey = observationKey?.nilIfBlank
+        let url = CollectorPost.secureURL(url)
+
+        guard sourceID != nil
+                || sourceKind != nil
+                || recordID != nil
+                || observationKey != nil
+                || url != nil
+        else { return nil }
+
+        return CatalogRecordProvenance(
+            sourceID: sourceID,
+            sourceKind: sourceKind,
+            recordID: recordID,
+            url: url,
+            retrievedAt: retrievedAt?.nilIfBlank,
+            payloadSHA256: payloadSha256?.nilIfBlank,
+            observationKey: observationKey,
+            fields: fields ?? []
+        )
+    }
 }
 
 private struct CollectorPostEnrichment: Decodable {

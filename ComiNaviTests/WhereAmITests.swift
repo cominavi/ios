@@ -1,5 +1,6 @@
 import CoreGraphics
 import XCTest
+
 @testable import ComiNavi
 
 final class WhereAmITests: XCTestCase {
@@ -40,6 +41,32 @@ final class WhereAmITests: XCTestCase {
         XCTAssertEqual(columns.map(\.id), ["あ", "か", "や"])
         XCTAssertEqual(columns[1].cells.map(\.character), ["か", "き", nil, nil, nil])
         XCTAssertEqual(columns[2].cells.map(\.character), ["や", nil, "ゆ", nil, "よ"])
+        XCTAssertEqual(layout.orderedCharacters, ["あ", "か", "き", "や", "ゆ", "よ"])
+    }
+
+    func testCharacterSearchMatchesHiraganaKatakanaAndRomaji() {
+        let characters = ["さ", "し", "す", "つ", "シ", "ツ", "ア"]
+
+        XCTAssertEqual(
+            WhereAmICharacterSearch.filter(characters, query: "し"),
+            ["し", "シ"]
+        )
+        XCTAssertEqual(
+            WhereAmICharacterSearch.filter(characters, query: "シ"),
+            ["し", "シ"]
+        )
+        XCTAssertEqual(
+            WhereAmICharacterSearch.filter(characters, query: "shi"),
+            ["し", "シ"]
+        )
+        XCTAssertEqual(
+            WhereAmICharacterSearch.filter(characters, query: "TSU"),
+            ["つ", "ツ"]
+        )
+        XCTAssertEqual(
+            WhereAmICharacterSearch.filter(characters, query: "ｔｓｕ"),
+            ["つ", "ツ"]
+        )
     }
 
     func testFullWidthAlphabetUsesAlphabeticalOrder() throws {
@@ -86,7 +113,8 @@ final class WhereAmITests: XCTestCase {
             timestamp: .now
         )
 
-        XCTAssertEqual(WhereAmIResolver.nearestVenue(to: nearby, venues: [west, east])?.id, east.id)
+        XCTAssertEqual(
+            WhereAmIResolver.nearestVenue(to: nearby, venues: [west, east])?.id, east.id)
         XCTAssertNil(WhereAmIResolver.nearestVenue(to: distant, venues: [west, east]))
     }
 
@@ -157,7 +185,7 @@ final class WhereAmITests: XCTestCase {
             WhereAmIResolver.table(blockName: "あ", number: 12, in: venue.placement.scene)
         )
 
-        let destination = WhereAmIResolver.navigationDestination(
+        let destination = WhereAmIResolver.destination(
             at: table,
             in: venue,
             selectedAt: Date(timeIntervalSince1970: 300)
@@ -169,6 +197,30 @@ final class WhereAmITests: XCTestCase {
         XCTAssertEqual(destination.canonicalLocationText, "1日目 東1–3ホール あ12")
     }
 
+    func testSharedDestinationPreservesSideAndUsesThatHalfOfTheTable() throws {
+        let venue = venue(
+            id: 1,
+            name: "East 1–3",
+            kind: .east123,
+            coordinate: BigSightCampusLayout.eastBuilding
+        )
+        let table = try XCTUnwrap(
+            WhereAmIResolver.table(blockName: "あ", number: 12, in: venue.placement.scene)
+        )
+
+        let destination = WhereAmIResolver.destination(
+            at: table,
+            in: venue,
+            subspace: 1,
+            selectedAt: Date(timeIntervalSince1970: 301)
+        )
+
+        XCTAssertEqual(destination.subspace, 1)
+        XCTAssertEqual(destination.point, CGPoint(x: 130, y: 220))
+        XCTAssertEqual(destination.spaceCode, "あ12b")
+        XCTAssertEqual(destination.canonicalLocationText, "1日目 東1–3ホール あ12b")
+    }
+
     func testMapPointResolvesNearestTableAndOrientationAwareSubspace() throws {
         let venue = venue(
             id: 1,
@@ -177,7 +229,8 @@ final class WhereAmITests: XCTestCase {
             coordinate: BigSightCampusLayout.eastBuilding
         )
         let scene = venue.placement.scene
-        let table = try XCTUnwrap(WhereAmIResolver.nearestTable(to: CGPoint(x: 80, y: 220), in: scene))
+        let table = try XCTUnwrap(
+            WhereAmIResolver.nearestTable(to: CGPoint(x: 80, y: 220), in: scene))
 
         XCTAssertEqual(table.id.spaceNumber, 12)
         XCTAssertEqual(
@@ -227,7 +280,7 @@ final class WhereAmITests: XCTestCase {
                     blockName: "あ",
                     origin: CGPoint(x: 100, y: 200),
                     orientation: .aLeft
-                ),
+                )
             ]
         )
         return WhereAmIVenueOption(

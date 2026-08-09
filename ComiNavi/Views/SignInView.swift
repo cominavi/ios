@@ -8,7 +8,6 @@
 import AuthenticationServices
 import SpriteKit
 import SwiftUI
-import Toast
 import UIKit
 
 enum DemoState {
@@ -60,8 +59,50 @@ enum ConventionFloorRoutePlanning {
     }
 }
 
+enum CirclemsAuthorizationURLBuilder {
+    static func makeURL(
+        serviceEnvironment: CirclemsServiceEnvironment,
+        clientID: String,
+        redirectURL: URL,
+        state: String
+    ) -> URL? {
+        guard
+            var components = URLComponents(
+                url: serviceEnvironment.authenticationBaseURL.appending(path: "OAuth2/"),
+                resolvingAgainstBaseURL: false
+            )
+        else {
+            return nil
+        }
+        components.queryItems = [
+            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "client_id", value: clientID),
+            URLQueryItem(name: "redirect_uri", value: redirectURL.absoluteString),
+            URLQueryItem(
+                name: "scope", value: "circle_read favorite_read favorite_write user_info"),
+            URLQueryItem(name: "state", value: state),
+        ]
+        return components.url
+    }
+}
+
+private enum SignInError: LocalizedError {
+    case environmentChanged
+
+    var errorDescription: String? {
+        switch self {
+        case .environmentChanged:
+            String(
+                localized: "The login response could not be verified. Please try again."
+            )
+        }
+    }
+}
+
+@MainActor
 class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentationContextProviding {
     @Published var state: DemoState = .anonymous
+    @Published var authenticationError: String?
     private var authenticationSession: ASWebAuthenticationSession?
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
@@ -69,43 +110,53 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
     }
 
     func signIn() {
+        guard state == .anonymous else { return }
+
+        let environment = AppEnvironment.current
+        let serviceEnvironment = environment.circlems
+        let storageNamespace = environment.storageNamespace
+        authenticationError = nil
         self.state = .authenticating
 
         Task {
             do {
-                try await self.doSignIn()
-                try await self.populateUserInfo()
+                try await self.doSignIn(
+                    environment: environment,
+                    serviceEnvironment: serviceEnvironment
+                )
+                try await self.populateUserInfo(
+                    serviceEnvironment: serviceEnvironment
+                )
             } catch {
                 self.state = .anonymous
-                AppData.userState.user = nil
+                if AppEnvironment.current.storageNamespace == storageNamespace {
+                    AppData.userState.user = nil
+                }
                 // see if it is a user cancelled error
-                if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue
+                {
                     return
                 }
 
-                Toast.showError(
-                    String(localized: "Authentication failed"),
-                    subtitle: error.localizedDescription
-                )
+                self.authenticationError = error.localizedDescription
             }
         }
     }
 
-    func doSignIn() async throws {
-        let environment = AppEnvironment.current
+    func doSignIn(
+        environment: AppEnvironment = .current,
+        serviceEnvironment: CirclemsServiceEnvironment? = nil
+    ) async throws {
+        let serviceEnvironment = serviceEnvironment ?? environment.circlems
         let oauthState = UUID().uuidString
-        var authURLComponents = URLComponents(
-            url: environment.circlems.authenticationBaseURL.appending(path: "OAuth2/"),
-            resolvingAgainstBaseURL: false
-        )!
-        authURLComponents.queryItems = [
-            URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "client_id", value: environment.circlemsClientID),
-            URLQueryItem(name: "redirect_uri", value: environment.oauthRedirectURL.absoluteString),
-            URLQueryItem(name: "scope", value: "circle_read favorite_read favorite_write user_info"),
-            URLQueryItem(name: "state", value: oauthState),
-        ]
-        guard let authURL = authURLComponents.url else {
+        guard
+            let authURL = CirclemsAuthorizationURLBuilder.makeURL(
+                serviceEnvironment: serviceEnvironment,
+                clientID: environment.circlemsClientID,
+                redirectURL: environment.oauthRedirectURL,
+                state: oauthState
+            )
+        else {
             preconditionFailure("Failed to construct the Circle.ms authorization URL.")
         }
 
@@ -123,78 +174,92 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
                     return
                 }
                 guard url.scheme == environment.oauthCallbackScheme,
-                      url.host == "oauth",
-                      url.path == "/circlems/landing"
+                    url.host == "oauth",
+                    url.path == "/circlems/landing"
                 else {
                     continuation.resume(throwing: URLError(.redirectToNonExistentLocation))
                     return
                 }
                 guard let status = url.queryValue(for: "status"), status == "succeeded" else {
                     let errorCode = url.queryValue(for: "error") ?? "unknown"
-                    return continuation.resume(throwing: NSError(
-                        domain: "SignInViewModel",
-                        code: 1,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: String(
-                                localized: "Authentication failed: \(errorCode)"
-                            ),
-                        ]
-                    ))
+                    return continuation.resume(
+                        throwing: NSError(
+                            domain: "SignInViewModel",
+                            code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: String(
+                                    localized: "Authentication failed: \(errorCode)"
+                                )
+                            ]
+                        ))
                 }
                 guard oauthState == url.queryValue(for: "state") else {
-                    return continuation.resume(throwing: NSError(
-                        domain: "SignInViewModel",
-                        code: 1,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: String(
-                                localized: "The login response could not be verified. Please try again."
-                            ),
-                        ]
-                    ))
+                    return continuation.resume(
+                        throwing: NSError(
+                            domain: "SignInViewModel",
+                            code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: String(
+                                    localized:
+                                        "The login response could not be verified. Please try again."
+                                )
+                            ]
+                        ))
                 }
-                guard let tokenType = url.queryValue(for: "token_type"), tokenType == "Bearer" else {
-                    return continuation.resume(throwing: NSError(
-                        domain: "SignInViewModel",
-                        code: 1,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: String(
-                                localized: "Circle.ms returned an unsupported login response."
-                            ),
-                        ]
-                    ))
+                guard let tokenType = url.queryValue(for: "token_type"), tokenType == "Bearer"
+                else {
+                    return continuation.resume(
+                        throwing: NSError(
+                            domain: "SignInViewModel",
+                            code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: String(
+                                    localized: "Circle.ms returned an unsupported login response."
+                                )
+                            ]
+                        ))
                 }
                 guard let accessToken = url.queryValue(for: "access_token") else {
-                    return continuation.resume(throwing: NSError(
-                        domain: "SignInViewModel",
-                        code: 1,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: String(
-                                localized: "The login response did not include an access token."
-                            ),
-                        ]
-                    ))
+                    return continuation.resume(
+                        throwing: NSError(
+                            domain: "SignInViewModel",
+                            code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: String(
+                                    localized: "The login response did not include an access token."
+                                )
+                            ]
+                        ))
                 }
                 guard let refreshToken = url.queryValue(for: "refresh_token") else {
-                    return continuation.resume(throwing: NSError(
-                        domain: "SignInViewModel",
-                        code: 1,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: String(
-                                localized: "The login response did not include a refresh token."
-                            ),
-                        ]
-                    ))
+                    return continuation.resume(
+                        throwing: NSError(
+                            domain: "SignInViewModel",
+                            code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: String(
+                                    localized: "The login response did not include a refresh token."
+                                )
+                            ]
+                        ))
                 }
-                guard let expiresInSecondsStr = url.queryValue(for: "expires_in"), let expiresInSeconds = Int(expiresInSecondsStr) else {
-                    return continuation.resume(throwing: NSError(
-                        domain: "SignInViewModel",
-                        code: 1,
-                        userInfo: [
-                            NSLocalizedDescriptionKey: String(
-                                localized: "The login response did not include an expiration time."
-                            ),
-                        ]
-                    ))
+                guard let expiresInSecondsStr = url.queryValue(for: "expires_in"),
+                    let expiresInSeconds = Int(expiresInSecondsStr)
+                else {
+                    return continuation.resume(
+                        throwing: NSError(
+                            domain: "SignInViewModel",
+                            code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey: String(
+                                    localized:
+                                        "The login response did not include an expiration time."
+                                )
+                            ]
+                        ))
+                }
+                guard AppEnvironment.current.circlems == serviceEnvironment else {
+                    return continuation.resume(throwing: SignInError.environmentChanged)
                 }
 
                 AppData.userState.user = User(
@@ -213,13 +278,25 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
         }
     }
 
-    func populateUserInfo() async throws {
+    func populateUserInfo(
+        serviceEnvironment: CirclemsServiceEnvironment = AppEnvironment.current.circlems
+    ) async throws {
+        guard AppEnvironment.current.circlems == serviceEnvironment,
+            let authenticatedUser = AppData.userState.user,
+            let refreshToken = authenticatedUser.refreshToken
+        else {
+            throw SignInError.environmentChanged
+        }
         let userInfo = try await CirclemsAPI.getUserInfo()
-        debugPrint(userInfo)
+        guard AppEnvironment.current.circlems == serviceEnvironment,
+            AppData.userState.user?.refreshToken == refreshToken
+        else {
+            throw SignInError.environmentChanged
+        }
         let newUser = User(
-            accessToken: AppData.userState.user?.accessToken,
-            accessTokenExpiresAt: AppData.userState.user?.accessTokenExpiresAt,
-            refreshToken: AppData.userState.user?.refreshToken,
+            accessToken: authenticatedUser.accessToken,
+            accessTokenExpiresAt: authenticatedUser.accessTokenExpiresAt,
+            refreshToken: refreshToken,
             userId: userInfo.response.pid,
             nickname: userInfo.response.nickname,
             preferenceR18Enabled: userInfo.response.r18 == 1 ? true : false
@@ -231,15 +308,13 @@ class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentati
 struct SignInView: View {
     @ScaledMetric(relativeTo: .title) private var logoSize = 60.0
     @StateObject private var vm = SignInViewModel()
+    #if DEBUG
+        @State private var selectedCirclemsEnvironment = AppEnvironment.current.circlems
+    #endif
     private let onUseDemoData: (() -> Void)?
-    private let onUseCrawlData: (() -> Void)?
 
-    init(
-        onUseDemoData: (() -> Void)? = nil,
-        onUseCrawlData: (() -> Void)? = nil
-    ) {
+    init(onUseDemoData: (() -> Void)? = nil) {
         self.onUseDemoData = onUseDemoData
-        self.onUseCrawlData = onUseCrawlData
     }
 
     var body: some View {
@@ -252,38 +327,52 @@ struct SignInView: View {
 
                     hero
 
+                    #if DEBUG
+                        circlemsEnvironmentSelector
+                            .padding(.top, 32)
+                    #endif
+
                     loginButton
-                        .padding(.top, 48)
+                        .padding(.top, loginButtonTopPadding)
+
+                    if let authenticationError = vm.authenticationError {
+                        HStack(alignment: .top, spacing: 10) {
+                            LucideIcon("exclamationmark.circle.fill", size: 20)
+                                .foregroundStyle(.red)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Authentication failed")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(authenticationError)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .padding(.top, 12)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("sign-in-authentication-error")
+                    }
 
                     #if DEBUG || COMINAVI_STAGING
-                    if let onUseDemoData {
-                        Button(action: onUseDemoData) {
-                            Label("Explore C104 demo data", systemImage: "externaldrive")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity, minHeight: 52)
+                        if let onUseDemoData {
+                            Button(action: onUseDemoData) {
+                                LucideLabel("Explore C104 demo data", icon: "externaldrive")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity, minHeight: 52)
+                            }
+                            .buttonStyle(.bordered)
+                            .buttonBorderShape(.roundedRectangle(radius: 16))
+                            .padding(.top, 12)
+                            .accessibilityHint("Opens an offline catalog without logging in")
+                            .accessibilityIdentifier("sign-in-demo-data")
                         }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.roundedRectangle(radius: 16))
-                        .padding(.top, 12)
-                        .accessibilityHint("Opens an offline catalog without logging in")
-                        .accessibilityIdentifier("sign-in-demo-data")
-                    }
 
-                    if let onUseCrawlData {
-                        Button(action: onUseCrawlData) {
-                            Label("Explore C108 crawl data", systemImage: "antenna.radiowaves.left.and.right")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity, minHeight: 52)
-                        }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.roundedRectangle(radius: 16))
-                        .padding(.top, 10)
-                        .accessibilityHint("Opens the bundled C108 placement and shinagaki archive without logging in")
-                        .accessibilityIdentifier("sign-in-crawl-data")
-                    }
                     #endif
                 }
-                .frame(maxWidth: 620, minHeight: max(0, proxy.size.height - 48), alignment: .topLeading)
+                .frame(
+                    maxWidth: 620, minHeight: max(0, proxy.size.height - 48), alignment: .topLeading
+                )
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 24)
@@ -312,13 +401,62 @@ struct SignInView: View {
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
                 .foregroundStyle(Color.accentColor)
 
-            Text("Find circles. Plan your route.")
+            Text("Find circles. Know where they are.")
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
     }
+
+    private var loginButtonTopPadding: CGFloat {
+        #if DEBUG
+            32
+        #else
+            48
+        #endif
+    }
+
+    #if DEBUG
+        private var circlemsEnvironmentSelector: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Circle.ms Environment")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Picker("Circle.ms Environment", selection: $selectedCirclemsEnvironment) {
+                    ForEach(CirclemsServiceEnvironment.allCases) { environment in
+                        Text(environment.displayName)
+                            .tag(environment)
+                            .accessibilityIdentifier(
+                                "sign-in-circlems-environment-\(environment.rawValue)"
+                            )
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .disabled(vm.state == .authenticating)
+                .accessibilityLabel(Text("Circle.ms Environment"))
+                .accessibilityHint(
+                    Text(selectedCirclemsEnvironment.signInDescription)
+                )
+                .accessibilityIdentifier("sign-in-circlems-environment")
+
+                Text(selectedCirclemsEnvironment.signInDescription)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(16)
+            .background(
+                .thinMaterial,
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+            .onChange(of: selectedCirclemsEnvironment) { _, environment in
+                AppData.selectCirclemsEnvironment(environment)
+            }
+        }
+    #endif
 
     @ViewBuilder
     private var loginButton: some View {
@@ -349,7 +487,7 @@ struct SignInView: View {
 
                     Spacer(minLength: 12)
 
-                    Image(systemName: "arrow.up.right")
+                    LucideIcon("arrow.up.right")
                         .accessibilityHidden(true)
                 }
             }
@@ -412,7 +550,7 @@ private final class ConventionFloorScene: SKScene {
     private let smallAisleCrowdSpacing: CGFloat = 5.5
     private let bigAisleCrowdSpacing: CGFloat = 2.6
     private let deskLineWidth: CGFloat = 1.45
-    private let visitorDiameterRange: ClosedRange<CGFloat> = 2.2 ... 3.2
+    private let visitorDiameterRange: ClosedRange<CGFloat> = 2.2...3.2
     private let maximumVisitorRadius: CGFloat = 1.6
     private let tableStopOffset: CGFloat = 3.6
     private let trackedUserDiameter: CGFloat = 6.2
@@ -447,7 +585,8 @@ private final class ConventionFloorScene: SKScene {
             bigAisle = tableLongSide * 3.25
             blockWidth = tableLongSide * 2 + endCapGap
 
-            bankLength = CGFloat(tablesPerBank) * tableLongSide
+            bankLength =
+                CGFloat(tablesPerBank) * tableLongSide
                 + CGFloat(tablesPerBank - 1) * tableSpacing
             blockHeight = bankLength + tableShortSide * 2
             horizontalStride = blockWidth + narrowAisle
@@ -592,8 +731,8 @@ private final class ConventionFloorScene: SKScene {
     private var plannedDeskHighlights: [SKShapeNode] = []
     private var intersectionXs: [CGFloat] = []
     private var intersectionYs: [CGFloat] = []
-    private var allowedUserColumns: ClosedRange<Int> = 0 ... 0
-    private var allowedUserRows: ClosedRange<Int> = 0 ... 0
+    private var allowedUserColumns: ClosedRange<Int> = 0...0
+    private var allowedUserRows: ClosedRange<Int> = 0...0
     private var turnRadius: CGFloat = 5
     private var cameraHasSettled = false
 
@@ -679,9 +818,11 @@ private final class ConventionFloorScene: SKScene {
         assertFloorClearances(metrics: metrics)
 
         let rotation = abs(floorRoot.zRotation)
-        let projectedWidth = abs(size.width * cos(rotation))
+        let projectedWidth =
+            abs(size.width * cos(rotation))
             + abs(size.height * sin(rotation))
-        let projectedHeight = abs(size.width * sin(rotation))
+        let projectedHeight =
+            abs(size.width * sin(rotation))
             + abs(size.height * cos(rotation))
         let halfWorldWidth = projectedWidth / 2 + metrics.horizontalStride
         let halfWorldHeight = projectedHeight / 2 + metrics.verticalStride
@@ -762,8 +903,9 @@ private final class ConventionFloorScene: SKScene {
         let rightBankX = origin.x + metrics.blockWidth - metrics.tableShortSide
         let bankStartY = origin.y + metrics.tableShortSide
 
-        for table in 0 ..< metrics.tablesPerBank {
-            let tableY = bankStartY
+        for table in 0..<metrics.tablesPerBank {
+            let tableY =
+                bankStartY
                 + CGFloat(table) * (metrics.tableLongSide + metrics.tableSpacing)
             let leftTableRect = CGRect(
                 x: origin.x,
@@ -811,9 +953,7 @@ private final class ConventionFloorScene: SKScene {
 
         let endCapPairWidth = metrics.tableLongSide * 2
         let endCapPairX = origin.x + (metrics.blockWidth - endCapPairWidth) / 2
-        let sideBankMidpointX = (
-            origin.x + metrics.tableShortSide + rightBankX
-        ) / 2
+        let sideBankMidpointX = (origin.x + metrics.tableShortSide + rightBankX) / 2
         assert(
             abs(endCapPairX + endCapPairWidth / 2 - sideBankMidpointX) < 0.001,
             "The joined end-cap pair must remain centered between the side banks."
@@ -843,13 +983,13 @@ private final class ConventionFloorScene: SKScene {
 
         for row in intersectionYs.indices {
             let rowY = intersectionYs[row]
-            guard visibleBounds.minY ... visibleBounds.maxY ~= rowY else { continue }
+            guard visibleBounds.minY...visibleBounds.maxY ~= rowY else { continue }
 
             let visitorCount = max(
                 180,
                 Int((intersectionXs.last! - intersectionXs.first!) / bigAisleCrowdSpacing)
             )
-            for visitor in 0 ..< visitorCount {
+            for visitor in 0..<visitorCount {
                 let seed = row * 70_001 + visitor * 509
                 let segmentIndex = min(
                     intersectionXs.count - 2,
@@ -869,7 +1009,7 @@ private final class ConventionFloorScene: SKScene {
         }
 
         for column in intersectionXs.indices {
-            for lowerRow in 0 ..< intersectionYs.count - 1 {
+            for lowerRow in 0..<intersectionYs.count - 1 {
                 let segmentBounds = CGRect(
                     x: intersectionXs[column] - metrics.narrowAisle / 2,
                     y: intersectionYs[lowerRow],
@@ -882,7 +1022,7 @@ private final class ConventionFloorScene: SKScene {
                     12,
                     Int(segmentBounds.height / smallAisleCrowdSpacing)
                 )
-                for visitor in 0 ..< visitorCount {
+                for visitor in 0..<visitorCount {
                     let seed = column * 90_001 + lowerRow * 7_001 + visitor * 401
                     let direction: WalkDirection = seed.isMultiple(of: 2) ? .north : .south
                     let sourceRow = direction == .north ? lowerRow : lowerRow + 1
@@ -916,16 +1056,18 @@ private final class ConventionFloorScene: SKScene {
         metrics: Metrics
     ) {
         let laneSeed = seed + 31
-        guard let segment = makeCorridorSegment(
-            fromColumn: column,
-            row: row,
-            direction: direction,
-            laneSeed: laneSeed,
-            agentSeed: seed,
-            decisions: 0,
-            allowDeskVisit: false,
-            metrics: metrics
-        ) else { return }
+        guard
+            let segment = makeCorridorSegment(
+                fromColumn: column,
+                row: row,
+                direction: direction,
+                laneSeed: laneSeed,
+                agentSeed: seed,
+                decisions: 0,
+                allowDeskVisit: false,
+                metrics: metrics
+            )
+        else { return }
 
         addAgent(
             state: .moving(
@@ -943,9 +1085,11 @@ private final class ConventionFloorScene: SKScene {
         metrics: Metrics
     ) {
         let column = nearestIndex(to: stop.aisleCenterX, in: intersectionXs)
-        guard let lowerRow = (0 ..< intersectionYs.count - 1).first(where: {
-            intersectionYs[$0] <= stop.y && stop.y < intersectionYs[$0 + 1]
-        }) else { return }
+        guard
+            let lowerRow = (0..<intersectionYs.count - 1).first(where: {
+                intersectionYs[$0] <= stop.y && stop.y < intersectionYs[$0 + 1]
+            })
+        else { return }
 
         let direction: WalkDirection = seed.isMultiple(of: 2) ? .north : .south
         let destinationRow = direction == .north ? lowerRow + 1 : lowerRow
@@ -995,7 +1139,8 @@ private final class ConventionFloorScene: SKScene {
         speed: CGFloat,
         deskVisitCooldown: Int = 0
     ) {
-        let diameter = visitorDiameterRange.lowerBound
+        let diameter =
+            visitorDiameterRange.lowerBound
             + (visitorDiameterRange.upperBound - visitorDiameterRange.lowerBound) * unit(seed + 11)
         let node = SKSpriteNode(
             texture: visitorTexture,
@@ -1006,9 +1151,9 @@ private final class ConventionFloorScene: SKScene {
         node.zPosition = 2
         floorRoot.addChild(node)
         switch state {
-        case let .moving(segment, distance):
+        case .moving(let segment, let distance):
             node.position = point(on: segment, progress: distance / max(segment.length, 0.001))
-        case let .dwelling(visit, _, _):
+        case .dwelling(let visit, _, _):
             node.position = visit.stopPoint
         }
         agents.append(
@@ -1035,7 +1180,7 @@ private final class ConventionFloorScene: SKScene {
 
     private func advance(agent: inout CrowdAgent, deltaTime: TimeInterval, metrics: Metrics) {
         switch agent.state {
-        case let .dwelling(visit, remaining, elapsed):
+        case .dwelling(let visit, let remaining, let elapsed):
             let nextElapsed = elapsed + deltaTime
             agent.node.position = CGPoint(
                 x: visit.stopPoint.x,
@@ -1063,7 +1208,7 @@ private final class ConventionFloorScene: SKScene {
             var transitions = 0
 
             while travelRemaining > 0, transitions < 5 {
-                guard case let .moving(segment, distanceTravelled) = agent.state else { break }
+                guard case .moving(let segment, let distanceTravelled) = agent.state else { break }
                 let remaining = max(0, segment.length - distanceTravelled)
                 if travelRemaining < remaining {
                     let nextDistance = distanceTravelled + travelRemaining
@@ -1089,7 +1234,7 @@ private final class ConventionFloorScene: SKScene {
         metrics: Metrics
     ) {
         switch completion {
-        case let .arrived(column, row, incoming):
+        case .arrived(let column, let row, let incoming):
             agent.decisions += 1
             agent.deskVisitCooldown = max(0, agent.deskVisitCooldown - 1)
             startCrowdTurn(
@@ -1100,17 +1245,19 @@ private final class ConventionFloorScene: SKScene {
                 metrics: metrics
             )
 
-        case let .exited(column, row, outgoing, laneSeed):
-            guard let segment = makeCorridorSegment(
-                fromColumn: column,
-                row: row,
-                direction: outgoing,
-                laneSeed: laneSeed,
-                agentSeed: agent.seed,
-                decisions: agent.decisions,
-                allowDeskVisit: agent.deskVisitCooldown == 0,
-                metrics: metrics
-            ) else {
+        case .exited(let column, let row, let outgoing, let laneSeed):
+            guard
+                let segment = makeCorridorSegment(
+                    fromColumn: column,
+                    row: row,
+                    direction: outgoing,
+                    laneSeed: laneSeed,
+                    agentSeed: agent.seed,
+                    decisions: agent.decisions,
+                    allowDeskVisit: agent.deskVisitCooldown == 0,
+                    metrics: metrics
+                )
+            else {
                 startCrowdTurn(
                     atColumn: column,
                     row: row,
@@ -1125,7 +1272,7 @@ private final class ConventionFloorScene: SKScene {
             }
             agent.state = .moving(segment: segment, distance: 0)
 
-        case let .reachedDeskLane(visit):
+        case .reachedDeskLane(let visit):
             agent.state = .moving(
                 segment: makeCrowdSegment(
                     from: agent.node.position,
@@ -1135,14 +1282,14 @@ private final class ConventionFloorScene: SKScene {
                 distance: 0
             )
 
-        case let .reachedDesk(visit):
+        case .reachedDesk(let visit):
             agent.state = .dwelling(
                 visit: visit,
                 remaining: visit.dwellDuration,
                 elapsed: 0
             )
 
-        case let .returnedFromDesk(visit):
+        case .returnedFromDesk(let visit):
             agent.state = .moving(
                 segment: makeCrowdSegment(
                     from: agent.node.position,
@@ -1209,7 +1356,7 @@ private final class ConventionFloorScene: SKScene {
         let nextColumn = column + direction.columnOffset
         let nextRow = row + direction.rowOffset
         guard intersectionXs.indices.contains(nextColumn),
-              intersectionYs.indices.contains(nextRow)
+            intersectionYs.indices.contains(nextRow)
         else { return nil }
 
         let start = corridorEntryPoint(
@@ -1233,8 +1380,8 @@ private final class ConventionFloorScene: SKScene {
         )
 
         guard allowDeskVisit,
-              direction == .north || direction == .south,
-              unit(agentSeed + decisions * 997 + 17) < 0.22
+            direction == .north || direction == .south,
+            unit(agentSeed + decisions * 997 + 17) < 0.22
         else {
             return makeCrowdSegment(from: start, to: destination, completion: arrival)
         }
@@ -1280,9 +1427,10 @@ private final class ConventionFloorScene: SKScene {
         to end: CGPoint,
         completion: CrowdSegmentCompletion
     ) -> CrowdSegment {
-        let length = control.map {
-            quadraticLength(from: start, control: $0, to: end)
-        } ?? distance(from: start, to: end)
+        let length =
+            control.map {
+                quadraticLength(from: start, control: $0, to: end)
+            } ?? distance(from: start, to: end)
         return CrowdSegment(
             start: start,
             control: control,
@@ -1367,7 +1515,8 @@ private final class ConventionFloorScene: SKScene {
         metrics: Metrics,
         forceLeft: Bool = false
     ) -> CGVector {
-        let corridorWidth = direction == .east || direction == .west
+        let corridorWidth =
+            direction == .east || direction == .west
             ? metrics.bigAisle
             : metrics.narrowAisle
         let followsLeft = forceLeft || unit(seed + 5) < leftTrafficProbability
@@ -1414,10 +1563,9 @@ private final class ConventionFloorScene: SKScene {
 
         let centerColumn = nearestIndex(to: 0, in: intersectionXs)
         let centerRow = nearestIndex(to: 0, in: intersectionYs)
-        allowedUserColumns = max(0, centerColumn - 2)
-            ... min(intersectionXs.count - 1, centerColumn + 2)
-        allowedUserRows = max(0, centerRow - 2)
-            ... min(intersectionYs.count - 1, centerRow + 2)
+        allowedUserColumns =
+            max(0, centerColumn - 2)...min(intersectionXs.count - 1, centerColumn + 2)
+        allowedUserRows = max(0, centerRow - 2)...min(intersectionYs.count - 1, centerRow + 2)
         turnRadius = min(metrics.narrowAisle * 0.34, metrics.bigAisle * 0.14)
 
         cameraNode = SKCameraNode()
@@ -1537,28 +1685,28 @@ private final class ConventionFloorScene: SKScene {
 
     private func handle(_ completion: UserSegmentCompletion) {
         switch completion {
-        case let .arrived(column, row, incoming):
+        case .arrived(let column, let row, let incoming):
             continuePlannedRoute(atColumn: column, row: row, incoming: incoming)
 
-        case let .exited(column, row, outgoing):
+        case .exited(let column, let row, let outgoing):
             startCorridor(fromColumn: column, row: row, direction: outgoing)
 
-        case let .enteredDestinationCorridor(route):
+        case .enteredDestinationCorridor(let route):
             startDestinationCorridor(route)
 
-        case let .reachedDestinationLane(route):
+        case .reachedDestinationLane(let route):
             startDeskApproach(route)
 
-        case let .reachedDestination(route):
+        case .reachedDestination(let route):
             trackedUserSegment = nil
             trackedUserSegmentDistance = 0
             trackedUserDwellRemaining = 5
             currentDeskRoute = route
 
-        case let .returnedToAisle(route):
+        case .returnedToAisle(let route):
             startReturnCorridor(route)
 
-        case let .returnedToIntersection(column, row, incoming):
+        case .returnedToIntersection(let column, let row, let incoming):
             currentDeskRoute = nil
             beginNextDeskRoute(fromColumn: column, row: row, incoming: incoming)
         }
@@ -1582,8 +1730,8 @@ private final class ConventionFloorScene: SKScene {
         routeCandidateStops = deskStops.filter { stop in
             let aisleColumn = nearestIndex(to: stop.aisleCenterX, in: intersectionXs)
             guard allowedUserColumns.contains(aisleColumn),
-                  minimumRouteY < stop.y,
-                  stop.y < maximumRouteY
+                minimumRouteY < stop.y,
+                stop.y < maximumRouteY
             else { return false }
 
             let scenePoint = floorRoot.convert(stop.stopPoint, to: self)
@@ -1606,7 +1754,8 @@ private final class ConventionFloorScene: SKScene {
                 to: stop.block
             )
         }
-        let preferredCandidates = ConventionFloorRoutePlanning
+        let preferredCandidates =
+            ConventionFloorRoutePlanning
             .preferredCandidateIndices(for: distances)
             .map { routeCandidateStops[$0] }
 
@@ -1629,19 +1778,24 @@ private final class ConventionFloorScene: SKScene {
             }
 
             let distances = candidates.map { reference.block.distance(to: $0.block) }
-            let preferredCandidates = ConventionFloorRoutePlanning
+            let preferredCandidates =
+                ConventionFloorRoutePlanning
                 .preferredCandidateIndices(for: distances)
                 .map { candidates[$0] }
 
-            guard let next = preferredCandidates.min(by: {
-                estimatedWalkingDistance(from: reference, to: $0)
-                    < estimatedWalkingDistance(from: reference, to: $1)
-            }) else { return }
+            guard
+                let next = preferredCandidates.min(by: {
+                    estimatedWalkingDistance(from: reference, to: $0)
+                        < estimatedWalkingDistance(from: reference, to: $1)
+                })
+            else { return }
             plannedDeskStops.append(next)
         }
     }
 
-    private func estimatedWalkingDistance(from source: DeskStop, to destination: DeskStop) -> CGFloat {
+    private func estimatedWalkingDistance(from source: DeskStop, to destination: DeskStop)
+        -> CGFloat
+    {
         guard let metrics = activeMetrics else { return .greatestFiniteMagnitude }
         let sourceColumn = nearestIndex(to: source.aisleCenterX, in: intersectionXs)
         let destinationColumn = nearestIndex(to: destination.aisleCenterX, in: intersectionXs)
@@ -1649,10 +1803,12 @@ private final class ConventionFloorScene: SKScene {
 
         for sourceRow in approachRows(for: source) {
             for destinationRow in approachRows(for: destination) {
-                let gridDistance = CGFloat(abs(sourceColumn - destinationColumn))
-                        * metrics.horizontalStride
+                let gridDistance =
+                    CGFloat(abs(sourceColumn - destinationColumn))
+                    * metrics.horizontalStride
                     + CGFloat(abs(sourceRow - destinationRow)) * metrics.verticalStride
-                let approachDistance = abs(source.y - intersectionYs[sourceRow])
+                let approachDistance =
+                    abs(source.y - intersectionYs[sourceRow])
                     + abs(destination.y - intersectionYs[destinationRow])
                 shortest = min(shortest, gridDistance + approachDistance)
             }
@@ -1703,11 +1859,11 @@ private final class ConventionFloorScene: SKScene {
         refreshPlannedDeskHighlights()
 
         guard let destination = plannedDeskStops.first,
-              let route = makeDeskRoute(
-                  to: destination,
-                  fromColumn: column,
-                  row: row
-              )
+            let route = makeDeskRoute(
+                to: destination,
+                fromColumn: column,
+                row: row
+            )
         else {
             currentDeskRoute = nil
             plannedDirections.removeAll(keepingCapacity: true)
@@ -1734,18 +1890,21 @@ private final class ConventionFloorScene: SKScene {
         guard let metrics = activeMetrics else { return nil }
         let aisleColumn = nearestIndex(to: destination.aisleCenterX, in: intersectionXs)
         guard allowedUserColumns.contains(aisleColumn),
-              let approachRow = approachRows(for: destination).min(by: { lhs, rhs in
-                  let lhsDistance = CGFloat(abs(column - aisleColumn)) * metrics.horizontalStride
-                      + CGFloat(abs(row - lhs)) * metrics.verticalStride
-                      + abs(destination.y - intersectionYs[lhs])
-                  let rhsDistance = CGFloat(abs(column - aisleColumn)) * metrics.horizontalStride
-                      + CGFloat(abs(row - rhs)) * metrics.verticalStride
-                      + abs(destination.y - intersectionYs[rhs])
-                  return lhsDistance < rhsDistance
-              })
+            let approachRow = approachRows(for: destination).min(by: { lhs, rhs in
+                let lhsDistance =
+                    CGFloat(abs(column - aisleColumn)) * metrics.horizontalStride
+                    + CGFloat(abs(row - lhs)) * metrics.verticalStride
+                    + abs(destination.y - intersectionYs[lhs])
+                let rhsDistance =
+                    CGFloat(abs(column - aisleColumn)) * metrics.horizontalStride
+                    + CGFloat(abs(row - rhs)) * metrics.verticalStride
+                    + abs(destination.y - intersectionYs[rhs])
+                return lhsDistance < rhsDistance
+            })
         else { return nil }
 
-        let approachDirection: WalkDirection = destination.y > intersectionYs[approachRow]
+        let approachDirection: WalkDirection =
+            destination.y > intersectionYs[approachRow]
             ? .north
             : .south
         let outboundOffset = trafficLaneOffset(
@@ -1822,9 +1981,10 @@ private final class ConventionFloorScene: SKScene {
         incoming: WalkDirection
     ) {
         if let route = currentDeskRoute,
-           plannedDirections.isEmpty,
-           column == route.aisleColumn,
-           row == route.approachRow {
+            plannedDirections.isEmpty,
+            column == route.aisleColumn,
+            row == route.approachRow
+        {
             startDestinationTurn(route, incoming: incoming)
         } else {
             startTurn(atColumn: column, row: row, incoming: incoming)
@@ -1968,7 +2128,8 @@ private final class ConventionFloorScene: SKScene {
         incoming: WalkDirection
     ) {
         guard let metrics = activeMetrics else { return }
-        let outgoing = plannedDirections.isEmpty
+        let outgoing =
+            plannedDirections.isEmpty
             ? chooseDirection(fromColumn: column, row: row, incoming: incoming)
             : plannedDirections.removeFirst()
         let intersection = intersectionPoint(column: column, row: row)
@@ -2022,7 +2183,7 @@ private final class ConventionFloorScene: SKScene {
             return (direction, weight)
         }
         let totalWeight = weightedCandidates.reduce(0) { $0 + $1.1 }
-        var selection = Double.random(in: 0 ..< totalWeight)
+        var selection = Double.random(in: 0..<totalWeight)
 
         for (direction, weight) in weightedCandidates {
             if selection < weight {
@@ -2106,7 +2267,7 @@ private final class ConventionFloorScene: SKScene {
         var length: CGFloat = 0
         var previousPoint = start
 
-        for step in 1 ... 12 {
+        for step in 1...12 {
             let nextPoint = point(on: sampleSegment, progress: CGFloat(step) / 12)
             length += distance(from: previousPoint, to: nextPoint)
             previousPoint = nextPoint

@@ -16,7 +16,7 @@ The official layout coordinates use the high-resolution map coordinate system. F
 1. **Catalog repository** — a deep interface over the read-only main and image databases. It returns Sendable domain values and keeps GRDB, joins, query cancellation, and blob loading local.
 2. **Map screen model** — a `@MainActor @Observable` owner for day, venue, loading, selection, search, and overlay state. It never owns database records.
 3. **Vector map canvas** — a stateless renderer plus transient camera state. It draws only visible tables and resolves taps by inverting the camera transform.
-4. **User plan store** — a later writable database for bookmarks, colors, route ordering, and synchronization metadata. Official catalog databases remain read-only.
+4. **User plan store** — a writable database for bookmarks, colors, notes, and synchronization metadata. Official catalog databases remain read-only.
 
 The repository seam has two adapters from the start: SQLite for the app and an in-memory fixture for deterministic UI tests.
 
@@ -25,7 +25,7 @@ The repository seam has two adapters from the start: SQLite for the app and an i
 1. Replace the static map with the full-screen vector table scene, inertial pan/zoom/rotation, circle hit testing, and a lazy detail sheet.
 2. Query visible circle summaries after camera motion settles; fetch image blobs only above the seven-table zoom threshold and evict decoded images outside the viewport.
 3. Add indexed search and highlights. If the official database cannot satisfy the query efficiently, build a small derived FTS/R-tree cache keyed by the catalog digest.
-4. Add genre, bookmark, route, and color overlays to the same renderer without duplicating geometry.
+4. Add genre, bookmark, destination-pin, and color overlays to the same renderer without duplicating geometry.
 5. Move bookmarks and sync state into the user plan store, with deterministic conflict and ordering tests.
 6. Profile a representative long session on a physical device and enforce CPU, memory, hitch, and background-work budgets.
 
@@ -44,8 +44,8 @@ The repository seam has two adapters from the start: SQLite for the app and an i
 - `SQLiteMapCatalog` is the only map-facing adapter for the official read-only databases. SwiftUI receives small Sendable domain values, never GRDB records.
 - `MapCatalogIndex` lazily derives a digest-keyed 5 MB cache on the first close-zoom or search request. Its R-tree drives viewport queries and its trigram FTS index supports Japanese and Latin substring search. It is not part of launch initialization.
 - `MapScreenModel` is a main-actor `@Observable` state owner with separate cancellable tasks for scene, selection, viewport artwork, search, genre, local plan writes, and remote synchronization.
-- `InteractiveMapCanvas` renders coordinate-derived table geometry, subspace dividers, block labels, search/genre/bookmark overlays, route lines, stop badges, and close-zoom artwork. Pan, magnification, and rotation are transient gesture state; committed camera changes alone schedule viewport work.
-- `SQLiteUserPlanStore` keeps local route order, colors, memo fields, and sync state in Application Support. Catalog databases remain immutable.
+- `InteractiveMapCanvas` renders coordinate-derived table geometry, subspace dividers, block labels, search/genre/bookmark overlays, a selected destination pin, and close-zoom artwork. It does not prescribe a walking path. Pan, magnification, and rotation are transient gesture state; committed camera changes alone schedule viewport work.
+- `SQLiteUserPlanStore` keeps local favorites, colors, memo fields, and sync state in Application Support. Catalog databases remain immutable.
 - `BookmarkSyncCoordinator` merges remote Circle.ms favorites without overwriting pending local mutations, then flushes upserts and tombstones. Local interaction never waits for the network.
 - The app and test targets compile in Swift 6 mode. Shared app-shell state uses Observation; typed Sendable request and response models replace `[String: Any]` at Alamofire concurrency boundaries.
 

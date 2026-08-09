@@ -23,7 +23,6 @@ enum UnifiedMapAppearance: Equatable {
             UnifiedMapPalette(
                 mapBackground: UIColor(white: 0.94, alpha: 1),
                 grid: UIColor.black.withAlphaComponent(0.055),
-                routeUnderlay: UIColor.white.withAlphaComponent(0.92),
                 pedestrianUnderlay: UIColor.white.withAlphaComponent(0.86),
                 pedestrianFootway: UIColor(white: 0.27, alpha: 0.72),
                 pedestrianSteps: UIColor(red: 0.70, green: 0.34, blue: 0.13, alpha: 0.84),
@@ -45,7 +44,6 @@ enum UnifiedMapAppearance: Equatable {
             UnifiedMapPalette(
                 mapBackground: UIColor(red: 0.055, green: 0.063, blue: 0.071, alpha: 1),
                 grid: UIColor.white.withAlphaComponent(0.075),
-                routeUnderlay: UIColor.black.withAlphaComponent(0.8),
                 pedestrianUnderlay: UIColor.black.withAlphaComponent(0.72),
                 pedestrianFootway: UIColor(white: 0.78, alpha: 0.76),
                 pedestrianSteps: UIColor(red: 0.96, green: 0.57, blue: 0.28, alpha: 0.90),
@@ -70,7 +68,6 @@ enum UnifiedMapAppearance: Equatable {
 struct UnifiedMapPalette {
     let mapBackground: UIColor
     let grid: UIColor
-    let routeUnderlay: UIColor
     let pedestrianUnderlay: UIColor
     let pedestrianFootway: UIColor
     let pedestrianSteps: UIColor
@@ -105,8 +102,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     let genrePlacements: [CatalogMapGenrePlacement]
     let bookmarks: [MapBookmark]
     let locatedUser: LocatedMapUser?
-    let navigationDestination: MapNavigationDestination?
-    let navigationRoute: BigSightNavigationRoute?
+    let destination: MapDestination?
     let visibleMapLayers: Set<BigSightMapLayer>
     let locationFocusBottomInset: CGFloat
     let onViewportChange: (CatalogMapViewport) -> Void
@@ -174,8 +170,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             genrePlacements: genrePlacements,
             bookmarks: bookmarks,
             locatedUser: locatedUser,
-            navigationDestination: navigationDestination,
-            navigationRoute: navigationRoute,
+            destination: destination,
             visibleMapLayers: visibleMapLayers,
             locationFocusBottomInset: locationFocusBottomInset
         )
@@ -231,13 +226,16 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             doubleTap.delegate = self
             tap.require(toFail: doubleTap)
 
-            let longPress = UILongPressGestureRecognizer(target: self, action: #selector(longPress(_:)))
+            let longPress = UILongPressGestureRecognizer(
+                target: self, action: #selector(longPress(_:)))
             longPress.minimumPressDuration = 0.55
             longPress.allowableMovement = 18
             longPress.delegate = self
 
-            [pan, pinch, rotation, tap, doubleTap, longPress].forEach(host.mapView.addGestureRecognizer)
-            host.compassButton.addTarget(self, action: #selector(resetRotation), for: .touchUpInside)
+            [pan, pinch, rotation, tap, doubleTap, longPress].forEach(
+                host.mapView.addGestureRecognizer)
+            host.compassButton.addTarget(
+                self, action: #selector(resetRotation), for: .touchUpInside)
         }
 
         func updateCallbacks(
@@ -315,8 +313,8 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
 
         @objc private func tap(_ gesture: UITapGestureRecognizer) {
             guard let mapView = host?.mapView,
-                  let renderer,
-                  let hit = renderer.hit(at: gesture.location(in: mapView), in: mapView)
+                let renderer,
+                let hit = renderer.hit(at: gesture.location(in: mapView), in: mapView)
             else { return }
 
             switch hit {
@@ -337,12 +335,12 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
 
         @objc private func longPress(_ gesture: UILongPressGestureRecognizer) {
             guard gesture.state == .began,
-                  let mapView = host?.mapView,
-                  let renderer,
-                  let location = renderer.locationHit(
-                      at: gesture.location(in: mapView),
-                      in: mapView
-                  )
+                let mapView = host?.mapView,
+                let renderer,
+                let location = renderer.locationHit(
+                    at: gesture.location(in: mapView),
+                    in: mapView
+                )
             else { return }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             onLocate(
@@ -370,7 +368,9 @@ final class UnifiedMapHostView: UIView {
         )
         MLNOfflineStorage.shared.setMaximumAmbientCacheSize(cacheSize) { error in
             if let error {
-                logger.error("Unable to configure the map tile cache: \(error.localizedDescription, privacy: .public)")
+                logger.error(
+                    "Unable to configure the map tile cache: \(error.localizedDescription, privacy: .public)"
+                )
             }
         }
     }()
@@ -441,12 +441,13 @@ final class UnifiedMapHostView: UIView {
         var attributionConfiguration = UIButton.Configuration.plain()
         attributionConfiguration.title = "© OpenStreetMap"
         attributionConfiguration.baseForegroundColor = .secondaryLabel
-        attributionConfiguration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer {
-            incoming in
-            var outgoing = incoming
-            outgoing.font = .systemFont(ofSize: 8, weight: .regular)
-            return outgoing
-        }
+        attributionConfiguration.titleTextAttributesTransformer =
+            UIConfigurationTextAttributesTransformer {
+                incoming in
+                var outgoing = incoming
+                outgoing.font = .systemFont(ofSize: 8, weight: .regular)
+                return outgoing
+            }
         attributionConfiguration.contentInsets = NSDirectionalEdgeInsets(
             top: 1,
             leading: 3,
@@ -458,7 +459,8 @@ final class UnifiedMapHostView: UIView {
         dataAttributionButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.72)
         dataAttributionButton.layer.cornerRadius = 4
         dataAttributionButton.accessibilityLabel = String(localized: "Map data attribution")
-        dataAttributionButton.accessibilityValue = "OpenStreetMap, OpenStreetMap US, OpenMapTiles, and MapLibre"
+        dataAttributionButton.accessibilityValue =
+            "OpenStreetMap, OpenStreetMap US, OpenMapTiles, and MapLibre"
         dataAttributionButton.accessibilityIdentifier = "map-data-attribution-button"
         dataAttributionButton.translatesAutoresizingMaskIntoConstraints = false
         dataAttributionButton.menu = UIMenu(
@@ -494,7 +496,8 @@ final class UnifiedMapHostView: UIView {
                 equalTo: safeAreaLayoutGuide.trailingAnchor,
                 constant: -MapChromeLayout.trailingInset
             ),
-            compassButton.bottomAnchor.constraint(equalTo: dataAttributionButton.topAnchor, constant: -8),
+            compassButton.bottomAnchor.constraint(
+                equalTo: dataAttributionButton.topAnchor, constant: -8),
             dataAttributionButton.leadingAnchor.constraint(
                 greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor,
                 constant: 10
@@ -587,9 +590,9 @@ final class UnifiedMapHostView: UIView {
 
     private func applyRequestedBasemapCamera() {
         guard bounds.width > 1,
-              bounds.height > 1,
-              let camera = requestedBasemapCamera,
-              camera != lastBasemapCamera
+            bounds.height > 1,
+            let camera = requestedBasemapCamera,
+            camera != lastBasemapCamera
         else { return }
         lastBasemapCamera = camera
         basemapView.setCenter(
@@ -624,11 +627,11 @@ final class UnifiedMapHostView: UIView {
             return direct
         }
         guard let resourceURL = Bundle.main.resourceURL,
-              let enumerator = FileManager.default.enumerator(
+            let enumerator = FileManager.default.enumerator(
                 at: resourceURL,
                 includingPropertiesForKeys: [.isRegularFileKey],
                 options: [.skipsHiddenFiles]
-              )
+            )
         else { return openStreetMapStyleURL }
         for case let url as URL in enumerator where url.lastPathComponent == "AmericanaDark.json" {
             return url
@@ -657,11 +660,13 @@ final class UnifiedMapHostView: UIView {
     }
 
     func updateAccessibility(renderer: UnifiedBigSightScene, scope: MapScreenModel.Scope) {
-        mapView.accessibilityLabel = scope == .campus
+        mapView.accessibilityLabel =
+            scope == .campus
             ? String(localized: "Tokyo Big Sight unified campus map")
             : String(localized: "Interactive unified venue map")
         mapView.accessibilityHint = String(
-            localized: "Drag to move, pinch to zoom, rotate with two fingers, or tap a venue or table."
+            localized:
+                "Drag to move, pinch to zoom, rotate with two fingers, or tap a venue or table."
         )
         mapView.accessibilityValue = renderer.accessibilitySummary
         campusAccessibilityProxy.isHidden = scope != .campus
@@ -734,13 +739,14 @@ enum UnifiedMapLevelOfDetail {
         fadeSpan: CGFloat = 1
     ) -> CGFloat {
         guard maximumZoom > minimumZoom,
-              zoom >= minimumZoom,
-              zoom <= maximumZoom
+            zoom >= minimumZoom,
+            zoom <= maximumZoom
         else { return 0 }
 
         let availableSpan = maximumZoom - minimumZoom
         let span = min(max(fadeSpan, 0.001), availableSpan / 2)
-        let fadeIn = minimumZoom <= 0
+        let fadeIn =
+            minimumZoom <= 0
             ? 1
             : smoothstep((zoom - minimumZoom) / span)
         let fadeOut = smoothstep((maximumZoom - zoom) / span)
@@ -755,21 +761,21 @@ enum UnifiedMapLevelOfDetail {
 
 @MainActor
 final class MapCompassButton: UIButton {
-    private let arrowImageView = UIImageView(image: UIImage(systemName: "location.north.fill"))
-    private let northLabel = UILabel(frame: .zero)
+    private let indicatorView = UIView(frame: .zero)
+    private let northNeedleLayer = CAShapeLayer()
+    private let southNeedleLayer = CAShapeLayer()
+    private let centerCapLayer = CAShapeLayer()
     private(set) var indicatorRotation: CGFloat = 0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        arrowImageView.contentMode = .scaleAspectFit
-        arrowImageView.isUserInteractionEnabled = false
-        addSubview(arrowImageView)
-
-        northLabel.text = "N"
-        northLabel.font = .systemFont(ofSize: 8, weight: .bold)
-        northLabel.textAlignment = .center
-        northLabel.isUserInteractionEnabled = false
-        addSubview(northLabel)
+        indicatorView.isUserInteractionEnabled = false
+        indicatorView.layer.addSublayer(southNeedleLayer)
+        indicatorView.layer.addSublayer(northNeedleLayer)
+        indicatorView.layer.addSublayer(centerCapLayer)
+        addSubview(indicatorView)
+        layer.cornerRadius = 22
+        layer.borderWidth = 0.5
     }
 
     @available(*, unavailable)
@@ -779,36 +785,57 @@ final class MapCompassButton: UIButton {
 
     func updateIndicator(rotation: CGFloat) {
         indicatorRotation = rotation
-        setNeedsLayout()
+        indicatorView.transform = CGAffineTransform(rotationAngle: rotation)
     }
 
     func updateIndicatorColor(_ color: UIColor) {
-        arrowImageView.tintColor = color
-        northLabel.textColor = color
+        northNeedleLayer.fillColor = UIColor.systemRed.cgColor
+        southNeedleLayer.fillColor = color.withAlphaComponent(0.72).cgColor
+        centerCapLayer.fillColor = UIColor.systemBackground.cgColor
+        layer.borderColor = UIColor.separator.withAlphaComponent(0.35).cgColor
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        bringSubviewToFront(arrowImageView)
-        bringSubviewToFront(northLabel)
-        let center = CGPoint(x: bounds.midX, y: bounds.midY + 2)
-        arrowImageView.bounds = CGRect(x: 0, y: 0, width: 17, height: 17)
-        arrowImageView.center = center
-        arrowImageView.transform = CGAffineTransform(rotationAngle: indicatorRotation)
+        bringSubviewToFront(indicatorView)
+        indicatorView.bounds = CGRect(x: 0, y: 0, width: 30, height: 30)
+        indicatorView.center = CGPoint(x: bounds.midX, y: bounds.midY)
+        indicatorView.transform = CGAffineTransform(rotationAngle: indicatorRotation)
+        for layer in [northNeedleLayer, southNeedleLayer, centerCapLayer] {
+            layer.frame = indicatorView.bounds
+        }
 
-        northLabel.bounds = CGRect(x: 0, y: 0, width: 12, height: 10)
-        let radius: CGFloat = 14
-        northLabel.center = CGPoint(
-            x: center.x + sin(indicatorRotation) * radius,
-            y: center.y - cos(indicatorRotation) * radius
-        )
+        let center = CGPoint(x: indicatorView.bounds.midX, y: indicatorView.bounds.midY)
+        northNeedleLayer.path = needlePath(
+            tip: CGPoint(x: center.x, y: 1),
+            center: center
+        ).cgPath
+        southNeedleLayer.path = needlePath(
+            tip: CGPoint(x: center.x, y: 29),
+            center: center
+        ).cgPath
+        centerCapLayer.path = UIBezierPath(
+            ovalIn: CGRect(x: center.x - 2, y: center.y - 2, width: 4, height: 4)
+        ).cgPath
     }
 
     var indicatedNorthVector: CGVector {
         CGVector(dx: sin(indicatorRotation), dy: -cos(indicatorRotation))
     }
 
-    var displaysNorthLabel: Bool { northLabel.text == "N" }
+    var usesTwoToneNeedle: Bool {
+        northNeedleLayer.fillColor != nil && southNeedleLayer.fillColor != nil
+    }
+
+    private func needlePath(tip: CGPoint, center: CGPoint) -> UIBezierPath {
+        let path = UIBezierPath()
+        path.move(to: tip)
+        path.addLine(to: CGPoint(x: center.x - 4.5, y: center.y))
+        path.addLine(to: center)
+        path.addLine(to: CGPoint(x: center.x + 4.5, y: center.y))
+        path.close()
+        return path
+    }
 }
 
 @MainActor
@@ -836,24 +863,17 @@ final class UnifiedBigSightScene: SKScene {
         let maximumZoom: CGFloat
     }
 
-    private struct ScreenSpaceRoute {
-        let id: String
-        let node: SKNode
-        let layer: BigSightMapLayer
-        let minimumZoom: CGFloat
-        let maximumZoom: CGFloat
-    }
-
-    private static let darkArtworkShader = SKShader(source: """
-        void main() {
-            vec4 source = texture2D(u_texture, v_tex_coord);
-            float luminance = dot(source.rgb, vec3(0.2126, 0.7152, 0.0722));
-            float targetLuminance = clamp(0.86 - luminance * 0.78, 0.08, 0.86);
-            vec3 hue = luminance > 0.005 ? source.rgb / luminance : vec3(1.0);
-            vec3 darkColor = clamp(hue * targetLuminance, 0.0, 1.0);
-            gl_FragColor = vec4(darkColor, source.a) * v_color_mix;
-        }
-        """)
+    private static let darkArtworkShader = SKShader(
+        source: """
+            void main() {
+                vec4 source = texture2D(u_texture, v_tex_coord);
+                float luminance = dot(source.rgb, vec3(0.2126, 0.7152, 0.0722));
+                float targetLuminance = clamp(0.86 - luminance * 0.78, 0.08, 0.86);
+                vec3 hue = luminance > 0.005 ? source.rgb / luminance : vec3(1.0);
+                vec3 darkColor = clamp(hue * targetLuminance, 0.0, 1.0);
+                gl_FragColor = vec4(darkColor, source.a) * v_color_mix;
+            }
+            """)
 
     private(set) var scope: MapScreenModel.Scope = .campus
     private(set) var selectedMapID: Int?
@@ -868,7 +888,6 @@ final class UnifiedBigSightScene: SKScene {
     private let staticRoot = SKNode()
     private let campusDetailRoot = SKNode()
     private let pedestrianRoot = SKNode()
-    private let operationalRoot = SKNode()
     private let markerRoot = SKNode()
     private let venueRoot = SKNode()
     private let tableRoot = SKNode()
@@ -876,11 +895,10 @@ final class UnifiedBigSightScene: SKScene {
     private let tableLabelRoot = SKNode()
     private let genreRoot = SKNode()
     private let dynamicRoot = SKNode()
-    private let navigationRoot = SKNode()
+    private let destinationRoot = SKNode()
     private let userRoot = SKNode()
     private var venueMarkers: [ScreenSpaceMarker] = []
     private var facilityMarkers: [ScreenSpaceMarker] = []
-    private var operationalRoutes: [ScreenSpaceRoute] = []
     private var blockLabels: [SKLabelNode] = []
     private var minimumCameraScale: CGFloat = 1
     private var maximumCameraScale: CGFloat = 0.01
@@ -892,14 +910,14 @@ final class UnifiedBigSightScene: SKScene {
     private var requestedScopeInternally = false
     private var lastDynamicFingerprint: Int?
     private var artworkCount = 0
-    private var routeStopCount = 0
+    private var favoriteCount = 0
     private var locatedUserSummary: String?
-    private var navigationDestinationSummary: String?
+    private var destinationSummary: String?
     private var lastLocatedUserPlacedAt: Date?
     private var lastDestinationSelectedAt: Date?
-    private var lastNavigationRoute: BigSightNavigationRoute?
     private var locationFocusBottomInset: CGFloat = 0
     private var visibleMapLayers = BigSightMapLayer.defaultVisible
+    private var isSearchActive = false
 
     var cameraRotation: CGFloat { mapCamera.zRotation }
     var cameraCampusCenter: CGPoint {
@@ -937,19 +955,21 @@ final class UnifiedBigSightScene: SKScene {
     }
     var venueMarkerCount: Int { venueMarkers.count }
     var facilityMarkerCount: Int { facilityMarkers.count }
-    var operationalRouteCount: Int { operationalRoutes.count }
     var visibleFacilityMarkerCount: Int {
         facilityMarkers.filter { !$0.node.isHidden }.count
     }
+    var isPersistentOverlayVisible: Bool { !dynamicRoot.isHidden }
+    var persistentOverlayShapeCount: Int {
+        dynamicRoot.children.compactMap { $0 as? SKShapeNode }.count
+    }
+    var baseMapAlpha: CGFloat { staticRoot.alpha }
+    var areMapIconsHiddenForSearch: Bool { markerRoot.isHidden }
     func isFacilityMarkerVisible(id: String) -> Bool {
         facilityMarkers.first(where: { $0.id == id }).map { !$0.node.isHidden } ?? false
     }
     func updateVisibleMapLayers(_ layers: Set<BigSightMapLayer>) {
         visibleMapLayers = layers
         applyLevelOfDetail()
-    }
-    func isOperationalRouteVisible(id: String) -> Bool {
-        operationalRoutes.first(where: { $0.id == id }).map { !$0.node.isHidden } ?? false
     }
     var generatedBlockLabelCount: Int { blockLabels.count }
     var venueMarkerOpacities: [CGFloat] { venueMarkers.map(\.node.alpha) }
@@ -969,7 +989,7 @@ final class UnifiedBigSightScene: SKScene {
     var circleArtworkNodes: [SKSpriteNode] {
         dynamicRoot.children.compactMap { node in
             guard let sprite = node as? SKSpriteNode,
-                  sprite.name?.hasPrefix("circle-artwork-") == true
+                sprite.name?.hasPrefix("circle-artwork-") == true
             else { return nil }
             return sprite
         }
@@ -979,11 +999,8 @@ final class UnifiedBigSightScene: SKScene {
         genreOverlayNodeCount > 0 && !genreRoot.isHidden && genreRoot.alpha > 0
     }
     var userMarkerCount: Int { userRoot.children.count }
-    var navigationRouteNodeCount: Int {
-        navigationRoot.children.filter { $0.name == "pedestrian-navigation-route" }.count
-    }
     var destinationMarkerCount: Int {
-        navigationRoot.children.filter { $0.name == "navigation-destination-marker" }.count
+        destinationRoot.children.filter { $0.name == "map-destination-marker" }.count
     }
     var userHeadingIndicatorCount: Int {
         userRoot.children.filter {
@@ -992,30 +1009,34 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     var accessibilitySummary: String {
-        let bearing = normalizedRotation(mapCamera.zRotation) * 180 / .pi
+        let bearing = Double(normalizedRotation(mapCamera.zRotation) * 180 / .pi)
+            .formatted(.number.precision(.fractionLength(1)))
         let zoom = Double(zoomFactor).formatted(.number.precision(.fractionLength(1)))
         var summary: String
         if scope == .campus {
             summary = String(
-                localized: "\(campus.venues.count) venues and \(campus.facilities.count) facilities, zoom \(zoom) times"
+                localized:
+                    "\(campus.venues.count) venues and \(campus.facilities.count) facilities, zoom \(zoom) times"
             )
         } else {
             summary = String(
-                localized: "Zoom \(zoom) times, \(artworkCount) circle images, \(routeStopCount) route stops"
+                localized:
+                    "Zoom \(zoom) times, \(artworkCount) circle images, \(favoriteCount) favorites"
             )
         }
         if let locatedUserSummary {
             summary = String(localized: "\(summary), user location \(locatedUserSummary)")
         }
-        if let navigationDestinationSummary {
-            summary = String(localized: "\(summary), destination \(navigationDestinationSummary)")
+        if let destinationSummary {
+            summary = String(localized: "\(summary), destination \(destinationSummary)")
         }
         #if DEBUG
-        return String(
-            localized: "\(summary), camera offset \(mapCamera.position.x) \(mapCamera.position.y), bearing \(bearing) degrees"
-        )
+            return String(
+                localized:
+                    "\(summary), camera offset \(mapCamera.position.x) \(mapCamera.position.y), bearing \(bearing) degrees"
+            )
         #else
-        return summary
+            return summary
         #endif
     }
 
@@ -1035,8 +1056,8 @@ final class UnifiedBigSightScene: SKScene {
         addChild(tableLabelRoot)
         addChild(genreRoot)
         addChild(dynamicRoot)
-        navigationRoot.zPosition = 90
-        addChild(navigationRoot)
+        destinationRoot.zPosition = 90
+        addChild(destinationRoot)
         userRoot.zPosition = 100
         addChild(userRoot)
         buildStaticScene()
@@ -1061,9 +1082,10 @@ final class UnifiedBigSightScene: SKScene {
 
     override func didFinishUpdate() {
         super.didFinishUpdate()
-        guard mapCamera.position != lastCameraPosition
-            || mapCamera.xScale != lastCameraScale
-            || mapCamera.zRotation != lastCameraRotation
+        guard
+            mapCamera.position != lastCameraPosition
+                || mapCamera.xScale != lastCameraScale
+                || mapCamera.zRotation != lastCameraRotation
         else { return }
         clampCamera()
         applyLevelOfDetail()
@@ -1085,8 +1107,7 @@ final class UnifiedBigSightScene: SKScene {
         genrePlacements: [CatalogMapGenrePlacement],
         bookmarks: [MapBookmark],
         locatedUser: LocatedMapUser?,
-        navigationDestination: MapNavigationDestination? = nil,
-        navigationRoute: BigSightNavigationRoute? = nil,
+        destination: MapDestination? = nil,
         visibleMapLayers: Set<BigSightMapLayer> = BigSightMapLayer.defaultVisible,
         locationFocusBottomInset: CGFloat = 0
     ) {
@@ -1100,24 +1121,23 @@ final class UnifiedBigSightScene: SKScene {
         let previousScope = self.scope
         let previousMapID = self.selectedMapID
         let sanitizedFocusInset = max(0, locationFocusBottomInset)
-        let didFocusViewportChange = sanitizedFocusInset > 0
+        let didFocusViewportChange =
+            sanitizedFocusInset > 0
             && abs(sanitizedFocusInset - self.locationFocusBottomInset) > 0.5
-        let didDismissLocationSheet = sanitizedFocusInset == 0
-            && self.locationFocusBottomInset > 0.5
         self.locationFocusBottomInset = sanitizedFocusInset
-        let shouldFocusLocatedUser = locatedUser?.placedAt != lastLocatedUserPlacedAt
+        let shouldFocusLocatedUser =
+            locatedUser?.placedAt != lastLocatedUserPlacedAt
             || didFocusViewportChange
-        let shouldFocusDestination = navigationDestination?.selectedAt != lastDestinationSelectedAt
-        let shouldFocusRoute = navigationRoute != lastNavigationRoute
-            || (didDismissLocationSheet && navigationRoute != nil)
+        let shouldFocusDestination = destination?.selectedAt != lastDestinationSelectedAt
         self.scope = scope
         self.selectedMapID = scope == .venue ? selectedMapID : nil
         self.visibleMapLayers = visibleMapLayers
+        isSearchActive = searchActive
         applyLevelOfDetail()
         artworkCount = circleArtwork.count
-        routeStopCount = bookmarks.filter { $0.routeOrder != nil }.count
+        favoriteCount = bookmarks.count
         locatedUserSummary = locatedUser?.spaceCode
-        navigationDestinationSummary = navigationDestination?.spaceCode
+        destinationSummary = destination?.spaceCode
 
         if requestedScopeInternally {
             requestedScopeInternally = false
@@ -1138,8 +1158,7 @@ final class UnifiedBigSightScene: SKScene {
             genres: genrePlacements,
             bookmarks: bookmarks,
             locatedUser: locatedUser,
-            navigationDestination: navigationDestination,
-            navigationRoute: navigationRoute
+            destination: destination
         )
         if fingerprint != lastDynamicFingerprint {
             lastDynamicFingerprint = fingerprint
@@ -1152,15 +1171,13 @@ final class UnifiedBigSightScene: SKScene {
                 genrePlacements: genrePlacements,
                 bookmarks: bookmarks,
                 locatedUser: locatedUser,
-                navigationDestination: navigationDestination,
-                navigationRoute: navigationRoute
+                destination: destination
             )
         }
         lastLocatedUserPlacedAt = locatedUser?.placedAt
-        lastDestinationSelectedAt = navigationDestination?.selectedAt
-        lastNavigationRoute = navigationRoute
-        if shouldFocusDestination || shouldFocusRoute, let navigationDestination {
-            focus(on: navigationRoute, destination: navigationDestination, animated: true)
+        lastDestinationSelectedAt = destination?.selectedAt
+        if shouldFocusDestination, let destination {
+            focus(on: destination, animated: true)
         } else if shouldFocusLocatedUser, let locatedUser {
             focus(on: locatedUser, animated: true)
         }
@@ -1174,10 +1191,11 @@ final class UnifiedBigSightScene: SKScene {
         guard translation != .zero else { return }
         let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
         let before = convertPoint(fromView: center)
-        let after = convertPoint(fromView: CGPoint(
-            x: center.x + translation.x,
-            y: center.y + translation.y
-        ))
+        let after = convertPoint(
+            fromView: CGPoint(
+                x: center.x + translation.x,
+                y: center.y + translation.y
+            ))
         mapCamera.position.x -= after.x - before.x
         mapCamera.position.y -= after.y - before.y
         clampCamera()
@@ -1240,9 +1258,19 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     func resetRotation() {
-        let action = SKAction.rotate(toAngle: 0, duration: reduceMotion ? 0 : 0.22, shortestUnitArc: true)
+        mapCamera.removeAction(forKey: "reset-rotation")
+        let action = SKAction.rotate(
+            toAngle: 0, duration: reduceMotion ? 0 : 0.22, shortestUnitArc: true)
         action.timingMode = .easeOut
-        mapCamera.run(action) { [weak self] in self?.endGesture() }
+        let commitNorth = SKAction.run { [weak self] in
+            guard let self else { return }
+            // SpriteKit can finish the shortest-arc animation with a tiny
+            // negative remainder. Commit exact north so the map, compass, and
+            // accessibility value all agree after the reset.
+            self.mapCamera.zRotation = 0
+            self.endGesture()
+        }
+        mapCamera.run(.sequence([action, commitNorth]), withKey: "reset-rotation")
     }
 
     func endGesture(updateSemanticScope shouldUpdateSemanticScope: Bool = true) {
@@ -1266,12 +1294,18 @@ final class UnifiedBigSightScene: SKScene {
             return .userLocation
         }
         for (venue, local) in venueHits(at: viewPoint, in: view) {
-            if prefersTable || (scope == .venue && venue.id == selectedMapID && zoomFactor >= 12),
-               let table = venue.scene.tables.first(where: {
-                   CGRect(origin: $0.origin, size: venue.scene.tableSize).contains(local)
-               })
+            let isSelectedVenue = scope == .venue && venue.id == selectedMapID
+            if prefersTable || (isSelectedVenue && zoomFactor >= 12),
+                let table = venue.scene.tables.first(where: {
+                    CGRect(origin: $0.origin, size: venue.scene.tableSize).contains(local)
+                })
             {
                 return .table(table, subspace(at: local, table: table, scene: venue.scene))
+            }
+            // Once a venue is open, empty-space taps should not unexpectedly
+            // zoom all the way back out to its fitted bounds.
+            if isSelectedVenue {
+                return nil
             }
             return .venue(venue)
         }
@@ -1290,10 +1324,12 @@ final class UnifiedBigSightScene: SKScene {
 
     func locationHit(at viewPoint: CGPoint, in view: SKView) -> LocationHit? {
         for (venue, localPoint) in venueHits(at: viewPoint, in: view) {
-            guard let table = WhereAmIResolver.nearestTable(
-                to: localPoint,
-                in: venue.scene
-            ) else { continue }
+            guard
+                let table = WhereAmIResolver.nearestTable(
+                    to: localPoint,
+                    in: venue.scene
+                )
+            else { continue }
 
             return LocationHit(
                 mapID: venue.id,
@@ -1344,7 +1380,6 @@ final class UnifiedBigSightScene: SKScene {
         staticRoot.removeAllChildren()
         campusDetailRoot.removeAllChildren()
         pedestrianRoot.removeAllChildren()
-        operationalRoot.removeAllChildren()
         markerRoot.removeAllChildren()
         venueRoot.removeAllChildren()
         tableRoot.removeAllChildren()
@@ -1352,11 +1387,9 @@ final class UnifiedBigSightScene: SKScene {
         tableLabelRoot.removeAllChildren()
         venueMarkers = []
         facilityMarkers = []
-        operationalRoutes = []
         blockLabels = []
         staticRoot.addChild(campusDetailRoot)
         staticRoot.addChild(pedestrianRoot)
-        staticRoot.addChild(operationalRoot)
         staticRoot.addChild(markerRoot)
         staticRoot.addChild(venueRoot)
         staticRoot.addChild(tableRoot)
@@ -1424,7 +1457,8 @@ final class UnifiedBigSightScene: SKScene {
                 }
                 let line = SKShapeNode(path: renderedPath)
                 line.name = "openstreetmap-feature-\(feature.id)"
-                line.strokeColor = feature.kind == .steps
+                line.strokeColor =
+                    feature.kind == .steps
                     ? palette.pedestrianSteps
                     : palette.pedestrianFootway
                 line.lineWidth = feature.kind == .steps ? 1.45 : 1.25
@@ -1434,10 +1468,6 @@ final class UnifiedBigSightScene: SKScene {
                 line.zPosition = -2
                 pedestrianRoot.addChild(line)
             }
-        }
-
-        for route in campus.operationalRoutes where route.points.count > 1 {
-            buildOperationalRoute(route)
         }
 
         for venue in campus.venues {
@@ -1478,7 +1508,8 @@ final class UnifiedBigSightScene: SKScene {
             map.shader = appearance == .dark ? Self.darkArtworkShader : nil
             venueRoot.addChild(map)
         } else {
-            for (blockID, tables) in Dictionary(grouping: venue.scene.tables, by: { $0.id.blockID }) {
+            for (blockID, tables) in Dictionary(grouping: venue.scene.tables, by: { $0.id.blockID })
+            {
                 let path = CGMutablePath()
                 let dividerPath = CGMutablePath()
                 for table in tables {
@@ -1516,15 +1547,16 @@ final class UnifiedBigSightScene: SKScene {
             titleColor: palette.venueText,
             zPosition: 20
         )
-        venueMarkers.append(ScreenSpaceMarker(
-            id: "venue-\(venue.id)",
-            node: venueMarker.node,
-            label: venueMarker.label,
-            layer: nil,
-            minimumZoom: 0,
-            labelMinimumZoom: 0,
-            maximumZoom: 12
-        ))
+        venueMarkers.append(
+            ScreenSpaceMarker(
+                id: "venue-\(venue.id)",
+                node: venueMarker.node,
+                label: venueMarker.label,
+                layer: nil,
+                minimumZoom: 0,
+                labelMinimumZoom: 0,
+                maximumZoom: 12
+            ))
         markerRoot.addChild(venueMarker.node)
 
         if venue.scene.artwork == nil {
@@ -1558,15 +1590,16 @@ final class UnifiedBigSightScene: SKScene {
             titleColor: appearance.palette.primaryText,
             zPosition: 22
         )
-        facilityMarkers.append(ScreenSpaceMarker(
-            id: facility.id,
-            node: marker.node,
-            label: marker.label,
-            layer: facility.layer,
-            minimumZoom: facility.minimumZoom,
-            labelMinimumZoom: presentation.labelMinimumZoom,
-            maximumZoom: isInsideVenue ? facility.maximumZoom : .infinity
-        ))
+        facilityMarkers.append(
+            ScreenSpaceMarker(
+                id: facility.id,
+                node: marker.node,
+                label: marker.label,
+                layer: facility.layer,
+                minimumZoom: facility.minimumZoom,
+                labelMinimumZoom: presentation.labelMinimumZoom,
+                maximumZoom: isInsideVenue ? facility.maximumZoom : .infinity
+            ))
         markerRoot.addChild(marker.node)
     }
 
@@ -1603,78 +1636,26 @@ final class UnifiedBigSightScene: SKScene {
         case .food: compactTitle = String(localized: "Food")
         default: compactTitle = facility.name
         }
-        let labelMinimum = facility.layer == nil
+        let labelMinimum =
+            facility.layer == nil
             ? max(facility.minimumZoom, 3.2)
             : max(facility.minimumZoom, 5)
         return (compactTitle, labelMinimum)
     }
 
-    private func buildOperationalRoute(_ route: BigSightOperationalRoute) {
-        let scenePoints = route.points.map(UnifiedMapProjection.scenePoint(fromCampus:))
-        guard let first = scenePoints.first, let last = scenePoints.last else { return }
-
-        let path = CGMutablePath()
-        path.move(to: first)
-        for point in scenePoints.dropFirst() {
-            path.addLine(to: point)
-        }
-
-        let container = SKNode()
-        container.name = "operational-route-\(route.id)"
-        container.zPosition = 2
-
-        let underlay = SKShapeNode(path: path)
-        underlay.strokeColor = appearance.palette.routeUnderlay
-        underlay.lineWidth = 5
-        underlay.lineCap = .round
-        underlay.lineJoin = .round
-        container.addChild(underlay)
-
-        let line = SKShapeNode(path: path)
-        line.strokeColor = UIColor.systemBlue.withAlphaComponent(0.86)
-        line.lineWidth = 2.4
-        line.lineCap = .round
-        line.lineJoin = .round
-        container.addChild(line)
-
-        if scenePoints.count >= 2 {
-            let previous = scenePoints[scenePoints.count - 2]
-            let arrowPath = CGMutablePath()
-            arrowPath.move(to: CGPoint(x: 5.5, y: 0))
-            arrowPath.addLine(to: CGPoint(x: -4, y: 3.8))
-            arrowPath.addLine(to: CGPoint(x: -4, y: -3.8))
-            arrowPath.closeSubpath()
-            let arrow = SKShapeNode(path: arrowPath)
-            arrow.fillColor = .systemBlue
-            arrow.strokeColor = appearance.palette.routeUnderlay
-            arrow.lineWidth = 0.8
-            arrow.position = last
-            arrow.zRotation = atan2(last.y - previous.y, last.x - previous.x)
-            container.addChild(arrow)
-        }
-
-        operationalRoot.addChild(container)
-        operationalRoutes.append(ScreenSpaceRoute(
-            id: route.id,
-            node: container,
-            layer: route.layer,
-            minimumZoom: route.minimumZoom,
-            maximumZoom: route.maximumZoom
-        ))
-    }
-
     private func fitCameraIfNeeded(force: Bool) {
         guard size.width > 1, size.height > 1, force || !hasFittedInitialCamera else { return }
         let bounds = UnifiedMapProjection.sceneBounds(fromCampus: campus.bounds)
-        minimumCameraScale = max(bounds.width / (size.width * 0.86), bounds.height / (size.height * 0.76))
+        minimumCameraScale = max(
+            bounds.width / (size.width * 0.86), bounds.height / (size.height * 0.76))
         maximumCameraScale = max(minimumCameraScale / 180, 0.006)
         mapCamera.position = CGPoint(x: bounds.midX, y: bounds.midY)
         mapCamera.setScale(minimumCameraScale)
         mapCamera.zRotation = 0
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-rotated-camera") {
-            mapCamera.zRotation = .pi / 4
-        }
+            if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-rotated-camera") {
+                mapCamera.zRotation = .pi / 4
+            }
         #endif
         hasFittedInitialCamera = true
         applyLevelOfDetail()
@@ -1709,14 +1690,17 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func focus(on user: LocatedMapUser, animated: Bool) {
-        guard let venue = campus.venues.first(where: { $0.id == user.sceneID.mapID }) else { return }
+        guard let venue = campus.venues.first(where: { $0.id == user.sceneID.mapID }) else {
+            return
+        }
         let campusPoint = user.point.applying(venue.transform)
         let userPosition = UnifiedMapProjection.scenePoint(fromCampus: campusPoint)
         // One table remains comfortably legible while enough neighboring
         // aisles stay visible for the person to orient themselves.
         let targetScale = max(maximumCameraScale, minimumCameraScale / 52)
         let viewportSize = view?.bounds.size ?? size
-        let effectiveBottomInset = locationFocusBottomInset
+        let effectiveBottomInset =
+            locationFocusBottomInset
             + (view?.safeAreaInsets.bottom ?? 0)
         let visibleCenter = MapCameraMath.visibleViewportCenter(
             viewportSize: viewportSize,
@@ -1737,55 +1721,24 @@ final class UnifiedBigSightScene: SKScene {
         )
     }
 
-    private func focus(
-        on route: BigSightNavigationRoute?,
-        destination: MapNavigationDestination,
-        animated: Bool
-    ) {
+    private func focus(on destination: MapDestination, animated: Bool) {
         guard let venue = campus.venues.first(where: { $0.id == destination.sceneID.mapID }) else {
             return
         }
-        let destinationPoint = destination.point.applying(venue.transform)
-        let campusPoints = route?.points.isEmpty == false ? route!.points : [destinationPoint]
-        let scenePoints = campusPoints.map(UnifiedMapProjection.scenePoint(fromCampus:))
-
-        guard scenePoints.count > 1 else {
-            let targetScale = max(maximumCameraScale, minimumCameraScale / 45)
-            animateCamera(
-                position: scenePoints[0],
-                scale: targetScale,
-                rotation: -venue.rotation,
-                animated: animated
-            )
-            return
-        }
-
-        let routeBounds = scenePoints.dropFirst().reduce(
-            CGRect(origin: scenePoints[0], size: .zero)
-        ) { bounds, point in
-            bounds.union(CGRect(origin: point, size: .zero))
-        }
-        let viewportSize = view?.bounds.size ?? size
-        let targetScale = max(
-            maximumCameraScale,
-            minimumCameraScale / 48,
-            min(
-                minimumCameraScale,
-                max(
-                    routeBounds.width / max(viewportSize.width * 0.76, 1),
-                    routeBounds.height / max(viewportSize.height * 0.54, 1)
-                )
-            )
+        let destinationPoint = UnifiedMapProjection.scenePoint(
+            fromCampus: destination.point.applying(venue.transform)
         )
+        let targetScale = max(maximumCameraScale, minimumCameraScale / 45)
         animateCamera(
-            position: CGPoint(x: routeBounds.midX, y: routeBounds.midY),
+            position: destinationPoint,
             scale: targetScale,
-            rotation: 0,
+            rotation: -venue.rotation,
             animated: animated
         )
     }
 
-    private func animateCamera(position: CGPoint, scale: CGFloat, rotation: CGFloat, animated: Bool) {
+    private func animateCamera(position: CGPoint, scale: CGFloat, rotation: CGFloat, animated: Bool)
+    {
         mapCamera.removeAllActions()
         let duration = animated && !reduceMotion ? 0.42 : 0
         guard duration > 0 else {
@@ -1818,10 +1771,12 @@ final class UnifiedBigSightScene: SKScene {
         let maxX = bounds.maxX + margin - halfWidth
         let minY = bounds.minY - margin + halfHeight
         let maxY = bounds.maxY + margin - halfHeight
-        mapCamera.position.x = minX <= maxX
+        mapCamera.position.x =
+            minX <= maxX
             ? max(minX, min(maxX, mapCamera.position.x))
             : bounds.midX
-        mapCamera.position.y = minY <= maxY
+        mapCamera.position.y =
+            minY <= maxY
             ? max(minY, min(maxY, mapCamera.position.y))
             : bounds.midY
     }
@@ -1840,24 +1795,16 @@ final class UnifiedBigSightScene: SKScene {
             fadeSpan: 8
         )
         pedestrianRoot.isHidden = pedestrianRoot.alpha <= 0
-        for route in operationalRoutes {
-            let isVisible = visibleMapLayers.contains(route.layer)
-            route.node.alpha = isVisible
-                ? UnifiedMapLevelOfDetail.opacity(
-                    at: zoom,
-                    minimumZoom: route.minimumZoom,
-                    maximumZoom: route.maximumZoom
-                )
-                : 0
-            route.node.isHidden = route.node.alpha <= 0
-        }
         tableRoot.isHidden = zoom < 2.2
         blockLabelRoot.isHidden = zoom < 10 || zoom > 65
         tableLabelRoot.isHidden = zoom < 32
-        genreRoot.alpha = 1
+        staticRoot.alpha = isSearchActive ? 0.18 : 1
+        tableLabelRoot.alpha = isSearchActive ? 0.18 : 1
+        genreRoot.alpha = isSearchActive ? 0.12 : 1
         genreRoot.isHidden = scope != .venue
-        dynamicRoot.isHidden = zoom < 9
-        for marker in navigationRoot.children where marker.name == "navigation-destination-marker" {
+        dynamicRoot.isHidden = false
+        markerRoot.isHidden = isSearchActive
+        for marker in destinationRoot.children where marker.name == "map-destination-marker" {
             marker.setScale(mapCamera.xScale)
             marker.zRotation = levelRotation
         }
@@ -1865,7 +1812,8 @@ final class UnifiedBigSightScene: SKScene {
             marker.node.setScale(mapCamera.xScale)
             marker.node.zRotation = levelRotation
             let isVisible = marker.layer.map(visibleMapLayers.contains) ?? true
-            marker.node.alpha = isVisible
+            marker.node.alpha =
+                isVisible
                 ? UnifiedMapLevelOfDetail.opacity(
                     at: zoom,
                     minimumZoom: marker.minimumZoom,
@@ -1884,7 +1832,8 @@ final class UnifiedBigSightScene: SKScene {
             label.setScale(mapCamera.xScale)
             label.zRotation = levelRotation
             if let mapID = label.userData?["mapID"] as? Int {
-                label.isHidden = zoom < 10 || zoom > 65 || (scope == .venue && mapID != selectedMapID)
+                label.isHidden =
+                    zoom < 10 || zoom > 65 || (scope == .venue && mapID != selectedMapID)
             }
         }
         for child in tableLabelRoot.children {
@@ -1899,9 +1848,9 @@ final class UnifiedBigSightScene: SKScene {
     private func refreshVisibleTableLabels() {
         tableLabelRoot.removeAllChildren()
         guard zoomFactor >= 32,
-              let venue = selectedVenue,
-              venue.scene.artwork == nil,
-              let view
+            let venue = selectedVenue,
+            venue.scene.artwork == nil,
+            let view
         else { return }
         let visibleRect = visibleLocalRect(for: venue, in: view).insetBy(
             dx: -venue.scene.tableSize.width,
@@ -1933,22 +1882,18 @@ final class UnifiedBigSightScene: SKScene {
         genrePlacements: [CatalogMapGenrePlacement],
         bookmarks: [MapBookmark],
         locatedUser: LocatedMapUser?,
-        navigationDestination: MapNavigationDestination?,
-        navigationRoute: BigSightNavigationRoute?
+        destination: MapDestination?
     ) {
         genreRoot.removeAllChildren()
         dynamicRoot.removeAllChildren()
-        navigationRoot.removeAllChildren()
+        destinationRoot.removeAllChildren()
         userRoot.removeAllChildren()
 
-        if let navigationDestination {
-            addNavigation(
-                route: navigationRoute,
-                destination: navigationDestination
-            )
+        if let destination {
+            addDestinationMarker(destination)
         }
         if let user = locatedUser,
-           let venue = campus.venues.first(where: { $0.id == user.sceneID.mapID })
+            let venue = campus.venues.first(where: { $0.id == user.sceneID.mapID })
         {
             addUser(user, venue: venue)
         }
@@ -1973,8 +1918,8 @@ final class UnifiedBigSightScene: SKScene {
             addRectOverlay(
                 subspaceRect(table: table, subspace: bookmark.subspace, scene: scene),
                 venue: venue,
-                fill: bookmarkColor(bookmark.color).withAlphaComponent(0.62),
-                stroke: bookmarkColor(bookmark.color),
+                fill: bookmark.color.uiColor.withAlphaComponent(0.62),
+                stroke: bookmark.color.uiColor,
                 zPosition: 43
             )
         }
@@ -1990,12 +1935,10 @@ final class UnifiedBigSightScene: SKScene {
             )
         }
 
-        addRoute(bookmarks: bookmarks, venue: venue)
-
-        if zoomFactor >= 32 {
+        if zoomFactor >= 32, !searchActive {
             for placement in circlePlacements {
                 guard let table = scene.tableByID[placement.tableID],
-                      let image = circleArtwork[placement.circleID]
+                    let image = circleArtwork[placement.circleID]
                 else { continue }
                 let rect = subspaceRect(table: table, subspace: placement.subspace, scene: scene)
                 let center = CGPoint(x: rect.midX, y: rect.midY).applying(venue.transform)
@@ -2015,49 +1958,36 @@ final class UnifiedBigSightScene: SKScene {
                 )
                 sprite.zRotation = -venue.rotation - geometry.rotation
                 sprite.zPosition = 46
+                if let bookmark = bookmarks.first(where: {
+                    $0.catalogCircleID == placement.circleID
+                }) {
+                    let markRect = CircleFavoriteMarkGeometry.rect(in: sprite.size)
+                    let mark = SKShapeNode(
+                        rectOf: markRect.size,
+                        cornerRadius: 0
+                    )
+                    mark.fillColor = bookmark.color.uiColor
+                    mark.strokeColor = .clear
+                    mark.position = CGPoint(
+                        x: -sprite.size.width / 2 + markRect.midX,
+                        y: sprite.size.height / 2 - markRect.midY
+                    )
+                    mark.zPosition = 1
+                    sprite.addChild(mark)
+                }
                 dynamicRoot.addChild(sprite)
             }
         }
 
     }
 
-    private func addNavigation(
-        route: BigSightNavigationRoute?,
-        destination: MapNavigationDestination
-    ) {
-        if let route, route.points.count > 1 {
-            let path = CGMutablePath()
-            path.move(to: UnifiedMapProjection.scenePoint(fromCampus: route.points[0]))
-            for point in route.points.dropFirst() {
-                path.addLine(to: UnifiedMapProjection.scenePoint(fromCampus: point))
-            }
-
-            let underlay = SKShapeNode(path: path)
-            underlay.strokeColor = appearance.palette.routeUnderlay
-            underlay.lineWidth = 5.4
-            underlay.lineCap = .round
-            underlay.lineJoin = .round
-            underlay.zPosition = 0
-            navigationRoot.addChild(underlay)
-
-            let line = SKShapeNode(path: path)
-            line.name = "pedestrian-navigation-route"
-            line.strokeColor = route.usesFallback
-                ? UIColor.systemOrange.withAlphaComponent(0.9)
-                : UIColor.systemBlue.withAlphaComponent(0.92)
-            line.lineWidth = 3.1
-            line.lineCap = .round
-            line.lineJoin = .round
-            line.zPosition = 1
-            navigationRoot.addChild(line)
-        }
-
+    private func addDestinationMarker(_ destination: MapDestination) {
         guard let venue = campus.venues.first(where: { $0.id == destination.sceneID.mapID }) else {
             return
         }
         let campusPoint = destination.point.applying(venue.transform)
         let marker = SKNode()
-        marker.name = "navigation-destination-marker"
+        marker.name = "map-destination-marker"
         marker.position = UnifiedMapProjection.scenePoint(fromCampus: campusPoint)
         marker.setScale(mapCamera.xScale)
         marker.zRotation = mapCamera.zRotation
@@ -2080,37 +2010,7 @@ final class UnifiedBigSightScene: SKScene {
         center.zPosition = 1
         marker.addChild(center)
 
-        navigationRoot.addChild(marker)
-    }
-
-    private func addRoute(bookmarks: [MapBookmark], venue: BigSightVenuePlacement) {
-        let points = bookmarks
-            .filter { $0.routeOrder != nil }
-            .sorted { ($0.routeOrder ?? .max) < ($1.routeOrder ?? .max) }
-            .compactMap { bookmark -> CGPoint? in
-                guard let table = venue.scene.tableByID[bookmark.tableID] else { return nil }
-                let rect = subspaceRect(table: table, subspace: bookmark.subspace, scene: venue.scene)
-                let local = CGPoint(x: rect.midX, y: rect.midY)
-                return UnifiedMapProjection.scenePoint(fromCampus: local.applying(venue.transform))
-            }
-        guard points.count > 1 else { return }
-        let path = CGMutablePath()
-        path.move(to: points[0])
-        points.dropFirst().forEach { path.addLine(to: $0) }
-        let underlay = SKShapeNode(path: path)
-        underlay.strokeColor = appearance.palette.routeUnderlay
-        underlay.lineWidth = 0.26
-        underlay.lineCap = .round
-        underlay.lineJoin = .round
-        underlay.zPosition = 47
-        dynamicRoot.addChild(underlay)
-        let route = SKShapeNode(path: path)
-        route.strokeColor = UIColor.systemGreen.withAlphaComponent(0.85)
-        route.lineWidth = 0.13
-        route.lineCap = .round
-        route.lineJoin = .round
-        route.zPosition = 48
-        dynamicRoot.addChild(route)
+        destinationRoot.addChild(marker)
     }
 
     private func addUser(_ user: LocatedMapUser, venue: BigSightVenuePlacement) {
@@ -2244,10 +2144,12 @@ final class UnifiedBigSightScene: SKScene {
         }
         guard zoomFactor >= 2.4, scope == .campus else { return }
         let campusPoint = UnifiedMapProjection.campusPoint(fromScene: mapCamera.position)
-        guard let venue = campus.venues.first(where: {
-            CGRect(origin: .zero, size: $0.scene.size)
-                .contains(campusPoint.applying($0.transform.inverted()))
-        }) else { return }
+        guard
+            let venue = campus.venues.first(where: {
+                CGRect(origin: .zero, size: $0.scene.size)
+                    .contains(campusPoint.applying($0.transform.inverted()))
+            })
+        else { return }
         requestedScopeInternally = true
         scope = .venue
         selectedMapID = venue.id
@@ -2263,8 +2165,7 @@ final class UnifiedBigSightScene: SKScene {
         genres: [CatalogMapGenrePlacement],
         bookmarks: [MapBookmark],
         locatedUser: LocatedMapUser?,
-        navigationDestination: MapNavigationDestination?,
-        navigationRoute: BigSightNavigationRoute?
+        destination: MapDestination?
     ) -> Int {
         var hasher = Hasher()
         hasher.combine(selectedMapID)
@@ -2284,17 +2185,10 @@ final class UnifiedBigSightScene: SKScene {
         hasher.combine(bookmarks.count)
         bookmarks.forEach {
             hasher.combine($0.publicCircleID)
-            hasher.combine($0.routeOrder)
             hasher.combine($0.color.rawValue)
         }
         hasher.combine(locatedUser?.placedAt)
-        hasher.combine(navigationDestination?.selectedAt)
-        hasher.combine(navigationRoute?.distanceMeters)
-        hasher.combine(navigationRoute?.usesFallback)
-        navigationRoute?.points.forEach {
-            hasher.combine($0.x)
-            hasher.combine($0.y)
-        }
+        hasher.combine(destination?.selectedAt)
         return hasher.finalize()
     }
 
@@ -2386,7 +2280,8 @@ final class UnifiedBigSightScene: SKScene {
                 to: container
             )
         } else if let assetName = icon.assetName,
-                  let image = UIImage(named: assetName) {
+            let image = UIImage(named: assetName)
+        {
             let texture = SKTexture(image: image)
             texture.filteringMode = .linear
             let sprite = SKSpriteNode(texture: texture)
@@ -2538,27 +2433,14 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func genreColor(_ genreID: Int) -> UIColor {
-        UIColor(hue: CGFloat((genreID * 67) % 360) / 360, saturation: 0.58, brightness: 0.92, alpha: 1)
+        UIColor(
+            hue: CGFloat((genreID * 67) % 360) / 360, saturation: 0.58, brightness: 0.92, alpha: 1)
     }
 
-    private func bookmarkColor(_ color: BookmarkColor) -> UIColor {
-        switch color {
-        case .memoOnly: .systemGray
-        case .orange: UIColor(red: 1, green: 0.58, blue: 0.29, alpha: 1)
-        case .magenta: .systemPink
-        case .yellow: .systemYellow
-        case .green: .systemGreen
-        case .cyan: .systemCyan
-        case .purple: .systemPurple
-        case .blue: .systemBlue
-        case .lime: UIColor(red: 0.55, green: 0.85, blue: 0.1, alpha: 1)
-        case .red: .systemRed
-        }
-    }
 }
 
-private extension SKNode {
-    func descendants<T: SKNode>(of type: T.Type) -> [T] {
+extension SKNode {
+    fileprivate func descendants<T: SKNode>(of type: T.Type) -> [T] {
         children.flatMap { child in
             let matchingChild = (child as? T).map { [$0] } ?? []
             return matchingChild + child.descendants(of: type)

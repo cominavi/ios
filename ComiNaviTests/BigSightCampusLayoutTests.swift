@@ -1,5 +1,6 @@
 import CoreGraphics
 import XCTest
+
 @testable import ComiNavi
 
 final class BigSightCampusLayoutTests: XCTestCase {
@@ -56,28 +57,34 @@ final class BigSightCampusLayoutTests: XCTestCase {
     }
 
     func testC108VenuesUseTheirRealGeographicOrdering() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "東7", mapName: "E7"),
-            hall(id: 3, name: "西12", mapName: "W12"),
-            hall(id: 4, name: "南12", mapName: "S12"),
-        ], eventNumber: 108))
+        let campus = try XCTUnwrap(
+            makeCampus(
+                [
+                    hall(id: 1, name: "東123", mapName: "E123"),
+                    hall(id: 2, name: "東7", mapName: "E7"),
+                    hall(id: 3, name: "西12", mapName: "W12"),
+                    hall(id: 4, name: "南12", mapName: "S12"),
+                ], eventNumber: 108))
         let venues = Dictionary(uniqueKeysWithValues: campus.venues.map { ($0.kind, $0) })
 
         XCTAssertEqual(campus.venues.count, 4)
-        XCTAssertGreaterThan(try XCTUnwrap(venues[.east7]).center.x, try XCTUnwrap(venues[.east123]).center.x)
-        XCTAssertLessThan(try XCTUnwrap(venues[.east7]).center.y, try XCTUnwrap(venues[.east123]).center.y)
-        XCTAssertGreaterThan(try XCTUnwrap(venues[.south]).center.y, try XCTUnwrap(venues[.west]).center.y)
+        XCTAssertGreaterThan(
+            try XCTUnwrap(venues[.east7]).center.x, try XCTUnwrap(venues[.east123]).center.x)
+        XCTAssertLessThan(
+            try XCTUnwrap(venues[.east7]).center.y, try XCTUnwrap(venues[.east123]).center.y)
+        XCTAssertGreaterThan(
+            try XCTUnwrap(venues[.south]).center.y, try XCTUnwrap(venues[.west]).center.y)
         XCTAssertTrue(campus.venues.allSatisfy { campus.bounds.contains($0.bounds) })
     }
 
     func testC104EastRowsAreSeparatedWithinOneBuilding() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "東456", mapName: "E456"),
-            hall(id: 3, name: "東7", mapName: "E7"),
-            hall(id: 4, name: "西12", mapName: "W12"),
-        ]))
+        let campus = try XCTUnwrap(
+            makeCampus([
+                hall(id: 1, name: "東123", mapName: "E123"),
+                hall(id: 2, name: "東456", mapName: "E456"),
+                hall(id: 3, name: "東7", mapName: "E7"),
+                hall(id: 4, name: "西12", mapName: "W12"),
+            ]))
         let east123 = try XCTUnwrap(campus.venues.first { $0.kind == .east123 })
         let east456 = try XCTUnwrap(campus.venues.first { $0.kind == .east456 })
 
@@ -95,59 +102,63 @@ final class BigSightCampusLayoutTests: XCTestCase {
         let east7Hall = hall(id: 3, name: "東7", mapName: "E7")
         let westHall = hall(id: 4, name: "西12", mapName: "W12")
         let halls = [east123Hall, east456Hall, east7Hall, westHall]
-        let campus = try XCTUnwrap(BigSightCampusLayout.make(
-            eventNumber: 104,
-            day: 1,
-            halls: halls,
-            scenes: [
-                1: scene(for: east123Hall),
-                2: scene(for: east456Hall, layoutRotation: .pi),
-                3: scene(for: east7Hall),
-                4: scene(for: westHall),
-            ]
-        ))
+        let campus = try XCTUnwrap(
+            BigSightCampusLayout.make(
+                eventNumber: 104,
+                day: 1,
+                halls: halls,
+                scenes: [
+                    1: scene(for: east123Hall),
+                    2: scene(for: east456Hall, layoutRotation: .pi),
+                    3: scene(for: east7Hall),
+                    4: scene(for: westHall),
+                ]
+            ))
         let venues = Dictionary(uniqueKeysWithValues: campus.venues.map { ($0.kind, $0) })
-        let expected: [BigSightVenuePlacement.Kind: (
-            latitude: Double,
-            longitude: Double,
-            width: CGFloat,
-            height: CGFloat,
-            rotationDegrees: CGFloat
-        )] = [
-            .east123: (
-                35.631057820055005,
-                139.79794721575166,
-                275.8224542031329,
-                99.01318868830411,
-                146.462
-            ),
-            .east456: (
-                35.63237082511334,
-                139.7975145453659,
-                271.05487926318995,
-                97.30175153037587,
-                -33.53800000000001
-            ),
-            .east7: (
-                35.633471367816355,
-                139.7994204284449,
-                113.01855361967942,
-                122.28236949014496,
-                -33.40707083299674
-            ),
-            .west: (
-                35.62877144202331,
-                139.79501092499783,
-                205.27930023717607,
-                145.97639127976964,
-                146.97977914964463
-            ),
-        ]
+        let expected:
+            [BigSightVenuePlacement.Kind: (
+                latitude: Double,
+                longitude: Double,
+                width: CGFloat,
+                height: CGFloat,
+                rotationDegrees: CGFloat
+            )] = [
+                .east123: (
+                    35.631057820055005,
+                    139.79794721575166,
+                    275.8224542031329,
+                    99.01318868830411,
+                    146.462
+                ),
+                .east456: (
+                    35.63237082511334,
+                    139.7975145453659,
+                    271.05487926318995,
+                    97.30175153037587,
+                    -33.53800000000001
+                ),
+                .east7: (
+                    35.633471367816355,
+                    139.7994204284449,
+                    113.01855361967942,
+                    122.28236949014496,
+                    -33.40707083299674
+                ),
+                .west: (
+                    35.62877144202331,
+                    139.79501092499783,
+                    205.27930023717607,
+                    145.97639127976964,
+                    146.97977914964463
+                ),
+            ]
 
         for (kind, alignment) in expected {
             let venue = try XCTUnwrap(venues[kind])
-            XCTAssertEqual(venue.coordinate.latitude, alignment.latitude, accuracy: 0.000_000_000_001)
-            XCTAssertEqual(venue.coordinate.longitude, alignment.longitude, accuracy: 0.000_000_000_001)
+            XCTAssertEqual(
+                venue.coordinate.latitude, alignment.latitude, accuracy: 0.000_000_000_001)
+            XCTAssertEqual(
+                venue.coordinate.longitude, alignment.longitude, accuracy: 0.000_000_000_001)
             XCTAssertEqual(
                 venue.scene.size.width * venue.metersPerMapPoint,
                 alignment.width,
@@ -172,56 +183,61 @@ final class BigSightCampusLayoutTests: XCTestCase {
         let westHall = hall(id: 3, name: "西12", mapName: "W12")
         let southHall = hall(id: 4, name: "南12", mapName: "S12")
         let halls = [east123Hall, east7Hall, westHall, southHall]
-        let campus = try XCTUnwrap(BigSightCampusLayout.make(
-            eventNumber: 108,
-            day: 1,
-            halls: halls,
-            scenes: Dictionary(uniqueKeysWithValues: halls.map { hall in
-                (hall.externalMapId, scene(for: hall, eventNumber: 108))
-            })
-        ))
+        let campus = try XCTUnwrap(
+            BigSightCampusLayout.make(
+                eventNumber: 108,
+                day: 1,
+                halls: halls,
+                scenes: Dictionary(
+                    uniqueKeysWithValues: halls.map { hall in
+                        (hall.externalMapId, scene(for: hall, eventNumber: 108))
+                    })
+            ))
         let venues = Dictionary(uniqueKeysWithValues: campus.venues.map { ($0.kind, $0) })
-        let expected: [BigSightVenuePlacement.Kind: (
-            latitude: Double,
-            longitude: Double,
-            width: CGFloat,
-            height: CGFloat,
-            rotationDegrees: CGFloat
-        )] = [
-            .east123: (
-                35.631057820055005,
-                139.79794721575166,
-                275.8224542031329,
-                103.72809983536543,
-                146.462
-            ),
-            .east7: (
-                35.633471367816355,
-                139.7994204284449,
-                113.01855361967942,
-                122.28236949014496,
-                -33.40707083299674
-            ),
-            .west: (
-                35.62877144202331,
-                139.79501092499783,
-                205.27930023717607,
-                152.81943451220806,
-                146.97977914964463
-            ),
-            .south: (
-                35.62700699450169,
-                139.7956005438195,
-                164.32035141970715,
-                90.11116045596845,
-                56.39305764784899
-            ),
-        ]
+        let expected:
+            [BigSightVenuePlacement.Kind: (
+                latitude: Double,
+                longitude: Double,
+                width: CGFloat,
+                height: CGFloat,
+                rotationDegrees: CGFloat
+            )] = [
+                .east123: (
+                    35.631057820055005,
+                    139.79794721575166,
+                    275.8224542031329,
+                    103.72809983536543,
+                    146.462
+                ),
+                .east7: (
+                    35.633471367816355,
+                    139.7994204284449,
+                    113.01855361967942,
+                    122.28236949014496,
+                    -33.40707083299674
+                ),
+                .west: (
+                    35.62877144202331,
+                    139.79501092499783,
+                    205.27930023717607,
+                    152.81943451220806,
+                    146.97977914964463
+                ),
+                .south: (
+                    35.62700699450169,
+                    139.7956005438195,
+                    164.32035141970715,
+                    90.11116045596845,
+                    56.39305764784899
+                ),
+            ]
 
         for (kind, alignment) in expected {
             let venue = try XCTUnwrap(venues[kind])
-            XCTAssertEqual(venue.coordinate.latitude, alignment.latitude, accuracy: 0.000_000_000_001)
-            XCTAssertEqual(venue.coordinate.longitude, alignment.longitude, accuracy: 0.000_000_000_001)
+            XCTAssertEqual(
+                venue.coordinate.latitude, alignment.latitude, accuracy: 0.000_000_000_001)
+            XCTAssertEqual(
+                venue.coordinate.longitude, alignment.longitude, accuracy: 0.000_000_000_001)
             XCTAssertEqual(
                 venue.scene.size.width * venue.metersPerMapPoint,
                 alignment.width,
@@ -242,18 +258,20 @@ final class BigSightCampusLayoutTests: XCTestCase {
 
     func testAuthoredImageRotationIsComposedWithBuildingRotation() throws {
         let east456Hall = hall(id: 2, name: "東456", mapName: "E456")
-        let unrotatedCampus = try XCTUnwrap(BigSightCampusLayout.make(
-            eventNumber: 104,
-            day: 1,
-            halls: [east456Hall],
-            scenes: [2: scene(for: east456Hall)]
-        ))
-        let rotatedCampus = try XCTUnwrap(BigSightCampusLayout.make(
-            eventNumber: 104,
-            day: 1,
-            halls: [east456Hall],
-            scenes: [2: scene(for: east456Hall, layoutRotation: .pi)]
-        ))
+        let unrotatedCampus = try XCTUnwrap(
+            BigSightCampusLayout.make(
+                eventNumber: 104,
+                day: 1,
+                halls: [east456Hall],
+                scenes: [2: scene(for: east456Hall)]
+            ))
+        let rotatedCampus = try XCTUnwrap(
+            BigSightCampusLayout.make(
+                eventNumber: 104,
+                day: 1,
+                halls: [east456Hall],
+                scenes: [2: scene(for: east456Hall, layoutRotation: .pi)]
+            ))
         let unrotated = try XCTUnwrap(unrotatedCampus.venues.first)
         let rotated = try XCTUnwrap(rotatedCampus.venues.first)
 
@@ -265,12 +283,13 @@ final class BigSightCampusLayoutTests: XCTestCase {
     }
 
     func testConnectionGraphUsesNamedCampusPathsAndCalculatedDistances() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "東7", mapName: "E7"),
-            hall(id: 3, name: "西12", mapName: "W12"),
-            hall(id: 4, name: "南12", mapName: "S12"),
-        ]))
+        let campus = try XCTUnwrap(
+            makeCampus([
+                hall(id: 1, name: "東123", mapName: "E123"),
+                hall(id: 2, name: "東7", mapName: "E7"),
+                hall(id: 3, name: "西12", mapName: "W12"),
+                hall(id: 4, name: "南12", mapName: "S12"),
+            ]))
 
         XCTAssertEqual(
             Set(campus.connections.map(\.id)),
@@ -286,10 +305,11 @@ final class BigSightCampusLayoutTests: XCTestCase {
     }
 
     func testCampusIncludesExactOpenStreetMapConnectingBridgeBoundary() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "西12", mapName: "W12"),
-        ]))
+        let campus = try XCTUnwrap(
+            makeCampus([
+                hall(id: 1, name: "東123", mapName: "E123"),
+                hall(id: 2, name: "西12", mapName: "W12"),
+            ]))
         let bridge = try XCTUnwrap(campus.openStreetMapFeatures.first)
 
         XCTAssertEqual(bridge.id, 154_080_996)
@@ -302,10 +322,11 @@ final class BigSightCampusLayoutTests: XCTestCase {
     }
 
     func testCampusUsesCuratedOpenStreetMapPedestrianNetwork() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "西12", mapName: "W12"),
-        ]))
+        let campus = try XCTUnwrap(
+            makeCampus([
+                hall(id: 1, name: "東123", mapName: "E123"),
+                hall(id: 2, name: "西12", mapName: "W12"),
+            ]))
         let pedestrianWays = campus.openStreetMapFeatures.filter {
             $0.kind == .footway || $0.kind == .steps
         }
@@ -317,16 +338,18 @@ final class BigSightCampusLayoutTests: XCTestCase {
         XCTAssertTrue(pedestrianWays.contains { $0.id == 385_355_910 })
         XCTAssertTrue(pedestrianWays.contains { $0.id == 385_355_911 })
         XCTAssertFalse(pedestrianWays.contains { $0.id == 1_123_373_666 })
-        XCTAssertTrue(pedestrianWays.allSatisfy { feature in
-            feature.points.count >= 2 && feature.points.allSatisfy(campus.bounds.contains)
-        })
+        XCTAssertTrue(
+            pedestrianWays.allSatisfy { feature in
+                feature.points.count >= 2 && feature.points.allSatisfy(campus.bounds.contains)
+            })
     }
 
     func testCampusFacilitiesUseUniqueRealCoordinatesAndExpandBounds() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "西12", mapName: "W12"),
-        ]))
+        let campus = try XCTUnwrap(
+            makeCampus([
+                hall(id: 1, name: "東123", mapName: "E123"),
+                hall(id: 2, name: "西12", mapName: "W12"),
+            ]))
 
         XCTAssertEqual(campus.facilities.count, 59)
         XCTAssertEqual(Set(campus.facilities.map(\.id)).count, campus.facilities.count)
@@ -345,16 +368,17 @@ final class BigSightCampusLayoutTests: XCTestCase {
         XCTAssertFalse(campus.facilities.contains { $0.id.hasPrefix("c108-") })
     }
 
-    func testC108AddsEventScopedOperationsAndCorrectClosureGroundTruth() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "東7", mapName: "E7"),
-            hall(id: 3, name: "西12", mapName: "W12"),
-            hall(id: 4, name: "南12", mapName: "S12"),
-        ], eventNumber: 108))
+    func testC108AddsEventScopedContextAndCorrectClosureGroundTruth() throws {
+        let campus = try XCTUnwrap(
+            makeCampus(
+                [
+                    hall(id: 1, name: "東123", mapName: "E123"),
+                    hall(id: 2, name: "東7", mapName: "E7"),
+                    hall(id: 3, name: "西12", mapName: "W12"),
+                    hall(id: 4, name: "南12", mapName: "S12"),
+                ], eventNumber: 108))
 
         XCTAssertEqual(campus.facilities.count, 82)
-        XCTAssertEqual(campus.operationalRoutes.count, 5)
         let closedHalls = try XCTUnwrap(campus.facilities.first { $0.id == "c108-east456-closed" })
         XCTAssertTrue(closedHalls.detail?.contains("2026") == true)
         XCTAssertNil(campus.facilities.first { $0.id == "c108-east123-closed" })
@@ -365,27 +389,22 @@ final class BigSightCampusLayoutTests: XCTestCase {
         XCTAssertNotNil(campus.facilities.first { $0.id == "c108-cosplay-east8" })
         XCTAssertNotNil(campus.facilities.first { $0.id == "c108-east-waiting-restroom" })
         XCTAssertNotNil(campus.facilities.first { $0.id == "c108-west-waiting-restroom" })
-        XCTAssertNotNil(campus.operationalRoutes.first { $0.id == "c108-rinkai-east-arrival" })
-        XCTAssertTrue(campus.operationalRoutes.allSatisfy { $0.layer == .crowdFlow })
     }
 
     func testC108ContextCoversEveryRequestedBehaviorAndFacilityClass() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "東7", mapName: "E7"),
-            hall(id: 3, name: "西12", mapName: "W12"),
-            hall(id: 4, name: "南12", mapName: "S12"),
-        ], eventNumber: 108))
+        let campus = try XCTUnwrap(
+            makeCampus(
+                [
+                    hall(id: 1, name: "東123", mapName: "E123"),
+                    hall(id: 2, name: "東7", mapName: "E7"),
+                    hall(id: 3, name: "西12", mapName: "W12"),
+                    hall(id: 4, name: "南12", mapName: "S12"),
+                ], eventNumber: 108))
 
         let coveredLayers = Set(campus.facilities.compactMap(\.layer))
-            .union(campus.operationalRoutes.map(\.layer))
         XCTAssertEqual(coveredLayers, Set(BigSightMapLayer.allCases))
         XCTAssertEqual(Set(campus.facilities.map(\.id)).count, campus.facilities.count)
-        XCTAssertEqual(Set(campus.operationalRoutes.map(\.id)).count, campus.operationalRoutes.count)
         XCTAssertTrue(campus.facilities.allSatisfy { campus.bounds.contains($0.center) })
-        XCTAssertTrue(campus.operationalRoutes.allSatisfy { route in
-            route.points.count >= 2 && route.points.allSatisfy(campus.bounds.contains)
-        })
 
         let requiredKinds: [BigSightFacilityLocation.Kind] = [
             .restroom,
@@ -451,36 +470,32 @@ final class BigSightCampusLayoutTests: XCTestCase {
             "east1-stairs-east",
         ]
         let actualIDs = Set(campus.facilities.map(\.id))
-        XCTAssertTrue(requiredIDs.isSubset(of: actualIDs), "Missing IDs: \(requiredIDs.subtracting(actualIDs))")
+        XCTAssertTrue(
+            requiredIDs.isSubset(of: actualIDs),
+            "Missing IDs: \(requiredIDs.subtracting(actualIDs))")
         XCTAssertNil(campus.facilities.first { $0.id == "c108-east123-closed" })
 
         XCTAssertGreaterThanOrEqual(campus.facilities.filter { $0.kind == .restroom }.count, 19)
-        XCTAssertGreaterThanOrEqual(campus.facilities.filter { $0.kind == .convenienceStore }.count, 11)
+        XCTAssertGreaterThanOrEqual(
+            campus.facilities.filter { $0.kind == .convenienceStore }.count, 11)
         XCTAssertGreaterThanOrEqual(campus.facilities.filter { $0.kind == .atm }.count, 5)
         XCTAssertGreaterThanOrEqual(campus.facilities.filter { $0.kind == .train }.count, 2)
-        XCTAssertTrue(campus.facilities.filter { $0.kind == .firstAid }.allSatisfy {
-            $0.detail?.localizedCaseInsensitiveContains("ambulance") == true
-        })
+        XCTAssertTrue(
+            campus.facilities.filter { $0.kind == .firstAid }.allSatisfy {
+                $0.detail?.localizedCaseInsensitiveContains("ambulance") == true
+            })
 
-        XCTAssertEqual(
-            Set(campus.operationalRoutes.map(\.id)),
-            [
-                "c108-rinkai-arrival",
-                "c108-rinkai-east-arrival",
-                "c108-yurikamome-arrival",
-                "c108-east-entry-flow",
-                "c108-east-galleria-flow",
-            ]
-        )
     }
 
     func testTaxiStandRemainsOutsideCalibratedVenueFootprints() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "東7", mapName: "E7"),
-            hall(id: 3, name: "西12", mapName: "W12"),
-            hall(id: 4, name: "南12", mapName: "S12"),
-        ], eventNumber: 108))
+        let campus = try XCTUnwrap(
+            makeCampus(
+                [
+                    hall(id: 1, name: "東123", mapName: "E123"),
+                    hall(id: 2, name: "東7", mapName: "E7"),
+                    hall(id: 3, name: "西12", mapName: "W12"),
+                    hall(id: 4, name: "南12", mapName: "S12"),
+                ], eventNumber: 108))
         let taxiStand = try XCTUnwrap(
             campus.facilities.first { $0.id == "taxi-stand" }
         )
@@ -491,9 +506,11 @@ final class BigSightCampusLayoutTests: XCTestCase {
     }
 
     func testEastHallOneVerticalAccessFollowsCalibratedVenueArtwork() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-        ], eventNumber: 108))
+        let campus = try XCTUnwrap(
+            makeCampus(
+                [
+                    hall(id: 1, name: "東123", mapName: "E123")
+                ], eventNumber: 108))
         let venue = try XCTUnwrap(campus.venues.first)
         let accessIDs: Set<String> = [
             "east1-elevator-west",
@@ -505,12 +522,14 @@ final class BigSightCampusLayoutTests: XCTestCase {
         let access = campus.facilities.filter { accessIDs.contains($0.id) }
 
         XCTAssertEqual(access.count, accessIDs.count)
-        XCTAssertTrue(access.allSatisfy { venue.bounds.insetBy(dx: -0.5, dy: -0.5).contains($0.center) })
+        XCTAssertTrue(
+            access.allSatisfy { venue.bounds.insetBy(dx: -0.5, dy: -0.5).contains($0.center) })
         XCTAssertTrue(access.allSatisfy { $0.layer == .verticalAccess })
-        XCTAssertTrue(access.allSatisfy {
-            $0.detail?.localizedCaseInsensitiveContains("staff") == true
-                || $0.detail?.localizedCaseInsensitiveContains("direction") == true
-        })
+        XCTAssertTrue(
+            access.allSatisfy {
+                $0.detail?.localizedCaseInsensitiveContains("staff") == true
+                    || $0.detail?.localizedCaseInsensitiveContains("direction") == true
+            })
 
         let expectedNormalizedPositions: [String: CGPoint] = [
             "east1-elevator-west": CGPoint(x: 0.675, y: 0.970),
@@ -533,32 +552,26 @@ final class BigSightCampusLayoutTests: XCTestCase {
     }
 
     @MainActor
-    func testLayerVisibilityHidesOperationalMarkersWithoutHidingPermanentLandmarks() throws {
-        let campus = try XCTUnwrap(makeCampus([
-            hall(id: 1, name: "東123", mapName: "E123"),
-            hall(id: 2, name: "西12", mapName: "W12"),
-        ], eventNumber: 108))
+    func testLayerVisibilityHidesEventMarkersWithoutHidingPermanentLandmarks() throws {
+        let campus = try XCTUnwrap(
+            makeCampus(
+                [
+                    hall(id: 1, name: "東123", mapName: "E123"),
+                    hall(id: 2, name: "西12", mapName: "W12"),
+                ], eventNumber: 108))
         let renderer = UnifiedBigSightScene(campus: campus)
 
-        XCTAssertEqual(renderer.operationalRouteCount, 5)
-        XCTAssertTrue(renderer.isOperationalRouteVisible(id: "c108-rinkai-arrival"))
         XCTAssertTrue(renderer.isFacilityMarkerVisible(id: "c108-east-entry"))
         XCTAssertTrue(renderer.isFacilityMarkerVisible(id: "conference-tower"))
 
         renderer.updateVisibleMapLayers([])
 
         XCTAssertFalse(renderer.isFacilityMarkerVisible(id: "c108-east-entry"))
-        XCTAssertFalse(renderer.isOperationalRouteVisible(id: "c108-rinkai-arrival"))
         XCTAssertTrue(renderer.isFacilityMarkerVisible(id: "conference-tower"))
 
         renderer.updateVisibleMapLayers([.gates])
 
         XCTAssertTrue(renderer.isFacilityMarkerVisible(id: "c108-east-entry"))
-        XCTAssertFalse(renderer.isOperationalRouteVisible(id: "c108-rinkai-arrival"))
-
-        renderer.updateVisibleMapLayers([.crowdFlow])
-
-        XCTAssertTrue(renderer.isOperationalRouteVisible(id: "c108-rinkai-arrival"))
     }
 
     func testEveryVenueKindUsesItsComiNaviHallIcon() {
@@ -577,9 +590,10 @@ final class BigSightCampusLayoutTests: XCTestCase {
             eventNumber: eventNumber,
             day: 1,
             halls: halls,
-            scenes: Dictionary(uniqueKeysWithValues: halls.map { hall in
-                (hall.externalMapId, scene(for: hall, eventNumber: eventNumber))
-            })
+            scenes: Dictionary(
+                uniqueKeysWithValues: halls.map { hall in
+                    (hall.externalMapId, scene(for: hall, eventNumber: eventNumber))
+                })
         )
     }
 
@@ -599,7 +613,7 @@ final class BigSightCampusLayoutTests: XCTestCase {
                     blockName: hall.name,
                     origin: CGPoint(x: 80, y: 80),
                     orientation: .aTop
-                ),
+                )
             ],
             layoutRotation: layoutRotation
         )

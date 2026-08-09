@@ -22,9 +22,11 @@ not used for C108 closure state because the dated venue-owner construction map,
 C108 placement note, current C108 hall allocation, and current international
 map all agree on East 4–6.
 
-Crowd-control directions are intentionally described as staff-controlled. The
-organizer warns that routes change with congestion, and no authoritative source
-assigns a permanent up/down direction to each East Hall stair or escalator.
+ComiNavi deliberately does not render crowd-flow or pedestrian routes. A user
+can pin a destination and copy its venue-aware address, but must follow current
+signage and staff directions. The organizer warns that routes change with
+congestion, and no authoritative source assigns a permanent up/down direction
+to each East Hall stair or escalator.
 
 Field reports were used only to model behavior, not to override an event's
 official map:

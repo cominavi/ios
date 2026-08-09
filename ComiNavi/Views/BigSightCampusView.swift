@@ -90,20 +90,20 @@ struct BigSightCampusView: View {
 
     private var accessibilityCameraValue: String {
         #if DEBUG
-        return String(
-            format: "north up, zoom %.2f times, camera offset %.1f %.1f",
-            camera.zoom,
-            camera.translation.width,
-            camera.translation.height
-        )
+            return String(
+                format: "north up, zoom %.2f times, camera offset %.1f %.1f",
+                camera.zoom,
+                camera.translation.width,
+                camera.translation.height
+            )
         #else
-        return "north up, zoom \(camera.zoom) times"
+            return "north up, zoom \(camera.zoom) times"
         #endif
     }
 
     private var northIndicator: some View {
         VStack(spacing: 2) {
-            Image(systemName: "location.north.fill")
+            LucideIcon("location.north.fill")
                 .font(.headline)
                 .foregroundStyle(Color(red: 0.04, green: 0.43, blue: 0.27))
             Text("N")
@@ -116,7 +116,7 @@ struct BigSightCampusView: View {
 
     private var campusLegend: some View {
         HStack(spacing: 8) {
-            Label("100 m grid", systemImage: "ruler")
+            LucideLabel("100 m grid", icon: "ruler")
             Spacer(minLength: 8)
             Text("Tap a venue · Positions © OpenStreetMap contributors")
                 .lineLimit(1)
@@ -282,22 +282,24 @@ struct BigSightCampusView: View {
 
         let dotSize = 7 / renderedScale
         context.fill(
-            Path(ellipseIn: CGRect(
-                x: venue.center.x - dotSize / 2,
-                y: venue.center.y - dotSize / 2,
-                width: dotSize,
-                height: dotSize
-            )),
+            Path(
+                ellipseIn: CGRect(
+                    x: venue.center.x - dotSize / 2,
+                    y: venue.center.y - dotSize / 2,
+                    width: dotSize,
+                    height: dotSize
+                )),
             with: .color(tint)
         )
         context.stroke(
-            Path(ellipseIn: CGRect(
-                x: venue.center.x - dotSize / 2,
-                y: venue.center.y - dotSize / 2,
-                width: dotSize,
-                height: dotSize
-            )),
-            with: .color(routeUnderlay),
+            Path(
+                ellipseIn: CGRect(
+                    x: venue.center.x - dotSize / 2,
+                    y: venue.center.y - dotSize / 2,
+                    width: dotSize,
+                    height: dotSize
+                )),
+            with: .color(markerUnderlay),
             lineWidth: 2 / renderedScale
         )
 
@@ -313,18 +315,18 @@ struct BigSightCampusView: View {
             BigSightVenueBadge(icon: venue.kind.icon)
                 .accessibilityHidden(true)
         }
-            .font(.caption.weight(.bold))
-            .foregroundStyle(.primary)
-            .labelStyle(BigSightMapLabelStyle(iconSize: 18))
-            .padding(.horizontal, 7)
-            .frame(height: 25)
-            .background(markerSurface, in: .capsule)
-            .overlay {
-                Capsule()
-                    .stroke(venueColor(venue.kind).opacity(0.55), lineWidth: 1)
-            }
-            .position(venue.center.applying(transform))
-            .offset(y: -21)
+        .font(.caption.weight(.bold))
+        .foregroundStyle(.primary)
+        .labelStyle(BigSightMapLabelStyle(iconSize: 18))
+        .padding(.horizontal, 7)
+        .frame(height: 25)
+        .background(markerSurface, in: .capsule)
+        .overlay {
+            Capsule()
+                .stroke(venueColor(venue.kind).opacity(0.55), lineWidth: 1)
+        }
+        .position(venue.center.applying(transform))
+        .offset(y: -21)
     }
 
     private func facilityLabel(
@@ -371,13 +373,15 @@ struct BigSightCampusView: View {
     }
 
     private func entrancePlazaLabel(transform: CGAffineTransform) -> some View {
-        Label("Entrance Plaza", systemImage: "figure.walk")
+        LucideLabel("Entrance Plaza", icon: "figure.walk")
             .font(.caption2.weight(.semibold))
             .foregroundStyle(Color(red: 0.04, green: 0.43, blue: 0.27))
             .padding(.horizontal, 7)
             .frame(height: 22)
             .background(markerSurface, in: .capsule)
-            .position(BigSightCampusLayout.project(BigSightCampusLayout.entrancePlaza).applying(transform))
+            .position(
+                BigSightCampusLayout.project(BigSightCampusLayout.entrancePlaza).applying(transform)
+            )
             .offset(x: 165, y: -18)
     }
 
@@ -385,7 +389,8 @@ struct BigSightCampusView: View {
         _ connection: BigSightCampusConnection,
         transform: CGAffineTransform
     ) -> some View {
-        let label = camera.zoom > 1.35
+        let label =
+            camera.zoom > 1.35
             ? "\(connection.name) · ≈\(connection.distanceMeters) m"
             : "≈\(connection.distanceMeters) m"
         let point = connectionLabelPoint(connection).applying(transform)
@@ -467,7 +472,7 @@ struct BigSightCampusView: View {
         Color(uiColor: .systemBackground).opacity(colorScheme == .dark ? 0.94 : 0.9)
     }
 
-    private var routeUnderlay: Color {
+    private var markerUnderlay: Color {
         colorScheme == .dark ? Color.black.opacity(0.8) : Color.white.opacity(0.92)
     }
 

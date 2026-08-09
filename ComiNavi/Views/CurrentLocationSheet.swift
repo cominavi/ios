@@ -5,6 +5,7 @@ struct CurrentLocationSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let location: LocatedMapUser
+    let eventNumber: Int
     let onUpdateLocation: () -> Void
 
     @State private var copied = false
@@ -16,7 +17,7 @@ struct CurrentLocationSheet: View {
                 locationHeader
                 canonicalLocation
                 sensorDetails
-                copyAction
+                shareActions
             }
             .frame(maxWidth: 620)
             .padding(.horizontal, 20)
@@ -57,11 +58,12 @@ struct CurrentLocationSheet: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            Label(
+            LucideLabel(
+                resource:
                 location.source == .mapLongPress
-                    ? "Positioned from your map press"
-                    : "Positioned with Where Am I",
-                systemImage: location.source == .mapLongPress ? "hand.tap.fill" : "location.fill"
+                    ? LocalizedStringResource("Positioned from your map press")
+                    : LocalizedStringResource("Positioned with Where Am I"),
+                icon: location.source == .mapLongPress ? "hand.tap.fill" : "location.fill"
             )
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
@@ -94,15 +96,15 @@ struct CurrentLocationSheet: View {
         if location.locationReading != nil || location.headingDegrees != nil {
             VStack(alignment: .leading, spacing: 12) {
                 if let reading = location.locationReading {
-                    Label(
+                    LucideLabel(
                         "GPS reference · about \(Int(reading.horizontalAccuracy.rounded())) m accuracy",
-                        systemImage: "location"
+                        icon: "location"
                     )
                 }
                 if let heading = location.headingDegrees {
-                    Label(
+                    LucideLabel(
                         "Compass heading · \(Int(heading.rounded()))° \(cardinalDirection(heading))",
-                        systemImage: "location.north.line.fill"
+                        icon: "location.north.line.fill"
                     )
                 }
             }
@@ -112,19 +114,31 @@ struct CurrentLocationSheet: View {
         }
     }
 
-    private var copyAction: some View {
+    private var shareActions: some View {
         Button {
-            UIPasteboard.general.string = location.canonicalLocationText
+            let sharedLocation = SharedComiketLocation(
+                location: location,
+                eventNumber: eventNumber
+            )
+            UIPasteboard.general.string = sharedLocation?.clipboardText(
+                locationText: location.canonicalLocationText
+            ) ?? location.canonicalLocationText
             copied = true
             copyFeedback += 1
         } label: {
-            Label(copied ? "Copied" : "Copy location", systemImage: copied ? "checkmark" : "doc.on.doc")
-                .font(.headline)
-                .frame(maxWidth: .infinity, minHeight: 58)
-                .contentShape(.rect)
+            LucideLabel(
+                resource:
+                copied
+                    ? LocalizedStringResource("Copied")
+                    : LocalizedStringResource("Copy location"),
+                icon: copied ? "checkmark" : "doc.on.doc"
+            )
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .contentShape(.rect)
         }
         .buttonStyle(.borderedProminent)
-        .accessibilityHint("Copies the Comiket-formatted location")
+        .accessibilityHint("Copies the venue location and a link that opens it in ComiNavi")
         .accessibilityIdentifier("current-location-copy")
         .animation(.default, value: copied)
     }

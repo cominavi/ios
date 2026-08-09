@@ -5,6 +5,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
     let circles: [ExploreCircle]
     let model: ExploreModel
     let onSelect: (Int) -> Void
+    let onLongPress: (Int) -> Void
     let headerLayoutVersion: Int
     let header: Header
 
@@ -12,12 +13,14 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
         circles: [ExploreCircle],
         model: ExploreModel,
         onSelect: @escaping (Int) -> Void,
+        onLongPress: @escaping (Int) -> Void,
         headerLayoutVersion: Int,
         @ViewBuilder header: () -> Header
     ) {
         self.circles = circles
         self.model = model
         self.onSelect = onSelect
+        self.onLongPress = onLongPress
         self.headerLayoutVersion = headerLayoutVersion
         self.header = header()
     }
@@ -65,6 +68,13 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
         pinch.cancelsTouchesInView = false
         collectionView.addGestureRecognizer(pinch)
 
+        let longPress = UILongPressGestureRecognizer(
+            target: context.coordinator,
+            action: #selector(Coordinator.handleLongPress(_:))
+        )
+        longPress.minimumPressDuration = 0.45
+        collectionView.addGestureRecognizer(longPress)
+
         context.coordinator.install(on: collectionView)
         return collectionView
     }
@@ -99,6 +109,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
         private var pinchAnchor: PinchAnchor?
         private var measuredHeaderSize: CGSize?
         private var visibleArtworkPixelSize: ExploreArtworkPixelSize?
+        private var usesAdaptiveInitialColumns = true
 
         init(parent: ExploreGalleryCollection) {
             self.parent = parent
@@ -110,9 +121,11 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             if let collectionView = collectionView as? ExploreTouchCancellingCollectionView {
                 collectionView.onBoundsSizeChange = { [weak self, weak collectionView] in
                     guard let self, let collectionView else { return }
+                    self.applyAdaptiveColumnCountIfNeeded(in: collectionView)
                     self.refreshVisibleArtworkIfNeeded(in: collectionView)
                 }
             }
+            applyAdaptiveColumnCountIfNeeded(in: collectionView)
             updateAccessibility()
             collectionView.accessibilityCustomActions = [
                 UIAccessibilityCustomAction(
@@ -134,11 +147,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             let headerLayoutChanged = parent.headerLayoutVersion != self.parent.headerLayoutVersion
             self.parent = parent
             if let collectionView {
-                for header in collectionView.visibleSupplementaryViews(
-                    ofKind: UICollectionView.elementKindSectionHeader
-                ) {
-                    (header as? ExploreGalleryHeaderReusableView)?.configure(with: parent.header)
-                }
+                applyAdaptiveColumnCountIfNeeded(in: collectionView)
                 if headerLayoutChanged {
                     measuredHeaderSize = nil
                     collectionView.collectionViewLayout.invalidateLayout()
@@ -219,7 +228,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             sizeForItemAt indexPath: IndexPath
         ) -> CGSize {
             let width = itemWidth(in: collectionView)
-            let artworkHeight = width * 300 / 211
+            let artworkHeight = width / ExploreLayoutMetrics.circleArtworkAspectRatio
             if renderedCardDetail == .artworkOnly {
                 return CGSize(width: width, height: artworkHeight)
             }
@@ -308,6 +317,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             guard let collectionView else { return }
             switch gesture.state {
             case .began:
+                usesAdaptiveInitialColumns = false
                 collectionView.layer.removeAllAnimations()
                 collectionView.setContentOffset(collectionView.contentOffset, animated: false)
                 pinchAnchor = makeAnchor(
@@ -338,6 +348,17 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             default:
                 break
             }
+        }
+
+        @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+            guard gesture.state == .began,
+                  let collectionView,
+                  let indexPath = collectionView.indexPathForItem(
+                      at: gesture.location(in: collectionView)
+                  ),
+                  let circleIndex = circleIndex(for: indexPath)
+            else { return }
+            parent.onLongPress(parent.circles[circleIndex].id)
         }
 
         private func makeAnchor(
@@ -526,10 +547,11 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                     + CGFloat(rhs) * (itemWidth + spacing)
                 return abs(lhsCenter - viewportX) < abs(rhsCenter - viewportX)
             } ?? 0
-            // UICollectionViewFlowLayout advances the item row phase once for
-            // the scrolling section header. Offset the leading placeholders so
-            // the anchored circle still lands in the column under the pinch.
-            return (targetColumn - circleIndex % columns + columns + 1) % columns
+            return ExploreGalleryZoomGeometry.leadingPlaceholderCount(
+                aligningItemAtIndex: circleIndex,
+                with: targetColumn,
+                columns: columns
+            )
         }
 
         private func restore(
@@ -551,6 +573,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
 
         private func stepZoom(towardFewerColumns: Bool) -> Bool {
             guard let collectionView else { return false }
+            usesAdaptiveInitialColumns = false
             let levels = ExploreGalleryZoomGeometry.columnLevels
             let currentIndex = levels.enumerated().min {
                 abs($0.element - columnCount) < abs($1.element - columnCount)
@@ -575,7 +598,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
         }
 
         private static func cardDetail(for columns: CGFloat) -> ExploreGalleryCardDetail {
-            if columns >= 4 {
+            if columns >= 5 {
                 return .artworkOnly
             }
             if columns >= 2.5 {
@@ -583,6 +606,26 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             }
             return .full
         }
+
+        private func applyAdaptiveColumnCountIfNeeded(
+            in collectionView: UICollectionView
+        ) {
+            guard usesAdaptiveInitialColumns, collectionView.bounds.width > 0 else { return }
+            let preferredColumns = ExploreGalleryZoomGeometry.preferredInitialColumnCount(
+                for: collectionView.bounds.width
+            )
+            guard preferredColumns != columnCount else { return }
+
+            columnCount = preferredColumns
+            renderedCardDetail = Self.cardDetail(for: preferredColumns)
+            leadingPlaceholderCount = 0
+            measuredHeaderSize = nil
+            visibleArtworkPixelSize = nil
+            collectionView.collectionViewLayout.invalidateLayout()
+            collectionView.reloadData()
+            updateAccessibility()
+        }
+
     }
 }
 

@@ -2,7 +2,7 @@ import CoreGraphics
 import UIKit
 
 enum ExploreGalleryZoomGeometry {
-    static let columnLevels: [CGFloat] = [1, 2, 3, 5]
+    static let columnLevels: [CGFloat] = [1, 2, 3, 4, 5]
 
     static var columnRange: ClosedRange<CGFloat> {
         (columnLevels.first ?? 1)...(columnLevels.last ?? 5)
@@ -23,6 +23,27 @@ enum ExploreGalleryZoomGeometry {
         columnLevels.min { lhs, rhs in
             abs(lhs - columns) < abs(rhs - columns)
         } ?? columns
+    }
+
+    static func preferredInitialColumnCount(for width: CGFloat) -> CGFloat {
+        if width >= 1_100 {
+            return 4
+        }
+        if width >= 700 {
+            return 3
+        }
+        return 2
+    }
+
+    static func leadingPlaceholderCount(
+        aligningItemAtIndex itemIndex: Int,
+        with targetColumn: Int,
+        columns: Int
+    ) -> Int {
+        guard columns > 0 else { return 0 }
+        let clampedTargetColumn = min(max(targetColumn, 0), columns - 1)
+        let currentColumn = itemIndex % columns
+        return (clampedTargetColumn - currentColumn + columns) % columns
     }
 
     static func unitPoint(in frame: CGRect, at contentPoint: CGPoint) -> CGPoint {

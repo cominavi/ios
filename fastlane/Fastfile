@@ -1,0 +1,54 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Upload App Store metadata and screenshots without uploading or submitting a build"
+  lane :upload_metadata do
+    review_keys = {
+      first_name: "COMINAVI_REVIEW_FIRST_NAME",
+      last_name: "COMINAVI_REVIEW_LAST_NAME",
+      phone_number: "COMINAVI_REVIEW_PHONE",
+      email_address: "COMINAVI_REVIEW_EMAIL",
+      demo_user: "COMINAVI_REVIEW_DEMO_USER",
+      demo_password: "COMINAVI_REVIEW_DEMO_PASSWORD"
+    }
+
+    missing = review_keys.values.reject { |key| ENV.fetch(key, "").strip.length.positive? }
+    unless missing.empty?
+      UI.user_error!("Set the App Review values outside the repository: #{missing.join(', ')}")
+    end
+
+    review_information = review_keys.to_h { |name, key| [name, ENV.fetch(key).strip] }
+    review_information[:notes] = File.read(
+      File.join(__dir__, "metadata", "review_information", "notes.txt")
+    ).strip
+
+    options = {
+      app_identifier: "llc.mikunet.cominavi",
+      app_version: "1.0",
+      platform: "ios",
+      metadata_path: File.join(__dir__, "metadata"),
+      screenshots_path: File.join(__dir__, "screenshots"),
+      app_rating_config_path: File.join(__dir__, "age_rating.json"),
+      app_review_information: review_information,
+      skip_binary_upload: true,
+      submit_for_review: false,
+      overwrite_screenshots: true,
+      run_precheck_before_submit: true,
+      force: false
+    }
+
+    key_id = ENV.fetch("ASC_KEY_ID", "").strip
+    issuer_id = ENV.fetch("ASC_ISSUER_ID", "").strip
+    key_filepath = ENV.fetch("ASC_KEY_FILEPATH", "").strip
+    if [key_id, issuer_id, key_filepath].all? { |value| value.length.positive? }
+      options[:api_key] = app_store_connect_api_key(
+        key_id: key_id,
+        issuer_id: issuer_id,
+        key_filepath: key_filepath,
+        in_house: false
+      )
+    end
+
+    deliver(**options)
+  end
+end

@@ -1,6 +1,6 @@
+@testable import ComiNavi
 import Foundation
 import XCTest
-@testable import ComiNavi
 
 final class LocalizationTests: XCTestCase {
     func testJapaneseLocalizationResolvesRepresentativeInterfaceCopy() throws {
@@ -26,10 +26,6 @@ final class LocalizationTests: XCTestCase {
             "コミナビへようこそ！"
         )
         XCTAssertEqual(
-            japaneseBundle.localizedString(forKey: "Crawl data", value: nil, table: nil),
-            "クロールデータ"
-        )
-        XCTAssertEqual(
             japaneseBundle.localizedString(forKey: "Shinagaki", value: nil, table: nil),
             "お品書き"
         )
@@ -40,6 +36,26 @@ final class LocalizationTests: XCTestCase {
                 table: nil
             ),
             "お品書きの新着順"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Log out of Circle.ms?",
+                value: nil,
+                table: nil
+            ),
+            "Circle.msからログアウトしますか？"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(forKey: "Cancel", value: nil, table: nil),
+            "キャンセル"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Hiragana, katakana, or romaji",
+                value: nil,
+                table: nil
+            ),
+            "ひらがな・カタカナ・ローマ字"
         )
     }
 
@@ -123,7 +139,7 @@ final class LocalizationTests: XCTestCase {
 
     private func placeholders(in value: String) -> [String] {
         let expression = try! NSRegularExpression(pattern: #"%(?:\d+\$)?(?:lld|ld|d|f|@)"#)
-        let range = NSRange(value.startIndex..<value.endIndex, in: value)
+        let range = NSRange(value.startIndex ..< value.endIndex, in: value)
         return expression.matches(in: value, range: range).compactMap { match in
             guard let range = Range(match.range, in: value) else { return nil }
             return value[range].replacingOccurrences(

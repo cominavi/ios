@@ -65,34 +65,72 @@ actor BookmarkSyncCoordinator {
     private let catalog: any MapCatalog
     private let localStore: any UserPlanStoring
     private let remoteStore: any FavoriteRemoteStoring
+    private let serviceFavoriteSync: (any CominaviFavoriteSyncing)?
+    private var requestedRevision: UInt64 = 0
+    private var completedRevision: UInt64 = 0
+    private var worker: Task<Void, Error>?
 
     init(
         eventID: Int,
         eventNumber: Int,
         catalog: any MapCatalog,
         localStore: any UserPlanStoring,
-        remoteStore: any FavoriteRemoteStoring = CirclemsFavoriteRemoteStore()
+        remoteStore: any FavoriteRemoteStoring = CirclemsFavoriteRemoteStore(),
+        serviceFavoriteSync: (any CominaviFavoriteSyncing)? = nil
     ) {
         self.eventID = eventID
         self.eventNumber = eventNumber
         self.catalog = catalog
         self.localStore = localStore
         self.remoteStore = remoteStore
+        self.serviceFavoriteSync = serviceFavoriteSync
     }
 
     func sync() async throws {
+        requestedRevision &+= 1
+
+        if worker == nil {
+            worker = Task { [weak self] in
+                guard let self else { return }
+                try await self.drainSyncQueue()
+            }
+        }
+
+        guard let worker else { return }
+        try await worker.value
+    }
+
+    private func drainSyncQueue() async throws {
+        while completedRevision < requestedRevision {
+            let targetRevision = requestedRevision
+
+            do {
+                try await performSync()
+            } catch {
+                worker = nil
+                throw error
+            }
+
+            completedRevision = targetRevision
+        }
+
+        worker = nil
+    }
+
+    private func performSync() async throws {
         let remoteFavorites = try await remoteStore.favorites(eventID: eventID)
         let remoteIDs = Set(remoteFavorites.map(\.publicCircleID))
         let existingLocal = try await localStore.allBookmarks(eventNumber: eventNumber)
-        let localByID = Dictionary(uniqueKeysWithValues: existingLocal.map { ($0.publicCircleID, $0) })
         let pendingIDs = Set(existingLocal.filter { $0.syncState != .synced }.map(\.publicCircleID))
 
-        let locations = try await catalog.bookmarkLocations(updateIDs: remoteFavorites.map(\.updateID))
-        let locationByUpdateID = Dictionary(uniqueKeysWithValues: locations.map { ($0.updateID, $0) })
+        let locations = try await catalog.bookmarkLocations(
+            updateIDs: remoteFavorites.map(\.updateID))
+        let locationByUpdateID = Dictionary(
+            uniqueKeysWithValues: locations.map { ($0.updateID, $0) })
 
         for remoteFavorite in remoteFavorites {
             guard !pendingIDs.contains(remoteFavorite.publicCircleID),
-                  let location = locationByUpdateID[remoteFavorite.updateID]
+                let location = locationByUpdateID[remoteFavorite.updateID]
             else {
                 continue
             }
@@ -108,15 +146,16 @@ actor BookmarkSyncCoordinator {
                 subspace: location.subspace,
                 color: remoteFavorite.color,
                 memo: remoteFavorite.memo,
-                routeOrder: localByID[remoteFavorite.publicCircleID]?.routeOrder,
                 modifiedAt: Date(),
                 syncState: .synced
             )
             try await localStore.upsert(bookmark)
         }
 
-        for local in existingLocal where local.syncState == .synced && !remoteIDs.contains(local.publicCircleID) {
-            try await localStore.remove(eventNumber: eventNumber, publicCircleID: local.publicCircleID)
+        for local in existingLocal
+        where local.syncState == .synced && !remoteIDs.contains(local.publicCircleID) {
+            try await localStore.remove(
+                eventNumber: eventNumber, publicCircleID: local.publicCircleID)
         }
 
         let pendingChanges = try await localStore.pendingChanges(eventNumber: eventNumber)
@@ -124,7 +163,8 @@ actor BookmarkSyncCoordinator {
             switch bookmark.syncState {
             case .pendingDelete:
                 try await remoteStore.delete(publicCircleID: bookmark.publicCircleID)
-                try await localStore.remove(eventNumber: eventNumber, publicCircleID: bookmark.publicCircleID)
+                try await localStore.remove(
+                    eventNumber: eventNumber, publicCircleID: bookmark.publicCircleID)
             case .pendingUpsert:
                 if remoteIDs.contains(bookmark.publicCircleID) {
                     try await remoteStore.update(bookmark)
@@ -138,32 +178,46 @@ actor BookmarkSyncCoordinator {
                 break
             }
         }
+
+        if let serviceFavoriteSync {
+            let synchronized = try await localStore.allBookmarks(eventNumber: eventNumber)
+            try await serviceFavoriteSync.synchronizeFavorites(
+                eventNumber: eventNumber,
+                bookmarks: synchronized
+            )
+        }
     }
+
+    #if DEBUG
+        func syncQueueSnapshot() -> (requested: UInt64, completed: UInt64, isRunning: Bool) {
+            (requestedRevision, completedRevision, worker != nil)
+        }
+    #endif
 }
 
 #if DEBUG
-actor FixtureFavoriteRemoteStore: FavoriteRemoteStoring {
-    private var stored: [Int: RemoteFavorite] = [:]
+    actor FixtureFavoriteRemoteStore: FavoriteRemoteStoring {
+        private var stored: [Int: RemoteFavorite] = [:]
 
-    func favorites(eventID: Int) async throws -> [RemoteFavorite] {
-        Array(stored.values)
-    }
+        func favorites(eventID: Int) async throws -> [RemoteFavorite] {
+            Array(stored.values)
+        }
 
-    func add(_ bookmark: MapBookmark) async throws {
-        stored[bookmark.publicCircleID] = RemoteFavorite(
-            publicCircleID: bookmark.publicCircleID,
-            updateID: bookmark.updateID ?? bookmark.catalogCircleID,
-            color: bookmark.color,
-            memo: bookmark.memo
-        )
-    }
+        func add(_ bookmark: MapBookmark) async throws {
+            stored[bookmark.publicCircleID] = RemoteFavorite(
+                publicCircleID: bookmark.publicCircleID,
+                updateID: bookmark.updateID ?? bookmark.catalogCircleID,
+                color: bookmark.color,
+                memo: bookmark.memo
+            )
+        }
 
-    func update(_ bookmark: MapBookmark) async throws {
-        try await add(bookmark)
-    }
+        func update(_ bookmark: MapBookmark) async throws {
+            try await add(bookmark)
+        }
 
-    func delete(publicCircleID: Int) async throws {
-        stored[publicCircleID] = nil
+        func delete(publicCircleID: Int) async throws {
+            stored[publicCircleID] = nil
+        }
     }
-}
 #endif

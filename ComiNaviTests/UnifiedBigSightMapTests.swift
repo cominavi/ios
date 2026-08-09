@@ -1,9 +1,60 @@
 import CoreGraphics
 import SpriteKit
 import XCTest
+
 @testable import ComiNavi
 
 final class UnifiedBigSightMapTests: XCTestCase {
+    @MainActor
+    func testSelectionFavoriteAndSearchOverlaysStayVisibleAtOverviewZoom() throws {
+        let campus = makeSingleVenueCampus()
+        let venue = try XCTUnwrap(campus.venues.first)
+        let table = try XCTUnwrap(venue.scene.tables.first)
+        let renderer = UnifiedBigSightScene(campus: campus)
+        renderer.reduceMotion = true
+        let bookmark = MapBookmark(
+            eventNumber: 108,
+            publicCircleID: 100,
+            catalogCircleID: 7,
+            updateID: 70,
+            day: 1,
+            mapID: venue.id,
+            tableID: table.id,
+            subspace: 0,
+            color: .orange,
+            memo: "",
+            modifiedAt: .now,
+            syncState: .synced
+        )
+
+        renderer.update(
+            campus: campus,
+            scope: .venue,
+            selectedMapID: venue.id,
+            selectedTableID: table.id,
+            circlePlacements: [],
+            circleArtwork: [:],
+            searchMatches: [
+                CatalogMapSearchMatch(
+                    id: 7,
+                    tableID: table.id,
+                    subspace: 0,
+                    circleName: "一年戦争",
+                    penName: "武田"
+                )
+            ],
+            searchActive: true,
+            genrePlacements: [],
+            bookmarks: [bookmark],
+            locatedUser: nil
+        )
+
+        XCTAssertLessThan(renderer.zoomFactor, 9)
+        XCTAssertTrue(renderer.isPersistentOverlayVisible)
+        XCTAssertGreaterThanOrEqual(renderer.persistentOverlayShapeCount, 3)
+        XCTAssertEqual(renderer.baseMapAlpha, 0.18, accuracy: 0.001)
+        XCTAssertTrue(renderer.areMapIconsHiddenForSearch)
+    }
     func testAllComiNaviBigSightSVGsCompileAsImageAssets() {
         for icon in BigSightMapIcon.allCases {
             guard let assetName = icon.assetName else { continue }
@@ -38,7 +89,8 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
         XCTAssertEqual(east.japanese, "東")
         XCTAssertEqual(east.english, "EAST")
-        XCTAssertEqual(east.color, .init(red: 216.0 / 255.0, green: 11.0 / 255.0, blue: 42.0 / 255.0))
+        XCTAssertEqual(
+            east.color, .init(red: 216.0 / 255.0, green: 11.0 / 255.0, blue: 42.0 / 255.0))
 
         XCTAssertEqual(west.japanese, "西")
         XCTAssertEqual(west.english, "WEST")
@@ -63,6 +115,62 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertEqual(scenePoint.x, 173.25, accuracy: 0.000_1)
         XCTAssertEqual(scenePoint.y, 84.5, accuracy: 0.000_1)
         XCTAssertEqual(UnifiedMapProjection.campusPoint(fromScene: scenePoint), campusPoint)
+    }
+
+    func testCampusBoundaryAllowsOneHundredAdditionalMetersNorth() throws {
+        let hall = UFDSchema.DayHall(
+            id: "east-123",
+            name: "東123",
+            mapName: "E123",
+            externalMapId: 1,
+            externalCorrespondingFloorId: 1,
+            areas: []
+        )
+        let scene = CatalogMapScene(
+            id: .init(day: 1, mapID: 1),
+            name: "E123",
+            size: CGSize(width: 4_680, height: 1_680),
+            tableSize: CGSize(width: 40, height: 40),
+            tables: []
+        )
+        let campus = try XCTUnwrap(
+            BigSightCampusLayout.make(
+                eventNumber: 104,
+                day: 1,
+                halls: [hall],
+                scenes: [1: scene]
+            )
+        )
+
+        var occupiedBounds = try XCTUnwrap(campus.venues.first).bounds
+        for point in campus.connections.flatMap(\.points) {
+            occupiedBounds = occupiedBounds.union(
+                CGRect(x: point.x, y: point.y, width: 1, height: 1)
+            )
+        }
+        for point in campus.openStreetMapFeatures.flatMap(\.points) {
+            occupiedBounds = occupiedBounds.union(
+                CGRect(x: point.x, y: point.y, width: 1, height: 1)
+            )
+        }
+        for facility in campus.facilities {
+            occupiedBounds = occupiedBounds.union(
+                CGRect(x: facility.center.x, y: facility.center.y, width: 1, height: 1)
+            )
+        }
+        let standardBounds = occupiedBounds.insetBy(
+            dx: -BigSightCampusLayout.mapBoundaryPaddingMeters,
+            dy: -BigSightCampusLayout.mapBoundaryPaddingMeters
+        )
+
+        XCTAssertEqual(campus.bounds.minX, standardBounds.minX, accuracy: 0.001)
+        XCTAssertEqual(campus.bounds.maxX, standardBounds.maxX, accuracy: 0.001)
+        XCTAssertEqual(campus.bounds.maxY, standardBounds.maxY, accuracy: 0.001)
+        XCTAssertEqual(
+            campus.bounds.minY,
+            standardBounds.minY - BigSightCampusLayout.additionalNorthBoundaryMeters,
+            accuracy: 0.001
+        )
     }
 
     @MainActor
@@ -102,12 +210,13 @@ final class UnifiedBigSightMapTests: XCTestCase {
             tableSize: CGSize(width: 40, height: 40),
             tables: []
         )
-        let campus = try XCTUnwrap(BigSightCampusLayout.make(
-            eventNumber: 104,
-            day: 1,
-            halls: [hall],
-            scenes: [1: scene]
-        ))
+        let campus = try XCTUnwrap(
+            BigSightCampusLayout.make(
+                eventNumber: 104,
+                day: 1,
+                halls: [hall],
+                scenes: [1: scene]
+            ))
 
         XCTAssertEqual(
             UnifiedBigSightScene(campus: campus).openStreetMapFeatureNodeCount,
@@ -136,7 +245,8 @@ final class UnifiedBigSightMapTests: XCTestCase {
             frame: CGRect(x: 0, y: 0, width: 390, height: 844),
             appearance: .light
         )
-        XCTAssertEqual(host.basemapView.styleURL?.absoluteString, "https://americanamap.org/style.json")
+        XCTAssertEqual(
+            host.basemapView.styleURL?.absoluteString, "https://americanamap.org/style.json")
 
         host.updateAppearance(.dark)
 
@@ -333,7 +443,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
             selectedMapID: 1,
             selectedTableID: nil,
             circlePlacements: [
-                CatalogMapCirclePlacement(circleID: 7, tableID: table.id, subspace: 0),
+                CatalogMapCirclePlacement(circleID: 7, tableID: table.id, subspace: 0)
             ],
             circleArtwork: [7: image],
             searchMatches: [],
@@ -349,7 +459,9 @@ final class UnifiedBigSightMapTests: XCTestCase {
             in: CGSize(width: 40, height: 20),
             orientation: .aBottom
         )
-        XCTAssertEqual(sprite.size.width, expected.imageSize.width * venue.metersPerMapPoint, accuracy: 0.000_001)
+        XCTAssertEqual(
+            sprite.size.width, expected.imageSize.width * venue.metersPerMapPoint,
+            accuracy: 0.000_001)
         XCTAssertEqual(
             sprite.size.height,
             expected.imageSize.height * venue.verticalMetersPerMapPoint,
@@ -561,7 +673,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
         let pivot = CGPoint(x: host.bounds.midX, y: host.bounds.midY)
         renderer.rotate(by: .pi / 4, around: pivot, in: host.mapView)
         host.updateCompass(rotation: renderer.cameraRotation)
-        XCTAssertTrue(host.compassButton.displaysNorthLabel)
+        XCTAssertTrue(host.compassButton.usesTwoToneNeedle)
 
         let center = renderer.cameraCampusCenter
         let north = CGPoint(
@@ -682,23 +794,14 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
-    func testDestinationRouteAndMarkerRemainVisibleOnUnifiedCampusMap() async throws {
+    func testDestinationMarkerRemainsVisibleOnUnifiedCampusMap() async throws {
         let campus = makeSingleVenueCampus()
         let venue = try XCTUnwrap(campus.venues.first)
         let table = try XCTUnwrap(venue.scene.tables.first)
-        let destination = WhereAmIResolver.navigationDestination(
+        let destination = WhereAmIResolver.destination(
             at: table,
             in: WhereAmIVenueOption(displayName: "Test Hall", placement: venue),
             selectedAt: Date(timeIntervalSince1970: 300)
-        )
-        let destinationPoint = destination.point.applying(venue.transform)
-        let route = BigSightNavigationRoute(
-            points: [
-                CGPoint(x: destinationPoint.x - 30, y: destinationPoint.y - 20),
-                destinationPoint,
-            ],
-            distanceMeters: 38,
-            usesFallback: false
         )
         let renderer = UnifiedBigSightScene(campus: campus)
         renderer.reduceMotion = true
@@ -718,13 +821,12 @@ final class UnifiedBigSightMapTests: XCTestCase {
             genrePlacements: [],
             bookmarks: [],
             locatedUser: nil,
-            navigationDestination: destination,
-            navigationRoute: route
+            destination: destination
         )
 
-        XCTAssertEqual(renderer.navigationRouteNodeCount, 1)
         XCTAssertEqual(renderer.destinationMarkerCount, 1)
-        XCTAssertTrue(renderer.accessibilitySummary.contains("destination \(destination.spaceCode)"))
+        XCTAssertTrue(
+            renderer.accessibilitySummary.contains("destination \(destination.spaceCode)"))
     }
 
     @MainActor
@@ -754,7 +856,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
                     subspace: 0,
                     genreID: 1,
                     genreName: "Test Genre"
-                ),
+                )
             ],
             bookmarks: [],
             locatedUser: nil
@@ -765,6 +867,28 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertLessThan(renderer.zoomFactor, 9)
         XCTAssertEqual(renderer.genreOverlayNodeCount, 1)
         XCTAssertTrue(renderer.isGenreOverlayVisible)
+    }
+
+    @MainActor
+    func testTappingAnAlreadyOpenVenueNeverRequestsFitAgain() async throws {
+        let campus = makeSingleVenueCampus()
+        let venue = try XCTUnwrap(campus.venues.first)
+        let renderer = UnifiedBigSightScene(campus: campus)
+        renderer.reduceMotion = true
+        let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        view.presentScene(renderer)
+        try await Task.sleep(for: .milliseconds(30))
+
+        renderer.requestVenue(venue.id)
+        try await Task.sleep(for: .milliseconds(30))
+        let hit = renderer.hit(
+            at: CGPoint(x: view.bounds.midX, y: view.bounds.midY),
+            in: view
+        )
+
+        if case .venue = hit {
+            XCTFail("An open venue must not turn a detail-level tap into a fit-to-venue action.")
+        }
     }
 
     @MainActor
@@ -782,12 +906,14 @@ final class UnifiedBigSightMapTests: XCTestCase {
         )
         renderer.didFinishUpdate()
 
-        XCTAssertTrue(renderer.venueMarkerRotations.allSatisfy {
-            abs($0 - renderer.cameraRotation) < 0.000_001
-        })
-        XCTAssertTrue(renderer.blockLabelRotations.allSatisfy {
-            abs($0 - renderer.cameraRotation) < 0.000_001
-        })
+        XCTAssertTrue(
+            renderer.venueMarkerRotations.allSatisfy {
+                abs($0 - renderer.cameraRotation) < 0.000_001
+            })
+        XCTAssertTrue(
+            renderer.blockLabelRotations.allSatisfy {
+                abs($0 - renderer.cameraRotation) < 0.000_001
+            })
         let screenRightVectors = renderer.venueMarkerScreenRightVectors(in: view)
         XCTAssertFalse(screenRightVectors.isEmpty)
         for vector in screenRightVectors {
@@ -896,13 +1022,14 @@ final class UnifiedBigSightMapTests: XCTestCase {
         )
         for venue in campus.venues {
             let artwork = try XCTUnwrap(venue.scene.artwork)
-            let filename = switch venue.kind {
-            case .east123: "E123"
-            case .east456: "E456"
-            case .east7: "E7"
-            case .west: "W12"
-            case .south: "S12"
-            }
+            let filename =
+                switch venue.kind {
+                case .east123: "E123"
+                case .east456: "E456"
+                case .east7: "E7"
+                case .west: "W12"
+                case .south: "S12"
+                }
             XCTAssertEqual(artwork.pixelSize, venue.scene.size)
             XCTAssertEqual(artwork.image.width, Int(venue.scene.size.width))
             XCTAssertEqual(artwork.image.height, Int(venue.scene.size.height))
@@ -924,7 +1051,8 @@ final class UnifiedBigSightMapTests: XCTestCase {
             subspace: 1,
             mapID: campusVenue.id
         )
-        XCTAssertNotNil(campusLocation, "Campus long press should create a location before venue selection")
+        XCTAssertNotNil(
+            campusLocation, "Campus long press should create a location before venue selection")
         model.showCampus()
 
         let renderer = UnifiedBigSightScene(campus: campus)
@@ -981,6 +1109,32 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
+    func testSelectingSecondCircleTargetsBookmarkAction() async throws {
+        let model = MapScreenModel.fixture()
+        model.load()
+        try await waitUntilReady(model)
+
+        let scene = try XCTUnwrap(model.scene)
+        let table = try XCTUnwrap(scene.tables.first)
+        model.select(table: table, preferredSubspace: 0)
+        try await waitUntil { model.selection?.isLoading == false }
+
+        let circles = try XCTUnwrap(model.selection?.circles)
+        let circleA = try XCTUnwrap(circles.first { $0.subspace == 0 })
+        let circleB = try XCTUnwrap(circles.first { $0.subspace == 1 })
+        XCTAssertEqual(model.selection?.selectedCircleID, circleA.id)
+
+        model.select(circle: circleB)
+        model.toggleBookmark()
+
+        XCTAssertEqual(model.selection?.selectedCircleID, circleB.id)
+        let bookmark = try XCTUnwrap(model.bookmark(for: circleB))
+        XCTAssertEqual(bookmark.catalogCircleID, circleB.id)
+        XCTAssertEqual(bookmark.subspace, circleB.subspace)
+        XCTAssertNil(model.bookmark(for: circleA))
+    }
+
+    @MainActor
     private func waitUntilReady(
         _ model: MapScreenModel,
         timeout: Duration = .seconds(10)
@@ -991,6 +1145,19 @@ final class UnifiedBigSightMapTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
         XCTAssertEqual(model.phase, .ready)
+    }
+
+    @MainActor
+    private func waitUntil(
+        timeout: Duration = .seconds(3),
+        _ condition: () -> Bool
+    ) async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while !condition(), clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(condition())
     }
 
     private func makeSingleVenueCampus() -> BigSightCampusScene {
@@ -1005,7 +1172,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
                     blockName: "A",
                     origin: CGPoint(x: 100, y: 100),
                     orientation: .aLeft
-                ),
+                )
             ]
         )
         let venue = BigSightVenuePlacement(
@@ -1059,15 +1226,17 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     private func makeImage(width: Int, height: Int) -> CGImage? {
-        guard let context = CGContext(
-            data: nil,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: width * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
+        guard
+            let context = CGContext(
+                data: nil,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else { return nil }
         context.setFillColor(CGColor(gray: 1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         return context.makeImage()

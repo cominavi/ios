@@ -80,6 +80,7 @@ struct CatalogEventDayBanner: View {
     let selectedDay: Int
     let action: () -> Void
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ScaledMetric(relativeTo: .body) private var minimumHeight = 54.0
 
     private var selectedDate: Date? {
@@ -89,44 +90,48 @@ struct CatalogEventDayBanner: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.headline.weight(.semibold))
+            HStack(spacing: 11) {
+                LucideIcon("calendar.badge.clock")
+                    .font(.callout.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
                     .frame(width: 30, height: 30)
-                    .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 8))
+                    .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 9))
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(primaryLabel)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
+                        .lineLimit(1)
 
                     if let selectedDate {
                         Text(
                             selectedDate,
                             format: CatalogDateFormatting.abbreviated(for: selectedDate)
                         )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                     }
                 }
 
                 Spacer(minLength: 8)
 
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption.weight(.bold))
+                LucideIcon("chevron.up.chevron.down")
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 13)
             .frame(maxWidth: .infinity, minHeight: minimumHeight)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .background(.bar)
-        .overlay(alignment: .bottom) {
-            Divider()
+        .frame(maxWidth: horizontalSizeClass == .regular ? 280 : .infinity, alignment: .leading)
+        .background(.regularMaterial, in: .rect(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
         }
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint("Change event day or Comiket")
@@ -192,7 +197,7 @@ struct CatalogEventDaySheet: View {
 
     private var sheetSummary: some View {
         HStack(spacing: 14) {
-            Image(systemName: "calendar.badge.clock")
+            LucideIcon("calendar.badge.clock")
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(Color.accentColor)
                 .frame(width: 46, height: 46)
@@ -226,7 +231,7 @@ struct CatalogEventDaySheet: View {
                 CatalogEventSelectionView(catalogLibrary: catalogLibrary)
             } label: {
                 HStack(spacing: 14) {
-                    Image(systemName: "externaldrive")
+                    LucideIcon("externaldrive")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 30)
@@ -243,7 +248,7 @@ struct CatalogEventDaySheet: View {
 
                     Spacer(minLength: 8)
 
-                    Image(systemName: "chevron.forward")
+                    LucideIcon("chevron.forward")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
@@ -410,7 +415,7 @@ private struct CatalogSettingRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                Image(systemName: systemImage)
+                LucideIcon(systemImage)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                     .frame(width: 30)
@@ -430,7 +435,7 @@ private struct CatalogSettingRow: View {
                 Spacer(minLength: 8)
 
                 if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
+                    LucideIcon("checkmark.circle.fill")
                         .font(.title3)
                         .foregroundStyle(Color.accentColor)
                         .accessibilityHidden(true)

@@ -4,6 +4,7 @@ import GRDB
 actor MapCatalogIndex {
     private enum MetadataKey {
         static let catalogDigest = "catalogDigest"
+        static let searchFormatVersion = 2
     }
 
     private struct SourceCircle: Sendable {
@@ -34,7 +35,7 @@ actor MapCatalogIndex {
         catalogDigest: String
     ) throws {
         self.sourceDatabase = sourceDatabase
-        self.catalogDigest = catalogDigest
+        self.catalogDigest = "\(catalogDigest):search-v\(MetadataKey.searchFormatVersion)"
         database = try DatabasePool(path: cacheDatabasePath)
 
         var migrator = DatabaseMigrator()
@@ -115,12 +116,15 @@ actor MapCatalogIndex {
         }
     }
 
-    func search(day: Int, mapID: Int, query: String) async throws -> [CatalogMapSearchMatch] {
-        let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
-        guard !terms.isEmpty else { return [] }
+    func search(
+        day: Int,
+        mapID: Int,
+        normalizedTerms: [String]
+    ) async throws -> [CatalogMapSearchMatch] {
+        guard !normalizedTerms.isEmpty else { return [] }
         try await prepareIfNeeded()
 
-        let matchExpression = terms
+        let matchExpression = normalizedTerms
             .map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"" }
             .joined(separator: " AND ")
 
@@ -279,7 +283,12 @@ actor MapCatalogIndex {
                         circle.circleName,
                         circle.circleKana,
                         circle.penName,
-                        circle.description,
+                        JapaneseSearchNormalizer.searchableText([
+                            circle.circleName,
+                            circle.circleKana,
+                            circle.penName,
+                            circle.description,
+                        ]),
                     ])
                 }
                 try database.execute(

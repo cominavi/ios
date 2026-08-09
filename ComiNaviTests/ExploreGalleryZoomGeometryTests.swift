@@ -39,6 +39,48 @@ final class ExploreGalleryZoomGeometryTests: XCTestCase {
         XCTAssertEqual(ExploreGalleryZoomGeometry.nearestColumnLevel(to: 2.6), 3)
     }
 
+    func testInitialDensityAdaptsToEffectiveContainerWidth() {
+        XCTAssertEqual(
+            ExploreGalleryZoomGeometry.preferredInitialColumnCount(for: 390),
+            2
+        )
+        XCTAssertEqual(
+            ExploreGalleryZoomGeometry.preferredInitialColumnCount(for: 744),
+            3
+        )
+        XCTAssertEqual(
+            ExploreGalleryZoomGeometry.preferredInitialColumnCount(for: 1_366),
+            4
+        )
+    }
+
+    func testPlaceholderPhaseKeepsTheAnchoredItemInItsTargetColumn() {
+        XCTAssertEqual(
+            ExploreGalleryZoomGeometry.leadingPlaceholderCount(
+                aligningItemAtIndex: 7,
+                with: 2,
+                columns: 5
+            ),
+            0
+        )
+        XCTAssertEqual(
+            ExploreGalleryZoomGeometry.leadingPlaceholderCount(
+                aligningItemAtIndex: 7,
+                with: 3,
+                columns: 5
+            ),
+            1
+        )
+        XCTAssertEqual(
+            ExploreGalleryZoomGeometry.leadingPlaceholderCount(
+                aligningItemAtIndex: 8,
+                with: 2,
+                columns: 5
+            ),
+            4
+        )
+    }
+
     func testAnchoredOffsetKeepsTheSamePointUnderTheGestureOrigin() {
         let itemFrame = CGRect(x: 180, y: 760, width: 120, height: 230)
         let itemUnitPoint = CGPoint(x: 0.25, y: 0.7)

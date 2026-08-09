@@ -6,7 +6,6 @@ enum CatalogDataMode: String, CaseIterable, Hashable, Sendable {
 
     #if DEBUG || COMINAVI_STAGING
     case demo
-    case crawl
     #endif
 
     var displayName: String {
@@ -16,8 +15,6 @@ enum CatalogDataMode: String, CaseIterable, Hashable, Sendable {
         #if DEBUG || COMINAVI_STAGING
         case .demo:
             String(localized: "Demo data")
-        case .crawl:
-            String(localized: "Crawl data")
         #endif
         }
     }
@@ -29,8 +26,6 @@ enum CatalogDataMode: String, CaseIterable, Hashable, Sendable {
         #if DEBUG || COMINAVI_STAGING
         case .demo:
             String(localized: "Opens the bundled C104 catalog without a network connection.")
-        case .crawl:
-            String(localized: "Opens the bundled C108 placement catalog with crawled X and shinagaki data.")
         #endif
         }
     }
@@ -230,58 +225,6 @@ struct DemoCatalogSource: CatalogSource {
     }
 }
 
-struct CrawlCatalogSource: CatalogSource {
-    static let c108 = CatalogEvent(id: 230, number: 108)
-
-    let mode = CatalogDataMode.crawl
-    private let resourceDirectory: URL?
-
-    init(resourceDirectory: URL? = nil) {
-        self.resourceDirectory = resourceDirectory
-    }
-
-    func availableEvents() async throws -> [CatalogEvent] {
-        [Self.c108]
-    }
-
-    func configuration(for event: CatalogEvent) async throws -> CatalogDataSourceConfiguration {
-        guard event == Self.c108 else {
-            throw CatalogLibraryError.crawlEventUnavailable
-        }
-
-        let mainURL = try resourceURL(named: "crawl-c108-main.sqlite")
-        let imageURL = try resourceURL(named: "crawl-c108-images.sqlite")
-        let enrichmentURL = try resourceURL(named: "crawl-c108-shinagaki.json")
-        return CatalogDataSourceConfiguration(
-            eventID: event.id,
-            eventNumber: event.number,
-            main: .init(
-                digest: "998afda25c3f53aa870b025de480a55aa5707106478aef81d1fa96eab05d9add",
-                origin: .local(mainURL)
-            ),
-            image: .init(
-                digest: "56bfc2aa56a8cd1ac606de2d890d96ce46f439b69eb704f4a06197c0afd25e64",
-                origin: .local(imageURL)
-            ),
-            enrichment: CatalogEnrichmentConfiguration(
-                resourceURL: enrichmentURL,
-                isRequired: true
-            ),
-            allowsBookmarkSync: false,
-            allowsRemoteMetadata: false
-        )
-    }
-
-    private func resourceURL(named name: String) throws -> URL {
-        guard let url = CatalogResourceLocator.url(
-            named: name,
-            resourceDirectory: resourceDirectory
-        ) else {
-            throw CatalogLibraryError.missingCrawlResource(name)
-        }
-        return url
-    }
-}
 #endif
 
 private enum CatalogResourceLocator {
@@ -342,7 +285,6 @@ final class CatalogLibrary {
         ]
         #if DEBUG || COMINAVI_STAGING
         sources[.demo] = DemoCatalogSource()
-        sources[.crawl] = CrawlCatalogSource()
         #endif
         self.sources = sources
         self.defaults = defaults
@@ -552,11 +494,6 @@ final class CatalogLibrary {
         {
             return .demo
         }
-        if ProcessInfo.processInfo.arguments.contains("-cominavi-crawl-data"),
-           availableModes.contains(.crawl)
-        {
-            return .crawl
-        }
         #endif
 
         let key = "CatalogLibrary.mode.\(AppEnvironment.current.storageNamespace)"
@@ -575,8 +512,6 @@ enum CatalogLibraryError: LocalizedError {
     case invalidDatabaseURL
     case demoEventUnavailable
     case missingDemoDatabase(String)
-    case crawlEventUnavailable
-    case missingCrawlResource(String)
 
     var errorDescription: String? {
         switch self {
@@ -589,12 +524,6 @@ enum CatalogLibraryError: LocalizedError {
         case .missingDemoDatabase(let name):
             String(
                 localized: "The demo catalog is missing \(name). Run Scripts/prepare-demo-catalog.sh before building."
-            )
-        case .crawlEventUnavailable:
-            String(localized: "This event is not included in the crawl catalog.")
-        case .missingCrawlResource(let name):
-            String(
-                localized: "The crawl catalog is missing \(name). Run Scripts/prepare-crawl-catalog.sh before building."
             )
         }
     }

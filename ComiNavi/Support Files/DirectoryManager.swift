@@ -33,7 +33,7 @@ struct EventStorageShard: Hashable, Sendable {
         let legacyDirectory = legacyDirectory(in: eventsDirectory)
         let directory = directory(in: eventsDirectory)
         guard fileManager.fileExists(atPath: legacyDirectory.path),
-              !fileManager.fileExists(atPath: directory.path)
+            !fileManager.fileExists(atPath: directory.path)
         else {
             return directory
         }
@@ -67,7 +67,8 @@ final class DirectoryManager: Sendable {
         let fileManager = FileManager.default
         if !fileManager.fileExists(atPath: url.path) {
             do {
-                try fileManager.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
+                try fileManager.createDirectory(
+                    at: url, withIntermediateDirectories: true, attributes: nil)
             } catch {
                 print("Error creating directory at \(url.path): \(error)")
             }
@@ -93,7 +94,8 @@ final class DirectoryManager: Sendable {
     }
 
     var environmentCachesDirectory: URL {
-        let url = cachesDirectory
+        let url =
+            cachesDirectory
             .appendingPathComponent("environments", isDirectory: true)
             .appendingPathComponent(AppEnvironment.current.build.rawValue, isDirectory: true)
             .appendingPathComponent(AppEnvironment.current.circlems.rawValue, isDirectory: true)
@@ -102,7 +104,8 @@ final class DirectoryManager: Sendable {
     }
 
     var environmentApplicationSupportDirectory: URL {
-        let url = applicationSupportDirectory
+        let url =
+            applicationSupportDirectory
             .appendingPathComponent("environments", isDirectory: true)
             .appendingPathComponent(AppEnvironment.current.build.rawValue, isDirectory: true)
             .appendingPathComponent(AppEnvironment.current.circlems.rawValue, isDirectory: true)
@@ -111,7 +114,8 @@ final class DirectoryManager: Sendable {
     }
 
     var applicationSupportDirectory: URL {
-        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first!
         createDirectoryIfNeeded(at: url)
         return url
     }
@@ -123,7 +127,7 @@ final class DirectoryManager: Sendable {
     }
 
     // --
-    
+
     func cachesFor(eventID: Int, comiketId: String) -> URL {
         let url = eventDirectory(
             in: environmentCachesDirectory,
@@ -146,8 +150,8 @@ final class DirectoryManager: Sendable {
             eventID: eventID,
             comiketId: comiketId
         )
-            .appendingPathComponent(scope.rawValue, isDirectory: true)
-            .appendingPathComponent(type.rawValue, isDirectory: true)
+        .appendingPathComponent(scope.rawValue, isDirectory: true)
+        .appendingPathComponent(type.rawValue, isDirectory: true)
         if createIfNeeded {
             createDirectoryIfNeeded(at: url)
         }
@@ -170,8 +174,8 @@ final class DirectoryManager: Sendable {
             eventID: eventID,
             comiketId: comiketId
         )
-            .appendingPathComponent("users", isDirectory: true)
-            .appendingPathComponent("user-\(userID)", isDirectory: true)
+        .appendingPathComponent("users", isDirectory: true)
+        .appendingPathComponent("user-\(userID)", isDirectory: true)
         createDirectoryIfNeeded(at: url)
         return url
     }
@@ -186,7 +190,7 @@ final class DirectoryManager: Sendable {
             return try shard.resolveDirectory(in: eventsDirectory)
         } catch {
             // If migration cannot complete, keep using the legacy location. This is
-            // especially important for user-authored route plans, which are not caches.
+            // especially important for user-authored favorites, which are not caches.
             NSLog("Could not migrate legacy C\(comiketId) event shard: \(error)")
             let legacyDirectory = shard.legacyDirectory(in: eventsDirectory)
             if FileManager.default.fileExists(atPath: legacyDirectory.path) {

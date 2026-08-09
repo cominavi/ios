@@ -58,6 +58,29 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertEqual(model.visibleCircles.map(\.id), [1])
     }
 
+    func testSearchTreatsHiraganaAndKatakanaAsEquivalent() async {
+        let circle = makeExploreCircle(
+            id: 31,
+            day: 1,
+            genreID: 10,
+            name: "アイスココナステッカー",
+            penName: "カタカナ作家",
+            description: "オリジナル作品",
+            tags: ["ブルーアーカイブ"]
+        )
+        let model = ExploreModel(circles: [circle], selectedDay: 1)
+        await model.load()
+
+        model.searchQuery = "あいすここなすてっかー"
+        XCTAssertEqual(model.visibleCircles.map(\.id), [31])
+
+        model.searchQuery = "かたかな作家"
+        XCTAssertEqual(model.visibleCircles.map(\.id), [31])
+
+        model.searchQuery = "ぶるーあーかいぶ"
+        XCTAssertEqual(model.visibleCircles.map(\.id), [31])
+    }
+
     func testFacetsCountOnlyTheSelectedDay() async {
         let model = ExploreModel(circles: fixtures, selectedDay: 1)
         await model.load()
@@ -148,6 +171,75 @@ final class ExploreModelTests: XCTestCase {
 
         model.shinagakiFilter = .highConfidence
         XCTAssertEqual(model.visibleCircles.map(\.id), [2])
+    }
+
+    func testSpaceFilterDistinguishesCombinedABFromSingleSpaceCircles() async {
+        var combined = fixtures[0]
+        let secondHalf = makeExploreCircle(
+            id: 5,
+            day: 1,
+            genreID: 10,
+            name: combined.displayName,
+            penName: "Artist One",
+            description: "Illustration books",
+            tags: ["Action"]
+        )
+        combined.memberCircles = [combined.circle, secondHalf.circle]
+        let model = ExploreModel(circles: [combined, fixtures[1]], selectedDay: 1)
+        await model.load()
+
+        model.spaceFilter = .combinedAB
+        XCTAssertEqual(model.visibleCircles.map(\.id), [1])
+
+        model.spaceFilter = .singleSpace
+        XCTAssertEqual(model.visibleCircles.map(\.id), [2])
+    }
+
+    func testAttendanceFilterUsesConfirmedAndWithdrawalClaims() async {
+        let attending = makeExploreCircle(
+            id: 11,
+            day: 1,
+            genreID: 10,
+            name: "Attending",
+            penName: "Artist",
+            description: "Attending",
+            tags: [],
+            enrichment: makeEnrichment(
+                postID: "attending",
+                handle: "attending",
+                text: "参加します",
+                date: Date(timeIntervalSince1970: 100),
+                postConfidence: .high,
+                placementConfidence: .high,
+                attendanceClaims: [makeAttendanceClaim(id: "attending", status: .attending)]
+            )
+        )
+        let withdrawn = makeExploreCircle(
+            id: 12,
+            day: 1,
+            genreID: 10,
+            name: "Withdrawn",
+            penName: "Artist",
+            description: "Withdrawn",
+            tags: [],
+            enrichment: makeEnrichment(
+                postID: "withdrawn",
+                handle: "withdrawn",
+                text: "欠席します",
+                date: Date(timeIntervalSince1970: 200),
+                postConfidence: .high,
+                placementConfidence: .high,
+                attendanceClaims: [makeAttendanceClaim(id: "withdrawn", status: .withdrawn)]
+            )
+        )
+        let model = ExploreModel(circles: [attending, withdrawn], selectedDay: 1)
+        await model.load()
+
+        model.attendanceFilter = .attending
+        XCTAssertEqual(model.visibleCircles.map(\.id), [11])
+
+        model.attendanceFilter = .withdrawn
+        XCTAssertEqual(model.visibleCircles.map(\.id), [12])
     }
 
     func testLatestShinagakiSortKeepsCatalogOrderAsStableFallback() async {
@@ -427,7 +519,7 @@ final class ExploreModelTests: XCTestCase {
     func testCoverThumbnailDownsamplingCoversMixedSourceAspectsWithoutUpscaling() async throws {
         let targetPixelSize = ExploreLayoutMetrics
             .artworkPixelSize(width: 76, displayScale: 3)
-        XCTAssertEqual(targetPixelSize, ExploreArtworkPixelSize(width: 228, height: 325))
+        XCTAssertEqual(targetPixelSize, ExploreArtworkPixelSize(width: 228, height: 323))
 
         let sourceSizes = [
             ExploreArtworkPixelSize(width: 1_200, height: 800),
@@ -490,34 +582,7 @@ final class ExploreModelTests: XCTestCase {
                 width: 390,
                 displayScale: 3
             ),
-            ExploreArtworkPixelSize(width: 1_170, height: 1_664)
-        )
-    }
-
-    func testBundledCrawlModelLoadsDayOneCirclesAndShinagaki() async throws {
-        let configuration = try await CrawlCatalogSource().configuration(
-            for: CrawlCatalogSource.c108
-        )
-        let dataSource = CirclemsDataSource(configuration: configuration)
-
-        for _ in 0..<300 {
-            if dataSource.readiness == .ready { break }
-            if case .error(let message) = dataSource.readiness {
-                XCTFail("Crawl catalog failed to open: \(message)")
-                return
-            }
-            try await Task.sleep(for: .milliseconds(100))
-        }
-
-        let model = ExploreModel(dataSource: dataSource, selectedDay: 1)
-        await model.load()
-
-        XCTAssertEqual(model.selectedDayCircleCount, 11_518)
-        XCTAssertFalse(model.visibleCircles.isEmpty)
-        XCTAssertGreaterThan(model.shinagakiCircleCount, 0)
-        XCTAssertNotNil(
-            model.allCircles.first(where: { $0.id == 8_880 })?
-                .preferredCoverURL
+            ExploreArtworkPixelSize(width: 1_170, height: 1_655)
         )
     }
 
@@ -776,10 +841,11 @@ final class ExploreModelTests: XCTestCase {
         postConfidence: CatalogConfidence,
         placementConfidence: CatalogConfidence,
         media: [CatalogShinagakiMedia] = [],
-        tags: [CatalogEnrichmentTag] = []
+        tags: [CatalogEnrichmentTag] = [],
+        attendanceClaims: [CatalogAttendanceClaim] = []
     ) -> CatalogCircleEnrichment {
-        CatalogCircleEnrichment(posts: [
-            CatalogShinagakiPost(
+        CatalogCircleEnrichment(
+            posts: [CatalogShinagakiPost(
                 id: postID,
                 postURL: URL(string: "https://x.com/\(handle)/status/\(postID)")!,
                 text: text,
@@ -794,8 +860,32 @@ final class ExploreModelTests: XCTestCase {
                 placementConfidence: placementConfidence,
                 matchScore: 75,
                 matchReasons: []
-            ),
-        ])
+            )],
+            attendanceClaims: attendanceClaims
+        )
+    }
+
+    private func makeAttendanceClaim(
+        id: String,
+        status: CatalogAttendanceStatus
+    ) -> CatalogAttendanceClaim {
+        CatalogAttendanceClaim(
+            id: id,
+            status: status,
+            confidence: .high,
+            reasons: [],
+            policyID: "test",
+            postURL: URL(string: "https://x.com/test/status/\(id)")!,
+            text: id,
+            createdAt: Date(timeIntervalSince1970: 100),
+            authorHandle: "test",
+            authorName: nil,
+            matchingPolicyID: "test",
+            matchScore: 100,
+            matchReasons: [],
+            provenance: [],
+            matchedCircleProvenance: []
+        )
     }
 
     private func makeImageData(width: Int, height: Int) throws -> Data {

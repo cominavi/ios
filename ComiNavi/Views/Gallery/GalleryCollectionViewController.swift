@@ -104,7 +104,7 @@ class CircleCollectionViewCell: UICollectionViewCell {
         contentView.backgroundColor = .darkGray
 
         leftImageView = UIImageView()
-        leftImageView.contentMode = .scaleAspectFill
+        leftImageView.contentMode = .scaleAspectFit
         leftImageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(leftImageView)
 
@@ -313,8 +313,8 @@ class GalleryCollectionViewController: UIViewController, UICollectionViewDelegat
         self.navigationItem.titleView = titleView
 
 //        // add two right button items to navigation item that decreases/increases the number of columns
-//        let decreaseButton = UIBarButtonItem(image: UIImage(systemName: "minus"), style: .plain, target: self, action: #selector(increaseColumns))
-//        let increaseButton = UIBarButtonItem(image: UIImage(systemName: "plus"), style: .plain, target: self, action: #selector(decreaseColumns))
+//        let decreaseButton = UIBarButtonItem(image: LucideIcon.uiImage(for: "minus"), style: .plain, target: self, action: #selector(increaseColumns))
+//        let increaseButton = UIBarButtonItem(image: LucideIcon.uiImage(for: "plus"), style: .plain, target: self, action: #selector(decreaseColumns))
 //        self.navigationItem.rightBarButtonItems = [increaseButton, decreaseButton]
 
         searchController.obscuresBackgroundDuringPresentation = false
@@ -453,10 +453,10 @@ extension GalleryCollectionViewController {
 
     private func circleContextMenu(circle: CirclemsDataSchema.ComiketCircleWC) -> UIMenu {
         // Create "Add to Favorites" and "Show in Map"
-        let addToFavorites = UIAction(title: String(localized: "Add to Favorites", comment: "Gallery Preview Action: Add to Favorites"), image: UIImage(systemName: "star")) { _ in
+        let addToFavorites = UIAction(title: String(localized: "Add to Favorites", comment: "Gallery Preview Action: Add to Favorites"), image: LucideIcon.uiImage(for: "star")) { _ in
             // Add to favorites
         }
-        let showInMap = UIAction(title: String(localized: "Show in Map", comment: "Gallery Preview Action: Show in Map"), image: UIImage(systemName: "map")) { _ in
+        let showInMap = UIAction(title: String(localized: "Show in Map", comment: "Gallery Preview Action: Show in Map"), image: LucideIcon.uiImage(for: "map")) { _ in
             // Show in map
         }
         return UIMenu(title: String(localized: "Actions", comment: "Gallery Preview Action Title"), children: [addToFavorites, showInMap])

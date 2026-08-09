@@ -5,20 +5,34 @@
 //  Created by Galvin Gao on 9/13/24.
 //
 
-import Alamofire
 import CryptoKit
 import Foundation
 import GRDB
-import Gzip
 import Observation
+import zlib
 
 enum Readiness: Equatable {
     struct Progress: Equatable {
         var type: CirclemsDataSourceDatabaseType
         var totalBytes: Int64
         var completedBytes: Int64
+        var bytesPerSecond: Double?
+
+        init(
+            type: CirclemsDataSourceDatabaseType,
+            totalBytes: Int64,
+            completedBytes: Int64,
+            bytesPerSecond: Double? = nil
+        ) {
+            self.type = type
+            self.totalBytes = totalBytes
+            self.completedBytes = completedBytes
+            self.bytesPerSecond = bytesPerSecond
+        }
+
         var fractionCompleted: Double {
-            return Double(completedBytes) / Double(totalBytes)
+            guard totalBytes > 0 else { return completedBytes > 0 ? 1 : 0 }
+            return Swift.min(Swift.max(Double(completedBytes) / Double(totalBytes), 0), 1)
         }
     }
     
@@ -41,7 +55,27 @@ extension Readiness.Progresses {
     }
     
     var fractionCompleted: Double {
-        return Double(completedBytes) / Double(totalBytes)
+        guard totalBytes > 0 else { return completedBytes > 0 ? 1 : 0 }
+        return Swift.min(Swift.max(Double(completedBytes) / Double(totalBytes), 0), 1)
+    }
+
+    var bytesPerSecond: Double? {
+        let activeProgresses = filter { $0.completedBytes < $0.totalBytes }
+        guard !activeProgresses.isEmpty,
+              activeProgresses.allSatisfy({ ($0.bytesPerSecond ?? 0) > 0 })
+        else {
+            return nil
+        }
+        return activeProgresses.compactMap(\.bytesPerSecond).reduce(0, +)
+    }
+
+    var estimatedRemainingTime: TimeInterval? {
+        guard let bytesPerSecond, bytesPerSecond > 0 else { return nil }
+        let remainingBytes = reduce(Int64(0)) { partialResult, progress in
+            partialResult + Swift.max(progress.totalBytes - progress.completedBytes, 0)
+        }
+        guard remainingBytes > 0 else { return nil }
+        return Double(remainingBytes) / bytesPerSecond
     }
 }
 
@@ -99,7 +133,7 @@ struct CatalogDataSourceConfiguration: Equatable, Sendable {
     }
 }
 
-enum CirclemsDataSourceDatabaseType: String {
+enum CirclemsDataSourceDatabaseType: String, Equatable, Hashable, Sendable {
     case main
     case image
 
@@ -129,7 +163,11 @@ enum CirclemsDataSourceDatabaseType: String {
     }
 }
 
-struct CirclemsDataSourceDatabaseMetadata: Equatable {
+enum CirclemsDatabaseInstallationError: Error, Equatable, Sendable {
+    case integrityCheckFailed
+}
+
+struct CirclemsDataSourceDatabaseMetadata: Equatable, Sendable {
     var type: CirclemsDataSourceDatabaseType
     var digest: String
     var origin: CatalogDatabaseOrigin
@@ -157,9 +195,11 @@ final class CirclemsDataSource {
     static let SHOULD_CHECK_DATABASE_EXISTS = true
     
     private let databases: CirclemsDataSourceDatabases
+    private let databaseDownloader: ResumableCatalogDownload
     private let allowsBookmarkSync: Bool
     private let enrichmentIsRequired: Bool
     private let enrichmentStore: CatalogEnrichmentStore?
+    private let realtimeStore: CominaviRealtimeStore?
     let allowsRemoteMetadata: Bool
     
     private var sqliteMain: (any DatabaseReader)!
@@ -176,7 +216,10 @@ final class CirclemsDataSource {
     
     var readiness: Readiness = .uninitialized
     
-    init(configuration: CatalogDataSourceConfiguration) {
+    init(
+        configuration: CatalogDataSourceConfiguration,
+        databaseDownloader: ResumableCatalogDownload = .live
+    ) {
         let comiketId = String(configuration.eventNumber)
         self.eventID = configuration.eventID
         self.databases = CirclemsDataSourceDatabases(
@@ -203,12 +246,14 @@ final class CirclemsDataSource {
                 )
             )
         )
+        self.databaseDownloader = databaseDownloader
         self.allowsBookmarkSync = configuration.allowsBookmarkSync
         self.allowsRemoteMetadata = configuration.allowsRemoteMetadata
         enrichmentIsRequired = configuration.enrichment?.isRequired == true
         enrichmentStore = configuration.enrichment.map {
             CatalogEnrichmentStore(resourceURL: $0.resourceURL)
         }
+        realtimeStore = configuration.allowsBookmarkSync ? .shared : nil
         self.comiketId = comiketId
 
         let userID = AppData.userState.user?.userId ?? 0
@@ -358,7 +403,7 @@ final class CirclemsDataSource {
 
         for database in allDatabases {
             if database.isLocalResource {
-                try Self.validateDatabase(
+                try await Self.validateDatabaseOffMainActor(
                     at: URL(fileURLWithPath: database.localPath),
                     type: database.type
                 )
@@ -372,22 +417,23 @@ final class CirclemsDataSource {
             return
         }
         
-        self.readiness = .downloading(progresses: databasesToDownload.map { db in
+        let initialProgresses = databasesToDownload.map { db in
             Readiness.Progress(type: db.type, totalBytes: db.type.estimatedBytes, completedBytes: 0)
-        })
+        }
+        let progressTracker = DownloadProgressTracker(progresses: initialProgresses)
+        self.readiness = .downloading(progresses: initialProgresses)
 
         // parallel download
         try await withThrowingTaskGroup(of: Void.self) { group in
             for database in databasesToDownload {
                 group.addTask {
                     try await self.downloadDatabase(metadata: database) { [weak self] completedBytes, totalBytes in
-                        if case var .downloading(progresses) = self?.readiness {
-                            if let index = progresses.firstIndex(where: { $0.type == database.type }) {
-                                progresses[index].completedBytes = completedBytes
-                                progresses[index].totalBytes = totalBytes
-                                self?.readiness = .downloading(progresses: progresses)
-                            }
-                        }
+                        guard let progresses = progressTracker.record(
+                            type: database.type,
+                            completedBytes: completedBytes,
+                            totalBytes: totalBytes
+                        ) else { return }
+                        self?.readiness = .downloading(progresses: progresses)
                     }
                 }
             }
@@ -433,50 +479,57 @@ final class CirclemsDataSource {
         )
         let temporaryDatabaseURL = downloadDirectory
             .appendingPathComponent("\(metadata.type.rawValue)-\(UUID().uuidString).sqlite")
+        let checkpointURL = downloadCheckpointURL(
+            for: metadata,
+            in: downloadDirectory
+        )
         let digestKey = databaseDigestKey(for: metadata.type)
         
-        print("Downloading database from \(url) to \(metadata.localPath)...")
-        
-        let request = AF.download(url)
-            .downloadProgress { progress in
-                Task { @MainActor in
-                    progressHandler?(progress.completedUnitCount, progress.totalUnitCount)
-                }
-            }
-            .validate()
+        NSLog(
+            "Downloading \(metadata.type.rawValue) catalog database from \(url.host ?? "Circle.ms")"
+        )
 
         do {
-            // Alamofire's async serializer automatically cancels the request when
-            // the owning catalog task is cancelled during an event switch.
-            let data = try await request.serializingData().value
-            try Task.checkCancellation()
+            var didRetryFailedIntegrityCheck = false
+            while true {
+                let downloadedArchiveURL = try await databaseDownloader.download(
+                    from: url,
+                    checkpointURL: checkpointURL
+                ) { completedBytes, totalBytes in
+                    Task { @MainActor in
+                        progressHandler?(completedBytes, totalBytes)
+                    }
+                }
 
-            let downloadedDigest = Insecure.MD5.hash(data: data)
-                .map { String(format: "%02x", $0) }
-                .joined()
-            guard downloadedDigest.caseInsensitiveCompare(metadata.digest) == .orderedSame else {
-                throw NSError(
-                    domain: "CirclemsDataSource",
-                    code: 4,
-                    userInfo: [
-                        NSLocalizedDescriptionKey: String(
-                            localized: "The downloaded \(metadata.type.localizedName) database failed its integrity check."
-                        ),
-                    ]
-                )
+                do {
+                    try await Self.installDownloadedDatabase(
+                        archiveURL: downloadedArchiveURL,
+                        temporaryURL: temporaryDatabaseURL,
+                        destinationURL: URL(fileURLWithPath: metadata.localPath),
+                        expectedDigest: metadata.digest,
+                        type: metadata.type
+                    )
+
+                    UserDefaults.standard.set(metadata.digest, forKey: digestKey)
+                    return
+                } catch CirclemsDatabaseInstallationError.integrityCheckFailed {
+                    databaseDownloader.discardCheckpoint(at: checkpointURL)
+                    if !didRetryFailedIntegrityCheck {
+                        didRetryFailedIntegrityCheck = true
+                        continue
+                    }
+                    throw NSError(
+                        domain: "CirclemsDataSource",
+                        code: 4,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "The downloaded \(metadata.type.localizedName) database failed its integrity check."
+                            ),
+                        ]
+                    )
+                }
             }
-
-            let uncompressedData = try data.gunzipped()
-            try uncompressedData.write(to: temporaryDatabaseURL, options: .atomic)
-            try Self.validateDatabase(at: temporaryDatabaseURL, type: metadata.type)
-            try Self.installDatabase(
-                from: temporaryDatabaseURL,
-                to: URL(fileURLWithPath: metadata.localPath)
-            )
-
-            UserDefaults.standard.set(metadata.digest, forKey: digestKey)
         } catch {
-            try? FileManager.default.removeItem(at: temporaryDatabaseURL)
             if Task.isCancelled {
                 throw CancellationError()
             }
@@ -490,6 +543,185 @@ final class CirclemsDataSource {
                 ]
             )
         }
+    }
+
+    nonisolated static func installDownloadedDatabase(
+        archiveURL: URL,
+        temporaryURL: URL,
+        destinationURL: URL,
+        expectedDigest: String,
+        type: CirclemsDataSourceDatabaseType
+    ) async throws {
+        try await runDatabaseWorker {
+            let fileManager = FileManager.default
+            defer {
+                try? fileManager.removeItem(at: archiveURL)
+                try? fileManager.removeItem(at: temporaryURL)
+            }
+
+            let downloadedDigest = try md5Digest(of: archiveURL)
+            guard downloadedDigest.caseInsensitiveCompare(expectedDigest) == .orderedSame else {
+                throw CirclemsDatabaseInstallationError.integrityCheckFailed
+            }
+
+            try decompressGzipArchive(at: archiveURL, to: temporaryURL)
+            try Task.checkCancellation()
+            try validateDatabase(at: temporaryURL, type: type)
+            try Task.checkCancellation()
+            try installDatabase(from: temporaryURL, to: destinationURL)
+        }
+    }
+
+    nonisolated private static func validateDatabaseOffMainActor(
+        at url: URL,
+        type: CirclemsDataSourceDatabaseType
+    ) async throws {
+        try await runDatabaseWorker {
+            try validateDatabase(at: url, type: type)
+        }
+    }
+
+    nonisolated private static func runDatabaseWorker<Result: Sendable>(
+        _ operation: @escaping @Sendable () throws -> Result
+    ) async throws -> Result {
+        let worker = Task.detached(priority: .userInitiated) {
+            try autoreleasepool(invoking: operation)
+        }
+
+        return try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
+    }
+
+    nonisolated private static func md5Digest(of url: URL) throws -> String {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+
+        var digest = Insecure.MD5()
+        let bufferSize = 256 * 1024
+
+        while true {
+            try Task.checkCancellation()
+            let data = try autoreleasepool {
+                try handle.read(upToCount: bufferSize) ?? Data()
+            }
+            guard !data.isEmpty else { break }
+
+            digest.update(data: data)
+        }
+
+        return digest.finalize()
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    nonisolated private static func decompressGzipArchive(
+        at archiveURL: URL,
+        to outputURL: URL
+    ) throws {
+        guard hasGzipHeader(at: archiveURL) else {
+            throw gzipError(
+                code: Z_DATA_ERROR,
+                description: "The downloaded archive is not in gzip format."
+            )
+        }
+
+        guard let archive = gzopen(archiveURL.path, "rb") else {
+            throw gzipError(
+                code: Z_ERRNO,
+                description: "The downloaded archive could not be opened."
+            )
+        }
+
+        var didCloseArchive = false
+        defer {
+            if !didCloseArchive {
+                gzclose(archive)
+            }
+        }
+
+        let fileManager = FileManager.default
+        guard fileManager.createFile(atPath: outputURL.path, contents: nil) else {
+            throw CocoaError(
+                .fileWriteUnknown,
+                userInfo: [NSFilePathErrorKey: outputURL.path]
+            )
+        }
+
+        let output = try FileHandle(forWritingTo: outputURL)
+        var didCloseOutput = false
+        defer {
+            if !didCloseOutput {
+                try? output.close()
+            }
+        }
+
+        let bufferSize = 256 * 1024
+        let buffer = UnsafeMutableRawPointer.allocate(
+            byteCount: bufferSize,
+            alignment: MemoryLayout<UInt8>.alignment
+        )
+        defer { buffer.deallocate() }
+
+        while true {
+            try Task.checkCancellation()
+            let bytesRead = gzread(archive, buffer, UInt32(bufferSize))
+
+            if bytesRead > 0 {
+                try autoreleasepool {
+                    let data = Data(
+                        bytesNoCopy: buffer,
+                        count: Int(bytesRead),
+                        deallocator: .none
+                    )
+                    try output.write(contentsOf: data)
+                }
+                continue
+            }
+
+            if bytesRead < 0 {
+                var code: Int32 = Z_DATA_ERROR
+                let message = gzerror(archive, &code).map(String.init(cString:))
+                throw gzipError(
+                    code: code,
+                    description: message ?? "The downloaded archive could not be decompressed."
+                )
+            }
+
+            break
+        }
+
+        try output.synchronize()
+        try output.close()
+        didCloseOutput = true
+
+        let closeStatus = gzclose(archive)
+        didCloseArchive = true
+        guard closeStatus == Z_OK else {
+            throw gzipError(
+                code: closeStatus,
+                description: "The downloaded archive could not be decompressed."
+            )
+        }
+    }
+
+    nonisolated private static func hasGzipHeader(at url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        return (try? handle.read(upToCount: 2)) == Data([0x1f, 0x8b])
+    }
+
+    nonisolated private static func gzipError(
+        code: Int32,
+        description: String
+    ) -> NSError {
+        NSError(
+            domain: "CirclemsDataSource.Gzip",
+            code: Int(code),
+            userInfo: [NSLocalizedDescriptionKey: description]
+        )
     }
 
     nonisolated private static func validateDatabase(
@@ -567,6 +799,33 @@ final class CirclemsDataSource {
         "CirclemsDataSource.databaseDownloaded.gzippedDigest.\(AppEnvironment.current.storageNamespace).event-\(eventID).comiket-\(comiketId).\(type.rawValue)"
     }
 
+    private func downloadCheckpointURL(
+        for metadata: CirclemsDataSourceDatabaseMetadata,
+        in downloadDirectory: URL
+    ) -> URL {
+        let digestIdentifier = SHA256.hash(data: Data(metadata.digest.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        let fileName = "\(metadata.type.rawValue)-\(digestIdentifier).resume-data"
+        let checkpointURL = downloadDirectory.appendingPathComponent(fileName)
+
+        if let existingFiles = try? FileManager.default.contentsOfDirectory(
+            at: downloadDirectory,
+            includingPropertiesForKeys: nil
+        ) {
+            let prefix = "\(metadata.type.rawValue)-"
+            for fileURL in existingFiles
+            where fileURL.lastPathComponent.hasPrefix(prefix)
+                && fileURL.pathExtension == "resume-data"
+                && fileURL != checkpointURL
+            {
+                try? FileManager.default.removeItem(at: fileURL)
+            }
+        }
+
+        return checkpointURL
+    }
+
     private func initDatabaseConnections() async throws {
         // Initialize the SQLite databases
         var configuration = Configuration()
@@ -616,7 +875,8 @@ final class CirclemsDataSource {
                 eventID: eventID,
                 eventNumber: Int(comiketId) ?? 0,
                 catalog: mapCatalog,
-                localStore: userPlanStore
+                localStore: userPlanStore,
+                serviceFavoriteSync: CominaviServiceClient.shared
             )
         }
     }
@@ -763,6 +1023,17 @@ final class CirclemsDataSource {
         }
     }
 
+    func getCircle(circleID: Int) async -> CirclemsDataSchema.ComiketCircleWC? {
+        let comiketNumber = Int(comiketId) ?? 0
+        return try? await sqliteMain.read { database in
+            try CirclemsDataSchema.ComiketCircleWC.fetchOne(
+                database,
+                sql: "SELECT * FROM ComiketCircleWC WHERE comiketNo = ? AND id = ?",
+                arguments: [comiketNumber, circleID]
+            )
+        }
+    }
+
     func getCircleExtensions() async -> [CirclemsDataSchema.ComiketCircleExtend] {
         do {
             return try await sqliteMain.read { database in
@@ -782,14 +1053,27 @@ final class CirclemsDataSource {
                 arguments: [comiketNumber, circleID]
             )
         }
-        let enrichment: CatalogCircleEnrichment?
+        let bundledEnrichment: CatalogCircleEnrichment?
         if let enrichmentStore {
-            enrichment = try? await enrichmentStore.details(
+            bundledEnrichment = try? await enrichmentStore.details(
                 circleID: circleID,
                 publicCircleID: extensionRecord?.WCId
             )
         } else {
-            enrichment = nil
+            bundledEnrichment = nil
+        }
+        var realtimeEnrichment: CatalogCircleEnrichment?
+        if let realtimeStore, let publicCircleID = extensionRecord?.WCId {
+            try? await realtimeStore.refresh(eventNumber: comiketNumber)
+            realtimeEnrichment = await realtimeStore.enrichment(
+                eventNumber: comiketNumber,
+                publicCircleID: publicCircleID
+            )
+        }
+        let enrichment = if let bundledEnrichment {
+            bundledEnrichment.merging(realtimeEnrichment)
+        } else {
+            realtimeEnrichment
         }
         return CatalogCircleDetails(
             extensionRecord: extensionRecord,
@@ -798,19 +1082,32 @@ final class CirclemsDataSource {
     }
 
     func getCircleEnrichments() async -> [Int: CatalogCircleEnrichment] {
-        guard let enrichmentStore else { return [:] }
         let extensions = await getCircleExtensions()
         let publicCircleIDsByCircleID = Dictionary(
             uniqueKeysWithValues: extensions.map { ($0.id, $0.WCId) }
         )
-        do {
-            return try await enrichmentStore.all(
+        var result: [Int: CatalogCircleEnrichment] = [:]
+        if let enrichmentStore {
+            result = (try? await enrichmentStore.all(
                 publicCircleIDsByCircleID: publicCircleIDsByCircleID
-            )
-        } catch {
-            NSLog("Catalog enrichment lookup failed: \(error)")
-            return [:]
+            )) ?? [:]
         }
+        if let realtimeStore {
+            let eventNumber = Int(comiketId) ?? 0
+            try? await realtimeStore.refresh(eventNumber: eventNumber)
+            let realtimeByPublicID = await realtimeStore.enrichments(
+                eventNumber: eventNumber
+            )
+            for (circleID, publicCircleID) in publicCircleIDsByCircleID {
+                guard let realtime = realtimeByPublicID[publicCircleID] else { continue }
+                if let bundled = result[circleID] {
+                    result[circleID] = bundled.merging(realtime)
+                } else {
+                    result[circleID] = realtime
+                }
+            }
+        }
+        return result
     }
 
     func enrichmentStatistics() async -> (

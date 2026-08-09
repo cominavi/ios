@@ -11,8 +11,9 @@ import DebugSwift
 import PostHog
 import Sentry
 import SwiftUI
+import UserNotifications
 
-class AppDelegate: NSObject, UIApplicationDelegate {
+class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool
     {
@@ -36,12 +37,60 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         #if DEBUG
         DebugSwift.setup()
         DebugSwift.Debugger.feedbackEnable = false
-        DebugSwift.show()
+        if !ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-hide-debugger") {
+            DebugSwift.show()
+        }
         #endif
 
         AppTrack.user(AppData.userState.user)
+        UNUserNotificationCenter.current().delegate = self
+        Task { @MainActor in
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            if [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus) {
+                application.registerForRemoteNotifications()
+            }
+        }
 
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Task {
+            do {
+                try await CominaviServiceClient.shared.registerPushToken(deviceToken)
+            } catch CominaviServiceError.notLoggedIn {
+                // Registration is retried after a later authorized app launch.
+            } catch {
+                #if DEBUG
+                print("ComiNavi push registration failed: \(error)")
+                #endif
+            }
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        #if DEBUG
+        print("APNs registration failed: \(error)")
+        #endif
+    }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        let isLocalReminder = notification.request.identifier.hasPrefix(
+            SystemComiketNotificationScheduler.requestPrefix
+        )
+        let isRealtimeCircleUpdate = notification.request.content.userInfo["cominavi"] != nil
+        guard isLocalReminder || isRealtimeCircleUpdate else { return [] }
+
+        return [.banner, .list, .sound]
     }
 }
 

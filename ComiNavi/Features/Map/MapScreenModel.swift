@@ -1,7 +1,7 @@
 import Foundation
 import ImageIO
-import Observation
 import OSLog
+import Observation
 
 @MainActor
 @Observable
@@ -28,7 +28,7 @@ final class MapScreenModel {
         let preferredSubspace: Int
         var circles: [CatalogMapCircle]
         var selectedCircleID: Int?
-        var imageData: Data?
+        var imageDataByCircleID: [Int: Data]
         var isLoading: Bool
         let address: ComiketSpaceAddress
 
@@ -37,7 +37,19 @@ final class MapScreenModel {
         }
 
         var selectedAddress: ComiketSpaceAddress {
-            address.selecting(subspace: selectedCircle?.subspace ?? preferredSubspace)
+            guard circles.count == 2,
+                CatalogCirclePairing.sameIdentity(circles[0], circles[1])
+            else {
+                return address.selecting(subspace: selectedCircle?.subspace ?? preferredSubspace)
+            }
+            return ComiketSpaceAddress(
+                day: address.day,
+                hallName: address.hallName,
+                blockName: address.blockName,
+                spaceNumber: address.spaceNumber,
+                subspace: nil,
+                isCombinedAB: true
+            )
         }
     }
 
@@ -61,15 +73,14 @@ final class MapScreenModel {
     private(set) var isSyncingBookmarks = false
     private(set) var bookmarkError: String?
     private(set) var locatedUser: LocatedMapUser?
-    private(set) var navigationDestination: MapNavigationDestination?
-    private(set) var navigationRoute: BigSightNavigationRoute?
+    private(set) var destination: MapDestination?
     var selection: Selection?
 
     @ObservationIgnored private let catalog: any MapCatalog
     @ObservationIgnored private let detailArtworkLoader: (any CircleDetailArtworkLoading)?
     @ObservationIgnored private let userPlanStore: any UserPlanStoring
     @ObservationIgnored private let bookmarkSyncCoordinator: BookmarkSyncCoordinator?
-    @ObservationIgnored private let eventNumber: Int
+    @ObservationIgnored let eventNumber: Int
     @ObservationIgnored private let artworkCache = NSCache<NSNumber, CGImage>()
     @ObservationIgnored private var sceneCache: [CatalogMapScene.ID: CatalogMapScene] = [:]
     @ObservationIgnored private var sceneTask: Task<Void, Never>?
@@ -100,7 +111,8 @@ final class MapScreenModel {
         self.eventNumber = eventNumber
         let initialDay = selectedDay ?? days.first?.dayIndex ?? 1
         self.selectedDay = initialDay
-        self.selectedMapID = selectedMapID
+        self.selectedMapID =
+            selectedMapID
             ?? days.first(where: { $0.dayIndex == initialDay })?.halls.first?.externalMapId
             ?? 1
         scope = initialScope
@@ -137,9 +149,8 @@ final class MapScreenModel {
         if locatedUser?.sceneID.day != selectedDay {
             locatedUser = nil
         }
-        if navigationDestination?.sceneID.day != selectedDay {
-            navigationDestination = nil
-            navigationRoute = nil
+        if destination?.sceneID.day != selectedDay {
+            destination = nil
         }
         phase = .loading
 
@@ -175,12 +186,14 @@ final class MapScreenModel {
                     guard !scenes.isEmpty else {
                         throw firstError ?? MapScreenError.missingCampusVenues
                     }
-                    guard let campus = BigSightCampusLayout.make(
-                        eventNumber: eventNumber,
-                        day: day,
-                        halls: halls,
-                        scenes: scenes
-                    ) else {
+                    guard
+                        let campus = BigSightCampusLayout.make(
+                            eventNumber: eventNumber,
+                            day: day,
+                            halls: halls,
+                            scenes: scenes
+                        )
+                    else {
                         throw MapScreenError.missingCampusVenues
                     }
                     guard let self, self.selectedDay == day, self.scope == scope else { return }
@@ -188,7 +201,6 @@ final class MapScreenModel {
                         self.sceneCache[scene.id] = scene
                     }
                     self.campusScene = campus
-                    self.refreshNavigationRoute()
                     self.phase = .ready
                     return
                 }
@@ -196,9 +208,9 @@ final class MapScreenModel {
                 let scene = try await catalog.scene(day: day, mapID: mapID)
                 try Task.checkCancellation()
                 guard let self,
-                      self.selectedDay == day,
-                      self.selectedMapID == mapID,
-                      self.scope == scope
+                    self.selectedDay == day,
+                    self.selectedMapID == mapID,
+                    self.scope == scope
                 else {
                     return
                 }
@@ -216,9 +228,9 @@ final class MapScreenModel {
                 return
             } catch {
                 guard let self,
-                      self.selectedDay == day,
-                      self.scope == scope,
-                      scope == .campus || self.selectedMapID == mapID
+                    self.selectedDay == day,
+                    self.scope == scope,
+                    scope == .campus || self.selectedMapID == mapID
                 else {
                     return
                 }
@@ -293,18 +305,18 @@ final class MapScreenModel {
         guard !scenes.isEmpty else {
             throw firstError ?? MapScreenError.missingCampusVenues
         }
-        guard let campus = BigSightCampusLayout.make(
-            eventNumber: eventNumber,
-            day: day,
-            halls: halls,
-            scenes: scenes
-        ) else {
+        guard
+            let campus = BigSightCampusLayout.make(
+                eventNumber: eventNumber,
+                day: day,
+                halls: halls,
+                scenes: scenes
+            )
+        else {
             throw MapScreenError.missingCampusVenues
         }
         guard selectedDay == day else { throw CancellationError() }
         campusScene = campus
-        refreshNavigationRoute()
-
         let hallsByMapID = Dictionary(uniqueKeysWithValues: halls.map { ($0.externalMapId, $0) })
         return campus.venues.map { placement in
             let hallName = hallsByMapID[placement.id]?.name ?? placement.kind.displayName
@@ -317,7 +329,6 @@ final class MapScreenModel {
 
     func locateUser(_ user: LocatedMapUser) {
         locatedUser = user
-        refreshNavigationRoute()
         selection = nil
         setSearchPresented(false)
 
@@ -325,28 +336,14 @@ final class MapScreenModel {
         select(mapID: user.sceneID.mapID)
     }
 
-    func navigate(to destination: MapNavigationDestination) {
-        navigationDestination = destination
+    func show(_ destination: MapDestination) {
+        self.destination = destination
         selection = nil
         setSearchPresented(false)
-        refreshNavigationRoute()
     }
 
-    func clearNavigationDestination() {
-        navigationDestination = nil
-        navigationRoute = nil
-    }
-
-    private func refreshNavigationRoute() {
-        guard let locatedUser, let navigationDestination, let campusScene else {
-            navigationRoute = nil
-            return
-        }
-        navigationRoute = PedestrianRoutePlanner.route(
-            from: locatedUser,
-            to: navigationDestination,
-            in: campusScene
-        )
+    func clearDestination() {
+        destination = nil
     }
 
     private func activateVenue(_ cachedScene: CatalogMapScene) {
@@ -381,15 +378,17 @@ final class MapScreenModel {
         mapID: Int? = nil
     ) -> LocatedMapUser? {
         let targetMapID = mapID ?? selectedMapID
-        let placement = campusScene?.venues.first { venue in
-            venue.id == targetMapID && venue.scene.tableByID[table.id] == table
-        } ?? standalonePlacement(mapID: targetMapID, table: table)
+        let placement =
+            campusScene?.venues.first { venue in
+                venue.id == targetMapID && venue.scene.tableByID[table.id] == table
+            } ?? standalonePlacement(mapID: targetMapID, table: table)
         guard let placement
         else {
             return nil
         }
 
-        let hallName = halls.first(where: { $0.externalMapId == targetMapID })?.name
+        let hallName =
+            halls.first(where: { $0.externalMapId == targetMapID })?.name
             ?? placement.kind.displayName
         let venue = WhereAmIVenueOption(
             displayName: WhereAmIResolver.venueDisplayName(for: hallName),
@@ -414,16 +413,21 @@ final class MapScreenModel {
         table: CatalogMapTable
     ) -> BigSightVenuePlacement? {
         guard let scene,
-              scene.id == CatalogMapScene.ID(day: selectedDay, mapID: mapID),
-              scene.tableByID[table.id] == table,
-              let campus = BigSightCampusLayout.make(
-                  eventNumber: eventNumber,
-                  day: selectedDay,
-                  halls: halls,
-                  scenes: [mapID: scene]
-              )
+            scene.id == CatalogMapScene.ID(day: selectedDay, mapID: mapID),
+            scene.tableByID[table.id] == table,
+            let campus = BigSightCampusLayout.make(
+                eventNumber: eventNumber,
+                day: selectedDay,
+                halls: halls,
+                scenes: [mapID: scene]
+            )
         else { return nil }
         return campus.venues.first
+    }
+
+    func select(circle: CatalogMapCircle) {
+        guard selection?.circles.contains(where: { $0.id == circle.id }) == true else { return }
+        selection?.selectedCircleID = circle.id
     }
 
     func select(table: CatalogMapTable, preferredSubspace: Int) {
@@ -433,7 +437,7 @@ final class MapScreenModel {
             preferredSubspace: preferredSubspace,
             circles: [],
             selectedCircleID: nil,
-            imageData: nil,
+            imageDataByCircleID: [:],
             isLoading: true,
             address: ComiketSpaceAddress(
                 day: selectedDay,
@@ -450,26 +454,61 @@ final class MapScreenModel {
                 let circles = try await catalog.circles(day: day, tableID: table.id)
                 try Task.checkCancellation()
                 guard let self, self.selection?.id == table.id else { return }
-                let selected = circles.first(where: { $0.subspace == preferredSubspace }) ?? circles.first
+                let selected =
+                    circles.first(where: { $0.subspace == preferredSubspace }) ?? circles.first
                 self.selection?.circles = circles
                 self.selection?.selectedCircleID = selected?.id
                 self.selection?.isLoading = false
 
-                guard let selected else { return }
-                let images = try? await catalog.circleImages(circleIDs: [selected.id])
-                let fallback = images?[selected.id]
+                let images = (try? await catalog.circleImages(circleIDs: circles.map(\.id))) ?? [:]
                 try Task.checkCancellation()
-                guard self.selection?.selectedCircleID == selected.id else { return }
-                self.selection?.imageData = fallback
+                guard self.selection?.id == table.id else { return }
+                self.selection?.imageDataByCircleID = images
 
                 guard let detailArtworkLoader else { return }
-                let bestImage = await detailArtworkLoader.bestImageData(
-                    for: selected,
-                    fallback: fallback
-                )
+                let bestImages = await withTaskGroup(
+                    of: (Int, Data?).self,
+                    returning: [Int: Data].self
+                ) { group in
+                    for circle in circles {
+                        let fallback = images[circle.id]
+                        group.addTask {
+                            let image = await detailArtworkLoader.bestImageData(
+                                for: circle,
+                                fallback: fallback
+                            )
+                            return (circle.id, image)
+                        }
+                    }
+
+                    var loaded: [Int: Data] = [:]
+                    for await (circleID, image) in group {
+                        if let image {
+                            loaded[circleID] = image
+                        }
+                    }
+                    return loaded
+                }
                 try Task.checkCancellation()
-                guard self.selection?.selectedCircleID == selected.id else { return }
-                self.selection?.imageData = bestImage
+                guard self.selection?.id == table.id else { return }
+                self.selection?.imageDataByCircleID.merge(bestImages) { _, best in best }
+
+                let decodedBestImages = await Task.detached(priority: .userInitiated) {
+                    bestImages.compactMapValues(Self.decodeImage)
+                }.value
+                try Task.checkCancellation()
+                guard self.selection?.id == table.id else { return }
+                let visibleCircleIDs = Set(self.visibleCirclePlacements.map(\.circleID))
+                for (circleID, image) in decodedBestImages {
+                    self.artworkCache.setObject(
+                        image,
+                        forKey: NSNumber(value: circleID),
+                        cost: image.bytesPerRow * image.height
+                    )
+                    if visibleCircleIDs.contains(circleID) {
+                        self.visibleCircleArtwork[circleID] = image
+                    }
+                }
             } catch is CancellationError {
                 return
             } catch {
@@ -484,28 +523,6 @@ final class MapScreenModel {
             return WhereAmIResolver.canonicalVenueName(for: venue.kind)
         }
         return halls.first(where: { $0.externalMapId == selectedMapID })?.name ?? "会場"
-    }
-
-    func select(circle: CatalogMapCircle) {
-        guard selection?.selectedCircleID != circle.id else { return }
-        selectionTask?.cancel()
-        selection?.selectedCircleID = circle.id
-        selection?.imageData = nil
-
-        selectionTask = Task { [weak self, catalog] in
-            let images = try? await catalog.circleImages(circleIDs: [circle.id])
-            let fallback = images?[circle.id]
-            guard !Task.isCancelled, let self, self.selection?.selectedCircleID == circle.id else { return }
-            self.selection?.imageData = fallback
-
-            guard let detailArtworkLoader = self.detailArtworkLoader else { return }
-            let bestImage = await detailArtworkLoader.bestImageData(
-                for: circle,
-                fallback: fallback
-            )
-            guard !Task.isCancelled, self.selection?.selectedCircleID == circle.id else { return }
-            self.selection?.imageData = bestImage
-        }
     }
 
     func setSearchPresented(_ isPresented: Bool) {
@@ -532,12 +549,14 @@ final class MapScreenModel {
         searchTask = Task { [weak self, catalog] in
             do {
                 try await Task.sleep(for: .milliseconds(260))
-                let matches = try await catalog.search(day: day, mapID: mapID, query: normalizedQuery)
+                let matches = try await catalog.search(
+                    day: day, mapID: mapID, query: normalizedQuery)
                 try Task.checkCancellation()
                 guard let self,
-                      self.selectedDay == day,
-                      self.selectedMapID == mapID,
-                      self.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines) == normalizedQuery
+                    self.selectedDay == day,
+                    self.selectedMapID == mapID,
+                    self.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                        == normalizedQuery
                 else {
                     return
                 }
@@ -570,9 +589,9 @@ final class MapScreenModel {
 
     func toggleBookmark() {
         guard let selection,
-              let circle = selection.selectedCircle,
-              let publicCircleID = circle.publicCircleID,
-              let scene
+            let circle = selection.selectedCircle,
+            let publicCircleID = circle.publicCircleID,
+            let scene
         else {
             return
         }
@@ -586,11 +605,9 @@ final class MapScreenModel {
             bookmarks[publicCircleID] = nil
             existing.modifiedAt = Date()
             existing.syncState = .pendingDelete
-            let planned = MapRoutePlanner.plan(bookmarks: Array(bookmarks.values), in: scene)
-            bookmarks = Dictionary(uniqueKeysWithValues: planned.map { ($0.publicCircleID, $0) })
             bookmarkTask = Task { [weak self, userPlanStore] in
                 do {
-                    try await userPlanStore.upsert(planned + [existing])
+                    try await userPlanStore.upsert(existing)
                     guard let self else { return }
                     self.isMutatingBookmark = false
                     self.scheduleBookmarkSync()
@@ -615,41 +632,39 @@ final class MapScreenModel {
             subspace: circle.subspace,
             color: .orange,
             memo: "",
-            routeOrder: (bookmarks.values.compactMap(\.routeOrder).max() ?? -1) + 1,
             modifiedAt: Date(),
             syncState: .pendingUpsert
         )
         let previousBookmarks = bookmarks
         bookmarks[publicCircleID] = bookmark
-        let planned = MapRoutePlanner.plan(bookmarks: Array(bookmarks.values), in: scene)
-        bookmarks = Dictionary(uniqueKeysWithValues: planned.map { ($0.publicCircleID, $0) })
-        persist(planned, restoring: previousBookmarks)
+        persist(bookmark, restoring: previousBookmarks)
     }
 
     func setBookmarkColor(_ color: BookmarkColor) {
         guard let selection,
-              let circle = selection.selectedCircle,
-              let publicCircleID = circle.publicCircleID,
-              let scene
+            let circle = selection.selectedCircle,
+            let publicCircleID = circle.publicCircleID,
+            let scene
         else {
             return
         }
 
-        var bookmark = bookmarks[publicCircleID] ?? MapBookmark(
-            eventNumber: eventNumber,
-            publicCircleID: publicCircleID,
-            catalogCircleID: circle.id,
-            updateID: circle.updateID,
-            day: selectedDay,
-            mapID: scene.id.mapID,
-            tableID: selection.table.id,
-            subspace: circle.subspace,
-            color: color,
-            memo: "",
-            routeOrder: (bookmarks.values.compactMap(\.routeOrder).max() ?? -1) + 1,
-            modifiedAt: Date(),
-            syncState: .pendingUpsert
-        )
+        var bookmark =
+            bookmarks[publicCircleID]
+            ?? MapBookmark(
+                eventNumber: eventNumber,
+                publicCircleID: publicCircleID,
+                catalogCircleID: circle.id,
+                updateID: circle.updateID,
+                day: selectedDay,
+                mapID: scene.id.mapID,
+                tableID: selection.table.id,
+                subspace: circle.subspace,
+                color: color,
+                memo: "",
+                modifiedAt: Date(),
+                syncState: .pendingUpsert
+            )
         bookmark.color = color
         bookmark.modifiedAt = Date()
         bookmark.syncState = .pendingUpsert
@@ -657,7 +672,10 @@ final class MapScreenModel {
         persist(bookmark)
     }
 
-    private func persist(_ bookmark: MapBookmark) {
+    private func persist(
+        _ bookmark: MapBookmark,
+        restoring previousBookmarks: [Int: MapBookmark]? = nil
+    ) {
         bookmarkTask?.cancel()
         bookmarkError = nil
         isMutatingBookmark = true
@@ -669,26 +687,11 @@ final class MapScreenModel {
                 self.scheduleBookmarkSync()
             } catch {
                 guard let self else { return }
-                self.bookmarks[bookmark.publicCircleID] = nil
-                self.bookmarkError = error.localizedDescription
-                self.isMutatingBookmark = false
-            }
-        }
-    }
-
-    private func persist(_ bookmarks: [MapBookmark], restoring previousBookmarks: [Int: MapBookmark]) {
-        bookmarkTask?.cancel()
-        bookmarkError = nil
-        isMutatingBookmark = true
-        bookmarkTask = Task { [weak self, userPlanStore] in
-            do {
-                try await userPlanStore.upsert(bookmarks)
-                guard let self else { return }
-                self.isMutatingBookmark = false
-                self.scheduleBookmarkSync()
-            } catch {
-                guard let self else { return }
-                self.bookmarks = previousBookmarks
+                if let previousBookmarks {
+                    self.bookmarks = previousBookmarks
+                } else {
+                    self.bookmarks[bookmark.publicCircleID] = nil
+                }
                 self.bookmarkError = error.localizedDescription
                 self.isMutatingBookmark = false
             }
@@ -708,7 +711,8 @@ final class MapScreenModel {
                 )
                 try Task.checkCancellation()
                 guard let self, self.selectedDay == day, self.selectedMapID == mapID else { return }
-                self.bookmarks = Dictionary(uniqueKeysWithValues: bookmarks.map { ($0.publicCircleID, $0) })
+                self.bookmarks = Dictionary(
+                    uniqueKeysWithValues: bookmarks.map { ($0.publicCircleID, $0) })
                 if !self.hasAttemptedInitialBookmarkSync {
                     self.hasAttemptedInitialBookmarkSync = true
                     self.scheduleBookmarkSync(delay: .zero)
@@ -743,7 +747,8 @@ final class MapScreenModel {
                 try Task.checkCancellation()
                 guard let self else { return }
                 if self.selectedDay == day, self.selectedMapID == mapID {
-                    self.bookmarks = Dictionary(uniqueKeysWithValues: bookmarks.map { ($0.publicCircleID, $0) })
+                    self.bookmarks = Dictionary(
+                        uniqueKeysWithValues: bookmarks.map { ($0.publicCircleID, $0) })
                 }
                 self.isSyncingBookmarks = false
             } catch is CancellationError {
@@ -751,9 +756,11 @@ final class MapScreenModel {
                 self.isSyncingBookmarks = false
             } catch {
                 guard let self else { return }
-                Self.logger.error("Bookmark synchronization failed: \(error.localizedDescription, privacy: .public)")
+                Self.logger.error(
+                    "Bookmark synchronization failed: \(error.localizedDescription, privacy: .public)"
+                )
                 #if DEBUG
-                print("Bookmark synchronization failed: \(error)")
+                    print("Bookmark synchronization failed: \(error)")
                 #endif
                 self.bookmarkError = error.localizedDescription
                 self.isSyncingBookmarks = false
@@ -772,9 +779,9 @@ final class MapScreenModel {
                 let placements = try await catalog.genrePlacements(day: day, mapID: mapID)
                 try Task.checkCancellation()
                 guard let self,
-                      self.showsGenreOverlay,
-                      self.selectedDay == day,
-                      self.selectedMapID == mapID
+                    self.showsGenreOverlay,
+                    self.selectedDay == day,
+                    self.selectedMapID == mapID
                 else {
                     return
                 }
@@ -845,69 +852,72 @@ final class MapScreenModel {
 
     nonisolated private static func decodeImage(_ data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        return CGImageSourceCreateImageAtIndex(source, 0, [
-            kCGImageSourceShouldCacheImmediately: true,
-        ] as CFDictionary)
+        return CGImageSourceCreateImageAtIndex(
+            source, 0,
+            [
+                kCGImageSourceShouldCacheImmediately: true
+            ] as CFDictionary)
     }
 
     #if DEBUG
-    static func fixture() -> MapScreenModel {
-        MapScreenModel(
-            days: [
-                UFDSchema.Day(
-                    id: "fixture-1",
-                    dayIndex: 1,
-                    date: DateComponents(year: 2026, month: 8, day: 15),
-                    halls: [
-                        UFDSchema.DayHall(
-                            id: "fixture-hall",
-                            name: "Fixture Hall",
-                            mapName: "FIXTURE",
-                            externalMapId: 1,
-                            externalCorrespondingFloorId: 1,
-                            areas: []
-                        ),
-                    ]
-                ),
-            ],
-            eventNumber: 104,
-            initialScope: .venue,
-            catalog: FixtureMapCatalog(),
-            userPlanStore: InMemoryUserPlanStore()
-        )
-    }
+        static func fixture() -> MapScreenModel {
+            MapScreenModel(
+                days: [
+                    UFDSchema.Day(
+                        id: "fixture-1",
+                        dayIndex: 1,
+                        date: DateComponents(year: 2026, month: 8, day: 15),
+                        halls: [
+                            UFDSchema.DayHall(
+                                id: "fixture-hall",
+                                name: "Fixture Hall",
+                                mapName: "FIXTURE",
+                                externalMapId: 1,
+                                externalCorrespondingFloorId: 1,
+                                areas: []
+                            )
+                        ]
+                    )
+                ],
+                eventNumber: 104,
+                initialScope: .venue,
+                catalog: FixtureMapCatalog(),
+                userPlanStore: InMemoryUserPlanStore()
+            )
+        }
 
-    static func previewCampusFixture() -> MapScreenModel {
-        MapScreenModel(
-            days: [
-                UFDSchema.Day(
-                    id: "campus-fixture-1",
-                    dayIndex: 1,
-                    date: DateComponents(year: 2026, month: 8, day: 15),
-                    halls: [
-                        previewHall(id: 101, name: "東123", mapName: "E123"),
-                        previewHall(id: 102, name: "東7", mapName: "E7"),
-                        previewHall(id: 103, name: "西12", mapName: "W12"),
-                        previewHall(id: 104, name: "南12", mapName: "S12"),
-                    ]
-                ),
-            ],
-            eventNumber: 108,
-            catalog: FixtureMapCatalog(),
-            userPlanStore: InMemoryUserPlanStore()
-        )
-    }
+        static func previewCampusFixture() -> MapScreenModel {
+            MapScreenModel(
+                days: [
+                    UFDSchema.Day(
+                        id: "campus-fixture-1",
+                        dayIndex: 1,
+                        date: DateComponents(year: 2026, month: 8, day: 15),
+                        halls: [
+                            previewHall(id: 101, name: "東123", mapName: "E123"),
+                            previewHall(id: 102, name: "東7", mapName: "E7"),
+                            previewHall(id: 103, name: "西12", mapName: "W12"),
+                            previewHall(id: 104, name: "南12", mapName: "S12"),
+                        ]
+                    )
+                ],
+                eventNumber: 108,
+                catalog: FixtureMapCatalog(),
+                userPlanStore: InMemoryUserPlanStore()
+            )
+        }
 
-    private static func previewHall(id: Int, name: String, mapName: String) -> UFDSchema.DayHall {
-        UFDSchema.DayHall(
-            id: "campus-fixture-hall-\(id)",
-            name: name,
-            mapName: mapName,
-            externalMapId: id,
-            externalCorrespondingFloorId: id,
-            areas: []
-        )
-    }
+        private static func previewHall(id: Int, name: String, mapName: String) -> UFDSchema.DayHall
+        {
+            UFDSchema.DayHall(
+                id: "campus-fixture-hall-\(id)",
+                name: name,
+                mapName: mapName,
+                externalMapId: id,
+                externalCorrespondingFloorId: id,
+                areas: []
+            )
+        }
     #endif
 }
 

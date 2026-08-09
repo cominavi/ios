@@ -6,12 +6,16 @@ struct MapView: View {
 
     @State private var model: MapScreenModel
     @State private var showsWhereAmI = false
-    @State private var showsWhereToGo = false
+    @State private var showsDestinationPicker = false
     @State private var showsCurrentLocation = false
     @State private var opensWhereAmIAfterSheet = false
     @State private var isMapLegendExpanded = true
     @State private var visibleMapLayers = BigSightMapLayer.defaultVisible
+    @State private var circleSheetDetent: PresentationDetent = .fraction(0.62)
     @Binding private var selectedDay: Int
+    private let dataSource: CirclemsDataSource?
+    private let eventDaySelector: CatalogEventDayBanner?
+    private let sharedLocationInbox: SharedLocationInbox?
 
     private var currentLocationMapBottomInset: CGFloat {
         showsCurrentLocation ? Self.currentLocationSheetHeight : 0
@@ -20,7 +24,9 @@ struct MapView: View {
     @MainActor
     init(
         dataSource: CirclemsDataSource,
-        selectedDay: Binding<Int>
+        selectedDay: Binding<Int>,
+        eventDaySelector: CatalogEventDayBanner? = nil,
+        sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox
     ) {
         let model = MapScreenModel(
             days: dataSource.comiket.days,
@@ -36,23 +42,30 @@ struct MapView: View {
         )
         _model = State(initialValue: model)
         _selectedDay = selectedDay
+        self.dataSource = dataSource
+        self.eventDaySelector = eventDaySelector
+        self.sharedLocationInbox = sharedLocationInbox
     }
 
     @MainActor
     init(model: MapScreenModel) {
         _model = State(initialValue: model)
         _selectedDay = .constant(model.selectedDay)
+        dataSource = nil
+        eventDaySelector = nil
+        sharedLocationInbox = nil
     }
 
     var body: some View {
         @Bindable var model = model
 
-        ZStack(alignment: .top) {
+        ZStack(alignment: .topLeading) {
             mapContent
                 .ignoresSafeArea()
 
             MapControlPanel(
                 model: model,
+                eventDaySelector: eventDaySelector,
                 visibleMapLayers: $visibleMapLayers,
                 onWhereAmI: {
                     if model.locatedUser != nil {
@@ -64,15 +77,16 @@ struct MapView: View {
                 onUpdateLocation: {
                     showsWhereAmI = true
                 },
-                onWhereToGo: {
-                    showsWhereToGo = true
+                onFindTable: {
+                    showsDestinationPicker = true
                 },
                 onClearDestination: {
-                    model.clearNavigationDestination()
+                    model.clearDestination()
                 }
             )
-                .padding(.horizontal, 14)
-                .safeAreaPadding(.top, 8)
+            .frame(maxWidth: 760)
+            .padding(.horizontal, 14)
+            .safeAreaPadding(.top, 8)
 
             if model.phase == .ready, model.scope == .venue, model.showsGenreOverlay {
                 MapLegendView(
@@ -84,11 +98,15 @@ struct MapView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
         }
-        .background(Color(white: 0.94))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(uiColor: .secondarySystemBackground))
         .task {
             if model.scene == nil, model.campusScene == nil {
                 model.load()
             }
+        }
+        .task(id: sharedLocationInbox?.pending?.id) {
+            await openPendingSharedLocation()
         }
         .onChange(of: selectedDay, initial: true) { _, day in
             if model.selectedDay != day {
@@ -103,35 +121,51 @@ struct MapView: View {
         .sheet(item: $model.selection) { selection in
             CircleMapDetailSheet(
                 selection: selection,
-                bookmark: model.bookmark(for: selection.selectedCircle),
-                isMutatingBookmark: model.isMutatingBookmark,
-                isSyncingBookmark: model.isSyncingBookmarks,
-                bookmarkError: model.bookmarkError,
-                onSelectCircle: model.select(circle:),
-                onToggleBookmark: model.toggleBookmark,
-                onSetBookmarkColor: model.setBookmarkColor
+                bookmarks: model.bookmarks,
+                dataSource: dataSource,
+                eventNumber: model.eventNumber,
+                mapID: model.selectedMapID,
+                onOpenDetail: { circle in
+                    model.select(circle: circle)
+                    circleSheetDetent = .large
+                }
             )
-            .presentationDetents([.height(300), .medium, .large])
+            .presentationDetents(
+                [.fraction(0.62), .large],
+                selection: $circleSheetDetent
+            )
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showsCurrentLocation, onDismiss: {
-            guard opensWhereAmIAfterSheet else { return }
-            opensWhereAmIAfterSheet = false
-            showsWhereAmI = true
-        }) {
+        .onChange(of: model.selection?.id) {
+            circleSheetDetent = .fraction(0.62)
+        }
+        .sheet(
+            isPresented: $showsCurrentLocation,
+            onDismiss: {
+                guard opensWhereAmIAfterSheet else { return }
+                opensWhereAmIAfterSheet = false
+                showsWhereAmI = true
+            }
+        ) {
             if let location = model.locatedUser {
-                CurrentLocationSheet(location: location) {
+                CurrentLocationSheet(
+                    location: location,
+                    eventNumber: model.eventNumber
+                ) {
                     opensWhereAmIAfterSheet = true
                 }
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
             }
         }
-        .sheet(isPresented: $showsWhereAmI, onDismiss: {
-            if model.locatedUser != nil {
-                showsCurrentLocation = true
+        .sheet(
+            isPresented: $showsWhereAmI,
+            onDismiss: {
+                if model.locatedUser != nil {
+                    showsCurrentLocation = true
+                }
             }
-        }) {
+        ) {
             WhereAmIView(
                 mapModel: model,
                 locationService: makeWhereAmILocationService()
@@ -139,10 +173,59 @@ struct MapView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showsWhereToGo) {
-            WhereToGoView(mapModel: model)
+        .sheet(isPresented: $showsDestinationPicker) {
+            DestinationPickerView(mapModel: model)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+    }
+
+    @MainActor
+    private func openPendingSharedLocation() async {
+        guard let sharedLocationInbox,
+            let request = sharedLocationInbox.pending,
+            request.location.eventNumber == model.eventNumber
+        else {
+            return
+        }
+
+        let location = request.location
+        guard model.days.contains(where: { $0.dayIndex == location.sceneID.day }) else {
+            sharedLocationInbox.fail(request.id, with: .locationUnavailable)
+            return
+        }
+
+        if model.selectedDay != location.sceneID.day {
+            model.select(day: location.sceneID.day)
+        }
+        if selectedDay != location.sceneID.day {
+            selectedDay = location.sceneID.day
+        }
+
+        do {
+            let venues = try await model.whereAmIVenues()
+            try Task.checkCancellation()
+            guard
+                let venue = venues.first(where: {
+                    $0.placement.scene.id == location.sceneID
+                }),
+                let table = venue.placement.scene.tableByID[location.tableID]
+            else {
+                sharedLocationInbox.fail(request.id, with: .locationUnavailable)
+                return
+            }
+
+            model.show(
+                WhereAmIResolver.destination(
+                    at: table,
+                    in: venue,
+                    subspace: location.subspace
+                ))
+            sharedLocationInbox.acknowledge(request.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            sharedLocationInbox.fail(request.id, with: .locationUnavailable)
         }
     }
 
@@ -162,8 +245,7 @@ struct MapView: View {
                     genrePlacements: model.genrePlacements,
                     bookmarks: Array(model.bookmarks.values),
                     locatedUser: model.locatedUser,
-                    navigationDestination: model.navigationDestination,
-                    navigationRoute: model.navigationRoute,
+                    destination: model.destination,
                     visibleMapLayers: visibleMapLayers,
                     locationFocusBottomInset: currentLocationMapBottomInset,
                     onViewportChange: model.updateViewport,
@@ -214,11 +296,19 @@ struct MapView: View {
                 )
                 .allowsHitTesting(model.phase == .ready)
             } else if case .failed(let message) = model.phase {
-                ContentUnavailableView(
-                    "Map unavailable",
-                    systemImage: "map.fill",
-                    description: Text(message)
-                )
+                ContentUnavailableView {
+                    LucideLabel("Map unavailable", icon: "map.fill")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button {
+                        model.load()
+                    } label: {
+                        LucideLabel("Try Again", icon: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("map-retry-button")
+                }
             } else {
                 MapLoadingView(
                     message: model.scope == .campus ? "Loading campus…" : "Loading venue…"
@@ -226,7 +316,7 @@ struct MapView: View {
             }
 
             if model.phase == .loading,
-               model.campusScene != nil || model.scene != nil
+                model.campusScene != nil || model.scene != nil
             {
                 MapRefreshIndicator(
                     message: model.scope == .campus ? "Updating campus…" : "Updating venue…"
@@ -238,16 +328,16 @@ struct MapView: View {
     @MainActor
     private func makeWhereAmILocationService() -> WhereAmILocationService {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-where-am-i") {
-            return WhereAmILocationService(
-                simulatedReading: WhereAmILocationReading(
-                    coordinate: BigSightCampusLayout.eastBuilding,
-                    horizontalAccuracy: 12,
-                    timestamp: .now
-                ),
-                simulatedHeading: 72
-            )
-        }
+            if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-where-am-i") {
+                return WhereAmILocationService(
+                    simulatedReading: WhereAmILocationReading(
+                        coordinate: BigSightCampusLayout.eastBuilding,
+                        horizontalAccuracy: 12,
+                        timestamp: .now
+                    ),
+                    simulatedHeading: 72
+                )
+            }
         #endif
         return WhereAmILocationService()
     }
@@ -255,55 +345,83 @@ struct MapView: View {
 
 private struct MapControlPanel: View {
     let model: MapScreenModel
+    let eventDaySelector: CatalogEventDayBanner?
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
     let onWhereAmI: () -> Void
     let onUpdateLocation: () -> Void
-    let onWhereToGo: () -> Void
+    let onFindTable: () -> Void
     let onClearDestination: () -> Void
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            if let eventDaySelector {
+                eventDaySelector
+            }
             MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
-            WhereAmIEntryButton(
-                location: model.locatedUser,
-                action: onWhereAmI,
-                updateAction: onUpdateLocation
-            )
-            WhereToGoEntryButton(
-                destination: model.navigationDestination,
-                route: model.navigationRoute,
-                hasCurrentLocation: model.locatedUser != nil,
-                action: onWhereToGo,
-                clearAction: onClearDestination
-            )
+            primaryActions
             if model.isSearchPresented {
                 MapSearchField(model: model)
             }
         }
     }
+
+    private var primaryActions: some View {
+        Group {
+            if horizontalSizeClass == .regular {
+                HStack(alignment: .top, spacing: 8) {
+                    actionButtons
+                }
+            } else {
+                VStack(spacing: 8) {
+                    actionButtons
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        WhereAmIEntryButton(
+            location: model.locatedUser,
+            action: onWhereAmI,
+            updateAction: onUpdateLocation
+        )
+        .frame(maxWidth: .infinity)
+
+        DestinationEntryButton(
+            destination: model.destination,
+            eventNumber: model.eventNumber,
+            action: onFindTable,
+            clearAction: onClearDestination
+        )
+        .frame(maxWidth: .infinity)
+    }
 }
 
-private struct WhereToGoEntryButton: View {
-    let destination: MapNavigationDestination?
-    let route: BigSightNavigationRoute?
-    let hasCurrentLocation: Bool
+private struct DestinationEntryButton: View {
+    let destination: MapDestination?
+    let eventNumber: Int
     let action: () -> Void
     let clearAction: () -> Void
 
+    @State private var copied = false
+    @State private var copyFeedback = 0
     @ScaledMetric(relativeTo: .headline) private var minimumHeight = 58.0
 
     var body: some View {
         HStack(spacing: 0) {
             Button(action: action) {
                 HStack(spacing: 12) {
-                    Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                    LucideIcon("mappin.and.ellipse")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(
-                            destination.map { String(localized: "Going to \($0.spaceCode)") }
-                                ?? String(localized: "Where do you want to go?")
+                            destination.map { String(localized: "Table \($0.spaceCode)") }
+                                ?? String(localized: "Find a table")
                         )
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -312,7 +430,7 @@ private struct WhereToGoEntryButton: View {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    Image(systemName: "chevron.forward")
+                    LucideIcon("chevron.forward")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
@@ -323,15 +441,31 @@ private struct WhereToGoEntryButton: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Choose a destination using its Comiket address")
-            .accessibilityIdentifier("where-to-button")
+            .accessibilityHint("Choose a table and pin it on the map")
+            .accessibilityIdentifier("find-table-button")
 
-            if destination != nil {
+            if let destination {
+                Divider()
+                    .frame(height: 34)
+
+                Button {
+                    copy(destination)
+                } label: {
+                    LucideIcon(copied ? "checkmark" : "doc.on.doc")
+                        .font(.headline.weight(.semibold))
+                        .frame(width: 52, height: minimumHeight)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(copied ? "Copied" : "Copy table location")
+                .accessibilityHint("Copies the venue-aware location and a ComiNavi link")
+                .accessibilityIdentifier("copy-destination-button")
+
                 Divider()
                     .frame(height: 34)
 
                 Button(action: clearAction) {
-                    Image(systemName: "xmark")
+                    LucideIcon("xmark")
                         .font(.headline.weight(.semibold))
                         .frame(width: 56, height: minimumHeight)
                         .contentShape(.rect)
@@ -347,24 +481,32 @@ private struct WhereToGoEntryButton: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
         }
+        .sensoryFeedback(.success, trigger: copyFeedback)
+        .onChange(of: destination?.selectedAt) {
+            copied = false
+        }
     }
 
     private var subtitle: String {
         guard destination != nil else {
-            return String(localized: "Enter a Comiket table address")
+            return String(localized: "Pin a table using its Comiket address")
         }
-        guard hasCurrentLocation else {
-            return String(localized: "Set your current location to build the route")
-        }
-        guard let route else {
-            return String(localized: "Building walking route…")
-        }
-        if route.usesFallback {
-            return String(localized: "Path data incomplete · \(route.distanceMeters) m")
-        }
-        return String(
-            localized: "\(route.distanceMeters) m · About \(route.estimatedWalkingMinutes) min"
+        return String(localized: "Pinned on the map · follow current signs and staff")
+    }
+
+    private func copy(_ destination: MapDestination) {
+        let shared = SharedComiketLocation(
+            eventNumber: eventNumber,
+            sceneID: destination.sceneID,
+            tableID: destination.tableID,
+            subspace: destination.subspace
         )
+        UIPasteboard.general.string =
+            shared?.clipboardText(
+                locationText: destination.canonicalLocationText
+            ) ?? destination.canonicalLocationText
+        copied = true
+        copyFeedback += 1
     }
 }
 
@@ -379,7 +521,7 @@ private struct WhereAmIEntryButton: View {
         HStack(spacing: 0) {
             Button(action: action) {
                 HStack(spacing: 12) {
-                    Image(systemName: "location.viewfinder")
+                    LucideIcon("location.viewfinder")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
                         .accessibilityHidden(true)
@@ -399,7 +541,7 @@ private struct WhereAmIEntryButton: View {
                         .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.forward")
+                    LucideIcon("chevron.forward")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tertiary)
                         .accessibilityHidden(true)
@@ -415,7 +557,8 @@ private struct WhereAmIEntryButton: View {
                     ? "Open the large-button venue locator. You can also press and hold the map."
                     : "View and copy your current location"
             )
-            .accessibilityIdentifier(location == nil ? "where-am-i-button" : "current-location-button")
+            .accessibilityIdentifier(
+                location == nil ? "where-am-i-button" : "current-location-button")
 
             if location != nil {
                 Divider()
@@ -425,7 +568,7 @@ private struct WhereAmIEntryButton: View {
                     updateAction()
                 } label: {
                     VStack(spacing: 2) {
-                        Image(systemName: "location.viewfinder")
+                        LucideIcon("location.viewfinder")
                             .font(.headline.weight(.semibold))
                         Text("Update location")
                             .font(.caption2.weight(.semibold))
@@ -458,7 +601,7 @@ private struct MapSelectorBar: View {
                     model.showCampus()
                 } label: {
                     if model.scope == .campus {
-                        Label("Campus", systemImage: "checkmark")
+                        LucideLabel("Campus", icon: "checkmark")
                     } else {
                         Text("Campus")
                     }
@@ -471,7 +614,7 @@ private struct MapSelectorBar: View {
                         model.select(mapID: hall.externalMapId)
                     } label: {
                         if model.scope == .venue, hall.externalMapId == model.selectedMapID {
-                            Label(hall.name, systemImage: "checkmark")
+                            LucideLabel(verbatim: hall.name, icon: "checkmark")
                         } else {
                             Text(hall.name)
                         }
@@ -489,14 +632,20 @@ private struct MapSelectorBar: View {
 
             Menu {
                 Section("Quick Views") {
-                    Button("Before arrival", systemImage: "map.fill") {
+                    Button {
                         visibleMapLayers = [.essentials, .assistance, .cosplay]
+                    } label: {
+                        LucideLabel("Before arrival", icon: "map.fill")
                     }
-                    Button("Arrival", systemImage: "figure.walk.arrival") {
-                        visibleMapLayers = [.gates, .essentials, .assistance, .crowdFlow]
+                    Button {
+                        visibleMapLayers = [.gates, .essentials, .assistance]
+                    } label: {
+                        LucideLabel("Arrival", icon: "figure.walk.arrival")
                     }
-                    Button("On-site", systemImage: "building.2.fill") {
+                    Button {
                         visibleMapLayers = [.essentials, .assistance, .verticalAccess, .cosplay]
+                    } label: {
+                        LucideLabel("On-site", icon: "building.2.fill")
                     }
                 }
 
@@ -514,28 +663,32 @@ private struct MapSelectorBar: View {
                                 }
                             )
                         ) {
-                            Label(layer.title, systemImage: layer.systemImage)
+                            LucideLabel(verbatim: layer.title, icon: layer.systemImage)
                         }
                     }
                 }
 
                 Divider()
 
-                Button("Show All", systemImage: "eye") {
+                Button {
                     visibleMapLayers = BigSightMapLayer.defaultVisible
+                } label: {
+                    LucideLabel("Show All", icon: "eye")
                 }
-                Button("Hide Optional Layers", systemImage: "eye.slash") {
+                Button {
                     visibleMapLayers.removeAll()
+                } label: {
+                    LucideLabel("Hide Optional Layers", icon: "eye.slash")
                 }
             } label: {
-                Image(systemName: "line.3.horizontal.decrease.circle")
+                LucideIcon("line.3.horizontal.decrease.circle")
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(
                         visibleMapLayers == BigSightMapLayer.defaultVisible
                             ? Color.primary
                             : Color.accentColor
                     )
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 44)
                     .background(.thinMaterial, in: .circle)
             }
             .buttonStyle(.plain)
@@ -549,9 +702,9 @@ private struct MapSelectorBar: View {
                 Button {
                     model.setSearchPresented(!model.isSearchPresented)
                 } label: {
-                    Image(systemName: model.isSearchPresented ? "xmark" : "magnifyingglass")
+                    LucideIcon(model.isSearchPresented ? "xmark" : "magnifyingglass")
                         .font(.callout.weight(.semibold))
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(.thinMaterial, in: .circle)
                 }
                 .buttonStyle(.plain)
@@ -561,14 +714,16 @@ private struct MapSelectorBar: View {
                 Button {
                     model.toggleGenreOverlay()
                 } label: {
-                    Image(systemName: "square.3.layers.3d")
+                    LucideIcon("square.3.layers.3d")
                         .font(.callout.weight(.semibold))
                         .foregroundStyle(model.showsGenreOverlay ? Color.accentColor : .primary)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(.thinMaterial, in: .circle)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(model.showsGenreOverlay ? "Hide genre overlay" : "Show genre overlay")
+                .accessibilityLabel(
+                    model.showsGenreOverlay ? "Hide genre overlay" : "Show genre overlay"
+                )
                 .accessibilityIdentifier("map-genre-button")
             }
         }
@@ -589,7 +744,7 @@ private struct MapSearchField: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass")
+            LucideIcon("magnifyingglass")
                 .foregroundStyle(.secondary)
 
             TextField(
@@ -635,11 +790,11 @@ private struct SelectorLabel: View {
     let systemImage: String
 
     var body: some View {
-        Label(title, systemImage: systemImage)
+        LucideLabel(verbatim: title, icon: systemImage)
             .font(.subheadline.weight(.semibold))
             .lineLimit(1)
             .padding(.horizontal, 13)
-            .frame(height: 36)
+            .frame(height: 44)
             .background(.thinMaterial, in: .capsule)
             .overlay {
                 Capsule()
@@ -659,6 +814,7 @@ private struct MapLoadingView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -682,6 +838,38 @@ private struct MapRefreshIndicator: View {
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("map-refresh-indicator")
         .allowsHitTesting(false)
+    }
+}
+
+private struct MapCompassNeedle: View {
+    var body: some View {
+        ZStack {
+            MapCompassNeedleHalf(pointsNorth: true)
+                .fill(.red)
+
+            MapCompassNeedleHalf(pointsNorth: false)
+                .fill(.primary.opacity(0.72))
+
+            Circle()
+                .fill(.background)
+                .frame(width: 4, height: 4)
+        }
+        .frame(width: 20, height: 28)
+    }
+}
+
+private struct MapCompassNeedleHalf: Shape {
+    let pointsNorth: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        var path = Path()
+        path.move(to: pointsNorth ? CGPoint(x: rect.midX, y: rect.minY) : center)
+        path.addLine(to: CGPoint(x: rect.midX - 4.5, y: rect.midY))
+        path.addLine(to: pointsNorth ? center : CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.midX + 4.5, y: rect.midY))
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -814,8 +1002,6 @@ private struct InteractiveMapCanvas: View {
                     lineWidth: max(1 / renderedScale, 2)
                 )
 
-                drawRoute(bookmarks: bookmarks, in: &context, renderedScale: renderedScale)
-
                 for table in scene.tables where tableRect(table).intersects(visibleRect) {
                     draw(
                         table: table,
@@ -830,7 +1016,8 @@ private struct InteractiveMapCanvas: View {
                 }
 
                 if scene.artwork == nil {
-                    drawBlockLabels(in: &context, visibleRect: visibleRect, renderedScale: renderedScale)
+                    drawBlockLabels(
+                        in: &context, visibleRect: visibleRect, renderedScale: renderedScale)
                 }
                 if let locatedUser, locatedUser.sceneID == scene.id {
                     drawLocatedUser(locatedUser, in: &context, renderedScale: renderedScale)
@@ -842,7 +1029,9 @@ private struct InteractiveMapCanvas: View {
             .accessibilityValue(
                 accessibilityValue
             )
-            .accessibilityHint("Double-tap to inspect a table. Press and hold to set your location.")
+            .accessibilityHint(
+                "Double-tap to inspect a table. Press and hold to set your location."
+            )
             .accessibilityAction(named: Text("Set location at map center")) {
                 locate(
                     at: CGPoint(x: viewportSize.width / 2, y: viewportSize.height / 2),
@@ -896,9 +1085,11 @@ private struct InteractiveMapCanvas: View {
                     camera.zoom = initialZoom
                 }
                 #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-rotated-camera") {
-                    camera.rotation = .pi / 4
-                }
+                    if ProcessInfo.processInfo.arguments.contains(
+                        "-cominavi-ui-testing-rotated-camera")
+                    {
+                        camera.rotation = .pi / 4
+                    }
                 #endif
             }
             .onChange(of: locatedUser?.placedAt) {
@@ -912,8 +1103,8 @@ private struct InteractiveMapCanvas: View {
             }
             .onChange(of: locationFocusBottomInset) {
                 guard locationFocusBottomInset > 0,
-                      let locatedUser,
-                      locatedUser.sceneID == scene.id
+                    let locatedUser,
+                    locatedUser.sceneID == scene.id
                 else { return }
                 focus(
                     on: locatedUser,
@@ -932,30 +1123,34 @@ private struct InteractiveMapCanvas: View {
         if let locatedUser, locatedUser.sceneID == scene.id {
             let heading = locatedUser.headingDegrees.map { Int($0.rounded()) }
             if let heading {
-                return Text(accessibilityCameraValue(
-                    "Zoom \(camera.zoom) times, user location \(locatedUser.spaceCode), heading \(heading) degrees"
-                ))
+                return Text(
+                    accessibilityCameraValue(
+                        "Zoom \(camera.zoom) times, user location \(locatedUser.spaceCode), heading \(heading) degrees"
+                    ))
             }
-            return Text(accessibilityCameraValue(
-                "Zoom \(camera.zoom) times, user location \(locatedUser.spaceCode)"
-            ))
+            return Text(
+                accessibilityCameraValue(
+                    "Zoom \(camera.zoom) times, user location \(locatedUser.spaceCode)"
+                ))
         }
-        return Text(accessibilityCameraValue(
-            "Zoom \(camera.zoom) times, \(circleArtwork.count) circle images, \(bookmarks.count) route stops"
-        ))
+        return Text(
+            accessibilityCameraValue(
+                "Zoom \(camera.zoom) times, \(circleArtwork.count) circle images, \(bookmarks.count) favorites"
+            ))
     }
 
     private func accessibilityCameraValue(_ summary: String) -> String {
         #if DEBUG
-        let bearing = MapCameraMath.normalizedRotation(camera.rotation) * 180 / .pi
-        return summary + String(
-            format: ", camera offset %.1f %.1f, bearing %.1f degrees",
-            camera.translation.width,
-            camera.translation.height,
-            bearing
-        )
+            let bearing = MapCameraMath.normalizedRotation(camera.rotation) * 180 / .pi
+            return summary
+                + String(
+                    format: ", camera offset %.1f %.1f, bearing %.1f degrees",
+                    camera.translation.width,
+                    camera.translation.height,
+                    bearing
+                )
         #else
-        return summary
+            return summary
         #endif
     }
 
@@ -981,7 +1176,7 @@ private struct InteractiveMapCanvas: View {
         DragGesture(minimumDistance: 0)
             .updating($dragTranslation) { value, state, _ in
                 guard !didTriggerLongPress,
-                      hypot(value.translation.width, value.translation.height) >= 4
+                    hypot(value.translation.width, value.translation.height) >= 4
                 else {
                     return
                 }
@@ -996,7 +1191,7 @@ private struct InteractiveMapCanvas: View {
                 let triggeredLongPress = didTriggerLongPress
                 didTriggerLongPress = false
                 guard !triggeredLongPress,
-                      hypot(value.translation.width, value.translation.height) >= 4
+                    hypot(value.translation.width, value.translation.height) >= 4
                 else {
                     return
                 }
@@ -1110,13 +1305,18 @@ private struct InteractiveMapCanvas: View {
                     }
                 }
             } label: {
-                Image(systemName: "location.north.fill")
-                    .font(.headline)
+                MapCompassNeedle()
                     .rotationEffect(
                         .radians(MapCameraMath.northIndicatorRotation(mapRotation: camera.rotation))
                     )
+                    .frame(width: 30, height: 30)
                     .frame(width: 44, height: 44)
                     .background(.regularMaterial, in: .circle)
+                    .overlay {
+                        Circle()
+                            .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
+                    }
+                    .accessibilityHidden(true)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Reset map to north")
@@ -1145,15 +1345,18 @@ private struct InteractiveMapCanvas: View {
                 with: .color(
                     selected
                         ? Color.accentColor.opacity(0.28)
-                        : tableColor(table.id.blockID).opacity(searchActive && searchMatches.isEmpty ? 0.24 : 1)
+                        : tableColor(table.id.blockID).opacity(
+                            searchActive && searchMatches.isEmpty ? 0.24 : 1)
                 )
             )
         }
 
         for genre in genres {
             context.fill(
-                Path(subspaceRect(tableRect: rect, orientation: table.orientation, subspace: genre.subspace)),
-                with: .color(genreColor(genre.genreID).opacity(0.42))
+                Path(
+                    subspaceRect(
+                        tableRect: rect, orientation: table.orientation, subspace: genre.subspace)),
+                with: .color(genreColor(genre.genreID).opacity(searchActive ? 0.10 : 0.42))
             )
         }
 
@@ -1163,7 +1366,7 @@ private struct InteractiveMapCanvas: View {
                 orientation: table.orientation,
                 subspace: bookmark.subspace
             )
-            let color = bookmarkColor(bookmark.color)
+            let color = bookmark.color.swiftUIColor
             context.fill(Path(bookmarkRect), with: .color(color.opacity(0.62)))
             context.stroke(
                 Path(bookmarkRect.insetBy(dx: 1.2, dy: 1.2)),
@@ -1173,7 +1376,8 @@ private struct InteractiveMapCanvas: View {
         }
 
         for match in searchMatches {
-            let matchRect = subspaceRect(tableRect: rect, orientation: table.orientation, subspace: match.subspace)
+            let matchRect = subspaceRect(
+                tableRect: rect, orientation: table.orientation, subspace: match.subspace)
             context.fill(Path(matchRect), with: .color(Color.yellow.opacity(0.82)))
             context.stroke(
                 Path(matchRect.insetBy(dx: 1.5, dy: 1.5)),
@@ -1182,7 +1386,7 @@ private struct InteractiveMapCanvas: View {
             )
         }
 
-        if renderedScale >= CatalogMapViewport.circleArtworkThreshold {
+        if renderedScale >= CatalogMapViewport.circleArtworkThreshold, !searchActive {
             for placement in placements {
                 guard let image = circleArtwork[placement.circleID] else { continue }
                 let target = subspaceRect(
@@ -1198,15 +1402,26 @@ private struct InteractiveMapCanvas: View {
                 context.drawLayer { layer in
                     layer.translateBy(x: target.midX, y: target.midY)
                     layer.rotate(by: .radians(geometry.rotation))
+                    let imageRect = CGRect(
+                        x: -geometry.imageSize.width / 2,
+                        y: -geometry.imageSize.height / 2,
+                        width: geometry.imageSize.width,
+                        height: geometry.imageSize.height
+                    )
                     layer.draw(
                         Image(decorative: image, scale: 1),
-                        in: CGRect(
-                            x: -geometry.imageSize.width / 2,
-                            y: -geometry.imageSize.height / 2,
-                            width: geometry.imageSize.width,
-                            height: geometry.imageSize.height
-                        )
+                        in: imageRect
                     )
+                    if let bookmark = bookmarks.first(where: {
+                        $0.catalogCircleID == placement.circleID
+                    }) {
+                        let mark = CircleFavoriteMarkGeometry.rect(in: geometry.imageSize)
+                            .offsetBy(dx: imageRect.minX, dy: imageRect.minY)
+                        layer.fill(
+                            Path(mark),
+                            with: .color(bookmark.color.swiftUIColor)
+                        )
+                    }
                 }
             }
         }
@@ -1236,35 +1451,6 @@ private struct InteractiveMapCanvas: View {
             )
         }
 
-        for bookmark in bookmarks {
-            guard let routeOrder = bookmark.routeOrder, renderedScale >= 0.22 else { continue }
-            let target = subspaceRect(
-                tableRect: rect,
-                orientation: table.orientation,
-                subspace: bookmark.subspace
-            )
-            let radius = min(8 / renderedScale, 8)
-            let badge = CGRect(
-                x: target.midX - radius,
-                y: target.midY - radius,
-                width: radius * 2,
-                height: radius * 2
-            )
-            context.fill(Path(ellipseIn: badge), with: .color(bookmarkColor(bookmark.color)))
-            context.stroke(
-                Path(ellipseIn: badge),
-                with: .color(.white),
-                lineWidth: max(1 / renderedScale, 0.7)
-            )
-            context.draw(
-                Text("\(routeOrder + 1)")
-                    .font(.system(size: min(10 / renderedScale, 8), weight: .bold, design: .rounded))
-                    .foregroundStyle(.white),
-                at: CGPoint(x: target.midX, y: target.midY),
-                anchor: .center
-            )
-        }
-
         guard !usesAuthoredMap, renderedScale >= 0.55 else { return }
         context.draw(
             Text("\(table.blockName)\(table.id.spaceNumber)")
@@ -1272,53 +1458,6 @@ private struct InteractiveMapCanvas: View {
                 .foregroundStyle(Color.primary.opacity(0.78)),
             at: CGPoint(x: rect.midX, y: rect.midY),
             anchor: .center
-        )
-    }
-
-    private func drawRoute(
-        bookmarks: [MapBookmark],
-        in context: inout GraphicsContext,
-        renderedScale: CGFloat
-    ) {
-        let stops = bookmarks
-            .filter { $0.routeOrder != nil }
-            .sorted { ($0.routeOrder ?? .max) < ($1.routeOrder ?? .max) }
-            .compactMap { bookmark -> CGPoint? in
-                guard let table = scene.tableByID[bookmark.tableID] else { return nil }
-                let target = subspaceRect(
-                    tableRect: tableRect(table),
-                    orientation: table.orientation,
-                    subspace: bookmark.subspace
-                )
-                return CGPoint(x: target.midX, y: target.midY)
-            }
-        guard stops.count > 1 else { return }
-
-        var path = Path()
-        path.move(to: stops[0])
-        for stop in stops.dropFirst() {
-            path.addLine(to: stop)
-        }
-        context.stroke(
-            path,
-            with: .color(
-                colorScheme == .dark ? .black.opacity(0.8) : .white.opacity(0.92)
-            ),
-            style: StrokeStyle(
-                lineWidth: 6 / renderedScale,
-                lineCap: .round,
-                lineJoin: .round
-            )
-        )
-        context.stroke(
-            path,
-            with: .color(Color.accentColor.opacity(0.82)),
-            style: StrokeStyle(
-                lineWidth: 3 / renderedScale,
-                lineCap: .round,
-                lineJoin: .round,
-                dash: [8 / renderedScale, 5 / renderedScale]
-            )
         )
     }
 
@@ -1332,12 +1471,13 @@ private struct InteractiveMapCanvas: View {
         let haloRadius = 15 / renderedScale
 
         context.fill(
-            Path(ellipseIn: CGRect(
-                x: center.x - haloRadius,
-                y: center.y - haloRadius,
-                width: haloRadius * 2,
-                height: haloRadius * 2
-            )),
+            Path(
+                ellipseIn: CGRect(
+                    x: center.x - haloRadius,
+                    y: center.y - haloRadius,
+                    width: haloRadius * 2,
+                    height: haloRadius * 2
+                )),
             with: .color(Color.blue.opacity(0.18))
         )
 
@@ -1348,29 +1488,33 @@ private struct InteractiveMapCanvas: View {
             let baseDistance = 5 / renderedScale
             let halfWidth = 7 / renderedScale
             var pointer = Path()
-            pointer.move(to: CGPoint(
-                x: center.x + direction.dx * tipDistance,
-                y: center.y + direction.dy * tipDistance
-            ))
-            pointer.addLine(to: CGPoint(
-                x: center.x - direction.dx * baseDistance + perpendicular.dx * halfWidth,
-                y: center.y - direction.dy * baseDistance + perpendicular.dy * halfWidth
-            ))
-            pointer.addLine(to: CGPoint(
-                x: center.x - direction.dx * baseDistance - perpendicular.dx * halfWidth,
-                y: center.y - direction.dy * baseDistance - perpendicular.dy * halfWidth
-            ))
+            pointer.move(
+                to: CGPoint(
+                    x: center.x + direction.dx * tipDistance,
+                    y: center.y + direction.dy * tipDistance
+                ))
+            pointer.addLine(
+                to: CGPoint(
+                    x: center.x - direction.dx * baseDistance + perpendicular.dx * halfWidth,
+                    y: center.y - direction.dy * baseDistance + perpendicular.dy * halfWidth
+                ))
+            pointer.addLine(
+                to: CGPoint(
+                    x: center.x - direction.dx * baseDistance - perpendicular.dx * halfWidth,
+                    y: center.y - direction.dy * baseDistance - perpendicular.dy * halfWidth
+                ))
             pointer.closeSubpath()
             context.fill(pointer, with: .color(.blue))
             context.stroke(pointer, with: .color(.white), lineWidth: 1.5 / renderedScale)
         }
 
-        let puck = Path(ellipseIn: CGRect(
-            x: center.x - puckRadius,
-            y: center.y - puckRadius,
-            width: puckRadius * 2,
-            height: puckRadius * 2
-        ))
+        let puck = Path(
+            ellipseIn: CGRect(
+                x: center.x - puckRadius,
+                y: center.y - puckRadius,
+                width: puckRadius * 2,
+                height: puckRadius * 2
+            ))
         context.fill(puck, with: .color(.blue))
         context.stroke(puck, with: .color(.white), lineWidth: 2.5 / renderedScale)
     }
@@ -1403,21 +1547,6 @@ private struct InteractiveMapCanvas: View {
         return Color(hue: hue, saturation: 0.58, brightness: 0.92)
     }
 
-    private func bookmarkColor(_ color: BookmarkColor) -> Color {
-        switch color {
-        case .memoOnly: .gray
-        case .orange: Color(red: 1, green: 0.58, blue: 0.29)
-        case .magenta: Color(red: 1, green: 0, blue: 1)
-        case .yellow: Color(red: 1, green: 0.97, blue: 0)
-        case .green: Color(red: 0, green: 0.71, blue: 0.29)
-        case .cyan: Color(red: 0, green: 0.71, blue: 1)
-        case .purple: Color(red: 0.61, green: 0.32, blue: 0.61)
-        case .blue: .blue
-        case .lime: .green
-        case .red: .red
-        }
-    }
-
     private func subspaceRect(
         tableRect: CGRect,
         orientation: CatalogMapTable.Orientation,
@@ -1426,26 +1555,52 @@ private struct InteractiveMapCanvas: View {
         switch orientation {
         case .aLeft:
             return subspace == 0
-                ? CGRect(x: tableRect.minX, y: tableRect.minY, width: tableRect.width / 2, height: tableRect.height)
-                : CGRect(x: tableRect.midX, y: tableRect.minY, width: tableRect.width / 2, height: tableRect.height)
+                ? CGRect(
+                    x: tableRect.minX, y: tableRect.minY, width: tableRect.width / 2,
+                    height: tableRect.height
+                )
+                : CGRect(
+                    x: tableRect.midX, y: tableRect.minY, width: tableRect.width / 2,
+                    height: tableRect.height
+                )
         case .aBottom:
             return subspace == 0
-                ? CGRect(x: tableRect.minX, y: tableRect.midY, width: tableRect.width, height: tableRect.height / 2)
-                : CGRect(x: tableRect.minX, y: tableRect.minY, width: tableRect.width, height: tableRect.height / 2)
+                ? CGRect(
+                    x: tableRect.minX, y: tableRect.midY, width: tableRect.width,
+                    height: tableRect.height / 2
+                )
+                : CGRect(
+                    x: tableRect.minX, y: tableRect.minY, width: tableRect.width,
+                    height: tableRect.height / 2
+                )
         case .aRight:
             return subspace == 0
-                ? CGRect(x: tableRect.midX, y: tableRect.minY, width: tableRect.width / 2, height: tableRect.height)
-                : CGRect(x: tableRect.minX, y: tableRect.minY, width: tableRect.width / 2, height: tableRect.height)
+                ? CGRect(
+                    x: tableRect.midX, y: tableRect.minY, width: tableRect.width / 2,
+                    height: tableRect.height
+                )
+                : CGRect(
+                    x: tableRect.minX, y: tableRect.minY, width: tableRect.width / 2,
+                    height: tableRect.height
+                )
         case .aTop:
             return subspace == 0
-                ? CGRect(x: tableRect.minX, y: tableRect.minY, width: tableRect.width, height: tableRect.height / 2)
-                : CGRect(x: tableRect.minX, y: tableRect.midY, width: tableRect.width, height: tableRect.height / 2)
+                ? CGRect(
+                    x: tableRect.minX, y: tableRect.minY, width: tableRect.width,
+                    height: tableRect.height / 2
+                )
+                : CGRect(
+                    x: tableRect.minX, y: tableRect.midY, width: tableRect.width,
+                    height: tableRect.height / 2
+                )
         }
     }
 
     private func selectTable(at screenPoint: CGPoint, transform: CGAffineTransform) {
         let mapPoint = screenPoint.applying(transform.inverted())
-        guard let table = scene.tables.first(where: { tableRect($0).contains(mapPoint) }) else { return }
+        guard let table = scene.tables.first(where: { tableRect($0).contains(mapPoint) }) else {
+            return
+        }
 
         let rect = tableRect(table)
         let subspace: Int
@@ -1558,33 +1713,29 @@ private struct CircleMapDetailSheet: View {
     @State private var copyFeedback = 0
 
     let selection: MapScreenModel.Selection
-    let bookmark: MapBookmark?
-    let isMutatingBookmark: Bool
-    let isSyncingBookmark: Bool
-    let bookmarkError: String?
-    let onSelectCircle: (CatalogMapCircle) -> Void
-    let onToggleBookmark: () -> Void
-    let onSetBookmarkColor: (BookmarkColor) -> Void
+    let bookmarks: [Int: MapBookmark]
+    let dataSource: CirclemsDataSource?
+    let eventNumber: Int
+    let mapID: Int
+    let onOpenDetail: (CatalogMapCircle) -> Void
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    header
-
                     if selection.isLoading {
                         ProgressView("Loading circles…")
                             .frame(maxWidth: .infinity, alignment: .center)
                     } else if selection.circles.isEmpty {
-                        ContentUnavailableView(
+                        LucideContentUnavailableView(
                             "No circle assigned",
-                            systemImage: "person.slash",
-                            description: Text("This physical table has no public circle for the selected day.")
+                            icon: "person.slash",
+                            description: Text(
+                                "This physical table has no public circle for the selected day.")
                         )
                     } else {
-                        circlePicker
-                        selectedCircleDetail
-                        bookmarkControls
+                        circleSummaries
+                        locationCard
                     }
                 }
                 .padding()
@@ -1593,8 +1744,10 @@ private struct CircleMapDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close", systemImage: "xmark") {
+                    Button {
                         dismiss()
+                    } label: {
+                        LucideLabel("Close", icon: "xmark")
                     }
                     .accessibilityIdentifier("map-circle-sheet-close")
                 }
@@ -1607,14 +1760,23 @@ private struct CircleMapDetailSheet: View {
         .accessibilityIdentifier("map-circle-sheet")
     }
 
-    private var header: some View {
+    private var locationCard: some View {
         Button {
-            UIPasteboard.general.string = selection.selectedAddress.canonicalText
+            let shared = SharedComiketLocation(
+                eventNumber: eventNumber,
+                sceneID: .init(day: selection.selectedAddress.day, mapID: mapID),
+                tableID: selection.table.id,
+                subspace: selection.selectedAddress.subspace
+            )
+            UIPasteboard.general.string =
+                shared?.clipboardText(
+                    locationText: selection.selectedAddress.canonicalText
+                ) ?? selection.selectedAddress.canonicalText
             copiedAddress = true
             copyFeedback += 1
         } label: {
             HStack(spacing: 14) {
-                Image(systemName: copiedAddress ? "checkmark.circle.fill" : "mappin.and.ellipse")
+                LucideIcon(copiedAddress ? "checkmark.circle.fill" : "mappin.and.ellipse")
                     .font(.title2)
                     .foregroundStyle(copiedAddress ? .green : .accent)
 
@@ -1646,164 +1808,208 @@ private struct CircleMapDetailSheet: View {
                 .stroke(Color(uiColor: .separator).opacity(0.32), lineWidth: 0.5)
         }
         .accessibilityLabel("Copy \(selection.selectedAddress.canonicalText)")
-        .accessibilityHint("Copies the Comiket-formatted circle address")
+        .accessibilityHint("Copies the venue-aware circle address and a ComiNavi link")
         .accessibilityIdentifier("map-circle-address-copy")
     }
 
-    private var circlePicker: some View {
-        HStack(spacing: 8) {
-            ForEach(selection.circles) { circle in
-                Button {
-                    onSelectCircle(circle)
-                } label: {
-                    Text(circle.subspace == 0 ? "a" : "b")
-                        .font(.headline.monospaced())
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                }
-                .buttonStyle(.bordered)
-                .tint(selection.selectedCircleID == circle.id ? .accentColor : .secondary)
+    private var circleSummaries: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ForEach(circleGroups.indices, id: \.self) { index in
+                let circles = circleGroups[index]
+                let circle = circles[0]
+                CircleMapSummaryCard(
+                    circles: circles,
+                    imageData: selection.imageDataByCircleID[circle.id],
+                    dataSource: dataSource,
+                    favoriteColor: circles.lazy.compactMap { member in
+                        member.publicCircleID.flatMap { bookmarks[$0]?.color }
+                    }.first,
+                    onOpenDetail: {
+                        onOpenDetail(circle)
+                    }
+                )
+                .frame(maxWidth: .infinity, alignment: .top)
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("map-circle-ab-summary")
     }
 
-    @ViewBuilder
-    private var selectedCircleDetail: some View {
-        if let circle = selection.selectedCircle {
-            HStack(alignment: .top, spacing: 14) {
-                if let data = selection.imageData, let image = UIImage(data: data) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(width: 112, height: 150)
-                        .clipShape(.rect(cornerRadius: 8))
-                        .accessibilityIdentifier("map-selected-circle-artwork")
-                } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(.quaternary)
-                        .frame(width: 112, height: 150)
-                        .overlay {
-                            Image(systemName: "photo")
-                                .foregroundStyle(.secondary)
-                        }
-                }
+    private var circleGroups: [[CatalogMapCircle]] {
+        guard selection.circles.count == 2,
+            CatalogCirclePairing.sameIdentity(selection.circles[0], selection.circles[1])
+        else { return selection.circles.map { [$0] } }
+        return [selection.circles]
+    }
 
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(
-                        circle.circleName.isEmpty
-                            ? String(localized: "Unnamed circle")
-                            : circle.circleName
-                    )
-                        .font(.title3.weight(.bold))
-                    if !circle.penName.isEmpty {
-                        Text(circle.penName)
-                            .foregroundStyle(.secondary)
-                    }
-                    if let genreName = circle.genreName, !genreName.isEmpty {
-                        Label(genreName, systemImage: "tag")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if !circle.description.isEmpty {
-                        Text(circle.description)
-                            .font(.footnote)
-                            .lineLimit(5)
-                    }
-                    if let url = circle.circlemsURL {
-                        Link("Open on Circle.ms", destination: url)
-                            .font(.footnote.weight(.semibold))
-                    }
-                }
+}
+
+private struct CircleMapSummaryCard: View {
+    let circles: [CatalogMapCircle]
+    let imageData: Data?
+    let dataSource: CirclemsDataSource?
+    let favoriteColor: BookmarkColor?
+    let onOpenDetail: () -> Void
+
+    @State private var catalogCircles: [CirclemsDataSchema.ComiketCircleWC] = []
+    @State private var isOpeningDetail = false
+    @State private var showsDetail = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(isCombinedAB ? "A+B" : (circle.subspace == 0 ? "A" : "B"))
+                .font(.headline.monospaced().weight(.bold))
+                .foregroundStyle(.secondary)
+                .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
 
-    @ViewBuilder
-    private var bookmarkControls: some View {
-        if selection.selectedCircle?.publicCircleID != nil {
-            VStack(alignment: .leading, spacing: 10) {
-                Divider()
+            artworkButton
+                .padding(.horizontal, 10)
 
-                HStack {
-                    Button(action: onToggleBookmark) {
-                        Label(
-                            bookmark == nil ? "Add to route" : "Remove from route",
-                            systemImage: bookmark == nil ? "star" : "star.fill"
-                        )
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isMutatingBookmark)
-                    .accessibilityIdentifier("map-bookmark-button")
+            VStack(alignment: .leading, spacing: 7) {
+                Text(displayName)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
 
-                    if isMutatingBookmark || isSyncingBookmark {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-
-                    if bookmark?.syncState == .pendingUpsert {
-                        Label("Pending sync", systemImage: "arrow.triangle.2.circlepath")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                if !circle.penName.isEmpty {
+                    Text(circle.penName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
 
-                if bookmark != nil {
-                    Text("Route color")
-                        .font(.caption.weight(.semibold))
+                if let genreName = circle.genreName, !genreName.isEmpty {
+                    Text(genreName)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(
+            Color(uiColor: .secondarySystemBackground)
+        )
+        .compositingGroup()
+        .clipShape(.rect(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    Color(uiColor: .separator).opacity(0.3),
+                    lineWidth: 0.5
+                )
+        }
+        .navigationDestination(isPresented: $showsDetail) {
+            if !catalogCircles.isEmpty, let dataSource {
+                CircleDetailView(circles: catalogCircles, dataSource: dataSource)
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
 
-                    HStack(spacing: 10) {
-                        ForEach(BookmarkColor.selectableColors) { color in
-                            Button {
-                                onSetBookmarkColor(color)
-                            } label: {
-                                Circle()
-                                    .fill(bookmarkColor(color))
-                                    .frame(width: 24, height: 24)
-                                    .overlay {
-                                        if bookmark?.color == color {
-                                            Image(systemName: "checkmark")
-                                                .font(.caption.bold())
-                                                .foregroundStyle(.white)
-                                        }
-                                    }
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Route color \(color.rawValue)")
-                            .accessibilityIdentifier("map-bookmark-color-\(color.rawValue)")
+    private var artworkButton: some View {
+        Button(action: openDetails) {
+            artwork
+                .overlay(alignment: .topTrailing) {
+                    Group {
+                        if isOpeningDetail {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            LucideIcon("arrow.up.right")
+                                .font(.caption2.weight(.bold))
                         }
                     }
+                    .foregroundStyle(.primary)
+                    .frame(width: 28, height: 28)
+                    .background(.regularMaterial, in: .circle)
+                    .padding(6)
+                    .accessibilityHidden(true)
                 }
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open \(displayName) details")
+        .accessibilityHint("Selects this circle, then opens its full detail page")
+        .accessibilityIdentifier(
+            "map-circle-artwork-\(isCombinedAB ? "a+b" : (circle.subspace == 0 ? "a" : "b"))"
+        )
+    }
 
-                if let bookmarkError {
-                    Text(bookmarkError)
-                        .font(.caption)
-                        .foregroundStyle(.red)
+    private func openDetails() {
+        onOpenDetail()
+        guard let dataSource else { return }
+
+        if !catalogCircles.isEmpty {
+            showsDetail = true
+            return
+        }
+        guard !isOpeningDetail else { return }
+        isOpeningDetail = true
+
+        Task { @MainActor in
+            let loaded = await withTaskGroup(
+                of: CirclemsDataSchema.ComiketCircleWC?.self,
+                returning: [CirclemsDataSchema.ComiketCircleWC].self
+            ) { group in
+                for member in circles {
+                    group.addTask { [dataSource] in
+                        await dataSource.getCircle(circleID: member.id)
+                    }
                 }
+                var result: [CirclemsDataSchema.ComiketCircleWC] = []
+                for await member in group {
+                    if let member { result.append(member) }
+                }
+                return result.sorted { ($0.spaceNoSub ?? 0) < ($1.spaceNoSub ?? 0) }
+            }
+            catalogCircles = loaded
+            isOpeningDetail = false
+            showsDetail = !loaded.isEmpty
+        }
+    }
+
+    private var artwork: some View {
+        Group {
+            if let imageData, let image = UIImage(data: imageData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+            } else {
+                Rectangle()
+                    .fill(.quaternary)
+                    .overlay {
+                        ProgressView()
+                    }
             }
         }
-    }
-
-    private func bookmarkColor(_ color: BookmarkColor) -> Color {
-        switch color {
-        case .memoOnly: .gray
-        case .orange: Color(red: 1, green: 0.58, blue: 0.29)
-        case .magenta: Color(red: 1, green: 0, blue: 1)
-        case .yellow: Color(red: 1, green: 0.97, blue: 0)
-        case .green: Color(red: 0, green: 0.71, blue: 0.29)
-        case .cyan: Color(red: 0, green: 0.71, blue: 1)
-        case .purple: Color(red: 0.61, green: 0.32, blue: 0.61)
-        case .blue: .blue
-        case .lime: .green
-        case .red: .red
+        .aspectRatio(180 / 256, contentMode: .fit)
+        .frame(maxWidth: .infinity)
+        .background(Color(uiColor: .secondarySystemFill))
+        .clipShape(.rect(cornerRadius: 8))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(uiColor: .separator).opacity(0.25), lineWidth: 0.5)
+        }
+        .overlay {
+            CircleFavoriteMark(color: favoriteColor)
         }
     }
+
+    private var displayName: String {
+        circle.circleName.isEmpty ? String(localized: "Unnamed circle") : circle.circleName
+    }
+
+    private var circle: CatalogMapCircle { circles[0] }
+    private var isCombinedAB: Bool { circles.count == 2 }
 }
 
 #if DEBUG
-#Preview {
-    MapView(model: .fixture())
-}
+    #Preview {
+        MapView(model: .fixture())
+    }
 #endif

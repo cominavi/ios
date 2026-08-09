@@ -14,11 +14,8 @@ struct ProgressStepView: View {
     var body: some View {
         VStack(alignment: .leading) {
             VStack(alignment: .leading, spacing: 0) {
-                Image(systemName: "arrow.down")
-                    .resizable()
+                LucideIcon("arrow.down", size: 52)
                     .foregroundStyle(.accent)
-                    .scaledToFit()
-                    .frame(width: 52, height: 52)
                     .padding(.leading, 2)
 
                 Spacer()

@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+
 @testable import ComiNavi
 
 final class EventStorageShardTests: XCTestCase {
@@ -37,11 +38,12 @@ final class EventStorageShardTests: XCTestCase {
             at: legacyPlan.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let expectedPlan = Data("preserved route plan".utf8)
+        let expectedPlan = Data("preserved user plan".utf8)
         try expectedPlan.write(to: legacyPlan)
 
         let resolvedDirectory = try shard.resolveDirectory(in: eventsDirectory)
-        let migratedPlan = resolvedDirectory
+        let migratedPlan =
+            resolvedDirectory
             .appendingPathComponent("users/user-42/user-plan.sqlite")
 
         XCTAssertEqual(resolvedDirectory, shard.directory(in: eventsDirectory))

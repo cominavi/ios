@@ -17,7 +17,6 @@ struct BigSightCampusScene: Equatable, Sendable {
     let connections: [BigSightCampusConnection]
     let openStreetMapFeatures: [BigSightOpenStreetMapFeature]
     let facilities: [BigSightFacilityLocation]
-    let operationalRoutes: [BigSightOperationalRoute]
     let bounds: CGRect
 
     init(
@@ -26,7 +25,6 @@ struct BigSightCampusScene: Equatable, Sendable {
         connections: [BigSightCampusConnection],
         openStreetMapFeatures: [BigSightOpenStreetMapFeature] = [],
         facilities: [BigSightFacilityLocation] = [],
-        operationalRoutes: [BigSightOperationalRoute] = [],
         bounds: CGRect
     ) {
         self.id = id
@@ -34,7 +32,6 @@ struct BigSightCampusScene: Equatable, Sendable {
         self.connections = connections
         self.openStreetMapFeatures = openStreetMapFeatures
         self.facilities = facilities
-        self.operationalRoutes = operationalRoutes
         self.bounds = bounds
     }
 }
@@ -399,6 +396,8 @@ struct BigSightCampusConnection: Identifiable, Equatable, Sendable {
 enum BigSightCampusLayout {
     /// A standard Comiket table is approximately 1.8 m wide and 40 catalog-map points wide.
     static let metersPerMapPoint: CGFloat = 1.8 / 40
+    static let mapBoundaryPaddingMeters: CGFloat = 70
+    static let additionalNorthBoundaryMeters: CGFloat = 100
 
     /// Venue artwork alignment authored against OpenStreetMap for a specific event.
     /// `baseRotation` excludes the catalog's `mapRotation` so rotated map variants still
@@ -424,7 +423,7 @@ enum BigSightCampusLayout {
         }
     }
 
-    // Representative building and routing landmarks from OpenStreetMap and the official
+    // Representative building and orientation landmarks from OpenStreetMap and the official
     // Tokyo Big Sight floor diagrams. Artwork placement uses the calibrations below.
     static let eastBuilding = GeographicCoordinate(latitude: 35.6317268, longitude: 139.7977084)
     static let newEastBuilding = GeographicCoordinate(latitude: 35.6331039, longitude: 139.7991998)
@@ -463,7 +462,7 @@ enum BigSightCampusLayout {
         let hallsByMapID = Dictionary(uniqueKeysWithValues: halls.map { ($0.externalMapId, $0) })
         let venues = scenes.values.compactMap { scene -> BigSightVenuePlacement? in
             guard let hall = hallsByMapID[scene.id.mapID],
-                  let kind = venueKind(hall: hall, scene: scene)
+                let kind = venueKind(hall: hall, scene: scene)
             else {
                 return nil
             }
@@ -490,13 +489,13 @@ enum BigSightCampusLayout {
         guard !venues.isEmpty else { return nil }
 
         let connections = makeConnections(venues: venues)
-        let openStreetMapFeatures = [connectingBridgeFeature]
+        let openStreetMapFeatures =
+            [connectingBridgeFeature]
             + BigSightPedestrianWayCatalog.features
         let facilities = BigSightMapContextCatalog.facilities(
             eventNumber: eventNumber,
             venues: venues
         )
-        let operationalRoutes = BigSightMapContextCatalog.routes(eventNumber: eventNumber)
         var bounds = venues.dropFirst().reduce(venues[0].bounds) { $0.union($1.bounds) }
         for point in connections.flatMap(\.points) {
             bounds = bounds.union(CGRect(x: point.x, y: point.y, width: 1, height: 1))
@@ -505,12 +504,15 @@ enum BigSightCampusLayout {
             bounds = bounds.union(CGRect(x: point.x, y: point.y, width: 1, height: 1))
         }
         for facility in facilities {
-            bounds = bounds.union(CGRect(x: facility.center.x, y: facility.center.y, width: 1, height: 1))
+            bounds = bounds.union(
+                CGRect(x: facility.center.x, y: facility.center.y, width: 1, height: 1))
         }
-        for point in operationalRoutes.flatMap(\.points) {
-            bounds = bounds.union(CGRect(x: point.x, y: point.y, width: 1, height: 1))
-        }
-        bounds = bounds.insetBy(dx: -70, dy: -70)
+        bounds = bounds.insetBy(
+            dx: -mapBoundaryPaddingMeters,
+            dy: -mapBoundaryPaddingMeters
+        )
+        bounds.origin.y -= additionalNorthBoundaryMeters
+        bounds.size.height += additionalNorthBoundaryMeters
 
         return BigSightCampusScene(
             id: .init(day: day, mapIDs: venues.map(\.id)),
@@ -518,7 +520,6 @@ enum BigSightCampusLayout {
             connections: connections,
             openStreetMapFeatures: openStreetMapFeatures,
             facilities: facilities,
-            operationalRoutes: operationalRoutes,
             bounds: bounds
         )
     }
@@ -526,7 +527,8 @@ enum BigSightCampusLayout {
     static func project(_ coordinate: GeographicCoordinate) -> CGPoint {
         let earthRadius = 6_378_137.0
         let latitudeRadians = origin.latitude * .pi / 180
-        let x = (coordinate.longitude - origin.longitude) * .pi / 180
+        let x =
+            (coordinate.longitude - origin.longitude) * .pi / 180
             * earthRadius * cos(latitudeRadians)
         let north = (coordinate.latitude - origin.latitude) * .pi / 180 * earthRadius
         return CGPoint(x: x, y: -north)
@@ -559,10 +561,14 @@ enum BigSightCampusLayout {
         if name.contains("東7") || name.contains("E7") || name.contains("EAST7") {
             return .east7
         }
-        if name.contains("西") || name.contains("WEST") || name.contains("W12") || name.contains("W34") {
+        if name.contains("西") || name.contains("WEST") || name.contains("W12")
+            || name.contains("W34")
+        {
             return .west
         }
-        if name.contains("南") || name.contains("SOUTH") || name.contains("S12") || name.contains("S34") {
+        if name.contains("南") || name.contains("SOUTH") || name.contains("S12")
+            || name.contains("S34")
+        {
             return .south
         }
         return nil
@@ -591,7 +597,6 @@ enum BigSightCampusLayout {
     ) -> VenueCalibration? {
         if eventNumber == 108 {
             return c108VenueCalibration(for: kind, sceneSize: sceneSize)
-                ?? c104VenueCalibration(for: kind, sceneSize: sceneSize)
         }
         return c104VenueCalibration(for: kind, sceneSize: sceneSize)
     }
@@ -730,35 +735,41 @@ enum BigSightCampusLayout {
         var result: [BigSightCampusConnection] = []
 
         if venueByKind[.east123] != nil, venueByKind[.east456] != nil {
-            result.append(BigSightCampusConnection(
-                id: "east-galleria",
-                name: String(localized: "Galleria"),
-                points: [venueByKind[.east123]!.center, eastCenter, venueByKind[.east456]!.center]
-            ))
+            result.append(
+                BigSightCampusConnection(
+                    id: "east-galleria",
+                    name: String(localized: "Galleria"),
+                    points: [
+                        venueByKind[.east123]!.center, eastCenter, venueByKind[.east456]!.center,
+                    ]
+                ))
         }
 
         if let east7 = venueByKind[.east7], eastMain != nil {
-            result.append(BigSightCampusConnection(
-                id: "east-link-space",
-                name: String(localized: "Link Space"),
-                points: [east7.center, link, eastCenter]
-            ))
+            result.append(
+                BigSightCampusConnection(
+                    id: "east-link-space",
+                    name: String(localized: "Link Space"),
+                    points: [east7.center, link, eastCenter]
+                ))
         }
 
         if eastMain != nil, venueByKind[.west] != nil || venueByKind[.south] != nil {
-            result.append(BigSightCampusConnection(
-                id: "east-entrance-concourse",
-                name: String(localized: "North Concourse"),
-                points: [eastCenter, bridge, north, entrance]
-            ))
+            result.append(
+                BigSightCampusConnection(
+                    id: "east-entrance-concourse",
+                    name: String(localized: "North Concourse"),
+                    points: [eastCenter, bridge, north, entrance]
+                ))
         }
 
         if let west = venueByKind[.west] {
-            result.append(BigSightCampusConnection(
-                id: "entrance-west-atrium",
-                name: String(localized: "West Atrium"),
-                points: [entrance, atrium, west.center]
-            ))
+            result.append(
+                BigSightCampusConnection(
+                    id: "entrance-west-atrium",
+                    name: String(localized: "West Atrium"),
+                    points: [entrance, atrium, west.center]
+                ))
         }
 
         if let south = venueByKind[.south] {
@@ -766,11 +777,12 @@ enum BigSightCampusLayout {
                 x: entrance.x * 0.45 + south.center.x * 0.55,
                 y: entrance.y * 0.45 + south.center.y * 0.55
             )
-            result.append(BigSightCampusConnection(
-                id: "entrance-south-concourse",
-                name: String(localized: "South Concourse"),
-                points: [entrance, southConcourse, south.center]
-            ))
+            result.append(
+                BigSightCampusConnection(
+                    id: "entrance-south-concourse",
+                    name: String(localized: "South Concourse"),
+                    points: [entrance, southConcourse, south.center]
+                ))
         }
 
         return result

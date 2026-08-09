@@ -2,11 +2,48 @@ import SwiftUI
 import UIKit
 
 struct CircleDetailView: View {
-    let circle: CirclemsDataSchema.ComiketCircleWC
+    let circles: [CirclemsDataSchema.ComiketCircleWC]
     let dataSource: CirclemsDataSource
+    let tags: [String]
 
     @State private var details: CatalogCircleDetails?
-    @State private var hasEnrichmentArchive = false
+    @State private var extensionsByCircleID: [Int: CirclemsDataSchema.ComiketCircleExtend] = [:]
+    @State private var circleAddress: ComiketSpaceAddress?
+    @State private var isShowingDataSources = false
+    @State private var isOpeningMap = false
+    @State private var planModel: CircleUserPlanModel
+
+    init(
+        circle: CirclemsDataSchema.ComiketCircleWC,
+        dataSource: CirclemsDataSource,
+        tags: [String] = []
+    ) {
+        circles = [circle]
+        self.dataSource = dataSource
+        self.tags = tags
+        _planModel = State(initialValue: CircleUserPlanModel(
+            circle: circle,
+            dataSource: dataSource
+        ))
+    }
+
+    init(
+        circles: [CirclemsDataSchema.ComiketCircleWC],
+        dataSource: CirclemsDataSource,
+        tags: [String] = []
+    ) {
+        precondition(!circles.isEmpty)
+        self.circles = circles.sorted { ($0.spaceNoSub ?? 0) < ($1.spaceNoSub ?? 0) }
+        self.dataSource = dataSource
+        self.tags = tags
+        _planModel = State(initialValue: CircleUserPlanModel(
+            circles: circles,
+            dataSource: dataSource
+        ))
+    }
+
+    private var circle: CirclemsDataSchema.ComiketCircleWC { circles[0] }
+    private var isCombinedAB: Bool { circles.count == 2 }
 
     var body: some View {
         ScrollView {
@@ -14,20 +51,31 @@ struct CircleDetailView: View {
                 CircleDetailHeader(
                     circle: circle,
                     dataSource: dataSource,
-                    spaceLabel: spaceLabel
+                    spaceLabel: spaceLabel,
+                    favoriteColor: planModel.selectedColor,
+                    address: circleAddress,
+                    isOpeningMap: isOpeningMap,
+                    onOpenMap: openOnMap
                 )
+
+                if details?.extensionRecord?.WCId != nil {
+                    CircleUserPlanSection(model: planModel)
+                }
+
+                if !withdrawalClaims.isEmpty {
+                    CircleWithdrawalNotice(claims: withdrawalClaims)
+                }
 
                 if !shinagakiPosts.isEmpty {
                     CircleDetailShinagakiSection(posts: shinagakiPosts)
-                } else if hasEnrichmentArchive, details != nil {
-                    CircleDetailSection("Shinagaki") {
-                        ContentUnavailableView(
-                            "No matched shinagaki",
-                            systemImage: "doc.text.magnifyingglass",
-                            description: Text("No crawl post could be matched confidently to this circle.")
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
+                }
+
+                if !combinedTags.isEmpty {
+                    CircleDetailTagsSection(
+                        tags: combinedTags,
+                        day: circle.day ?? 1,
+                        dataSource: dataSource
+                    )
                 }
 
                 if hasAboutInformation {
@@ -54,45 +102,52 @@ struct CircleDetailView: View {
                 if !externalLinks.isEmpty {
                     CircleDetailSection(
                         "Links",
-                        contentInsets: EdgeInsets(
-                            top: 0,
-                            leading: 16,
-                            bottom: 0,
-                            trailing: 16
-                        )
+                        contentInsets: EdgeInsets()
                     ) {
                         VStack(spacing: 0) {
                             ForEach(externalLinks) { item in
                                 Link(destination: item.url) {
                                     HStack(spacing: 12) {
-                                        Image(systemName: item.systemImage)
+                                        LucideIcon(item.systemImage)
                                             .font(.body.weight(.semibold))
                                             .foregroundStyle(Color.accentColor)
                                             .frame(width: 24)
                                             .accessibilityHidden(true)
 
-                                        Text(item.title)
-                                            .foregroundStyle(.primary)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(item.title)
+                                                .font(.body.weight(.medium))
+                                                .foregroundStyle(.primary)
+
+                                            Text(item.preview)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                        }
 
                                         Spacer(minLength: 12)
 
-                                        Image(systemName: "arrow.up.right")
+                                        LucideIcon("arrow.up.right")
                                             .font(.caption.weight(.bold))
                                             .foregroundStyle(.tertiary)
                                             .accessibilityHidden(true)
                                     }
-                                    .frame(minHeight: 50)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .frame(minHeight: 56)
                                     .contentShape(.rect)
                                 }
+                                .buttonStyle(CircleListRowButtonStyle())
                                 .accessibilityHint("Opens in your browser")
                                 .accessibilityIdentifier(item.accessibilityIdentifier)
 
                                 if item.id != externalLinks.last?.id {
                                     Divider()
-                                        .padding(.leading, 36)
+                                        .padding(.leading, 52)
                                 }
                             }
                         }
+                        .clipShape(.rect(cornerRadius: 16))
                     }
                 }
             }
@@ -109,11 +164,58 @@ struct CircleDetailView: View {
             )
         )
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isShowingDataSources = true
+                } label: {
+                    LucideLabel("Data sources", icon: "info.circle")
+                }
+                .accessibilityHint("Shows where this circle's information came from")
+                .accessibilityIdentifier("circle-data-sources-button")
+            }
+        }
+        .sheet(isPresented: $isShowingDataSources) {
+            CircleDetailDataSourcesSheet(
+                circle: circle,
+                details: details,
+                officialCatalogLinks: officialCatalogLinks
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .task(id: circle.id) {
-            async let loadedDetails = dataSource.getCircleDetails(circleID: circle.id)
-            async let statistics = dataSource.enrichmentStatistics()
-            details = await loadedDetails
-            hasEnrichmentArchive = await statistics != nil
+            let loadedDetails = await withTaskGroup(
+                of: (Int, CatalogCircleDetails).self,
+                returning: [Int: CatalogCircleDetails].self
+            ) { group in
+                for member in circles {
+                    group.addTask { [dataSource] in
+                        (member.id, await dataSource.getCircleDetails(circleID: member.id))
+                    }
+                }
+                var result: [Int: CatalogCircleDetails] = [:]
+                for await (circleID, detail) in group { result[circleID] = detail }
+                return result
+            }
+            let primaryDetails = loadedDetails[circle.id]
+            extensionsByCircleID = loadedDetails.compactMapValues(\.extensionRecord)
+            let enrichments = loadedDetails.values.compactMap(\.enrichment)
+            details = CatalogCircleDetails(
+                extensionRecord: primaryDetails?.extensionRecord,
+                enrichment: enrichments.isEmpty
+                    ? nil
+                    : CatalogCircleEnrichment(
+                        posts: uniquePosts(enrichments.flatMap(\.posts)),
+                        attendanceClaims: enrichments.flatMap(\.attendanceClaims)
+                    )
+            )
+            await planModel.load(publicCircleIDsByCatalogID: loadedDetails.reduce(into: [:]) {
+                if let publicCircleID = $1.value.extensionRecord?.WCId {
+                    $0[$1.key] = publicCircleID
+                }
+            })
+            await loadCircleAddress()
         }
         .accessibilityIdentifier("circle-detail-screen")
     }
@@ -128,6 +230,17 @@ struct CircleDetailView: View {
         details?.enrichment?.posts ?? []
     }
 
+    private var withdrawalClaims: [CatalogAttendanceClaim] {
+        details?.enrichment?.withdrawalClaims ?? []
+    }
+
+    private var combinedTags: [String] {
+        ExploreModel.mergedTagLabels(
+            remoteTags: tags,
+            enrichmentTags: details?.enrichment?.tagLabels ?? []
+        )
+    }
+
     private var spaceLabel: String? {
         guard let blockID = circle.blockId,
               let block = dataSource.comiket.blocks.first(where: {
@@ -136,78 +249,80 @@ struct CircleDetailView: View {
               let spaceNumber = circle.spaceNo
         else { return nil }
 
-        let side = circle.spaceNoSub == 1 ? "b" : "a"
+        let side = isCombinedAB ? "a+b" : (circle.spaceNoSub == 1 ? "b" : "a")
         return "\(block.name)\(String(format: "%02d", spaceNumber))\(side)"
     }
 
     private var externalLinks: [CircleExternalLink] {
-        var links: [CircleExternalLink] = []
         var seen: Set<String> = []
-
-        func append(
-            _ title: LocalizedStringResource,
-            systemImage: String,
-            rawURL: String?,
-            accessibilityIdentifier: String
-        ) {
-            guard let url = normalizedWebURL(rawURL),
-                  seen.insert(url.absoluteString).inserted
-            else { return }
-            links.append(
-                CircleExternalLink(
-                    title: String(localized: title),
-                    systemImage: systemImage,
-                    url: url,
-                    accessibilityIdentifier: accessibilityIdentifier
-                )
+        return circles.flatMap { member in
+            CircleExternalLinkNormalizer.links(
+                circle: member,
+                extensionRecord: extensionsByCircleID[member.id],
+                enrichmentProfileURL: details?.enrichment?.primaryPost?.authorProfileURL
             )
-        }
-
-        append(
-            "Website",
-            systemImage: "globe",
-            rawURL: circle.url,
-            accessibilityIdentifier: "circle-link-website"
-        )
-        append(
-            "Circle.ms",
-            systemImage: "person.2.crop.square.stack",
-            rawURL: circle.circlems,
-            accessibilityIdentifier: "circle-link-circlems"
-        )
-        append(
-            "Circle.ms portal",
-            systemImage: "person.2.crop.square.stack",
-            rawURL: details?.extensionRecord?.CirclemsPortalURL,
-            accessibilityIdentifier: "circle-link-circlems-portal"
-        )
-        append(
-            "X profile",
-            systemImage: "at",
-            rawURL: details?.extensionRecord?.twitterURL.nonBlank
-                ?? details?.enrichment?.primaryPost?.authorProfileURL?.absoluteString,
-            accessibilityIdentifier: "circle-link-x"
-        )
-        append(
-            "Pixiv",
-            systemImage: "paintbrush.pointed",
-            rawURL: details?.extensionRecord?.pixivURL,
-            accessibilityIdentifier: "circle-link-pixiv"
-        )
-        return links
+        }.filter { seen.insert($0.id).inserted }
     }
 
-    private func normalizedWebURL(_ rawValue: String?) -> URL? {
-        guard let value = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !value.isEmpty
-        else { return nil }
+    private var officialCatalogLinks: [CircleExternalLink] {
+        CircleExternalLinkNormalizer.links(from: [
+            .init(circle.circlems, hint: .circlems),
+            .init(extensionsByCircleID[circle.id]?.CirclemsPortalURL, hint: .circlems),
+        ])
+    }
 
-        if let url = URL(string: value),
-           ["http", "https"].contains(url.scheme?.lowercased())
-        {
-            return url
+    private func openOnMap() {
+        guard !isOpeningMap,
+              let updateID = circle.updateId
+        else { return }
+
+        isOpeningMap = true
+        Task { @MainActor in
+            defer { isOpeningMap = false }
+            guard let locations = try? await dataSource.mapCatalog.bookmarkLocations(
+                updateIDs: [updateID]
+            ),
+                let location = locations.first(where: {
+                    $0.catalogCircleID == circle.id
+                }),
+                let sharedLocation = SharedComiketLocation(
+                    eventNumber: dataSource.comiket.number,
+                    sceneID: .init(day: location.day, mapID: location.mapID),
+                    tableID: location.tableID,
+                    subspace: location.subspace
+                )
+            else { return }
+
+            AppData.sharedLocationInbox.receive(url: sharedLocation.url)
         }
-        return URL(string: "https://\(value)")
+    }
+
+    private func loadCircleAddress() async {
+        let updateIDs = circles.compactMap(\.updateId)
+        guard let locations = try? await dataSource.mapCatalog.bookmarkLocations(
+            updateIDs: updateIDs
+        ),
+            let location = locations.first(where: { $0.catalogCircleID == circle.id }),
+            let blockID = circle.blockId,
+            let block = dataSource.comiket.blocks.first(where: { $0.externalBlockId == blockID })
+        else { return }
+        let hallName = dataSource.comiket.days
+            .first(where: { $0.dayIndex == location.day })?
+            .halls.first(where: { $0.externalMapId == location.mapID })?
+            .name ?? "会場"
+        circleAddress = ComiketSpaceAddress(
+            day: location.day,
+            hallName: hallName,
+            blockName: block.name,
+            spaceNumber: location.tableID.spaceNumber,
+            subspace: isCombinedAB ? nil : location.subspace,
+            isCombinedAB: isCombinedAB
+        )
+    }
+
+    private func uniquePosts(_ posts: [CatalogShinagakiPost]) -> [CatalogShinagakiPost] {
+        var seen: Set<String> = []
+        return posts.filter { seen.insert($0.id).inserted }
     }
 }
 
@@ -215,68 +330,315 @@ private struct CircleDetailHeader: View {
     let circle: CirclemsDataSchema.ComiketCircleWC
     let dataSource: CirclemsDataSource
     let spaceLabel: String?
+    let favoriteColor: BookmarkColor?
+    let address: ComiketSpaceAddress?
+    let isOpeningMap: Bool
+    let onOpenMap: () -> Void
 
-    @State private var image: Image?
+    @State private var image: UIImage?
+    @State private var didFailLoadingImage = false
+    @State private var isShowingLightbox = false
     @ScaledMetric(relativeTo: .title) private var artworkWidth = 154.0
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            Group {
-                if let image {
-                    image
-                        .resizable()
-                        .scaledToFit()
-                } else {
-                    Rectangle()
-                        .fill(Color(uiColor: .secondarySystemFill))
-                        .overlay {
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundStyle(.tertiary)
-                        }
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 16) {
+                    artwork(width: min(artworkWidth, 220))
+                    details
+                }
+            } else {
+                HStack(alignment: .top, spacing: 16) {
+                    artwork(width: artworkWidth)
+                    details
                 }
             }
-            .aspectRatio(180 / 256, contentMode: .fit)
-            .frame(width: artworkWidth)
-            .clipShape(.rect(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(uiColor: .separator).opacity(0.3), lineWidth: 0.5)
-            }
-            .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(circle.circleName.nonBlank ?? String(localized: "Unnamed circle"))
-                    .font(.title2.weight(.bold))
-                    .textSelection(.enabled)
-
-                if let penName = circle.penName.nonBlank {
-                    Text(penName)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-
-                if let spaceLabel {
-                    Label(spaceLabel, systemImage: "mappin.and.ellipse")
-                        .font(.headline.monospaced())
-                        .foregroundStyle(Color.accentColor)
-                }
-
-                if let day = circle.day {
-                    Label("Day \(day)", systemImage: "calendar")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .task(id: circle.id) {
+            image = nil
+            didFailLoadingImage = false
             let data = await dataSource.getCircleImage(circleId: circle.id)
-            image = await Image.asyncInit(data: data)
+            image = await Task.detached(priority: .userInitiated) {
+                data.flatMap(UIImage.init(data:))
+            }.value
+            didFailLoadingImage = image == nil
         }
-        .accessibilityElement(children: .combine)
+        .sheet(isPresented: $isShowingLightbox) {
+            if let image {
+                ShinagakiLightbox(
+                    image: image,
+                    accessibilityLabel: String(localized: "Circle cover for \(displayName)")
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.black)
+            }
+        }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("circle-detail-header")
+    }
+
+    private func artwork(width: CGFloat) -> some View {
+        Group {
+            if let image {
+                Button {
+                    isShowingLightbox = true
+                } label: {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Circle cover for \(displayName)")
+                .accessibilityHint("Opens the image viewer")
+                .accessibilityIdentifier("circle-cover-lightbox-button")
+            } else {
+                Rectangle()
+                    .fill(Color(uiColor: .secondarySystemFill))
+                    .overlay {
+                        if didFailLoadingImage {
+                            LucideIcon("photo.badge.exclamationmark")
+                                .font(.largeTitle)
+                                .foregroundStyle(.tertiary)
+                        } else {
+                            ProgressView()
+                        }
+                    }
+            }
+        }
+        .aspectRatio(180 / 256, contentMode: .fit)
+        .frame(width: width)
+        .clipShape(.rect(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color(uiColor: .separator).opacity(0.3), lineWidth: 0.5)
+        }
+        .overlay {
+            CircleFavoriteMark(color: favoriteColor)
+        }
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(displayName)
+                .font(.title2.weight(.bold))
+                .textSelection(.enabled)
+
+            if let penName = circle.penName.nonBlank {
+                Text(penName)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
+            if let spaceLabel {
+                HStack(spacing: 4) {
+                    Button(action: onOpenMap) {
+                        HStack(spacing: 7) {
+                            LucideLabel(
+                                verbatim: address?.canonicalText ?? spaceLabel,
+                                icon: "mappin.and.ellipse"
+                            )
+                            if isOpeningMap {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
+                        .font(.headline.monospaced())
+                        .foregroundStyle(Color.accentColor)
+                        .frame(minHeight: 44)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isOpeningMap)
+                    .accessibilityHint("Shows this circle on the map")
+                    .accessibilityIdentifier("circle-location-map-button")
+
+                    if let address {
+                        Button {
+                            UIPasteboard.general.string = address.canonicalText
+                        } label: {
+                            LucideIcon("doc.on.doc")
+                                .frame(width: 44, height: 44)
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Copy circle location")
+                        .accessibilityHint("Copies \(address.canonicalText)")
+                        .accessibilityIdentifier("circle-location-copy-button")
+                    }
+                }
+            }
+
+            if let day = circle.day {
+                LucideLabel("Day \(day)", icon: "calendar")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var displayName: String {
+        circle.circleName.nonBlank ?? String(localized: "Unnamed circle")
+    }
+}
+
+private struct CircleUserPlanSection: View {
+    let model: CircleUserPlanModel
+
+    @FocusState private var isNoteFocused: Bool
+
+    var body: some View {
+        @Bindable var model = model
+
+        CircleDetailSection("Your plan") {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    Button(action: model.toggleFavorite) {
+                        LucideLabel(
+                            resource:
+                            model.isFavorite
+                                ? LocalizedStringResource("Saved circle")
+                                : LocalizedStringResource("Save circle"),
+                            icon: model.isFavorite ? "star.fill" : "star"
+                        )
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(model.selectedColor?.swiftUIColor ?? Color.accentColor)
+                    .accessibilityIdentifier("circle-favorite-button")
+
+                    CirclePlanSaveStateView(state: model.saveState)
+                }
+
+                if model.isFavorite {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Label color")
+                            .font(.subheadline.weight(.semibold))
+
+                        ScrollView(.horizontal) {
+                            HStack(spacing: 10) {
+                            ForEach(BookmarkColor.selectableColors) { color in
+                                CirclePlanColorButton(
+                                    color: color,
+                                    isSelected: model.selectedColor == color,
+                                    onSelect: { model.selectColor(color) }
+                                )
+                            }
+                            }
+                        }
+                        .scrollIndicators(.hidden)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Private note")
+                            .font(.subheadline.weight(.semibold))
+
+                        TextEditor(text: $model.memo)
+                            .focused($isNoteFocused)
+                            .frame(minHeight: 92)
+                            .padding(10)
+                            .scrollContentBackground(.hidden)
+                            .background(
+                                Color(uiColor: .tertiarySystemGroupedBackground),
+                                in: .rect(cornerRadius: 12)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        isNoteFocused
+                                            ? Color.accentColor
+                                            : Color(uiColor: .separator).opacity(0.3),
+                                        lineWidth: isNoteFocused ? 1.5 : 0.5
+                                    )
+                            }
+                            .onChange(of: model.memo) {
+                                model.memoDidChange()
+                            }
+                            .onChange(of: isNoteFocused) { _, focused in
+                                if !focused {
+                                    model.flushMemo()
+                                }
+                            }
+                            .accessibilityIdentifier("circle-private-note")
+
+                        Text("Saved on this device first, then synchronized with Circle.ms when online.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if case .failed(let message) = model.saveState {
+                    LucideLabel(verbatim: message, icon: "exclamationmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .accessibilityIdentifier("circle-user-plan-section")
+        .onDisappear {
+            model.flushMemo()
+        }
+    }
+}
+
+private struct CirclePlanColorButton: View {
+    let color: BookmarkColor
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            Circle()
+                .fill(color.swiftUIColor)
+                .frame(width: 32, height: 32)
+                .overlay {
+                    if isSelected {
+                        LucideIcon("checkmark")
+                            .font(.caption.bold())
+                            .foregroundStyle(.white)
+                    }
+                }
+                .overlay {
+                    Circle()
+                        .stroke(
+                            isSelected ? Color.primary : Color.clear,
+                            lineWidth: 2
+                        )
+                        .padding(-3)
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(color.displayName))
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("circle-favorite-color-\(color.rawValue)")
+    }
+}
+
+private struct CirclePlanSaveStateView: View {
+    let state: CircleUserPlanModel.SaveState
+
+    var body: some View {
+        switch state {
+        case .saving:
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel("Saving")
+        case .saved:
+            LucideIcon("checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .accessibilityLabel("Saved locally")
+        case .idle, .failed:
+            EmptyView()
+        }
     }
 }
 
@@ -326,6 +688,406 @@ private struct CircleDetailPrincipalTitle: View {
     }
 }
 
+private struct CircleWithdrawalNotice: View {
+    let claims: [CatalogAttendanceClaim]
+
+    var body: some View {
+        if let claim = claims.first {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    LucideLabel("Reported not attending", icon: "person.crop.circle.badge.xmark")
+                        .font(.headline)
+                        .foregroundStyle(.red)
+
+                    Spacer(minLength: 8)
+
+                    Text(claim.confidence.title)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.red.opacity(0.12), in: .capsule)
+                }
+
+                Text("A public X post says this allocated circle will not attend. Its official catalog placement remains shown.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Link(destination: claim.postURL) {
+                    LucideLabel("View attendance evidence on X", icon: "arrow.up.right")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 44)
+                }
+                .accessibilityHint("Opens the original public post")
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.red.opacity(0.08), in: .rect(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.red.opacity(0.24), lineWidth: 0.5)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("circle-withdrawal-notice")
+        }
+    }
+}
+
+private struct CircleDetailDataSourcesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let circle: CirclemsDataSchema.ComiketCircleWC
+    let details: CatalogCircleDetails?
+    let officialCatalogLinks: [CircleExternalLink]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                officialCatalogSection
+
+                if !xEvidence.isEmpty {
+                    publicXEvidenceSection
+                }
+
+                if let enrichment = details?.enrichment,
+                   !enrichment.posts.isEmpty || !enrichment.attendanceClaims.isEmpty {
+                    automatedMatchingSection(enrichment: enrichment)
+                }
+
+                if let tags = details?.enrichment?.tags, !tags.isEmpty {
+                    tagProvenanceSection(tags: tags)
+                }
+            }
+            .navigationTitle("Data sources")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("circle-data-sources-sheet")
+    }
+
+    private var officialCatalogSection: some View {
+        Section("Official catalog") {
+            LabeledContent("Source") {
+                Text("Circle.ms Web Catalog")
+            }
+
+            LabeledContent("Catalog record") {
+                Text(verbatim: "C\(circle.comiketNo) · \(circle.id)")
+                    .monospacedDigit()
+            }
+
+            if let publicCircleID = details?.extensionRecord?.WCId {
+                LabeledContent("Public circle ID") {
+                    Text(publicCircleID, format: .number.grouping(.never))
+                        .monospacedDigit()
+                }
+            }
+
+            ForEach(officialCatalogLinks) { link in
+                Link(destination: link.url) {
+                    LucideLabel("Open official Circle.ms record", icon: "arrow.up.right")
+                }
+                .accessibilityHint("Opens the official catalog record")
+            }
+
+            Text("The official catalog allocation is preserved even when later public attendance evidence says the circle withdrew.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var publicXEvidenceSection: some View {
+        Section("Public X evidence") {
+            ForEach(xEvidence) { evidence in
+                Link(destination: evidence.url) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(evidence.title)
+                            .foregroundStyle(.primary)
+                        Text(verbatim: "@\(evidence.authorHandle)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityHint("Opens the original public post")
+            }
+        }
+    }
+
+    private func automatedMatchingSection(
+        enrichment: CatalogCircleEnrichment
+    ) -> some View {
+        Section("Automated matching") {
+            ForEach(enrichment.posts) { post in
+                CatalogPostDecisionSourceRow(post: post)
+            }
+
+            ForEach(enrichment.attendanceClaims) { claim in
+                CatalogAttendanceDecisionSourceRow(claim: claim)
+            }
+        }
+    }
+
+    private func tagProvenanceSection(
+        tags: [CatalogEnrichmentTag]
+    ) -> some View {
+        Section("Tag provenance") {
+            ForEach(tags) { tag in
+                CatalogTagSourceRow(tag: tag)
+            }
+        }
+    }
+
+    private var xEvidence: [CatalogXEvidence] {
+        let postEvidence = (details?.enrichment?.posts ?? []).map {
+            CatalogXEvidence(
+                id: "shinagaki:\($0.id)",
+                title: "Shinagaki post",
+                url: $0.postURL,
+                authorHandle: $0.authorHandle
+            )
+        }
+        let attendanceEvidence = (details?.enrichment?.attendanceClaims ?? []).map {
+            CatalogXEvidence(
+                id: "attendance:\($0.id)",
+                title: $0.status == .withdrawn ? "Withdrawal report" : "Attendance report",
+                url: $0.postURL,
+                authorHandle: $0.authorHandle
+            )
+        }
+
+        var seenURLs: Set<URL> = []
+        return (postEvidence + attendanceEvidence).filter {
+            seenURLs.insert($0.url).inserted
+        }
+    }
+}
+
+private struct CatalogXEvidence: Identifiable {
+    let id: String
+    let title: LocalizedStringResource
+    let url: URL
+    let authorHandle: String
+}
+
+private struct CatalogPostDecisionSourceRow: View {
+    let post: CatalogShinagakiPost
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Shinagaki match")
+                .font(.headline)
+
+            if let policyID = post.matchingPolicyID {
+                LabeledContent("Matching policy", value: policyID)
+            }
+
+            LabeledContent("Post confidence") {
+                Text(post.postConfidence.title)
+            }
+            LabeledContent("Placement confidence") {
+                Text(post.placementConfidence.title)
+            }
+
+            CatalogReasonList(reasons: post.postReasons + post.matchReasons)
+            CatalogProvenanceList(
+                provenance: post.provenance + post.matchedCircleProvenance
+            )
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct CatalogAttendanceDecisionSourceRow: View {
+    let claim: CatalogAttendanceClaim
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+
+            if let policyID = claim.matchingPolicyID {
+                LabeledContent("Matching policy", value: policyID)
+            }
+            if let policyID = claim.policyID {
+                LabeledContent("Attendance policy", value: policyID)
+            }
+
+            LabeledContent("Attendance confidence") {
+                Text(claim.confidence.title)
+            }
+
+            CatalogReasonList(reasons: claim.reasons + claim.matchReasons)
+            CatalogProvenanceList(
+                provenance: claim.provenance + claim.matchedCircleProvenance
+            )
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var title: LocalizedStringResource {
+        claim.status == .withdrawn ? "Withdrawal match" : "Attendance match"
+    }
+}
+
+private struct CatalogReasonList: View {
+    let reasons: [String]
+
+    var body: some View {
+        if !uniqueReasons.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Match reasons")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ForEach(uniqueReasons, id: \.self) { reason in
+                    Text(reason)
+                        .font(.caption.monospaced())
+                        .textSelection(.enabled)
+                }
+            }
+        }
+    }
+
+    private var uniqueReasons: [String] {
+        var seen: Set<String> = []
+        return reasons.filter { seen.insert($0).inserted }
+    }
+}
+
+private struct CatalogProvenanceList: View {
+    let provenance: [CatalogRecordProvenance]
+
+    var body: some View {
+        if !uniqueProvenance.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Source records")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ForEach(uniqueProvenance) { record in
+                    CatalogProvenanceRecordRow(record: record)
+                }
+            }
+        }
+    }
+
+    private var uniqueProvenance: [CatalogRecordProvenance] {
+        var seen: Set<CatalogRecordProvenance> = []
+        return provenance.filter { seen.insert($0).inserted }
+    }
+}
+
+private struct CatalogProvenanceRecordRow: View {
+    let record: CatalogRecordProvenance
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if let url = record.url {
+                Link(destination: url) {
+                    LucideLabel(verbatim: sourceName, icon: "arrow.up.right")
+                        .font(.subheadline)
+                }
+            } else {
+                Text(sourceName)
+                    .font(.subheadline)
+            }
+
+            if let recordID = record.recordID {
+                Text(recordID)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
+            if let retrievedAt = record.retrievedAt {
+                Text("Retrieved: \(retrievedAt)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var sourceName: String {
+        record.sourceID ?? record.sourceKind ?? String(localized: "Source record")
+    }
+}
+
+private struct CatalogTagSourceRow: View {
+    let tag: CatalogEnrichmentTag
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(tag.canonicalLabel)
+                .font(.headline)
+
+            if let evidenceLine = tag.evidenceLine {
+                LabeledContent("OCR evidence", value: evidenceLine)
+            }
+
+            if tag.provenance.isEmpty {
+                Text("Detected from shinagaki text or OCR by the collector's tag matcher.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(uniqueProvenance, id: \.id) { provenance in
+                    if let url = provenance.url {
+                        Link(destination: url) {
+                            LucideLabel(verbatim: provenance.title, icon: "arrow.up.right")
+                        }
+                    } else {
+                        Text(provenance.title)
+                            .font(.subheadline)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var uniqueProvenance: [CatalogTagSource] {
+        var seen: Set<CatalogTagSource> = []
+        return tag.provenance.compactMap(CatalogTagSource.init).filter {
+            seen.insert($0).inserted
+        }
+    }
+}
+
+private struct CatalogTagSource: Identifiable, Hashable {
+    let sourceID: String?
+    let recordID: String?
+    let url: URL?
+
+    init?(_ provenance: CatalogTagProvenance) {
+        sourceID = provenance.sourceID.nonBlank
+        recordID = provenance.recordID.nonBlank
+        if let rawURL = provenance.url.nonBlank,
+           let candidate = URL(string: rawURL),
+           ["http", "https"].contains(candidate.scheme?.lowercased()) {
+            url = candidate
+        } else {
+            url = nil
+        }
+
+        guard sourceID != nil || recordID != nil || url != nil else { return nil }
+    }
+
+    var id: String {
+        [sourceID ?? "", recordID ?? "", url?.absoluteString ?? ""]
+            .joined(separator: "\u{1f}")
+    }
+
+    var title: String {
+        let value = [sourceID, recordID].compactMap { $0 }.joined(separator: " · ")
+        return value.isEmpty ? String(localized: "Tag source") : value
+    }
+}
+
 private struct CircleDetailSection<Content: View>: View {
     let title: LocalizedStringResource
     let contentInsets: EdgeInsets
@@ -369,6 +1131,83 @@ private struct CircleDetailSection<Content: View>: View {
     }
 }
 
+private struct CircleDetailTagsSection: View {
+    let tags: [String]
+    let day: Int
+    let dataSource: CirclemsDataSource
+
+    var body: some View {
+        CircleDetailSection("Tags") {
+            CircleTagFlowLayout(spacing: 8) {
+                ForEach(tags, id: \.self) { tag in
+                    NavigationLink {
+                        ExploreTagPage(tag: tag, day: day, dataSource: dataSource)
+                    } label: {
+                        LucideLabel(verbatim: tag, icon: "tag")
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, 10)
+                            .frame(minHeight: 44)
+                            .background(Color.accentColor.opacity(0.12), in: .capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Shows circles with this tag")
+                }
+            }
+        }
+        .accessibilityIdentifier("circle-tags-section")
+    }
+}
+
+private struct CircleTagFlowLayout: Layout {
+    let spacing: CGFloat
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        arrangement(width: proposal.width ?? .infinity, subviews: subviews).size
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        for (index, point) in arrangement(width: bounds.width, subviews: subviews).points.enumerated() {
+            subviews[index].place(
+                at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y),
+                anchor: .topLeading,
+                proposal: .unspecified
+            )
+        }
+    }
+
+    private func arrangement(width: CGFloat, subviews: Subviews) -> (size: CGSize, points: [CGPoint]) {
+        var points: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var usedWidth: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            points.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            usedWidth = max(usedWidth, x - spacing)
+        }
+        return (CGSize(width: min(usedWidth, width), height: y + rowHeight), points)
+    }
+}
+
 private struct CircleDetailShinagakiSection: View {
     let posts: [CatalogShinagakiPost]
 
@@ -393,7 +1232,7 @@ private struct CircleDetailShinagakiSection: View {
 private struct ShinagakiMatchNotice: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            LucideIcon("exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .accessibilityHidden(true)
 
@@ -459,7 +1298,7 @@ private struct ShinagakiPostCard: View {
                 Spacer(minLength: 8)
 
                 Link(destination: post.postURL) {
-                    Label("Open shinagaki on X", systemImage: "arrow.up.right")
+                    LucideLabel("Open shinagaki on X", icon: "arrow.up.right")
                         .font(.subheadline.weight(.semibold))
                         .frame(minHeight: 44)
                 }
@@ -576,7 +1415,7 @@ private struct ShinagakiRemoteImage: View {
                             .scaledToFit()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        LucideIcon("arrow.up.left.and.arrow.down.right")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.primary)
                             .frame(width: 32, height: 32)
@@ -591,9 +1430,9 @@ private struct ShinagakiRemoteImage: View {
                 .accessibilityHint("Opens the image viewer")
                 .accessibilityIdentifier("shinagaki-image-preview")
             } else if didFail {
-                ContentUnavailableView(
+                LucideContentUnavailableView(
                     "Image unavailable",
-                    systemImage: "photo.badge.exclamationmark"
+                    icon: "photo.badge.exclamationmark"
                 )
             } else {
                 ZStack {
@@ -662,40 +1501,20 @@ private struct ShinagakiMediaGallery: View {
     let accessibilityLabel: String
 
     var body: some View {
-        GeometryReader { proxy in
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 8) {
-                    ForEach(media, id: \.self) { item in
-                        ShinagakiRemoteImage(
-                            media: item,
-                            accessibilityLabel: accessibilityLabel
-                        )
-                        .frame(
-                            width: proxy.size.width,
-                            height: proxy.size.height
-                        )
-                    }
-                }
-                .scrollTargetLayout()
+        VStack(spacing: 12) {
+            ForEach(media, id: \.self) { item in
+                ShinagakiRemoteImage(
+                    media: item,
+                    accessibilityLabel: accessibilityLabel
+                )
+                .aspectRatio(
+                    ShinagakiArtworkLayout.a4PortraitAspectRatio,
+                    contentMode: .fit
+                )
+                .frame(maxWidth: .infinity)
             }
-            .scrollIndicators(.hidden)
-            .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
         }
-        .aspectRatio(
-            ShinagakiArtworkLayout.a4PortraitAspectRatio,
-            contentMode: .fit
-        )
-        .frame(maxWidth: .infinity)
     }
-}
-
-private struct CircleExternalLink: Identifiable {
-    let title: String
-    let systemImage: String
-    let url: URL
-    let accessibilityIdentifier: String
-
-    var id: String { url.absoluteString }
 }
 
 private extension Optional where Wrapped == String {

@@ -7,9 +7,8 @@ project_directory=$(CDPATH= cd -- "${script_directory}/.." && pwd)
 collector_directory=${1:-"${project_directory}/../collector"}
 shinagaki_input=${2:-"${collector_directory}/out/c108-enriched/selected-posts.json"}
 destination="${project_directory}/ComiNavi/Resources/CrawlCatalogs/C108"
-catalog_library="${project_directory}/ComiNavi/DataSource/Circlems/CatalogLibrary.swift"
-
 catalog_source="${collector_directory}/out/catalog-seed/webcatalog108.db"
+
 if [ -d "${shinagaki_input}" ]; then
     shinagaki_source="${shinagaki_input}/selected-posts.json"
 else
@@ -17,7 +16,7 @@ else
 fi
 
 if [ ! -f "${catalog_source}" ]; then
-    echo "Missing crawl catalog: ${catalog_source}" >&2
+    echo "Missing authoritative catalog used to validate crawl enrichment: ${catalog_source}" >&2
     exit 1
 fi
 
@@ -26,61 +25,23 @@ if [ ! -f "${shinagaki_source}" ]; then
     exit 1
 fi
 
-if [ ! -f "${catalog_library}" ]; then
-    echo "Missing catalog configuration: ${catalog_library}" >&2
-    exit 1
-fi
-
-if ! command -v shasum >/dev/null 2>&1; then
-    echo "Missing required command: shasum" >&2
-    exit 1
-fi
-
-if ! command -v sqlite3 >/dev/null 2>&1; then
-    echo "Missing required command: sqlite3" >&2
-    exit 1
-fi
-
-expected_catalog_digest=$(
-    awk '
-        /^struct CrawlCatalogSource:/ {
-            in_crawl_source = 1
-        }
-        in_crawl_source && /main: \.init\(/ {
-            in_main_database = 1
-        }
-        in_crawl_source && in_main_database && /digest: "/ {
-            digest = $0
-            sub(/^.*digest: "/, "", digest)
-            sub(/".*$/, "", digest)
-            if (length(digest) == 64 && digest ~ /^[[:xdigit:]]+$/) {
-                print tolower(digest)
-            }
-            exit
-        }
-    ' "${catalog_library}"
-)
-
-if [ -z "${expected_catalog_digest}" ]; then
-    echo "Could not read the C108 main database SHA-256 from ${catalog_library}" >&2
-    exit 1
-fi
+for command in shasum sqlite3 jq; do
+    if ! command -v "${command}" >/dev/null 2>&1; then
+        echo "Missing required command: ${command}" >&2
+        exit 1
+    fi
+done
 
 catalog_digest_output=$(shasum -a 256 "${catalog_source}")
 catalog_source_digest=${catalog_digest_output%% *}
-if [ "${catalog_source_digest}" != "${expected_catalog_digest}" ]; then
-    {
-        echo "Crawl catalog SHA-256 does not match CatalogLibrary.swift."
-        echo "Source:   ${catalog_source}"
-        echo "Computed: ${catalog_source_digest}"
-        echo "Expected: ${expected_catalog_digest}"
-        echo "Update the crawl source or intentionally update CrawlCatalogSource before copying."
-    } >&2
+catalog_integrity=$(sqlite3 "${catalog_source}" "PRAGMA integrity_check;")
+if [ "${catalog_integrity}" != "ok" ]; then
+    echo "Authoritative catalog failed SQLite integrity_check: ${catalog_integrity}" >&2
     exit 1
 fi
 
 mkdir -p "${destination}"
-staging_directory=$(mktemp -d "${destination}/.prepare-crawl-catalog.XXXXXX")
+staging_directory=$(mktemp -d "${destination}/.prepare-crawl-enrichment.XXXXXX")
 cleanup() {
     if [ -n "${staging_directory:-}" ] && [ -d "${staging_directory}" ]; then
         rm -rf "${staging_directory}"
@@ -89,67 +50,103 @@ cleanup() {
 trap cleanup 0
 trap 'exit 1' 1 2 3 15
 
-staged_catalog="${staging_directory}/crawl-c108-main.sqlite"
 staged_enrichment="${staging_directory}/crawl-c108-shinagaki.json"
-staged_image_database="${staging_directory}/crawl-c108-images.sqlite"
-
-cp "${catalog_source}" "${staged_catalog}"
 cp "${shinagaki_source}" "${staged_enrichment}"
-
-sqlite3 "${staged_image_database}" <<'SQL'
-CREATE TABLE ComiketCircleImage (
-  comiketNo INTEGER NOT NULL,
-  id INTEGER NOT NULL,
-  WCId INTEGER NOT NULL,
-  width INTEGER NOT NULL,
-  height INTEGER NOT NULL,
-  type VARCHAR(10) NOT NULL,
-  size INTEGER NOT NULL,
-  md5 VARCHAR(20) NOT NULL,
-  cutImage BLOB,
-  PRIMARY KEY (comiketNo, id)
-);
-CREATE TABLE ComiketCommonImage (
-  comiketNo INTEGER NOT NULL,
-  name VARCHAR(30) NOT NULL,
-  width INTEGER NOT NULL,
-  height INTEGER NOT NULL,
-  type VARCHAR(10) NOT NULL,
-  size INTEGER NOT NULL,
-  md5 VARCHAR(20) NOT NULL,
-  image BLOB,
-  PRIMARY KEY (comiketNo, name)
-);
-SQL
+chmod 0644 "${staged_enrichment}"
 
 if [ ! -s "${staged_enrichment}" ]; then
     echo "Crawl enrichment is empty: ${shinagaki_source}" >&2
     exit 1
 fi
 
-staged_catalog_digest_output=$(shasum -a 256 "${staged_catalog}")
-staged_catalog_digest=${staged_catalog_digest_output%% *}
-if [ "${staged_catalog_digest}" != "${expected_catalog_digest}" ]; then
-    echo "Staged crawl catalog failed SHA-256 verification." >&2
+if ! jq -e --arg catalog_digest "${catalog_source_digest}" '
+    def is_integer: type == "number" and . == floor;
+
+    type == "array" and length > 0 and
+    all(.[];
+        (.tweet_id | type == "string" and length > 0) and
+        any(.provenance[]?;
+            (.sourceId | type == "string" and length > 0) and
+            (.sourceKind | type == "string" and length > 0) and
+            ((.payloadSha256 // "") | test("^[0-9a-f]{64}$")) and
+            ((.observationKey // "") | test("^[0-9a-f]{64}$"))
+        ) and
+        (.matched_circles | type == "array") and
+        all(.matched_circles[];
+            . as $circle |
+            ($circle.comiket_no | is_integer and . == 108) and
+            ($circle.circle_id | is_integer) and
+            ($circle.wc_id | is_integer) and
+            any($circle.provenance[]?;
+                .sourceId == "circlems_webcatalog" and
+                .payloadSha256 == $catalog_digest and
+                (.recordId |
+                    type == "string" and
+                    (
+                        . == ("108:" + ($circle.circle_id | tostring)) or
+                        startswith("108:" + ($circle.circle_id | tostring) + ":")
+                    )
+                ) and
+                (.fields | type == "array" and length > 0)
+            )
+        )
+    )
+' "${staged_enrichment}" >/dev/null; then
+    echo "Crawl enrichment is missing complete post or authoritative Circle.ms provenance." >&2
     exit 1
 fi
 
-catalog_integrity=$(sqlite3 "${staged_catalog}" "PRAGMA integrity_check;")
-if [ "${catalog_integrity}" != "ok" ]; then
-    echo "Crawl catalog failed SQLite integrity_check: ${catalog_integrity}" >&2
+duplicate_wcid_ownership_count=$(
+    sqlite3 -bail "${catalog_source}" '
+        SELECT COUNT(*)
+        FROM (
+            SELECT comiketNo, WCId
+            FROM ComiketCircleExtend
+            GROUP BY comiketNo, WCId
+            HAVING COUNT(*) > 1
+        );
+    '
+)
+if [ "${duplicate_wcid_ownership_count}" -ne 0 ]; then
+    echo "Authoritative catalog contains ${duplicate_wcid_ownership_count} duplicate (comiketNo, WCId) ownership pair(s)." >&2
     exit 1
 fi
 
-image_integrity=$(sqlite3 "${staged_image_database}" "PRAGMA integrity_check;")
-if [ "${image_integrity}" != "ok" ]; then
-    echo "Crawl image database failed SQLite integrity_check: ${image_integrity}" >&2
+expected_circles="${staging_directory}/expected-circles.tsv"
+jq -r '.[] | .matched_circles[] | [.comiket_no, .circle_id, .wc_id] | @tsv' \
+    "${staged_enrichment}" >"${expected_circles}"
+if [ ! -s "${expected_circles}" ]; then
+    echo "Crawl enrichment did not contain any matched Circle.ms circles." >&2
     exit 1
 fi
 
-mv -f "${staged_catalog}" "${destination}/crawl-c108-main.sqlite"
+unresolved_circle_count=$(
+    sqlite3 -bail "${catalog_source}" <<SQL
+CREATE TEMP TABLE expected_circles (
+    comiket_no INTEGER NOT NULL,
+    circle_id INTEGER NOT NULL,
+    wc_id INTEGER NOT NULL
+);
+.mode tabs
+.import "${expected_circles}" expected_circles
+SELECT COUNT(*)
+FROM expected_circles AS expected
+WHERE (
+    SELECT COUNT(*)
+    FROM ComiketCircleExtend AS circle
+    WHERE circle.comiketNo = expected.comiket_no
+      AND circle.id = expected.circle_id
+      AND circle.WCId = expected.wc_id
+) != 1;
+SQL
+)
+if [ "${unresolved_circle_count}" -ne 0 ]; then
+    echo "Crawl enrichment contains ${unresolved_circle_count} matched circle(s) without exactly one authoritative ComiketCircleExtend row matching comiket_no, circle_id, and wc_id." >&2
+    exit 1
+fi
+
 mv -f "${staged_enrichment}" "${destination}/crawl-c108-shinagaki.json"
-mv -f "${staged_image_database}" "${destination}/crawl-c108-images.sqlite"
-
+rm -f "${expected_circles}"
 rmdir "${staging_directory}"
 staging_directory=
-echo "Prepared C108 crawl catalog in ${destination}"
+echo "Prepared C108 crawl enrichment in ${destination}"

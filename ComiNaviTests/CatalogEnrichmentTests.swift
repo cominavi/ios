@@ -27,13 +27,32 @@ final class CatalogEnrichmentTests: XCTestCase {
                   }
                 ],
                 "post_confidence": "high",
+                "post_reasons": ["shinagaki_keyword", "media"],
                 "placement_confidence": "high",
+                "matching_policy_id": "c108-shinagaki-placement-v2",
+                "provenance": [
+                  {
+                    "sourceId": "x-public-post",
+                    "sourceKind": "social_post",
+                    "recordId": "100",
+                    "url": "https://x.com/test_circle/status/100",
+                    "fields": ["text", "media"]
+                  }
+                ],
                 "matched_circles": [
                   {
                     "circle_id": 10,
                     "wc_id": 1010,
                     "score": 75,
-                    "reasons": ["placement_in_post_or_profile"]
+                    "reasons": ["placement_in_post_or_profile"],
+                    "provenance": [
+                      {
+                        "source_id": "circlems-webcatalog-c108",
+                        "source_kind": "catalog_snapshot",
+                        "record_id": "108:10",
+                        "url": "https://webcatalog.circle.ms/Circle/Map/23000001/1"
+                      }
+                    ]
                   },
                   {
                     "circle_id": 20,
@@ -98,13 +117,115 @@ final class CatalogEnrichmentTests: XCTestCase {
         XCTAssertEqual(strongest.authorHandle, "test_circle")
         XCTAssertEqual(strongest.media.first?.displayURL.absoluteString, "https://pbs.twimg.com/media/menu-small.jpg")
         XCTAssertTrue(strongest.isHighConfidence)
+        XCTAssertEqual(strongest.matchingPolicyID, "c108-shinagaki-placement-v2")
+        XCTAssertEqual(strongest.postReasons, ["shinagaki_keyword", "media"])
+        XCTAssertEqual(strongest.provenance.first?.sourceID, "x-public-post")
+        XCTAssertEqual(
+            strongest.matchedCircleProvenance.first?.recordID,
+            "108:10"
+        )
         XCTAssertEqual(index.enrichment(circleID: 999, publicCircleID: 1010)?.tagLabels, [])
         XCTAssertNil(index.enrichment(circleID: 20, publicCircleID: 2020))
-        XCTAssertEqual(
-            index.enrichment(circleID: 31, publicCircleID: nil)?.primaryPost?.id,
-            "200",
-            "The seed circle ID remains a crawl-mode fallback when a public ID is unavailable."
+        XCTAssertNil(
+            index.enrichment(circleID: 31, publicCircleID: nil),
+            "A match carrying a stable public ID must never be reattached through its mutable seed ID."
         )
+    }
+
+    func testWithdrawalEvidenceMapsToEveryMatchedCircleWithoutCreatingShinagaki() throws {
+        let data = Data(
+            """
+            [
+              {
+                "tweet_id": "withdrawal-1",
+                "tweet_url": "https://x.com/rurudo_/status/2083911737565450341",
+                "text": "C108は欠席いたします",
+                "created_at": "2026-08-04T12:30:00Z",
+                "author_handle": "rurudo_",
+                "author_name": "rurudo",
+                "author": null,
+                "media": [],
+                "post_reasons": ["event_keyword"],
+                "post_confidence": "low",
+                "placement_confidence": "medium",
+                "matching_policy_id": "c108-shinagaki-placement-v2",
+                "provenance": [
+                  {
+                    "sourceId": "x-public-post",
+                    "sourceKind": "social_post",
+                    "recordId": "2083911737565450341",
+                    "url": "https://x.com/rurudo_/status/2083911737565450341"
+                  }
+                ],
+                "attendance": {
+                  "status": "withdrawn",
+                  "confidence": "high",
+                  "reasons": ["event_context", "withdrawal_statement"],
+                  "provenance": [
+                    {
+                      "sourceId": "x-public-post",
+                      "sourceKind": "attendance_evidence",
+                      "recordId": "2083911737565450341",
+                      "url": "https://x.com/rurudo_/status/2083911737565450341"
+                    }
+                  ],
+                  "policyId": "c108-participation-v1"
+                },
+                "matched_circles": [
+                  {
+                    "circle_id": 18223,
+                    "wc_id": 23009270,
+                    "score": 80,
+                    "reasons": ["catalog_handle"],
+                    "provenance": [
+                      {
+                        "sourceId": "circlems-webcatalog-c108",
+                        "sourceKind": "catalog_snapshot",
+                        "recordId": "108:18223"
+                      }
+                    ]
+                  },
+                  {
+                    "circle_id": 18224,
+                    "wc_id": 23009271,
+                    "score": 70,
+                    "reasons": ["catalog_handle"],
+                    "provenance": [
+                      {
+                        "sourceId": "circlems-webcatalog-c108",
+                        "sourceKind": "catalog_snapshot",
+                        "recordId": "108:18224"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+            """.utf8
+        )
+
+        let index = try CatalogEnrichmentIndex(data: data)
+
+        XCTAssertEqual(index.selectedPostCount, 1)
+        XCTAssertEqual(index.mappedPostCount, 1)
+        XCTAssertEqual(index.mappedPublicCircleCount, 2)
+
+        for publicCircleID in [23009270, 23009271] {
+            let enrichment = try XCTUnwrap(
+                index.enrichment(circleID: -1, publicCircleID: publicCircleID)
+            )
+            XCTAssertTrue(enrichment.posts.isEmpty)
+            let claim = try XCTUnwrap(enrichment.withdrawalClaims.first)
+            XCTAssertEqual(claim.status, .withdrawn)
+            XCTAssertEqual(claim.confidence, .high)
+            XCTAssertEqual(claim.policyID, "c108-participation-v1")
+            XCTAssertEqual(claim.matchingPolicyID, "c108-shinagaki-placement-v2")
+            XCTAssertEqual(claim.matchReasons, ["catalog_handle"])
+            XCTAssertEqual(claim.provenance.count, 2)
+            XCTAssertTrue(
+                claim.matchedCircleProvenance.first?.recordID?.hasPrefix("108:") == true
+            )
+        }
     }
 
     func testEmbeddedTagsDecodeMergeDeterministicallyAndFollowStrongestCircleMatches() throws {
@@ -290,6 +411,25 @@ final class CatalogEnrichmentTests: XCTestCase {
                     "reasons": []
                   }
                 ]
+              },
+              {
+                "tweet_id": "legacy-seed-only",
+                "tweet_url": "https://x.com/legacy_seed/status/3",
+                "text": "Legacy match without a public circle ID",
+                "created_at": null,
+                "author_handle": "legacy_seed",
+                "author_name": null,
+                "author": null,
+                "media": [],
+                "post_confidence": "high",
+                "placement_confidence": "high",
+                "matched_circles": [
+                  {
+                    "circle_id": 88,
+                    "score": 80,
+                    "reasons": []
+                  }
+                ]
               }
             ]
             """.utf8
@@ -302,10 +442,14 @@ final class CatalogEnrichmentTests: XCTestCase {
             ["public-match"],
             "A stable public ID must not be combined with posts sharing only a seed-local ID."
         )
+        XCTAssertNil(
+            index.enrichment(circleID: 77, publicCircleID: nil),
+            "Stable public matches must not be duplicated into the seed-ID fallback index."
+        )
         XCTAssertEqual(
-            Set(index.enrichment(circleID: 77, publicCircleID: nil)?.posts.map(\.id) ?? []),
-            ["public-match", "colliding-seed"],
-            "The seed-local ID remains the fallback when no public ID is available."
+            index.enrichment(circleID: 88, publicCircleID: nil)?.primaryPost?.id,
+            "legacy-seed-only",
+            "A legacy match may use the seed ID only when no stable public ID exists."
         )
     }
 }

@@ -14,6 +14,8 @@ import Sentry
 @MainActor
 enum AppData {
     static let catalogLibrary = CatalogLibrary()
+    static let sharedLocationInbox = SharedLocationInbox()
+    static let sharedLocationClipboardImporter = SharedLocationClipboardImporter()
 
     /// Transitional access for catalog consumers that have not yet adopted
     /// explicit data-source injection.
@@ -21,13 +23,24 @@ enum AppData {
         catalogLibrary.dataSource
     }
 
-    private static let circlemsSessionStore = CirclemsSessionStore(
-        account: AppEnvironment.current.storageNamespace
-    )
+    private static var circlemsSessionStore: CirclemsSessionStore {
+        CirclemsSessionStore(account: AppEnvironment.current.storageNamespace)
+    }
 
     // Remove this after existing installs have had enough time to migrate their session.
-    @UserDefaultsBacked("circlems.user.\(AppEnvironment.current.storageNamespace)")
-    private static var legacyUser: User?
+    private static var legacyUser: User? {
+        get {
+            UserDefaultsBacked<User?>(legacyUserDefaultsKey).wrappedValue
+        }
+        set {
+            var storage = UserDefaultsBacked<User?>(legacyUserDefaultsKey)
+            storage.wrappedValue = newValue
+        }
+    }
+
+    private static var legacyUserDefaultsKey: String {
+        "circlems.user.\(AppEnvironment.current.storageNamespace)"
+    }
 
     static var user: User? {
         get {
@@ -51,28 +64,60 @@ enum AppData {
         }
     }
 
-    static var userState = UserState()
+    static let userState = UserState()
+
+    #if DEBUG
+    /// Changes the Circle.ms service used by this Debug build and reloads all
+    /// environment-scoped state without carrying credentials across services.
+    @discardableResult
+    static func selectCirclemsEnvironment(
+        _ environment: CirclemsServiceEnvironment
+    ) -> Bool {
+        guard AppEnvironment.current.build == .debug,
+              environment != AppEnvironment.current.circlems
+        else {
+            return false
+        }
+
+        AppEnvironment.setDebugCirclemsEnvironment(environment)
+        catalogLibrary.reset()
+        if catalogLibrary.mode != .circlems {
+            catalogLibrary.selectMode(.circlems)
+        }
+        userState.reloadFromSelectedEnvironment()
+        return true
+    }
+    #endif
 
     public static func getUserToken() async -> String {
-        guard let expiresAt = AppData.userState.user?.accessTokenExpiresAt else {
+        let storageNamespace = AppEnvironment.current.storageNamespace
+        guard let user = userState.user,
+              let expiresAt = user.accessTokenExpiresAt
+        else {
             return ""
         }
         if expiresAt < Date() {
-            guard let newTokenResponse = try? await CominaviAPI.oauthCirclemsRefreshToken(refreshToken: AppData.userState.user?.refreshToken ?? "") else {
+            guard let refreshToken = user.refreshToken,
+                  let newTokenResponse = try? await CominaviAPI.oauthCirclemsRefreshToken(
+                      refreshToken: refreshToken
+                  ),
+                  storageNamespace == AppEnvironment.current.storageNamespace,
+                  userState.user?.refreshToken == refreshToken
+            else {
                 return ""
             }
-            AppData.userState.user = User(
+            userState.user = User(
                 accessToken: newTokenResponse.accessToken,
                 accessTokenExpiresAt: Date().addingTimeInterval(TimeInterval(newTokenResponse.expiresIn.int ?? 86400)),
                 refreshToken: newTokenResponse.refreshToken,
-                userId: AppData.userState.user?.userId,
-                nickname: AppData.userState.user?.nickname,
-                preferenceR18Enabled: AppData.userState.user?.preferenceR18Enabled
+                userId: user.userId,
+                nickname: user.nickname,
+                preferenceR18Enabled: user.preferenceR18Enabled
             )
             return newTokenResponse.accessToken
         }
 
-        return AppData.userState.user?.accessToken ?? ""
+        return user.accessToken ?? ""
     }
 }
 
@@ -206,5 +251,9 @@ final class UserState {
 
     var isLoggedIn: Bool {
         return user?.accessToken != nil
+    }
+
+    func reloadFromSelectedEnvironment() {
+        user = AppData.user
     }
 }

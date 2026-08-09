@@ -62,7 +62,7 @@ struct ShinagakiLightbox: View {
                 Button {
                     dismiss()
                 } label: {
-                    Image(systemName: "xmark")
+                    LucideIcon("xmark")
                         .font(.body.weight(.bold))
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)

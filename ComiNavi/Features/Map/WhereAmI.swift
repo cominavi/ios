@@ -24,10 +24,27 @@ struct ComiketSpaceAddress: Equatable, Sendable {
     let blockName: String
     let spaceNumber: Int
     let subspace: Int?
+    let isCombinedAB: Bool
+
+    init(
+        day: Int,
+        hallName: String,
+        blockName: String,
+        spaceNumber: Int,
+        subspace: Int?,
+        isCombinedAB: Bool = false
+    ) {
+        self.day = day
+        self.hallName = hallName
+        self.blockName = blockName
+        self.spaceNumber = spaceNumber
+        self.subspace = subspace
+        self.isCombinedAB = isCombinedAB
+    }
 
     var spaceCode: String {
         let number = String(format: "%02d", spaceNumber)
-        let side = subspace.map { $0 == 0 ? "a" : "b" } ?? ""
+        let side = isCombinedAB ? "a+b" : (subspace.map { $0 == 0 ? "a" : "b" } ?? "")
         return "\(blockName)\(number)\(side)"
     }
 
@@ -43,14 +60,15 @@ struct ComiketSpaceAddress: Equatable, Sendable {
             hallName: hallName,
             blockName: blockName,
             spaceNumber: spaceNumber,
-            subspace: subspace
+            subspace: subspace,
+            isCombinedAB: false
         )
     }
 
     static func canonicalHallName(_ value: String) -> String {
         let normalized = value.unicodeScalars.reduce(into: "") { result, scalar in
-            if (0xFF10 ... 0xFF19).contains(scalar.value),
-               let asciiDigit = UnicodeScalar(scalar.value - 0xFEE0)
+            if (0xFF10...0xFF19).contains(scalar.value),
+                let asciiDigit = UnicodeScalar(scalar.value - 0xFEE0)
             {
                 result.unicodeScalars.append(asciiDigit)
             } else if scalar != " " {
@@ -105,10 +123,11 @@ struct LocatedMapUser: Identifiable, Equatable, Sendable {
     }
 }
 
-struct MapNavigationDestination: Identifiable, Equatable, Sendable {
+struct MapDestination: Identifiable, Equatable, Sendable {
     let sceneID: CatalogMapScene.ID
     let tableID: CatalogMapTable.ID
     let blockName: String
+    let subspace: Int?
     let venueDisplayName: String
     let canonicalVenueName: String
     let point: CGPoint
@@ -126,7 +145,7 @@ struct MapNavigationDestination: Identifiable, Equatable, Sendable {
             hallName: canonicalVenueName,
             blockName: blockName,
             spaceNumber: tableID.spaceNumber,
-            subspace: nil
+            subspace: subspace
         )
     }
 }
@@ -148,6 +167,15 @@ struct WhereAmICharacterLayout: Equatable, Sendable {
     }
 
     let mode: Mode
+
+    var orderedCharacters: [String] {
+        switch mode {
+        case .kana(let columns):
+            columns.flatMap { $0.cells.compactMap(\.character) }
+        case .alphabet(let characters):
+            characters
+        }
+    }
 
     var usesOnlyLatinAlphabet: Bool {
         guard case .alphabet(let characters) = mode, !characters.isEmpty else { return false }
@@ -205,7 +233,7 @@ struct WhereAmICharacterLayout: Equatable, Sendable {
                 character.flatMap { available.contains($0) ? $0 : nil }
             }
             guard filtered.contains(where: { $0 != nil }),
-                  let id = filtered.compactMap({ $0 }).first
+                let id = filtered.compactMap({ $0 }).first
             else {
                 return nil
             }
@@ -230,8 +258,34 @@ struct WhereAmICharacterLayout: Equatable, Sendable {
         let normalized = normalizedLatin(value)
         guard !normalized.isEmpty else { return false }
         return normalized.unicodeScalars.allSatisfy { scalar in
-            (65 ... 90).contains(scalar.value) || (97 ... 122).contains(scalar.value)
+            (65...90).contains(scalar.value) || (97...122).contains(scalar.value)
         }
+    }
+}
+
+enum WhereAmICharacterSearch {
+    static func filter(_ characters: [String], query: String) -> [String] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return characters }
+
+        let kanaQuery = JapaneseSearchNormalizer.normalize(query)
+        let romajiQuery = romanized(query)
+        return characters.filter { character in
+            JapaneseSearchNormalizer.normalize(character).contains(kanaQuery)
+                || (!romajiQuery.isEmpty && romanized(character).hasPrefix(romajiQuery))
+        }
+    }
+
+    private static func romanized(_ value: String) -> String {
+        let widthFolded = value.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? value
+        let latin = widthFolded.applyingTransform(.toLatin, reverse: false) ?? widthFolded
+        let unaccented = latin.applyingTransform(.stripCombiningMarks, reverse: false) ?? latin
+        return unaccented
+            .folding(
+                options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                locale: Locale(identifier: "ja_JP")
+            )
+            .filter { $0.isLetter || $0.isNumber }
     }
 }
 
@@ -240,7 +294,9 @@ enum WhereAmIResolver {
         to reading: WhereAmILocationReading,
         venues: [WhereAmIVenueOption]
     ) -> WhereAmIVenueOption? {
-        guard reading.horizontalAccuracy >= 0, reading.horizontalAccuracy < 2_000 else { return nil }
+        guard reading.horizontalAccuracy >= 0, reading.horizontalAccuracy < 2_000 else {
+            return nil
+        }
 
         let nearest = venues.min { lhs, rhs in
             distance(from: reading.coordinate, to: lhs.placement.coordinate)
@@ -249,7 +305,8 @@ enum WhereAmIResolver {
         guard let nearest else { return nil }
 
         let maximumUsefulDistance = max(700, reading.horizontalAccuracy * 2)
-        return distance(from: reading.coordinate, to: nearest.placement.coordinate) <= maximumUsefulDistance
+        return distance(from: reading.coordinate, to: nearest.placement.coordinate)
+            <= maximumUsefulDistance
             ? nearest
             : nil
     }
@@ -282,10 +339,11 @@ enum WhereAmIResolver {
             venueDisplayName: venue.displayName,
             canonicalVenueName: table.hallName
                 ?? canonicalVenueName(for: venue.placement.kind),
-            point: point ?? CGPoint(
-                x: table.origin.x + venue.placement.scene.tableSize.width / 2,
-                y: table.origin.y + venue.placement.scene.tableSize.height / 2
-            ),
+            point: point
+                ?? CGPoint(
+                    x: table.origin.x + venue.placement.scene.tableSize.width / 2,
+                    y: table.origin.y + venue.placement.scene.tableSize.height / 2
+                ),
             headingDegrees: headingDegrees,
             venueRotationRadians: Double(venue.placement.rotation),
             locationReading: locationReading,
@@ -294,24 +352,61 @@ enum WhereAmIResolver {
         )
     }
 
-    static func navigationDestination(
+    static func destination(
         at table: CatalogMapTable,
         in venue: WhereAmIVenueOption,
+        subspace: Int? = nil,
         selectedAt: Date = .now
-    ) -> MapNavigationDestination {
-        MapNavigationDestination(
+    ) -> MapDestination {
+        MapDestination(
             sceneID: venue.placement.scene.id,
             tableID: table.id,
             blockName: table.blockName,
+            subspace: subspace,
             venueDisplayName: venue.displayName,
             canonicalVenueName: table.hallName
                 ?? canonicalVenueName(for: venue.placement.kind),
-            point: CGPoint(
-                x: table.origin.x + venue.placement.scene.tableSize.width / 2,
-                y: table.origin.y + venue.placement.scene.tableSize.height / 2
-            ),
+            point: point(at: table, subspace: subspace, in: venue.placement.scene),
             selectedAt: selectedAt
         )
+    }
+
+    private static func point(
+        at table: CatalogMapTable,
+        subspace: Int?,
+        in scene: CatalogMapScene
+    ) -> CGPoint {
+        let size = scene.tableSize
+        guard let subspace else {
+            return CGPoint(
+                x: table.origin.x + size.width / 2,
+                y: table.origin.y + size.height / 2
+            )
+        }
+
+        let aSide = subspace == 0
+        return switch table.orientation {
+        case .aLeft:
+            CGPoint(
+                x: table.origin.x + size.width * (aSide ? 0.25 : 0.75),
+                y: table.origin.y + size.height / 2
+            )
+        case .aBottom:
+            CGPoint(
+                x: table.origin.x + size.width / 2,
+                y: table.origin.y + size.height * (aSide ? 0.75 : 0.25)
+            )
+        case .aRight:
+            CGPoint(
+                x: table.origin.x + size.width * (aSide ? 0.75 : 0.25),
+                y: table.origin.y + size.height / 2
+            )
+        case .aTop:
+            CGPoint(
+                x: table.origin.x + size.width / 2,
+                y: table.origin.y + size.height * (aSide ? 0.25 : 0.75)
+            )
+        }
     }
 
     static func nearestTable(
@@ -388,9 +483,10 @@ enum WhereAmIResolver {
         let longitudeDelta = (rhs.longitude - lhs.longitude) * .pi / 180
         let lhsLatitude = lhs.latitude * .pi / 180
         let rhsLatitude = rhs.latitude * .pi / 180
-        let haversine = sin(latitudeDelta / 2) * sin(latitudeDelta / 2)
+        let haversine =
+            sin(latitudeDelta / 2) * sin(latitudeDelta / 2)
             + cos(lhsLatitude) * cos(rhsLatitude)
-                * sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
+            * sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
         return earthRadius * 2 * atan2(sqrt(haversine), sqrt(1 - haversine))
     }
 

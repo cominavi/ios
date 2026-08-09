@@ -11,9 +11,29 @@ enum AppBuildEnvironment: String, Sendable {
     case testFlight = "testflight"
 }
 
-enum CirclemsServiceEnvironment: String, Sendable {
+enum CirclemsServiceEnvironment: String, CaseIterable, Identifiable, Sendable {
     case testing
     case production
+
+    var id: Self { self }
+
+    var displayName: LocalizedStringResource {
+        switch self {
+        case .testing:
+            "Testing"
+        case .production:
+            "Production"
+        }
+    }
+
+    var signInDescription: LocalizedStringResource {
+        switch self {
+        case .testing:
+            "Uses Circle.ms sandbox authentication and catalog data."
+        case .production:
+            "Uses live Circle.ms authentication and catalog data."
+        }
+    }
 
     var authenticationBaseURL: URL {
         switch self {
@@ -37,16 +57,68 @@ enum CirclemsServiceEnvironment: String, Sendable {
 struct AppEnvironment: Sendable {
     static let current = load()
 
+    #if DEBUG
+    static let debugCirclemsEnvironmentDefaultsKey = "AppEnvironment.debug.circlems-environment"
+    #endif
+
     let build: AppBuildEnvironment
-    let circlems: CirclemsServiceEnvironment
+    private let configuredCirclems: CirclemsServiceEnvironment
     let circlemsClientID: String
     let oauthRedirectURL: URL
     let oauthCallbackScheme: String
     let circlemsTokenRefreshURL: URL
 
+    var circlems: CirclemsServiceEnvironment {
+        #if DEBUG
+        Self.resolveCirclemsEnvironment(
+            build: build,
+            configured: configuredCirclems,
+            debugOverrideRawValue: UserDefaults.standard.string(
+                forKey: Self.debugCirclemsEnvironmentDefaultsKey
+            ),
+            debugOverridesEnabled: true
+        )
+        #else
+        configuredCirclems
+        #endif
+    }
+
     var storageNamespace: String {
+        Self.storageNamespace(build: build, circlems: circlems)
+    }
+
+    static func storageNamespace(
+        build: AppBuildEnvironment,
+        circlems: CirclemsServiceEnvironment
+    ) -> String {
         "\(build.rawValue)/\(circlems.rawValue)"
     }
+
+    static func resolveCirclemsEnvironment(
+        build: AppBuildEnvironment,
+        configured: CirclemsServiceEnvironment,
+        debugOverrideRawValue: String?,
+        debugOverridesEnabled: Bool
+    ) -> CirclemsServiceEnvironment {
+        guard debugOverridesEnabled,
+              build == .debug,
+              let debugOverrideRawValue,
+              let override = CirclemsServiceEnvironment(rawValue: debugOverrideRawValue)
+        else {
+            return configured
+        }
+        return override
+    }
+
+    #if DEBUG
+    static func setDebugCirclemsEnvironment(
+        _ environment: CirclemsServiceEnvironment,
+        defaults: UserDefaults = .standard
+    ) {
+        guard current.build == .debug else { return }
+        defaults.set(environment.rawValue, forKey: debugCirclemsEnvironmentDefaultsKey)
+    }
+    #endif
 
     private static var compiledBuild: AppBuildEnvironment {
         #if COMINAVI_TESTFLIGHT
@@ -68,9 +140,15 @@ struct AppEnvironment: Sendable {
             build == compiledBuild,
             "Build-time environment \(compiledBuild.rawValue) does not match Info.plist environment \(build.rawValue)."
         )
+        let expectedCirclemsEnvironment: CirclemsServiceEnvironment = switch build {
+        case .debug, .staging:
+            .testing
+        case .testFlight:
+            .production
+        }
         precondition(
-            circlems == .testing,
-            "Circle.ms production is disabled until a production build and production OAuth credentials are added."
+            circlems == expectedCirclemsEnvironment,
+            "Circle.ms environment \(circlems.rawValue) is invalid for the \(build.rawValue) build."
         )
 
         let clientID = requiredString(key: "ComiNaviCirclemsClientID", bundle: bundle)
@@ -83,7 +161,7 @@ struct AppEnvironment: Sendable {
 
         return AppEnvironment(
             build: build,
-            circlems: circlems,
+            configuredCirclems: circlems,
             circlemsClientID: clientID,
             oauthRedirectURL: redirectURL,
             oauthCallbackScheme: callbackScheme,

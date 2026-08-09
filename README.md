@@ -42,8 +42,9 @@ xcodebuild \
   `sentry-cli --include-sources` reads the generated dSYM directory and source context,
   which are not completely modeled as build-phase inputs.
 - Use the shared `ComiNavi-TestFlight` scheme for App Store Connect archives.
-  It is release-optimized, uses the production bundle identifier with the
-  currently available Circle.ms sandbox credentials, and excludes non-production
-  SQLite fixtures. See `docs/testflight.md`.
+  It is release-optimized, uses the production bundle identifier and Circle.ms
+  production service, and excludes non-production SQLite fixtures. The OAuth
+  client secret remains server-side in the `cominavi.net` Worker and is never
+  bundled into the app. See `docs/testflight.md`.
 - Developer-specific debugger and breakpoint settings belong under ignored `xcuserdata`.
   The shared scheme keeps a non-debugger launch configuration for reproducible builds.

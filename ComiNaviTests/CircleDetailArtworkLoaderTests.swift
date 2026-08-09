@@ -5,6 +5,55 @@ import XCTest
 @testable import ComiNavi
 
 final class CircleDetailArtworkLoaderTests: XCTestCase {
+    @MainActor
+    func testSelectedRemoteCutPromotesMapArtworkCache() async throws {
+        let remote = try makePNG(width: 600, height: 850)
+        let catalog = FixtureMapCatalog()
+        let model = MapScreenModel(
+            days: [
+                UFDSchema.Day(
+                    id: "selected-artwork-test",
+                    dayIndex: 1,
+                    date: DateComponents(year: 2026, month: 8, day: 15),
+                    halls: [
+                        UFDSchema.DayHall(
+                            id: "selected-artwork-hall",
+                            name: "Fixture Hall",
+                            mapName: "FIXTURE",
+                            externalMapId: 1,
+                            externalCorrespondingFloorId: 1,
+                            areas: []
+                        ),
+                    ]
+                ),
+            ],
+            eventNumber: 108,
+            selectedMapID: 1,
+            initialScope: .venue,
+            catalog: catalog,
+            detailArtworkLoader: StubCircleDetailArtworkLoader(data: remote),
+            userPlanStore: InMemoryUserPlanStore()
+        )
+        model.load()
+        try await waitUntil { model.phase == .ready }
+        let scene = try XCTUnwrap(model.scene)
+        let table = try XCTUnwrap(scene.tables.first)
+        let circleID = table.id.blockID * 100 + table.id.spaceNumber * 2
+        model.updateViewport(CatalogMapViewport(
+            sceneID: scene.id,
+            mapRect: CGRect(origin: .zero, size: scene.size),
+            renderedScale: CatalogMapViewport.circleArtworkThreshold
+        ))
+        try await waitUntil { model.visibleCircleArtwork[circleID] != nil }
+        XCTAssertEqual(model.visibleCircleArtwork[circleID]?.width, 1)
+
+        model.select(table: table, preferredSubspace: 0)
+        try await waitUntil { model.visibleCircleArtwork[circleID]?.width == 600 }
+
+        XCTAssertEqual(model.visibleCircleArtwork[circleID]?.height, 850)
+        XCTAssertEqual(model.selection?.selectedCircleID, circleID)
+    }
+
     func testHigherResolutionRemoteCutReplacesDatabaseFallbackAndIsCached() async throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -124,5 +173,26 @@ final class CircleDetailArtworkLoaderTests: XCTestCase {
         CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), nil)
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         return data as Data
+    }
+
+    @MainActor
+    private func waitUntil(
+        timeout: Duration = .seconds(3),
+        _ condition: () -> Bool
+    ) async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while !condition(), clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertTrue(condition())
+    }
+}
+
+private struct StubCircleDetailArtworkLoader: CircleDetailArtworkLoading {
+    let data: Data
+
+    func bestImageData(for circle: CatalogMapCircle, fallback: Data?) async -> Data? {
+        data
     }
 }

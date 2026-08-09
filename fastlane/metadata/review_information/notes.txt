@@ -1,0 +1,11 @@
+ComiNavi requires a Circle.ms account because the production build does not include demo data. Use the account entered in the App Review Sign-In Information fields.
+
+Review flow:
+1. Launch the app and tap “Circle.msでログイン” / “Sign in with Circle.ms.”
+2. Sign in with the supplied review account and approve the requested catalog, favorite, and user-information permissions.
+3. Select an available event catalog. The initial main and image database download can be approximately 350 MB, so Wi-Fi is recommended.
+4. Use Explore to search and browse circles. Open a circle to inspect its placement and available shinagaki information.
+5. Use Map to view placements, save circles, color-code favorites, and pin a destination.
+6. “Where Am I” requests location only when opened. Permission is optional; the venue area can be selected manually.
+
+There are no purchases or subscriptions. The app is an unofficial client and uses third-party Circle.ms catalog content. Some catalog entries may reference mature or R18 works; the submitted age rating is conservatively overridden to 18+. Explicit graphic sexual content is not intentionally displayed.

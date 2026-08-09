@@ -5,11 +5,13 @@ Use the shared `ComiNavi-TestFlight` scheme for internal distribution.
 This configuration is release-optimized and uses the MikuNet-owned production
 bundle identifier, `llc.mikunet.cominavi`. The legacy identifier
 `net.cominavi.ComiNavi` is registered to another Apple Developer team and
-cannot be used for this deployment. Until production Circle.ms OAuth
-credentials are available, it intentionally connects to the Circle.ms sandbox
-with the existing testing client. Demo and crawl catalog modes are not compiled
-into this build, and their bundled SQLite fixtures are excluded from the app.
-The optional C108 shinagaki enrichment remains available to the live catalog.
+cannot be used for this deployment. It connects to the Circle.ms production
+OAuth and API services. The app contains only the public OAuth client ID; the
+client secret is stored in the `cominavi.net` Worker and used there for code and
+refresh-token exchange. The debug-only demo catalog mode is not compiled into
+this build, and its bundled SQLite fixtures are excluded from the app. The
+optional C108 crawl enrichment remains available to the live Circle.ms catalog;
+there is no standalone crawl catalog mode.
 
 ## Prepare an archive
 
@@ -33,7 +35,7 @@ xcodebuild \
   archive
 ```
 
-To produce a local App Store Connect export after the archive succeeds:
+To upload the archived build to App Store Connect after the archive succeeds:
 
 ```sh
 xcodebuild \
@@ -51,5 +53,5 @@ into the App Store upload. Xcode 26.6 can otherwise fail its packaging step with
 `rsync` from its ephemeral worker before the archive starts. Keep the archive so
 the matching dSYM remains available for crash symbolication.
 
-Build `1.0 (2026072701)` is the first prepared TestFlight build. Increase
+Build `1.0 (2026080901)` is the current prepared TestFlight build. Increase
 `CURRENT_PROJECT_VERSION` for every subsequent upload.

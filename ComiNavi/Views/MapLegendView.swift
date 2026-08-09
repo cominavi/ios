@@ -33,13 +33,13 @@ struct MapLegendView: View {
                 }
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "square.3.layers.3d.top.filled")
+                    LucideIcon("square.3.layers.3d.top.filled")
                         .foregroundStyle(Color.accentColor)
                         .accessibilityHidden(true)
                     Text("Genre overlay")
                         .font(.subheadline.weight(.semibold))
                     Spacer(minLength: 12)
-                    Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
+                    LucideIcon(isExpanded ? "chevron.down" : "chevron.up")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)

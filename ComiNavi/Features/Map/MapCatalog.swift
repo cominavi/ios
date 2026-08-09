@@ -117,6 +117,31 @@ struct CatalogMapCircle: Identifiable, Equatable, Sendable {
     let description: String
     let genreName: String?
     let circlemsURL: URL?
+    let circlemsPortalURL: URL?
+
+    init(
+        id: Int,
+        publicCircleID: Int?,
+        updateID: Int?,
+        subspace: Int,
+        circleName: String,
+        penName: String,
+        description: String,
+        genreName: String?,
+        circlemsURL: URL?,
+        circlemsPortalURL: URL? = nil
+    ) {
+        self.id = id
+        self.publicCircleID = publicCircleID
+        self.updateID = updateID
+        self.subspace = subspace
+        self.circleName = circleName
+        self.penName = penName
+        self.description = description
+        self.genreName = genreName
+        self.circlemsURL = circlemsURL
+        self.circlemsPortalURL = circlemsPortalURL
+    }
 }
 
 struct CatalogMapCirclePlacement: Identifiable, Equatable, Sendable {
@@ -402,6 +427,7 @@ struct SQLiteMapCatalog: MapCatalog {
                            circle.penName,
                            circle.description,
                            circle.circlems,
+                           circleExtension.CirclemsPortalURL,
                            genre.name AS genreName
                     FROM ComiketCircleWC circle
                     LEFT JOIN ComiketCircleExtend circleExtension ON circleExtension.id = circle.id
@@ -415,6 +441,7 @@ struct SQLiteMapCatalog: MapCatalog {
             ).compactMap { row -> CatalogMapCircle? in
                 guard let id: Int = row["id"] else { return nil }
                 let urlString: String? = row["circlems"]
+                let portalURLString: String? = row["CirclemsPortalURL"]
                 return CatalogMapCircle(
                     id: id,
                     publicCircleID: row["publicCircleId"],
@@ -424,7 +451,8 @@ struct SQLiteMapCatalog: MapCatalog {
                     penName: row["penName"] ?? "",
                     description: row["description"] ?? "",
                     genreName: row["genreName"],
-                    circlemsURL: urlString.flatMap(URL.init(string:))
+                    circlemsURL: urlString.flatMap(URL.init(string:)),
+                    circlemsPortalURL: portalURLString.flatMap(URL.init(string:))
                 )
             }
         }
@@ -497,28 +525,18 @@ struct SQLiteMapCatalog: MapCatalog {
     }
 
     func search(day: Int, mapID: Int, query: String) async throws -> [CatalogMapSearchMatch] {
-        if let index, query.unicodeScalars.count >= 3 {
-            return try await index.search(day: day, mapID: mapID, query: query)
-        }
-        let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        let terms = JapaneseSearchNormalizer.normalizedTerms(in: query)
         guard !terms.isEmpty else { return [] }
-
-        let termClause = """
-            (circle.circleName LIKE ? ESCAPE '\\'
-             OR circle.circleKana LIKE ? ESCAPE '\\'
-             OR circle.penName LIKE ? ESCAPE '\\'
-             OR circle.description LIKE ? ESCAPE '\\')
-            """
-        let whereClause = Array(repeating: termClause, count: terms.count).joined(separator: " AND ")
-        var arguments: [DatabaseValueConvertible?] = [day, mapID]
-        for term in terms {
-            let pattern = "%\(escapedLikePattern(term))%"
-            arguments.append(contentsOf: [pattern, pattern, pattern, pattern])
+        if let index, terms.allSatisfy({ $0.unicodeScalars.count >= 3 }) {
+            return try await index.search(
+                day: day,
+                mapID: mapID,
+                normalizedTerms: terms
+            )
         }
-        let queryArguments = StatementArguments(arguments)
 
         return try await mainDatabase.read { database in
-            try Row.fetchAll(
+            let rows = try Row.fetchCursor(
                 database,
                 sql: """
                     SELECT circle.id,
@@ -526,33 +544,53 @@ struct SQLiteMapCatalog: MapCatalog {
                            circle.spaceNo,
                            circle.spaceNoSub,
                            circle.circleName,
-                           circle.penName
+                           circle.circleKana,
+                           circle.penName,
+                           circle.description
                     FROM ComiketCircleWC circle
                     JOIN ComiketLayoutWC layout
                       ON layout.blockId = circle.blockId
                      AND layout.spaceNo = circle.spaceNo
                     WHERE circle.day = ?
                       AND layout.mapId = ?
-                      AND \(whereClause)
                     ORDER BY circle.blockId, circle.spaceNo, circle.spaceNoSub
-                    LIMIT 1000
                     """,
-                arguments: queryArguments
-            ).compactMap { row -> CatalogMapSearchMatch? in
+                arguments: [day, mapID]
+            )
+            var matches: [CatalogMapSearchMatch] = []
+            matches.reserveCapacity(1000)
+
+            while let row = try rows.next() {
                 guard let id: Int = row["id"],
                       let blockID: Int = row["blockId"],
                       let spaceNumber: Int = row["spaceNo"]
                 else {
-                    return nil
+                    continue
                 }
-                return CatalogMapSearchMatch(
+                let circleName: String = row["circleName"] ?? ""
+                let penName: String = row["penName"] ?? ""
+                guard JapaneseSearchNormalizer.containsAll(
+                    terms,
+                    in: [
+                        circleName,
+                        row["circleKana"] ?? "",
+                        penName,
+                        row["description"] ?? "",
+                    ]
+                ) else {
+                    continue
+                }
+
+                matches.append(CatalogMapSearchMatch(
                     id: id,
                     tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
                     subspace: row["spaceNoSub"] ?? 0,
-                    circleName: row["circleName"] ?? "",
-                    penName: row["penName"] ?? ""
-                )
+                    circleName: circleName,
+                    penName: penName
+                ))
+                if matches.count == 1000 { break }
             }
+            return matches
         }
     }
 
@@ -642,12 +680,6 @@ struct SQLiteMapCatalog: MapCatalog {
         }
     }
 
-    private func escapedLikePattern(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "%", with: "\\%")
-            .replacingOccurrences(of: "_", with: "\\_")
-    }
 }
 
 enum MapCatalogError: LocalizedError {

@@ -10,6 +10,8 @@ xcuserdata/
 *.ipa
 __pycache__/
 *.pyc
+.impeccable/
+*-maestro.png*
 
 # Swift Package Manager local state
 .build/

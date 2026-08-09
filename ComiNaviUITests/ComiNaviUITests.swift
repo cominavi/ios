@@ -26,7 +26,7 @@ final class ComiNaviUITests: XCTestCase {
         // UI tests must launch the application that they test.
         let app = XCUIApplication()
         app.launch()
-        
+
         // Wait for app to become idle and take a screenshot
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
         takeScreenshot(named: "MainView")
@@ -67,11 +67,12 @@ final class ComiNaviUITests: XCTestCase {
 
         let eventDayBanner = app.buttons["global-event-day-banner"]
         guard eventDayBanner.waitForExistence(timeout: 20) else {
-            throw XCTSkip("A downloaded authenticated catalog is required for this integration test.")
+            throw XCTSkip(
+                "A downloaded authenticated catalog is required for this integration test.")
         }
 
-        let mapTab = app.buttons["Map"]
-        let exploreTab = app.buttons["Explore"]
+        let mapTab = app.buttons["Map"].firstMatch
+        let exploreTab = app.buttons["Explore"].firstMatch
         XCTAssertTrue(mapTab.exists)
         XCTAssertTrue(exploreTab.exists)
         XCTAssertLessThan(mapTab.frame.minX, exploreTab.frame.minX)
@@ -80,7 +81,10 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 5))
         let gallery = app.collectionViews["explore-gallery"]
         XCTAssertTrue(gallery.waitForExistence(timeout: 10))
-        XCTAssertEqual(gallery.value as? String, "2 columns")
+        XCTAssertEqual(
+            gallery.value as? String,
+            expectedInitialGalleryColumns(for: app)
+        )
 
         gallery.pinch(withScale: 0.35, velocity: -1.5)
         expectation(
@@ -97,12 +101,17 @@ final class ComiNaviUITests: XCTestCase {
         waitForExpectations(timeout: 5)
 
         app.buttons["explore-layout-button"].tap()
-        app.buttons["List"].tap()
         XCTAssertTrue(app.scrollViews["explore-list"].waitForExistence(timeout: 5))
 
         app.buttons["explore-filter-button"].tap()
         XCTAssertTrue(app.otherElements["explore-filter-sheet"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["explore-genre-all"].exists)
+        XCTAssertTrue(app.buttons["explore-genre-picker"].exists)
+        XCTAssertTrue(app.buttons["explore-tag-picker"].exists)
+        XCTAssertTrue(app.buttons["explore-shinagaki-picker"].exists)
+        XCTAssertTrue(app.buttons["explore-attendance-picker"].exists)
+        XCTAssertTrue(app.buttons["explore-space-picker"].exists)
+        XCTAssertTrue(app.buttons["explore-saved-picker"].exists)
+        takeScreenshot(named: "Explore-Filters-Compact")
         app.buttons["Done"].tap()
 
         eventDayBanner.tap()
@@ -120,6 +129,91 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testExploreEventDaySelectorStaysAtTopLeading() {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        let eventDaySelector = app.buttons["global-event-day-banner"]
+        XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 20))
+
+        app.buttons["Explore"].firstMatch.tap()
+        XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 5))
+
+        let filterButton = app.buttons["explore-filter-button"]
+        XCTAssertTrue(filterButton.exists)
+        XCTAssertLessThan(eventDaySelector.frame.midX, app.frame.midX)
+        XCTAssertLessThan(eventDaySelector.frame.maxX, filterButton.frame.minX)
+        takeScreenshot(named: "Explore-Selector-Top-Leading")
+    }
+
+    @MainActor
+    func testDemoIPadMapSelectorAndActionsUseLeadingLayout() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        guard app.frame.width >= 700 else {
+            throw XCTSkip("This adaptive layout assertion requires an iPad-width window.")
+        }
+
+        let eventDaySelector = app.buttons["global-event-day-banner"]
+        let whereAmI = app.buttons["where-am-i-button"]
+        let findTable = app.buttons["find-table-button"]
+        XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 20))
+        XCTAssertTrue(whereAmI.waitForExistence(timeout: 20))
+        XCTAssertTrue(findTable.waitForExistence(timeout: 20))
+
+        XCTAssertLessThan(eventDaySelector.frame.midX, app.frame.midX)
+        XCTAssertEqual(whereAmI.frame.midY, findTable.frame.midY, accuracy: 2)
+        XCTAssertLessThan(whereAmI.frame.maxX, findTable.frame.minX)
+        takeScreenshot(named: "Map-iPad-Leading-Controls")
+    }
+
+    @MainActor
+    func testDemoExploreCompactFiltersFitOnIPad() {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        XCTAssertTrue(app.buttons["global-event-day-banner"].waitForExistence(timeout: 20))
+        app.buttons["Explore"].firstMatch.tap()
+        XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 5))
+        app.buttons["explore-filter-button"].tap()
+        XCTAssertTrue(app.otherElements["explore-filter-sheet"].waitForExistence(timeout: 5))
+
+        for identifier in [
+            "explore-genre-picker",
+            "explore-tag-picker",
+            "explore-shinagaki-picker",
+            "explore-attendance-picker",
+            "explore-space-picker",
+            "explore-saved-picker",
+        ] {
+            XCTAssertTrue(app.buttons[identifier].exists, "Missing compact filter \(identifier)")
+        }
+        XCTAssertTrue(app.buttons["Done"].isHittable)
+        takeScreenshot(named: "Explore-Filters-Compact-iPad")
+    }
+
+    @MainActor
+    func testDemoProfileProvidesItsNavigationContext() {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        let profileTab = app.buttons["Profile"].firstMatch
+        XCTAssertTrue(profileTab.waitForExistence(timeout: 20))
+        profileTab.tap()
+
+        XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["profile-following-import"].exists,
+            "Profile destinations should remain discoverable inside a navigation container."
+        )
+    }
+
+    @MainActor
     func testBackgroundingAndReturningToLogin() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-ui-testing-show-sign-in")
@@ -127,7 +221,8 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
 
         XCUIDevice.shared.press(.home)
-        let enteredBackground = app.wait(for: .runningBackground, timeout: 2)
+        let enteredBackground =
+            app.wait(for: .runningBackground, timeout: 2)
             || app.wait(for: .runningBackgroundSuspended, timeout: 5)
         XCTAssertTrue(enteredBackground)
 
@@ -152,6 +247,89 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testJapaneseToolboxShowsOfficialResourcesAndPersistentChecklist() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-AppleLanguages", "(ja)",
+            "-AppleLocale", "ja_JP",
+            "-cominavi-demo-data",
+        ]
+        app.launch()
+
+        let toolboxTab = app.buttons["お役立ち"].firstMatch
+        XCTAssertTrue(toolboxTab.waitForExistence(timeout: 20))
+        toolboxTab.tap()
+
+        XCTAssertTrue(app.navigationBars["お役立ち"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["C108の重要情報"].exists)
+
+        let copyVenueButton = app.buttons["toolbox-copy-venue"]
+        for _ in 0..<6 where !copyVenueButton.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(copyVenueButton.exists)
+
+        let comiketXResource =
+            app.descendants(matching: .any)["toolbox-resource-comiket-x"]
+        for _ in 0..<6 where !comiketXResource.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(comiketXResource.exists)
+
+        let admissionItem = app.buttons["toolbox-checklist-admission"]
+        for _ in 0..<6 where !admissionItem.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(admissionItem.isHittable)
+        let initialValue = try XCTUnwrap(admissionItem.value as? String)
+        admissionItem.tap()
+        expectation(
+            for: NSPredicate(format: "value != %@", initialValue),
+            evaluatedWith: admissionItem
+        )
+        waitForExpectations(timeout: 3)
+        let toggledValue = try XCTUnwrap(admissionItem.value as? String)
+
+        app.buttons["地図"].firstMatch.tap()
+        toolboxTab.tap()
+        let reopenedAdmissionItem = app.buttons["toolbox-checklist-admission"]
+        for _ in 0..<6 where !reopenedAdmissionItem.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(reopenedAdmissionItem.isHittable)
+        expectation(
+            for: NSPredicate(format: "value == %@", toggledValue),
+            evaluatedWith: reopenedAdmissionItem
+        )
+        waitForExpectations(timeout: 3)
+
+        takeScreenshot(named: "Toolbox-Japanese")
+    }
+
+    @MainActor
+    func testJapaneseToolboxShowsLocalEventReminderChoices() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-AppleLanguages", "(ja)",
+            "-AppleLocale", "ja_JP",
+            "-cominavi-demo-data",
+        ]
+        app.launch()
+
+        let toolboxTab = app.buttons["お役立ち"].firstMatch
+        XCTAssertTrue(toolboxTab.waitForExistence(timeout: 20))
+        toolboxTab.tap()
+
+        XCTAssertTrue(app.staticTexts["C108当日リマインダー"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.switches["toolbox-reminder-early-entry"].exists)
+        XCTAssertTrue(app.switches["toolbox-reminder-am-entry"].exists)
+        XCTAssertTrue(app.staticTexts["10:30"].exists)
+        XCTAssertTrue(app.staticTexts["11:00"].exists)
+
+        takeScreenshot(named: "C108-Event-Reminders-iPad")
+    }
+
+    @MainActor
     func testDemoCatalogCanOpenFromLoginWithoutAuthentication() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-ui-testing-show-sign-in")
@@ -164,7 +342,7 @@ final class ComiNaviUITests: XCTestCase {
         let eventDayBanner = app.buttons["global-event-day-banner"]
         XCTAssertTrue(eventDayBanner.waitForExistence(timeout: 30))
         XCTAssertFalse(app.buttons["Login via circle.ms"].exists)
-        XCTAssertTrue(app.buttons["Map"].exists)
+        XCTAssertTrue(app.buttons["Map"].firstMatch.exists)
 
         eventDayBanner.tap()
         XCTAssertTrue(app.otherElements["catalog-event-day-sheet"].waitForExistence(timeout: 5))
@@ -190,7 +368,8 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Map unavailable"].exists)
 
         XCUIDevice.shared.press(.home)
-        let enteredBackground = app.wait(for: .runningBackground, timeout: 2)
+        let enteredBackground =
+            app.wait(for: .runningBackground, timeout: 2)
             || app.wait(for: .runningBackgroundSuspended, timeout: 5)
         XCTAssertTrue(enteredBackground)
 
@@ -254,13 +433,16 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-demo-data")
         app.launch()
 
-        let exploreTab = app.buttons["Explore"]
+        let exploreTab = app.buttons["Explore"].firstMatch
         XCTAssertTrue(exploreTab.waitForExistence(timeout: 30))
         exploreTab.tap()
 
         let gallery = app.collectionViews["explore-gallery"]
         XCTAssertTrue(gallery.waitForExistence(timeout: 15))
-        XCTAssertEqual(gallery.value as? String, "2 columns")
+        XCTAssertEqual(
+            gallery.value as? String,
+            expectedInitialGalleryColumns(for: app)
+        )
         for _ in 0..<4 {
             gallery.swipeUp(velocity: .fast)
         }
@@ -323,16 +505,12 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-demo-data")
         app.launch()
 
-        let exploreTab = app.buttons["Explore"]
+        let exploreTab = app.buttons["Explore"].firstMatch
         XCTAssertTrue(exploreTab.waitForExistence(timeout: 30))
         exploreTab.tap()
 
-        let navigationBar = app.navigationBars["Explore"]
-        let title = navigationBar.staticTexts["Explore"]
         let filterButton = app.buttons["explore-filter-button"]
-        XCTAssertTrue(title.waitForExistence(timeout: 5))
         XCTAssertTrue(filterButton.waitForExistence(timeout: 5))
-        XCTAssertEqual(title.frame.midY, filterButton.frame.midY, accuracy: 2)
 
         let cloud = app.otherElements["explore-discovery-cloud"]
         XCTAssertTrue(cloud.waitForExistence(timeout: 20))
@@ -372,13 +550,18 @@ final class ComiNaviUITests: XCTestCase {
             evaluatedWith: cloud
         )
         waitForExpectations(timeout: 5)
-        XCTAssertTrue(title.exists)
-        XCTAssertTrue(filterButton.isHittable)
         XCTAssertFalse(eventDayBanner.isHittable)
         XCTAssertFalse(searchField.isHittable)
 
-        app.buttons["explore-layout-button"].tap()
-        app.buttons["List"].tap()
+        gallery.swipeDown(velocity: .fast)
+        expectation(
+            for: NSPredicate(format: "hittable == true"),
+            evaluatedWith: eventDayBanner
+        )
+        waitForExpectations(timeout: 5)
+        XCTAssertTrue(app.buttons["explore-filter-button"].firstMatch.isHittable)
+
+        app.buttons["explore-layout-button"].firstMatch.tap()
         let list = app.scrollViews["explore-list"]
         XCTAssertTrue(list.waitForExistence(timeout: 5))
         XCTAssertEqual(list.frame.maxY, app.windows.firstMatch.frame.maxY, accuracy: 1)
@@ -387,18 +570,51 @@ final class ComiNaviUITests: XCTestCase {
         eventDayBanner.swipeUp()
         XCTAssertFalse(eventDayBanner.isHittable)
         XCTAssertFalse(searchField.isHittable)
-        XCTAssertTrue(title.exists)
-        XCTAssertTrue(filterButton.isHittable)
         takeScreenshot(named: "Explore-Discovery-Cloud-Multiple-Interests")
     }
 
     @MainActor
-    func testCrawlExploreDiscoveryLoadingUsesStableChipLayout() throws {
+    func testDemoExploreAdaptsGalleryDensityAcrossRotation() throws {
+        XCUIDevice.shared.orientation = .portrait
+        defer { XCUIDevice.shared.orientation = .portrait }
+
         let app = XCUIApplication()
-        app.launchArguments.append("-cominavi-crawl-data")
+        app.launchArguments.append("-cominavi-demo-data")
         app.launch()
 
-        let exploreTab = app.buttons["Explore"]
+        let exploreTab = app.buttons["Explore"].firstMatch
+        XCTAssertTrue(exploreTab.waitForExistence(timeout: 30))
+        exploreTab.tap()
+
+        let gallery = app.collectionViews["explore-gallery"]
+        XCTAssertTrue(gallery.waitForExistence(timeout: 15))
+        XCTAssertEqual(
+            gallery.value as? String,
+            expectedInitialGalleryColumns(for: app)
+        )
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        expectation(
+            for: NSPredicate(
+                format: "value == %@",
+                expectedInitialGalleryColumns(forWidth: max(app.frame.width, app.frame.height))
+            ),
+            evaluatedWith: gallery
+        )
+        waitForExpectations(timeout: 8)
+
+        XCTAssertTrue(app.buttons["global-event-day-banner"].isHittable)
+        XCTAssertTrue(app.buttons["explore-filter-button"].isHittable)
+        takeScreenshot(named: "Explore-iPad-Landscape-Adaptive")
+    }
+
+    @MainActor
+    func testDemoExploreDiscoveryLoadingUsesStableChipLayout() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        let exploreTab = app.buttons["Explore"].firstMatch
         XCTAssertTrue(exploreTab.waitForExistence(timeout: 30))
         exploreTab.tap()
 
@@ -415,84 +631,6 @@ final class ComiNaviUITests: XCTestCase {
         }
 
         takeScreenshot(named: "Explore-Discovery-Loading")
-    }
-
-    @MainActor
-    func testCrawlCatalogFiltersAndOpensNativeShinagakiDetails() throws {
-        let app = XCUIApplication()
-        app.launchArguments.append("-cominavi-crawl-data")
-        app.launch()
-
-        let exploreTab = app.buttons["Explore"]
-        XCTAssertTrue(exploreTab.waitForExistence(timeout: 30))
-        exploreTab.tap()
-
-        let gallery = app.collectionViews["explore-gallery"]
-        if !gallery.waitForExistence(timeout: 20) {
-            app.buttons["Map"].tap()
-            exploreTab.tap()
-        }
-        XCTAssertTrue(gallery.waitForExistence(timeout: 20))
-
-        app.buttons["explore-filter-button"].tap()
-        XCTAssertTrue(app.otherElements["explore-filter-sheet"].waitForExistence(timeout: 5))
-        let hasShinagaki = app.buttons["explore-shinagaki-available"]
-        XCTAssertTrue(hasShinagaki.exists)
-        expectation(
-            for: NSPredicate(format: "NOT value BEGINSWITH %@", "0 circles"),
-            evaluatedWith: hasShinagaki
-        )
-        waitForExpectations(timeout: 10)
-        XCTAssertFalse(
-            (hasShinagaki.value as? String)?.hasPrefix("0 circles") == true,
-            "The bundled crawl archive should map shinagaki to C108 circles."
-        )
-        hasShinagaki.tap()
-        app.buttons["Done"].tap()
-
-        let search = app.textFields["explore-search-field"]
-        XCTAssertTrue(search.waitForExistence(timeout: 5))
-        search.tap()
-        search.typeText("06ni7hQ")
-
-        let matchedCircle = gallery.cells["explore-gallery-circle-8880"]
-        if !matchedCircle.waitForExistence(timeout: 5) {
-            gallery.swipeUp()
-        }
-        XCTAssertTrue(matchedCircle.waitForExistence(timeout: 5))
-        matchedCircle.tap()
-
-        let detail = app.descendants(matching: .any)["circle-detail-screen"]
-        XCTAssertTrue(detail.waitForExistence(timeout: 8))
-        let shinagakiSection = app.otherElements["circle-shinagaki-section"]
-        XCTAssertTrue(
-            shinagakiSection
-                .waitForExistence(timeout: 5)
-        )
-        XCTAssertTrue(
-            app.descendants(matching: .any)["shinagaki-match-notice"]
-                .waitForExistence(timeout: 5)
-        )
-
-        detail.swipeUp()
-        let expandPost = app.buttons["shinagaki-post-expand-2070092138935660893"]
-        if !expandPost.waitForExistence(timeout: 3) || !expandPost.isHittable {
-            detail.swipeUp()
-        }
-        XCTAssertTrue(expandPost.waitForExistence(timeout: 5))
-        XCTAssertEqual(expandPost.label, "Show more")
-        expandPost.tap()
-        XCTAssertEqual(expandPost.label, "Show less")
-
-        if !app.descendants(matching: .any)["circle-link-x"].exists {
-            detail.swipeUp()
-            detail.swipeUp()
-        }
-        XCTAssertTrue(
-            app.descendants(matching: .any)["circle-shinagaki-post-2070092138935660893"]
-                .waitForExistence(timeout: 5)
-        )
-        takeScreenshot(named: "C108-Crawl-Shinagaki-Detail")
     }
 
     @MainActor
@@ -541,13 +679,8 @@ final class ComiNaviUITests: XCTestCase {
         }
         XCTAssertTrue(app.staticTexts["Circle details"].waitForExistence(timeout: 5))
 
-        let bookmarkButton = app.buttons["map-bookmark-button"]
-        XCTAssertTrue(bookmarkButton.waitForExistence(timeout: 3))
-        bookmarkButton.tap()
-        XCTAssertTrue(app.buttons["Remove from route"].waitForExistence(timeout: 3))
-        XCTAssertTrue((map.value as? String)?.contains("1 route stops") == true)
-        XCTAssertTrue(app.buttons["map-bookmark-color-2"].waitForExistence(timeout: 2))
-        app.buttons["map-bookmark-color-2"].tap()
+        XCTAssertFalse(app.buttons["map-bookmark-button"].exists)
+        XCTAssertTrue(app.buttons["map-circle-artwork-a"].waitForExistence(timeout: 3))
         app.buttons["map-circle-sheet-close"].tap()
 
         // C104 uses the real campus-to-table scale ratio; reaching circle-cut
@@ -797,7 +930,16 @@ final class ComiNaviUITests: XCTestCase {
         takeScreenshot(named: "WhereAmI-Venue")
         eastVenue.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 
-        let character = app.buttons["where-am-i-character-ア"]
+        let characterSearchButton = app.buttons["where-am-i-character-search-button"]
+        XCTAssertTrue(characterSearchButton.waitForExistence(timeout: 3))
+        characterSearchButton.tap()
+        let characterSearchField = app.textFields["where-am-i-character-search-field"]
+        XCTAssertTrue(characterSearchField.waitForExistence(timeout: 3))
+        characterSearchField.typeText("shi")
+
+        let character = app.buttons["where-am-i-character-シ"]
+        XCTAssertTrue(character.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["where-am-i-character-ア"].exists)
         makeHittable(character, in: app)
         takeScreenshot(named: "WhereAmI-Character")
         character.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
@@ -820,9 +962,9 @@ final class ComiNaviUITests: XCTestCase {
 
         let spaceCode = app.staticTexts["current-location-space-code"]
         XCTAssertTrue(spaceCode.waitForExistence(timeout: 5))
-        XCTAssertEqual(spaceCode.label, "ア01")
+        XCTAssertEqual(spaceCode.label, "シ01")
         XCTAssertTrue(app.buttons["current-location-update"].exists)
-        XCTAssertFalse(app.buttons["Share location"].exists)
+        XCTAssertFalse(app.buttons["current-location-share"].exists)
         takeScreenshot(named: "WhereAmI-Located")
         app.buttons["current-location-copy"].tap()
         XCTAssertEqual(app.buttons["current-location-copy"].label, "Copied")
@@ -836,32 +978,32 @@ final class ComiNaviUITests: XCTestCase {
 
         let map = app.otherElements["unified-map-canvas"]
         XCTAssertTrue(map.waitForExistence(timeout: 5))
-        let userPositioned = NSPredicate(format: "value CONTAINS %@", "user location ア01")
+        let userPositioned = NSPredicate(format: "value CONTAINS %@", "user location シ01")
         expectation(for: userPositioned, evaluatedWith: map)
         waitForExpectations(timeout: 5)
         XCTAssertTrue(app.buttons["current-location-button"].exists)
         XCTAssertTrue(app.buttons["banner-update-location"].exists)
         takeScreenshot(named: "WhereAmI-Map-Focused")
 
-        let destinationEntry = app.buttons["where-to-button"]
+        let destinationEntry = app.buttons["find-table-button"]
         XCTAssertTrue(destinationEntry.waitForExistence(timeout: 5))
         destinationEntry.tap()
 
-        let destinationVenue = app.buttons["where-to-venue-1"]
+        let destinationVenue = app.buttons["find-table-venue-1"]
         XCTAssertTrue(destinationVenue.waitForExistence(timeout: 5))
         makeHittable(destinationVenue, in: app)
         destinationVenue.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 
-        let destinationCharacter = app.buttons["where-to-character-ア"]
+        let destinationCharacter = app.buttons["find-table-character-ア"]
         makeHittable(destinationCharacter, in: app)
         destinationCharacter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 
-        let destinationNumber = app.buttons["where-to-digit-2"]
+        let destinationNumber = app.buttons["find-table-digit-2"]
         makeHittable(destinationNumber, in: app)
         destinationNumber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        let navigate = app.buttons["where-to-navigate"]
-        XCTAssertTrue(navigate.isEnabled)
-        navigate.tap()
+        let showOnMap = app.buttons["find-table-show"]
+        XCTAssertTrue(showOnMap.isEnabled)
+        showOnMap.tap()
 
         expectation(
             for: NSPredicate(format: "label CONTAINS %@", "ア02"),
@@ -872,7 +1014,8 @@ final class ComiNaviUITests: XCTestCase {
         expectation(for: destinationOnMap, evaluatedWith: map)
         waitForExpectations(timeout: 5)
         XCTAssertTrue(app.buttons["clear-destination-button"].exists)
-        takeScreenshot(named: "WhereTo-Route")
+        XCTAssertTrue(app.buttons["copy-destination-button"].exists)
+        takeScreenshot(named: "FindTable-Pinned")
     }
 
     @MainActor
@@ -927,7 +1070,8 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(oldestEvent.exists)
 
         let originalCatalogLabel = selector.label
-        let alternateEventName = originalCatalogLabel.contains("108")
+        let alternateEventName =
+            originalCatalogLabel.contains("108")
             ? "Comic Market 104"
             : "Comic Market 108"
         let alternateEvent = app.buttons.matching(
@@ -943,7 +1087,9 @@ final class ComiNaviUITests: XCTestCase {
         waitForExpectations(timeout: 30)
         XCTAssertTrue(app.buttons["global-day-1"].waitForExistence(timeout: 30))
         app.buttons["catalog-settings-done"].tap()
-        XCTAssertTrue(selector.label.contains(alternateEventName.replacingOccurrences(of: "Comic Market ", with: "C")))
+        XCTAssertTrue(
+            selector.label.contains(
+                alternateEventName.replacingOccurrences(of: "Comic Market ", with: "C")))
 
         // Leave the user's simulator on the newest currently supported catalog.
         if alternateEventName != "Comic Market 108" {
@@ -973,7 +1119,7 @@ final class ComiNaviUITests: XCTestCase {
             }
         }
     }
-    
+
     @MainActor
     private func takeScreenshot(named name: String) {
         let screenshot = XCUIScreen.main.screenshot()
@@ -981,6 +1127,22 @@ final class ComiNaviUITests: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func expectedInitialGalleryColumns(for app: XCUIApplication) -> String {
+        expectedInitialGalleryColumns(forWidth: app.frame.width)
+    }
+
+    private func expectedInitialGalleryColumns(forWidth width: CGFloat) -> String {
+        let columns: Int
+        if width >= 1_100 {
+            columns = 4
+        } else if width >= 700 {
+            columns = 3
+        } else {
+            columns = 2
+        }
+        return "\(columns) columns"
     }
 
     private func distance(from point: CGPoint, to rect: CGRect) -> CGFloat {

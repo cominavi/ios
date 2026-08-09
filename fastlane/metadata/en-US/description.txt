@@ -1,0 +1,22 @@
+ComiNavi is an unofficial iPhone and iPad companion that connects Comiket catalog research with navigation at the venue.
+
+Find circles
+• Search the catalog by circle, creator, genre, and other details.
+• Browse circle cuts in a visual gallery.
+• For supported circles, view shinagaki information posted on X.
+
+Navigate the venue
+• See halls and placements on a Tokyo Big Sight venue map.
+• Save circles, color-code them, and keep their locations easy to find.
+• Optionally use location and heading to estimate where you are inside the venue.
+
+Keep your plan together
+• Sign in with Circle.ms and download available event catalogs.
+• Sync saved circles and notes with your Circle.ms favorites.
+• Keep catalogs and favorite lists organized by event.
+
+Location is processed on your device only while Where Am I is open and is not sent to the ComiNavi operator. You can select a venue area manually without granting location permission.
+
+A Circle.ms account and a supported catalog available from Circle.ms are required. The first catalog download may transfer a large amount of data.
+
+ComiNavi is not an official app of the Comic Market Preparatory Committee or Circle.ms. Names and content remain the property of their respective rights holders.

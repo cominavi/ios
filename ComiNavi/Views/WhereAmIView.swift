@@ -9,14 +9,14 @@ private enum ComiketLocationPickerPurpose: Equatable {
     var flowTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "Where Am I"
-        case .destination: "Where To?"
+        case .destination: "Find a Table"
         }
     }
 
     var venueTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "Where are you?"
-        case .destination: "Where do you want to go?"
+        case .destination: "Which venue is the table in?"
         }
     }
 
@@ -64,28 +64,28 @@ private enum ComiketLocationPickerPurpose: Equatable {
     var actionTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "Locate me"
-        case .destination: "Navigate"
+        case .destination: "Show on map"
         }
     }
 
     var actionIcon: String {
         switch self {
         case .currentLocation: "location.viewfinder"
-        case .destination: "arrow.triangle.turn.up.right.diamond.fill"
+        case .destination: "mappin.and.ellipse"
         }
     }
 
     var accessibilityPrefix: String {
         switch self {
         case .currentLocation: "where-am-i"
-        case .destination: "where-to"
+        case .destination: "find-table"
         }
     }
 
     var actionIdentifier: String {
         switch self {
         case .currentLocation: "where-am-i-locate"
-        case .destination: "where-to-navigate"
+        case .destination: "find-table-show"
         }
     }
 }
@@ -112,7 +112,7 @@ struct WhereAmIView: View {
     }
 }
 
-struct WhereToGoView: View {
+struct DestinationPickerView: View {
     let mapModel: MapScreenModel
 
     var body: some View {
@@ -191,8 +191,10 @@ private struct ComiketLocationPickerView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close", systemImage: "xmark") {
+                    Button {
                         dismiss()
+                    } label: {
+                        LucideLabel("Close", icon: "xmark")
                     }
                     .controlSize(.large)
                     .accessibilityIdentifier("\(purpose.accessibilityPrefix)-close")
@@ -246,13 +248,13 @@ private struct ComiketLocationPickerView: View {
 
     private func complete() {
         guard let selectedVenue,
-              let selectedCharacter,
-              let numericValue = Int(number),
-              let table = WhereAmIResolver.table(
-                  blockName: selectedCharacter,
-                  number: numericValue,
-                  in: selectedVenue.placement.scene
-              )
+            let selectedCharacter,
+            let numericValue = Int(number),
+            let table = WhereAmIResolver.table(
+                blockName: selectedCharacter,
+                number: numericValue,
+                in: selectedVenue.placement.scene
+            )
         else {
             return
         }
@@ -268,10 +270,11 @@ private struct ComiketLocationPickerView: View {
             )
             mapModel.locateUser(user)
         case .destination:
-            mapModel.navigate(to: WhereAmIResolver.navigationDestination(
-                at: table,
-                in: selectedVenue
-            ))
+            mapModel.show(
+                WhereAmIResolver.destination(
+                    at: table,
+                    in: selectedVenue
+                ))
         }
         completionFeedback += 1
         dismiss()
@@ -304,9 +307,9 @@ private struct VenueSelectionScreen: View {
                         .controlSize(.large)
                         .frame(maxWidth: .infinity, minHeight: 180)
                 } else if let errorMessage {
-                    ContentUnavailableView(
+                    LucideContentUnavailableView(
                         "Venues unavailable",
-                        systemImage: "building.2.crop.circle",
+                        icon: "building.2.crop.circle",
                         description: Text(errorMessage)
                     )
                 } else {
@@ -358,7 +361,9 @@ private struct VenueSelectionScreen: View {
         case .waiting, .unavailable:
             return nil
         }
-        guard let venue = WhereAmIResolver.nearestVenue(to: reading, venues: venues) else { return nil }
+        guard let venue = WhereAmIResolver.nearestVenue(to: reading, venues: venues) else {
+            return nil
+        }
         return (venue, source)
     }
 }
@@ -390,16 +395,19 @@ private struct LargeVenueButton: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     if let suggestion {
-                        Label(
-                            suggestion == .live ? "Suggested by live location" : "Suggested by last location",
-                            systemImage: suggestion == .live ? "location.fill" : "location"
+                        LucideLabel(
+                            resource:
+                                suggestion == .live
+                                ? LocalizedStringResource("Suggested by live location")
+                                : LocalizedStringResource("Suggested by last location"),
+                            icon: suggestion == .live ? "location.fill" : "location"
                         )
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(suggestion == .live ? Color.blue : Color.secondary)
                     }
                 }
 
-                Image(systemName: "chevron.forward")
+                LucideIcon("chevron.forward")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
@@ -465,20 +473,22 @@ private struct LocationStatusView: View {
     private func statusIcon(_ state: WhereAmILocationService.LocationState) -> some View {
         switch state {
         case .live:
-            Image(systemName: "location.fill")
+            LucideIcon("location.fill")
                 .foregroundStyle(.blue)
         case .cached:
-            Image(systemName: "location")
+            LucideIcon("location")
                 .foregroundStyle(.secondary)
         case .waiting:
             ProgressView()
         case .unavailable:
-            Image(systemName: "location.slash")
+            LucideIcon("location.slash")
                 .foregroundStyle(.secondary)
         }
     }
 
-    private func statusTitle(_ state: WhereAmILocationService.LocationState) -> LocalizedStringResource {
+    private func statusTitle(_ state: WhereAmILocationService.LocationState)
+        -> LocalizedStringResource
+    {
         switch state {
         case .live: "Using live location"
         case .cached: "Using last received location"
@@ -490,7 +500,10 @@ private struct LocationStatusView: View {
     private func statusMessage(_ state: WhereAmILocationService.LocationState) -> String {
         switch state {
         case .live(let reading), .cached(let reading):
-            return String(localized: "Accuracy about \(Int(reading.horizontalAccuracy.rounded())) meters. You always confirm the venue.")
+            return String(
+                localized:
+                    "Accuracy about \(Int(reading.horizontalAccuracy.rounded())) meters. You always confirm the venue."
+            )
         case .waiting:
             return String(localized: "You can choose a venue while this updates.")
         case .unavailable:
@@ -504,10 +517,22 @@ private struct CharacterSelectionScreen: View {
     let purpose: ComiketLocationPickerPurpose
     let onSelect: (String) -> Void
 
+    @State private var searchQuery = ""
+    @State private var isShowingSearch = false
+    @FocusState private var isSearchFocused: Bool
+
     private var layout: WhereAmICharacterLayout {
         WhereAmICharacterLayout.make(
             availableCharacters: venue.placement.scene.blockLabels.map(\.name)
         )
+    }
+
+    private var matchingCharacters: [String] {
+        WhereAmICharacterSearch.filter(layout.orderedCharacters, query: searchQuery)
+    }
+
+    private var isFiltering: Bool {
+        !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
@@ -529,55 +554,19 @@ private struct CharacterSelectionScreen: View {
                     }
                     .font(.headline)
                     .foregroundStyle(.secondary)
+
+                    if isShowingSearch {
+                        characterSearchField
+                    }
                 }
                 .frame(maxWidth: 760, alignment: .leading)
                 .padding(.horizontal, 20)
                 .frame(maxWidth: .infinity)
 
-                switch layout.mode {
-                case .kana(let columns):
-                    VStack(alignment: .leading, spacing: 10) {
-                        Label("Read down, then move right", systemImage: "arrow.down.right")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 20)
-                        KanaCharacterPicker(
-                            columns: columns,
-                            accessibilityPrefix: purpose.accessibilityPrefix,
-                            onSelect: onSelect
-                        )
-                    }
-                    .frame(maxWidth: .infinity)
-                case .alphabet(let characters):
-                    VStack(alignment: .leading, spacing: 14) {
-                        if layout.usesOnlyLatinAlphabet {
-                            Label(
-                                "Uppercase and lowercase letters identify different areas. Check the letter’s case carefully.",
-                                systemImage: "character.textbox"
-                            )
-                            .font(.footnote.weight(.medium))
-                            .foregroundStyle(.secondary)
-                            .padding(12)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color(uiColor: .secondarySystemBackground))
-                            .clipShape(.rect(cornerRadius: 10))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color(uiColor: .separator).opacity(0.3), lineWidth: 0.5)
-                            }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityIdentifier("\(purpose.accessibilityPrefix)-alphabet-case-notice")
-                        }
-
-                        AlphabetCharacterPicker(
-                            characters: characters,
-                            accessibilityPrefix: purpose.accessibilityPrefix,
-                            onSelect: onSelect
-                        )
-                    }
-                    .frame(maxWidth: 760)
-                    .padding(.horizontal, 20)
-                    .frame(maxWidth: .infinity)
+                if isFiltering {
+                    searchResults
+                } else {
+                    characterPicker
                 }
             }
             .padding(.top, 20)
@@ -587,6 +576,136 @@ private struct CharacterSelectionScreen: View {
         .background(Color(uiColor: .systemBackground))
         .navigationTitle(venue.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    if isShowingSearch {
+                        isSearchFocused = false
+                        searchQuery = ""
+                        isShowingSearch = false
+                    } else {
+                        isShowingSearch = true
+                    }
+                } label: {
+                    LucideIcon(isShowingSearch ? "xmark" : "magnifyingglass")
+                }
+                .accessibilityLabel(
+                    isShowingSearch ? "Close character search" : "Search block characters"
+                )
+                .accessibilityIdentifier(
+                    "\(purpose.accessibilityPrefix)-character-search-button"
+                )
+            }
+        }
+        .onChange(of: isShowingSearch) {
+            if isShowingSearch {
+                isSearchFocused = true
+            }
+        }
+    }
+
+    private var characterSearchField: some View {
+        HStack(spacing: 10) {
+            LucideIcon("magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+
+            TextField("Hiragana, katakana, or romaji", text: $searchQuery)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($isSearchFocused)
+                .accessibilityIdentifier(
+                    "\(purpose.accessibilityPrefix)-character-search-field"
+                )
+
+            if !searchQuery.isEmpty {
+                Button {
+                    searchQuery = ""
+                } label: {
+                    LucideIcon("xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 44)
+        .background(Color(uiColor: .secondarySystemBackground))
+        .clipShape(.rect(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private var searchResults: some View {
+        if matchingCharacters.isEmpty {
+            LucideContentUnavailableView(
+                "No matching block characters",
+                icon: "magnifyingglass",
+                description: Text("Try hiragana, katakana, or romaji.")
+            )
+            .frame(maxWidth: 760, minHeight: 180)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity)
+        } else {
+            AlphabetCharacterPicker(
+                characters: matchingCharacters,
+                accessibilityPrefix: purpose.accessibilityPrefix,
+                onSelect: onSelect
+            )
+            .frame(maxWidth: 760)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private var characterPicker: some View {
+        switch layout.mode {
+        case .kana(let columns):
+            VStack(alignment: .leading, spacing: 10) {
+                LucideLabel("Read down, then move right", icon: "arrow.down.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 20)
+                KanaCharacterPicker(
+                    columns: columns,
+                    accessibilityPrefix: purpose.accessibilityPrefix,
+                    onSelect: onSelect
+                )
+            }
+            .frame(maxWidth: .infinity)
+        case .alphabet(let characters):
+            VStack(alignment: .leading, spacing: 14) {
+                if layout.usesOnlyLatinAlphabet {
+                    LucideLabel(
+                        "Uppercase and lowercase letters identify different areas. Check the letter’s case carefully.",
+                        icon: "character.textbox"
+                    )
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(uiColor: .secondarySystemBackground))
+                    .clipShape(.rect(cornerRadius: 10))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color(uiColor: .separator).opacity(0.3), lineWidth: 0.5)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier(
+                        "\(purpose.accessibilityPrefix)-alphabet-case-notice")
+                }
+
+                AlphabetCharacterPicker(
+                    characters: characters,
+                    accessibilityPrefix: purpose.accessibilityPrefix,
+                    onSelect: onSelect
+                )
+            }
+            .frame(maxWidth: 760)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity)
+        }
     }
 }
 
@@ -774,7 +893,7 @@ private struct NumberSelectionScreen: View {
                     message: purpose.numberMessage
                 )
 
-                Label("\(venue.displayName) · Block \(character)", systemImage: "mappin.and.ellipse")
+                LucideLabel("\(venue.displayName) · Block \(character)", icon: "mappin.and.ellipse")
                     .font(.headline)
                     .foregroundStyle(.secondary)
 
@@ -783,10 +902,12 @@ private struct NumberSelectionScreen: View {
                 keypad
 
                 if !number.isEmpty, matchingTable == nil {
-                    Label("That space is not present in this block.", systemImage: "exclamationmark.circle")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.red)
-                        .accessibilityIdentifier("\(purpose.accessibilityPrefix)-number-error")
+                    LucideLabel(
+                        "That space is not present in this block.", icon: "exclamationmark.circle"
+                    )
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("\(purpose.accessibilityPrefix)-number-error")
                 }
             }
             .frame(maxWidth: 560)
@@ -797,7 +918,7 @@ private struct NumberSelectionScreen: View {
             Spacer(minLength: 0)
 
             Button(action: onComplete) {
-                Label(purpose.actionTitle, systemImage: purpose.actionIcon)
+                LucideLabel(resource: purpose.actionTitle, icon: purpose.actionIcon)
                     .font(.title3.weight(.bold))
                     .frame(maxWidth: .infinity, minHeight: locateHeight)
             }
@@ -808,7 +929,7 @@ private struct NumberSelectionScreen: View {
             .accessibilityHint(
                 purpose == .currentLocation
                     ? "Place your position on the venue map"
-                    : "Show a walking route to this table"
+                    : "Pin this table on the map; use current signs and staff directions"
             )
             .accessibilityIdentifier(purpose.actionIdentifier)
         }
@@ -854,7 +975,7 @@ private struct NumberSelectionScreen: View {
     @ViewBuilder
     private var numberRange: some View {
         if let minimum = tables.map(\.id.spaceNumber).min(),
-           let maximum = tables.map(\.id.spaceNumber).max()
+            let maximum = tables.map(\.id.spaceNumber).max()
         {
             Text("Available spaces: \(minimum) through \(maximum)")
                 .font(.subheadline.weight(.semibold))
@@ -919,12 +1040,12 @@ private enum NumberKey: Hashable, CaseIterable, Identifiable {
 
     var id: String { identifierSuffix }
 
-    @ViewBuilder
+    @MainActor @ViewBuilder
     var label: some View {
         switch self {
         case .digit(let digit): Text(String(digit))
         case .clear: Text("Clear")
-        case .delete: Image(systemName: "delete.left.fill")
+        case .delete: LucideIcon("delete.left.fill")
         }
     }
 
@@ -978,17 +1099,17 @@ private struct WhereAmIHeader: View {
 }
 
 #if DEBUG
-#Preview {
-    WhereAmIView(
-        mapModel: .previewCampusFixture(),
-        locationService: WhereAmILocationService(
-            simulatedReading: WhereAmILocationReading(
-                coordinate: BigSightCampusLayout.eastBuilding,
-                horizontalAccuracy: 12,
-                timestamp: .now
-            ),
-            simulatedHeading: 72
+    #Preview {
+        WhereAmIView(
+            mapModel: .previewCampusFixture(),
+            locationService: WhereAmILocationService(
+                simulatedReading: WhereAmILocationReading(
+                    coordinate: BigSightCampusLayout.eastBuilding,
+                    horizontalAccuracy: 12,
+                    timestamp: .now
+                ),
+                simulatedHeading: 72
+            )
         )
-    )
-}
+    }
 #endif

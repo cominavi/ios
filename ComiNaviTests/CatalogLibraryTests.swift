@@ -6,6 +6,37 @@ import XCTest
 
 @MainActor
 final class CatalogLibraryTests: XCTestCase {
+    func testReadinessProgressesClampInvalidTotalsAndOverflow() {
+        let empty = Readiness.Progress(
+            type: .main,
+            totalBytes: 0,
+            completedBytes: 0
+        )
+        let completedWithoutTotal = Readiness.Progress(
+            type: .image,
+            totalBytes: 0,
+            completedBytes: 1
+        )
+        let overflowing = Readiness.Progress(
+            type: .main,
+            totalBytes: 100,
+            completedBytes: 200
+        )
+        let half = Readiness.Progress(
+            type: .image,
+            totalBytes: 100,
+            completedBytes: 50
+        )
+
+        XCTAssertEqual(empty.fractionCompleted, 0)
+        XCTAssertEqual(completedWithoutTotal.fractionCompleted, 1)
+        XCTAssertEqual(overflowing.fractionCompleted, 1)
+        XCTAssertEqual(
+            [empty, half].fractionCompleted,
+            0.5
+        )
+    }
+
     func testStartRequestsPersistedSupportedEvent() async throws {
         let response = eventListResponse(
             events: [
@@ -88,6 +119,19 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertFalse(enrichment.isRequired)
         XCTAssertTrue(configuration.allowsBookmarkSync)
         XCTAssertTrue(configuration.allowsRemoteMetadata)
+
+        let index = try CatalogEnrichmentIndex(
+            data: Data(contentsOf: enrichment.resourceURL)
+        )
+        // The bundled archive grows whenever the crawler publishes a newer snapshot.
+        // Guard against accidental truncation without pinning the test to one crawl run.
+        XCTAssertGreaterThanOrEqual(index.selectedPostCount, 1_699)
+        XCTAssertGreaterThanOrEqual(index.mappedPostCount, 1_483)
+        XCTAssertEqual(
+            index.enrichment(circleID: 8_880, publicCircleID: 23_012_210)?
+                .primaryPost?.id,
+            "2070092138935660893"
+        )
     }
 
     #if DEBUG || COMINAVI_STAGING
@@ -216,54 +260,12 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertNil(dataSource.bookmarkSyncCoordinator)
     }
 
-    func testBundledCrawlCatalogOpensWithRequiredShinagakiEnrichment() async throws {
-        try? DirectoryManager.shared.removeCachesFor(
-            eventID: CrawlCatalogSource.c108.id,
-            comiketId: String(CrawlCatalogSource.c108.number)
-        )
-        let configuration = try await CrawlCatalogSource().configuration(
-            for: CrawlCatalogSource.c108
-        )
-        let dataSource = CirclemsDataSource(configuration: configuration)
-
-        for _ in 0 ..< 300 {
-            if dataSource.readiness == .ready { break }
-            if case .error(let message) = dataSource.readiness {
-                XCTFail("Crawl catalog failed to open: \(message)")
-                return
-            }
-            try await Task.sleep(for: .milliseconds(100))
-        }
-
-        XCTAssertEqual(dataSource.readiness, .ready)
-        XCTAssertEqual(dataSource.comiket.number, 108)
-        XCTAssertFalse(dataSource.allowsRemoteMetadata)
-        XCTAssertNil(dataSource.bookmarkSyncCoordinator)
-
-        let circles = await dataSource.getCircles()
-        XCTAssertEqual(circles.count, 22_856)
-        let loadedStatistics = await dataSource.enrichmentStatistics()
-        let statistics = try XCTUnwrap(loadedStatistics)
-        XCTAssertEqual(statistics.selectedPosts, 570)
-        XCTAssertEqual(statistics.mappedPosts, 497)
-        XCTAssertEqual(statistics.mappedCircles, 728)
-
-        let details = await dataSource.getCircleDetails(circleID: 8_880)
-        XCTAssertEqual(details.extensionRecord?.WCId, 23_012_210)
-        XCTAssertEqual(
-            details.enrichment?.primaryPost?.id,
-            "2070092138935660893"
-        )
-        let circleImage = await dataSource.getCircleImage(circleId: 8_880)
-        XCTAssertNil(circleImage)
-    }
-
-    func testNonProductionBuildExposesAllThreeCatalogModes() {
-        let library = CatalogLibrary(initialMode: .crawl)
+    func testNonProductionBuildExposesCirclemsAndDemoCatalogModes() {
+        let library = CatalogLibrary(initialMode: .circlems)
 
         XCTAssertEqual(
             Set(library.availableModes),
-            [.circlems, .demo, .crawl]
+            [.circlems, .demo]
         )
     }
 
