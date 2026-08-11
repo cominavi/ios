@@ -41,7 +41,10 @@ public enum CominaviAPIClientFactory {
             transport: URLSessionTransport(
                 configuration: .init(session: session)
             ),
-            middlewares: [BearerAuthenticationMiddleware(accessToken: accessToken)]
+            middlewares: [
+                BearerAuthenticationMiddleware(accessToken: accessToken),
+                ProfileRevisionHeaderMiddleware(),
+            ]
         )
     }
 
@@ -57,7 +60,10 @@ public enum CominaviAPIClientFactory {
             serverURL: serverURL,
             configuration: .init(dateTranscoder: CanonicalRFC3339DateTranscoder()),
             transport: URLRequestClosureTransport(sendRequest: transport),
-            middlewares: [BearerAuthenticationMiddleware(accessToken: accessToken)]
+            middlewares: [
+                BearerAuthenticationMiddleware(accessToken: accessToken),
+                ProfileRevisionHeaderMiddleware(),
+            ]
         )
     }
 }
@@ -135,5 +141,39 @@ private struct BearerAuthenticationMiddleware: ClientMiddleware {
             request.headerFields[.authorization] = "Bearer \(token)"
         }
         return try await next(request, body, baseURL)
+    }
+}
+
+/// Swift OpenAPI Runtime URI-encodes string header parameters, including the
+/// quotes and colon required by the profile `If-Match` tag. Restore that one
+/// domain-specific header before it reaches the HTTP transport.
+private struct ProfileRevisionHeaderMiddleware: ClientMiddleware {
+    func intercept(
+        _ request: HTTPRequest,
+        body: HTTPBody?,
+        baseURL: URL,
+        operationID: String,
+        next: @Sendable (HTTPRequest, HTTPBody?, URL) async throws -> (
+            HTTPResponse,
+            HTTPBody?
+        )
+    ) async throws -> (HTTPResponse, HTTPBody?) {
+        var request = request
+        if let encoded = request.headerFields[.ifMatch],
+           let decoded = encoded.removingPercentEncoding,
+           Self.isCanonicalProfileRevision(decoded)
+        {
+            request.headerFields[.ifMatch] = decoded
+        }
+        return try await next(request, body, baseURL)
+    }
+
+    private static func isCanonicalProfileRevision(_ value: String) -> Bool {
+        let prefix = "\"profile:"
+        guard value.hasPrefix(prefix), value.hasSuffix("\"") else { return false }
+        let revision = value.dropFirst(prefix.count).dropLast()
+        return revision.first?.isNumber == true
+            && revision.first != "0"
+            && revision.allSatisfy(\.isNumber)
     }
 }

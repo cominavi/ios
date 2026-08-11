@@ -181,6 +181,72 @@ final class CominaviServiceClientTests: XCTestCase {
         XCTAssertEqual(profile.identities[1].providerUserID, "42")
     }
 
+    func testAvatarMutationsUseRawProfileRevisionWireContract() async throws {
+        let jpeg = Data([
+            0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10,
+            0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+        ])
+        let uploadResponse = Data(#"""
+        {
+            "user": {
+                "id": "0123456789abcdef0123456789abcdef",
+                "displayName": "Galvin",
+                "avatarURL": "/api/v2/users/0123456789abcdef0123456789abcdef/avatar",
+                "revision": 4,
+                "identities": []
+            }
+        }
+        """#.utf8)
+        let deleteResponse = Data(#"""
+        {
+            "user": {
+                "id": "0123456789abcdef0123456789abcdef",
+                "displayName": "Galvin",
+                "revision": 5,
+                "identities": []
+            }
+        }
+        """#.utf8)
+        let transport = StaticCominaviTransport(responses: [
+            "PUT /api/v2/me/avatar": (200, uploadResponse),
+            "DELETE /api/v2/me/avatar": (200, deleteResponse),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+        let requestID = try XCTUnwrap(UUID(
+            uuidString: "33333333-3333-4333-8333-333333333333"
+        ))
+        let deleteRequestID = try XCTUnwrap(UUID(
+            uuidString: "44444444-4444-4444-8444-444444444444"
+        ))
+
+        _ = try await client.uploadAvatar(
+            jpeg,
+            contentType: "image/jpeg",
+            baseRevision: 3,
+            requestID: requestID
+        )
+        _ = try await client.deleteAvatar(
+            baseRevision: 4,
+            requestID: deleteRequestID
+        )
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map(\.httpMethod), ["PUT", "DELETE"])
+        XCTAssertTrue(requests.allSatisfy { $0.url?.path == "/api/v2/me/avatar" })
+        XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Content-Type"), "image/jpeg")
+        XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Content-Length"), "12")
+        XCTAssertEqual(
+            requests.map { $0.value(forHTTPHeaderField: "If-Match") },
+            [#""profile:3""#, #""profile:4""#]
+        )
+        XCTAssertEqual(
+            requests[0].value(forHTTPHeaderField: "Idempotency-Key"),
+            requestID.uuidString.lowercased()
+        )
+        XCTAssertEqual(requests[0].httpBody, jpeg)
+        XCTAssertNil(requests[1].httpBody)
+    }
+
     func testFrozenAuthProviderFixtureDecodesAndSendsExactLogoutContract() async throws {
         let fixture = try fixtureObject(named: "auth-providers-v1")
         let circlems = try XCTUnwrap(fixture["circlems"] as? [String: Any])
