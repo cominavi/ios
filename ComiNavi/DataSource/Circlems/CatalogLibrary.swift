@@ -309,7 +309,13 @@ final class CatalogLibrary {
         ]
         #if DEBUG || COMINAVI_STAGING
         sources[.circlems] = CirclemsCatalogSource(service: service)
-        sources[.demo] = DemoCatalogSource()
+        if initialMode == .demo
+            || ProcessInfo.processInfo.arguments.contains("-cominavi-demo-data")
+        {
+            // The bundled catalog is a deterministic automation fixture, not
+            // an end-user data source.
+            sources[.demo] = DemoCatalogSource()
+        }
         #endif
         self.sources = sources
         self.defaults = defaults

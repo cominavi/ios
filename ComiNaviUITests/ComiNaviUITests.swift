@@ -557,7 +557,7 @@ final class ComiNaviUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["コミナビへようこそ！"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["circle.msでログイン"].exists)
-        XCTAssertTrue(app.buttons["C104のデモデータを見る"].exists)
+        XCTAssertFalse(app.buttons["C104のデモデータを見る"].exists)
     }
 
     @MainActor
@@ -644,32 +644,14 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testDemoCatalogCanOpenFromLoginWithoutAuthentication() throws {
+    func testSignInDoesNotOfferDemoDataOrSourceControls() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-ui-testing-show-sign-in")
         app.launch()
 
-        let demoButton = app.buttons["sign-in-demo-data"]
-        XCTAssertTrue(demoButton.waitForExistence(timeout: 5))
-        demoButton.tap()
-
-        let eventDayBanner = app.buttons["global-event-day-banner"]
-        XCTAssertTrue(eventDayBanner.waitForExistence(timeout: 30))
-        XCTAssertFalse(app.buttons["Login via circle.ms"].exists)
-        XCTAssertTrue(app.buttons["Map"].firstMatch.exists)
-
-        eventDayBanner.tap()
-        XCTAssertTrue(app.otherElements["catalog-event-day-sheet"].waitForExistence(timeout: 5))
-        let eventSelectionLink = app.buttons["catalog-event-selection-link"]
-        XCTAssertLessThan(app.buttons["global-day-1"].frame.minY, eventSelectionLink.frame.minY)
-        eventSelectionLink.tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["catalog-event-selection-page"]
-                .waitForExistence(timeout: 5)
-        )
-        let c104 = app.buttons["catalog-event-190"]
-        XCTAssertTrue(c104.exists)
-        XCTAssertTrue(c104.label.contains("2024"))
+        XCTAssertTrue(app.buttons["Login via circle.ms"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["sign-in-demo-data"].exists)
+        XCTAssertFalse(app.otherElements["sign-in-circlems-environment"].exists)
     }
 
     @MainActor

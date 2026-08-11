@@ -24,19 +24,22 @@ struct SharedPlansScreen: View {
     let currentUserID: String?
     let features: SharedPlanPresentationFeatures
     let favoriteImportService: any CirclemsFavoriteImportServicing
+    let catalogDataSource: CirclemsDataSource?
 
     init(
         store: SharedPlanStore,
         comiketNo: Int?,
         currentUserID: String? = nil,
         features: SharedPlanPresentationFeatures = .production,
-        favoriteImportService: any CirclemsFavoriteImportServicing = CominaviServiceClient.shared
+        favoriteImportService: any CirclemsFavoriteImportServicing = CominaviServiceClient.shared,
+        catalogDataSource: CirclemsDataSource? = AppData.catalogLibrary.dataSource
     ) {
         self.store = store
         self.comiketNo = comiketNo
         self.currentUserID = currentUserID
         self.features = features
         self.favoriteImportService = favoriteImportService
+        self.catalogDataSource = catalogDataSource
     }
 
     var body: some View {
@@ -66,7 +69,8 @@ struct SharedPlansScreen: View {
                 SharedPlanNotificationInboxSheet(
                     store: store,
                     currentUserID: currentUserID,
-                    features: features
+                    features: features,
+                    catalogDataSource: catalogDataSource
                 )
             }
         }
@@ -477,12 +481,14 @@ private struct SharedPlanNotificationInboxSheet: View {
     let store: SharedPlanStore
     let currentUserID: String?
     let features: SharedPlanPresentationFeatures
+    let catalogDataSource: CirclemsDataSource?
 
     var body: some View {
         NavigationStack {
             SharedPlanNotificationInboxScreen(
                 store: store,
                 currentUserID: currentUserID,
+                catalogDataSource: catalogDataSource,
                 features: features
             )
             .toolbar {

@@ -241,7 +241,7 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertFalse(configuration.allowsBookmarkSync)
     }
 
-    func testSelectingDemoModePersistsItWithoutStartingUntilTheHostIsReady() {
+    func testDemoModeCannotBeSelectedWhenItWasNotExplicitlyEnabledForAutomation() {
         let service = CatalogServiceStub(
             eventListResponse: eventListResponse(
                 events: [.init(eventID: 190, eventNumber: 104)],
@@ -255,12 +255,11 @@ final class CatalogLibraryTests: XCTestCase {
 
         library.selectMode(.demo)
 
-        XCTAssertEqual(library.mode, .demo)
+        XCTAssertEqual(library.mode, .circlems)
         XCTAssertEqual(library.phase, .idle)
         XCTAssertNil(library.dataSource)
-        XCTAssertEqual(
-            defaults.string(forKey: "CatalogLibrary.mode.\(AppEnvironment.current.storageNamespace)"),
-            CatalogDataMode.demo.rawValue
+        XCTAssertNil(
+            defaults.string(forKey: "CatalogLibrary.mode.\(AppEnvironment.current.storageNamespace)")
         )
     }
 
@@ -351,7 +350,7 @@ final class CatalogLibraryTests: XCTestCase {
 
         XCTAssertEqual(
             Set(library.availableModes),
-            [.cominavi, .circlems, .demo]
+            [.cominavi, .circlems]
         )
     }
 

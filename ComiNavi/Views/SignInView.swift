@@ -541,19 +541,13 @@ final class SignInViewModel: NSObject, ObservableObject,
 struct SignInView: View {
     @ScaledMetric(relativeTo: .title) private var logoSize = 60.0
     @StateObject private var vm = SignInViewModel()
-    #if DEBUG
-        @State private var selectedCirclemsEnvironment = AppEnvironment.current.circlems
-    #endif
-    private let onUseDemoData: (() -> Void)?
     private let googleInvitation: SharedPlanInvitationInbox.Pending?
     private let googleSpecialEntry: Bool
 
     init(
-        onUseDemoData: (() -> Void)? = nil,
         googleInvitation: SharedPlanInvitationInbox.Pending? = nil,
         googleSpecialEntry: Bool = false
     ) {
-        self.onUseDemoData = onUseDemoData
         self.googleInvitation = googleInvitation
         self.googleSpecialEntry = googleSpecialEntry
     }
@@ -567,11 +561,6 @@ struct SignInView: View {
                     Spacer(minLength: 80)
 
                     hero
-
-                    #if DEBUG
-                        circlemsEnvironmentSelector
-                            .padding(.top, 32)
-                    #endif
 
                     loginButton
                         .padding(.top, loginButtonTopPadding)
@@ -611,21 +600,6 @@ struct SignInView: View {
                         .accessibilityIdentifier("sign-in-authentication-error")
                     }
 
-                    #if DEBUG || COMINAVI_STAGING
-                        if let onUseDemoData {
-                            Button(action: onUseDemoData) {
-                                LucideLabel("Explore C104 demo data", icon: "externaldrive")
-                                    .font(.headline)
-                                    .frame(maxWidth: .infinity, minHeight: 52)
-                            }
-                            .buttonStyle(.bordered)
-                            .buttonBorderShape(.roundedRectangle(radius: 16))
-                            .padding(.top, 12)
-                            .accessibilityHint("Opens an offline catalog without logging in")
-                            .accessibilityIdentifier("sign-in-demo-data")
-                        }
-
-                    #endif
                 }
                 .frame(
                     maxWidth: 620, minHeight: max(0, proxy.size.height - 48), alignment: .topLeading
@@ -689,47 +663,6 @@ struct SignInView: View {
             48
         #endif
     }
-
-    #if DEBUG
-        private var circlemsEnvironmentSelector: some View {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Circle.ms Environment")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-
-                Picker("Circle.ms Environment", selection: $selectedCirclemsEnvironment) {
-                    ForEach(CirclemsServiceEnvironment.allCases) { environment in
-                        Text(environment.displayName)
-                            .tag(environment)
-                            .accessibilityIdentifier(
-                                "sign-in-circlems-environment-\(environment.rawValue)"
-                            )
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .disabled(vm.state == .authenticating)
-                .accessibilityLabel(Text("Circle.ms Environment"))
-                .accessibilityHint(
-                    Text(selectedCirclemsEnvironment.signInDescription)
-                )
-                .accessibilityIdentifier("sign-in-circlems-environment")
-
-                Text(selectedCirclemsEnvironment.signInDescription)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(16)
-            .background(
-                .thinMaterial,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-            )
-            .onChange(of: selectedCirclemsEnvironment) { _, environment in
-                AppData.selectCirclemsEnvironment(environment)
-            }
-        }
-    #endif
 
     @ViewBuilder
     private var loginButton: some View {

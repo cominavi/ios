@@ -326,15 +326,18 @@ struct SharedPlanNotificationInboxScreen: View {
     let store: SharedPlanStore
     let features: SharedPlanPresentationFeatures
     let currentUserID: String?
+    let catalogDataSource: CirclemsDataSource?
     @State private var model = SharedPlanNotificationInboxModel()
 
     init(
         store: SharedPlanStore,
         currentUserID: String? = nil,
+        catalogDataSource: CirclemsDataSource? = nil,
         features: SharedPlanPresentationFeatures = .production
     ) {
         self.store = store
         self.currentUserID = currentUserID
+        self.catalogDataSource = catalogDataSource
         self.features = features
     }
 
@@ -351,8 +354,10 @@ struct SharedPlanNotificationInboxScreen: View {
                 SharedPlanNotificationRow(
                     notification: notification,
                     planName: model.planNames[notification.planID],
+                    planComiketNumber: model.planComiketNumbers[notification.planID],
                     isPendingRead: model.pendingReadIDs.contains(notification.id),
-                    readIssue: model.readIssues[notification.id]
+                    readIssue: model.readIssues[notification.id],
+                    catalogDataSource: catalogDataSource
                 ) {
                     Task { await model.open(notification, using: store) }
                 } onRetryRead: {
@@ -844,50 +849,57 @@ private extension SharedPlanProtectedInvitationAvailability {
 private struct SharedPlanNotificationRow: View {
     let notification: SharedPlanNotificationItem
     let planName: String?
+    let planComiketNumber: Int?
     let isPendingRead: Bool
     let readIssue: String?
+    let catalogDataSource: CirclemsDataSource?
     let onOpen: () -> Void
     let onRetryRead: () -> Void
+    @State private var circleSummary: CatalogNotificationCircle?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(action: onOpen) {
-                HStack(alignment: .top, spacing: 12) {
-                    unreadIndicator
+                HStack(alignment: .top, spacing: 8) {
                     if let presentation {
                         Image(systemName: presentation.systemImage)
                             .foregroundStyle(presentation.isConflict ? .orange : .accent)
-                            .frame(width: 24)
+                            .font(.caption)
+                            .frame(width: 18)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(presentation.title)
-                                .font(.body.weight(notification.readAt == nil ? .semibold : .regular))
+                                .font(.caption.weight(notification.readAt == nil ? .semibold : .regular))
+                            circleSummaryLine
                             Text(presentation.detail)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(notification.createdAt, format: .relative(presentation: .named))
                                 .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(.secondary)
+                            notificationTimestamp
                         }
                         .multilineTextAlignment(.leading)
                     } else {
                         Image(systemName: "questionmark.circle")
                             .foregroundStyle(.secondary)
-                            .frame(width: 24)
+                            .font(.caption)
+                            .frame(width: 18)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Shared Plan update")
-                                .font(.body.weight(.medium))
+                                .font(.caption.weight(.medium))
                             Text("Open the plan to review this update.")
-                                .font(.caption)
+                                .font(.caption2)
                                 .foregroundStyle(.secondary)
+                            notificationTimestamp
                         }
                     }
                     Spacer(minLength: 4)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
+                    VStack(alignment: .trailing, spacing: 10) {
+                        unreadIndicator
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                    }
                 }
             }
             .buttonStyle(.plain)
@@ -910,6 +922,18 @@ private struct SharedPlanNotificationRow: View {
             }
         }
         .padding(.vertical, 3)
+        .task(id: circleSummaryTaskID) {
+            circleSummary = nil
+            guard let publicCircleID = presentation?.publicCircleID,
+                  let catalogDataSource,
+                  catalogDataSource.readiness == .ready,
+                  let catalogComiket = catalogDataSource.comiket,
+                  planComiketNumber == catalogComiket.number
+            else { return }
+            circleSummary = await catalogDataSource.notificationCircle(
+                publicCircleID: publicCircleID
+            )
+        }
     }
 
     private var presentation: SharedPlanNotificationPresentation? {
@@ -919,13 +943,54 @@ private struct SharedPlanNotificationRow: View {
         )
     }
 
+    private var circleSummaryTaskID: String {
+        let isReady = catalogDataSource?.readiness == .ready
+        return "\(catalogDataSource?.eventID ?? 0):\(presentation?.publicCircleID ?? 0):\(isReady)"
+    }
+
+    @ViewBuilder
+    private var circleSummaryLine: some View {
+        if let circleSummary {
+            HStack(spacing: 6) {
+                if let imageData = circleSummary.coverImageData,
+                   let image = UIImage(data: imageData)
+                {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 28, height: 28)
+                        .clipped()
+                        .clipShape(.rect(cornerRadius: 4))
+                        .accessibilityHidden(true)
+                }
+                Text(circleSummary.name)
+                    .font(.caption2.weight(.medium))
+                    .lineLimit(2)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var notificationTimestamp: some View {
+        HStack(spacing: 4) {
+            Text(notification.createdAt, format: .relative(presentation: .named))
+            Text("•")
+                .accessibilityHidden(true)
+            Text(
+                notification.createdAt,
+                format: .dateTime.year().month(.abbreviated).day().hour().minute()
+            )
+        }
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+    }
+
     @ViewBuilder
     private var unreadIndicator: some View {
         if notification.readAt == nil, !isPendingRead {
             Circle()
                 .fill(Color.accentColor)
                 .frame(width: 8, height: 8)
-                .padding(.top, 7)
                 .accessibilityLabel("Unread")
         } else {
             Color.clear
