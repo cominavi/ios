@@ -7,6 +7,7 @@ struct MapView: View {
     @State private var model: MapScreenModel
     @State private var showsWhereAmI = false
     @State private var showsDestinationPicker = false
+    @State private var showsCircleSearch = false
     @State private var showsCurrentLocation = false
     @State private var opensWhereAmIAfterSheet = false
     @State private var isMapLegendExpanded = true
@@ -79,6 +80,9 @@ struct MapView: View {
                 },
                 onFindTable: {
                     showsDestinationPicker = true
+                },
+                onFindCircle: {
+                    showsCircleSearch = true
                 },
                 onClearDestination: {
                     model.clearDestination()
@@ -191,6 +195,11 @@ struct MapView: View {
         }
         .sheet(isPresented: $showsDestinationPicker) {
             DestinationPickerView(mapModel: model)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showsCircleSearch) {
+            CircleSearchPickerView(mapModel: model, days: model.days)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -359,6 +368,7 @@ private struct MapControlPanel: View {
     let onWhereAmI: () -> Void
     let onUpdateLocation: () -> Void
     let onFindTable: () -> Void
+    let onFindCircle: () -> Void
     let onClearDestination: () -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -371,7 +381,7 @@ private struct MapControlPanel: View {
             MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
             primaryActions
             if model.isSearchPresented {
-                MapSearchField(model: model)
+                MapSearchField(model: model, onFindByLocation: onFindCircle)
             }
         }
     }
@@ -748,41 +758,58 @@ private struct MapSelectorBar: View {
 
 private struct MapSearchField: View {
     let model: MapScreenModel
+    let onFindByLocation: () -> Void
     @State private var text = ""
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            LucideIcon("magnifyingglass")
-                .foregroundStyle(.secondary)
-
-            TextField(
-                "Circle, creator, or description",
-                text: $text
-            )
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .focused($isFocused)
-            .submitLabel(.search)
-            .accessibilityIdentifier("map-search-field")
-
-            if model.isSearching {
-                ProgressView()
-                    .controlSize(.small)
-            } else if !model.searchQuery.isEmpty {
-                Text("\(model.searchMatches.count)")
-                    .font(.caption.monospacedDigit().weight(.semibold))
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                LucideIcon("magnifyingglass")
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("\(model.searchMatches.count) matching circles")
-                    .accessibilityIdentifier("map-search-summary")
+
+                TextField(
+                    "Circle, creator, or description",
+                    text: $text
+                )
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .focused($isFocused)
+                .submitLabel(.search)
+                .accessibilityHint("Search circle names, creators, or descriptions")
+                .accessibilityIdentifier("map-search-field")
+
+                if model.isSearching {
+                    ProgressView()
+                        .controlSize(.small)
+                } else if !model.searchQuery.isEmpty {
+                    Text("\(model.searchMatches.count)")
+                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("\(model.searchMatches.count) matching circles")
+                        .accessibilityIdentifier("map-search-summary")
+                }
             }
-        }
-        .padding(.horizontal, 13)
-        .frame(height: 44)
-        .background(.regularMaterial, in: .rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(.white.opacity(0.55), lineWidth: 0.5)
+            .padding(.horizontal, 13)
+            .frame(height: 44)
+            .background(.regularMaterial, in: .rect(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(.white.opacity(0.55), lineWidth: 0.5)
+            }
+
+            Button {
+                isFocused = false
+                onFindByLocation()
+            } label: {
+                LucideLabel("Find a circle by table location", icon: "mappin.and.ellipse")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+            .tint(.accentColor)
+            .accessibilityHint("Choose the event day, block letter, and space number")
+            .accessibilityIdentifier("map-location-search-button")
         }
         .onAppear {
             text = model.searchQuery

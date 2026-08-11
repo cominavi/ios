@@ -993,6 +993,52 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testDemoMapCircleSearchUsesStructuredTableLocation() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        XCTAssertTrue(app.otherElements["unified-map-canvas"].waitForExistence(timeout: 30))
+        selectEast123(in: app)
+
+        app.buttons["map-search-button"].tap()
+        let textSearchField = app.textFields["map-search-field"]
+        XCTAssertTrue(textSearchField.waitForExistence(timeout: 3))
+        let locationSearch = app.buttons["map-location-search-button"]
+        XCTAssertTrue(locationSearch.exists)
+        locationSearch.tap()
+
+        let day = app.buttons["find-circle-day-1"]
+        XCTAssertTrue(day.waitForExistence(timeout: 5))
+        makeHittable(day, in: app)
+        day.tap()
+
+        let venue = app.buttons["find-circle-venue-1"]
+        XCTAssertTrue(venue.waitForExistence(timeout: 10))
+        makeHittable(venue, in: app)
+        venue.tap()
+
+        let character = app.buttons["find-circle-character-シ"]
+        XCTAssertTrue(character.waitForExistence(timeout: 5))
+        makeHittable(character, in: app)
+        character.tap()
+
+        let digit = app.buttons["find-circle-digit-1"]
+        XCTAssertTrue(digit.waitForExistence(timeout: 5))
+        makeHittable(digit, in: app)
+        digit.tap()
+
+        let showCircle = app.buttons["find-circle-show"]
+        XCTAssertTrue(showCircle.isEnabled)
+        showCircle.tap()
+
+        XCTAssertTrue(app.staticTexts["Circle details"].waitForExistence(timeout: 10))
+        let address = app.buttons["map-circle-address-copy"]
+        XCTAssertTrue(address.waitForExistence(timeout: 10))
+        XCTAssertTrue(address.label.contains("シ01"))
+    }
+
+    @MainActor
     func testDemoMapLayerMenuOffersBehaviorBasedViews() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")
