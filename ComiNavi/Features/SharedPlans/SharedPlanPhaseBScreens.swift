@@ -1776,10 +1776,6 @@ private struct SharedPlanCreateNeedSheet: View {
                     .keyboardType(.numberPad)
                     .accessibilityIdentifier("shared-plan-need-unit-price")
                 }
-                Section {
-                    SharedPlanPurchaseStageLegend()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
             }
             .navigationTitle("Add purchase need")
             .navigationBarTitleDisplayMode(.inline)
