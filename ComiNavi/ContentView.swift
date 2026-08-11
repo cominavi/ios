@@ -40,17 +40,15 @@ struct CatalogIndependentContentView: View {
                 )
             }
 
-            Tab(
-                "Profile",
-                image: LucideIcon.assetName(for: "person.circle"),
-                value: .profile
-            ) {
+            Tab(value: .profile) {
                 NavigationStack {
                     ProfileScreen(
                         catalogLibrary: catalogLibrary,
                         sharedLocationInbox: sharedLocationInbox
                     )
                 }
+            } label: {
+                ProfileTabLabel(profileStore: AppData.profileStore)
             }
         }
         .accessibilityIdentifier("catalog-independent-shell")
@@ -295,11 +293,7 @@ private struct CatalogContentView: View {
                         )
                     }
 
-                    Tab(
-                        "Profile",
-                        image: LucideIcon.assetName(for: "person.circle"),
-                        value: .profile
-                    ) {
+                    Tab(value: .profile) {
                         VStack(spacing: 0) {
                             HStack(spacing: 0) {
                                 eventDayBanner
@@ -314,6 +308,8 @@ private struct CatalogContentView: View {
                                 )
                             }
                         }
+                    } label: {
+                        ProfileTabLabel(profileStore: AppData.profileStore)
                     }
                 }
 
@@ -379,6 +375,27 @@ private struct CatalogContentView: View {
             selectedDay: selectedDay
         ) {
             showsCatalogSettings = true
+        }
+    }
+}
+
+private struct ProfileTabLabel: View {
+    let profileStore: CominaviProfileStore
+
+    var body: some View {
+        Label {
+            Text("Profile")
+        } icon: {
+            if let avatarURL = profileStore.profile?.avatarURL {
+                AuthenticatedProfileAvatar(
+                    url: avatarURL,
+                    size: 24,
+                    revision: profileStore.profile?.revision
+                )
+                    .accessibilityHidden(true)
+            } else {
+                Image(LucideIcon.assetName(for: "person.circle"))
+            }
         }
     }
 }
