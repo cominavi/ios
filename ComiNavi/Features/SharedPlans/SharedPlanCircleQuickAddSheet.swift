@@ -5,6 +5,7 @@ struct SharedPlanCircleQuickAddSheet: View {
     let currentUserID: String
     let circle: SharedPlanCircleKey
     let circleName: String
+    let penName: String?
     let onAdded: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -94,7 +95,16 @@ struct SharedPlanCircleQuickAddSheet: View {
                     }
                     .accessibilityIdentifier("circle-shared-plan-request-plan")
                 }
-                LabeledContent("Circle", value: circleName)
+                LabeledContent("Circle") {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(circleName)
+                        if let penName, !penName.isEmpty {
+                            Text(penName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
             }
 
             Section {

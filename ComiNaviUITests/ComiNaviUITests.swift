@@ -122,6 +122,24 @@ final class ComiNaviUITests: XCTestCase {
                 .waitForExistence(timeout: 8)
         )
 
+        XCTAssertTrue(app.staticTexts["うどん道場"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["青井"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["Day 1 · 東A12a"].exists)
+        XCTAssertFalse(app.staticTexts["Active"].exists)
+
+        let circleOverview = app.buttons["shared-plan-circle-overview"]
+        XCTAssertTrue(circleOverview.waitForExistence(timeout: 3))
+        circleOverview.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["shared-plan-circle-detail-test-surface"]
+                .waitForExistence(timeout: 3)
+        )
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["shared-plan-purchase-test-surface"]
+                .waitForExistence(timeout: 3)
+        )
+
         var rowHeights: [CGFloat] = []
         for index in 1 ... 5 {
             let id = String(format: "10000000-0000-4000-8000-%012d", index)

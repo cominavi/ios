@@ -188,6 +188,62 @@ struct SharedPlanProgressSummary: Equatable, Sendable {
     }
 }
 
+struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
+    let circleName: String
+    let penName: String?
+    let dayAndLocation: String
+
+    init(
+        publicCircleID: Int,
+        circleName: String?,
+        penName: String?,
+        day: Int?,
+        blockName: String?,
+        spaceNumber: Int?,
+        spaceNumberSub: Int?
+    ) {
+        let normalizedCircleName = circleName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPenName = penName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedBlockName = blockName?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        self.circleName = if let normalizedCircleName, !normalizedCircleName.isEmpty {
+            normalizedCircleName
+        } else {
+            String(localized: "Circle WCID \(publicCircleID.formatted())")
+        }
+        self.penName = if let normalizedPenName, !normalizedPenName.isEmpty {
+            normalizedPenName
+        } else {
+            nil
+        }
+
+        let location: String? = if let normalizedBlockName,
+                                   !normalizedBlockName.isEmpty,
+                                   let spaceNumber
+        {
+            "\(normalizedBlockName)\(String(format: "%02d", spaceNumber))\(spaceNumberSub == 1 ? "b" : "a")"
+        } else {
+            nil
+        }
+
+        dayAndLocation = switch (day, location) {
+        case let (.some(day), .some(location)):
+            String(localized: "Day \(day) · \(location)")
+        case let (.some(day), nil):
+            String(localized: "Day \(day)")
+        case let (nil, .some(location)):
+            location
+        case (nil, nil):
+            String(localized: "Location unavailable")
+        }
+    }
+
+    var navigationSubtitle: String {
+        guard let penName else { return circleName }
+        return "\(circleName) · \(penName)"
+    }
+}
+
 enum SharedPlanParentTarget: Equatable, Sendable {
     case circle(SharedPlanCircleKey)
     case need(SharedPlanCircleKey, UUID)

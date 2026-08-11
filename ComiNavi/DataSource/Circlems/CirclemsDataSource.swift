@@ -1116,9 +1116,9 @@ final class CirclemsDataSource {
         }
     }
 
-    func notificationCircle(publicCircleID: Int) async -> CatalogNotificationCircle? {
+    func getCircle(publicCircleID: Int) async -> CirclemsDataSchema.ComiketCircleWC? {
         let comiketNumber = Int(comiketId) ?? 0
-        let circle = try? await sqliteMain.read { database in
+        return try? await sqliteMain.read { database in
             try CirclemsDataSchema.ComiketCircleWC.fetchOne(
                 database,
                 sql: """
@@ -1133,6 +1133,10 @@ final class CirclemsDataSource {
                 arguments: [comiketNumber, publicCircleID]
             )
         }
+    }
+
+    func notificationCircle(publicCircleID: Int) async -> CatalogNotificationCircle? {
+        let circle = await getCircle(publicCircleID: publicCircleID)
         guard let circle else { return nil }
         let imageData = await getCircleImage(circleId: circle.id)
         let name = circle.circleName?.trimmingCharacters(in: .whitespacesAndNewlines)

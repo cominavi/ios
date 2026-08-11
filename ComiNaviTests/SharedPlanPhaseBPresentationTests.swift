@@ -712,6 +712,36 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(matchingAssignedAndBought.boughtFraction, 0.75)
     }
 
+    func testCircleIdentityCombinesNamePenNameDayAndCatalogLocation() {
+        let identity = SharedPlanCircleIdentityPresentation(
+            publicCircleID: 101,
+            circleName: " うどん道場 ",
+            penName: " 青井 ",
+            day: 1,
+            blockName: "東A",
+            spaceNumber: 12,
+            spaceNumberSub: 1
+        )
+
+        XCTAssertEqual(identity.circleName, "うどん道場")
+        XCTAssertEqual(identity.penName, "青井")
+        XCTAssertEqual(identity.dayAndLocation, String(localized: "Day 1 · 東A12b"))
+        XCTAssertEqual(identity.navigationSubtitle, "うどん道場 · 青井")
+
+        let fallback = SharedPlanCircleIdentityPresentation(
+            publicCircleID: 202,
+            circleName: " ",
+            penName: nil,
+            day: nil,
+            blockName: nil,
+            spaceNumber: nil,
+            spaceNumberSub: nil
+        )
+        XCTAssertEqual(fallback.circleName, String(localized: "Circle WCID \(202.formatted())"))
+        XCTAssertNil(fallback.penName)
+        XCTAssertEqual(fallback.dayAndLocation, String(localized: "Location unavailable"))
+    }
+
     func testEditorAccessibilityIdentifiersAreStableAndEntityScoped() {
         let otherCircle = SharedPlanCircleKey(comiketNo: 108, wcID: 102)!
         let otherNeed = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!

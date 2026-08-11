@@ -428,19 +428,23 @@ private enum SharedPlanEditorConfirmation: Identifiable {
 struct SharedPlanEditorScreen: View {
     let store: SharedPlanStore
     let currentUserID: String?
+    let catalogDataSource: CirclemsDataSource?
     @State private var model: SharedPlanEditorModel
     @State private var presentedSheet: SharedPlanEditorSheet?
     @State private var confirmation: SharedPlanEditorConfirmation?
+    @State private var catalogCircles: [SharedPlanCircleKey: CirclemsDataSchema.ComiketCircleWC] = [:]
     @Environment(\.scenePhase) private var scenePhase
 
     init(
         store: SharedPlanStore,
         planID: String,
         currentUserID: String? = nil,
-        features: SharedPlanPresentationFeatures = .production
+        features: SharedPlanPresentationFeatures = .production,
+        catalogDataSource: CirclemsDataSource? = nil
     ) {
         self.store = store
         self.currentUserID = currentUserID
+        self.catalogDataSource = catalogDataSource
         _model = State(initialValue: SharedPlanEditorModel(
             planID: planID,
             features: features
@@ -451,7 +455,7 @@ struct SharedPlanEditorScreen: View {
         @Bindable var model = model
         List {
             progressSection
-            circleSection
+            circleSections
             conflictSection
             readOnlySection
             recoverySection
@@ -464,6 +468,9 @@ struct SharedPlanEditorScreen: View {
         .refreshable { await model.reload(using: store) }
         .task(id: model.planID) {
             await model.run(using: store)
+        }
+        .task(id: catalogCircleTaskID) {
+            await loadCatalogCircles()
         }
         .task(id: scenePhase) {
             guard scenePhase != .active else { return }
@@ -675,9 +682,10 @@ struct SharedPlanEditorScreen: View {
         }
     }
 
-    private var circleSection: some View {
-        Section {
-            if model.circles.isEmpty {
+    @ViewBuilder
+    private var circleSections: some View {
+        if model.circles.isEmpty {
+            Section("Circles and purchases") {
                 LucideContentUnavailableView(
                     "No circles in this plan",
                     icon: "building-2",
@@ -685,29 +693,110 @@ struct SharedPlanEditorScreen: View {
                         ? String(localized: "Open a circle from the catalog to add a purchase request to this plan.")
                         : String(localized: "Circles and purchase requests will appear here."))
                 )
-            } else {
-                ForEach(model.circles) { circle in
-                    NavigationLink {
-                        SharedPlanCircleEditorScreen(
-                            model: model,
-                            store: store,
-                            circle: circle.key,
-                            currentUserID: currentUserID
+            }
+        } else {
+            ForEach(model.circles) { circle in
+                let identity = circleIdentity(for: circle.key)
+                Section {
+                    if circle.needs.isEmpty {
+                        NavigationLink {
+                            SharedPlanCircleEditorScreen(
+                                model: model,
+                                store: store,
+                                circle: circle.key,
+                                currentUserID: currentUserID,
+                                identity: identity,
+                                catalogCircle: catalogCircles[circle.key],
+                                catalogDataSource: catalogDataSource
+                            )
+                        } label: {
+                            SharedPlanEmptyPurchaseSummaryRow(identity: identity)
+                        }
+                        .accessibilityIdentifier(
+                            SharedPlanEditorAccessibilityID.circle(circle.key)
                         )
-                    } label: {
-                        SharedPlanCircleSummaryRow(
-                            circle: circle,
-                            conflictCount: conflictCount(for: circle.key)
-                        )
+                    } else {
+                        ForEach(circle.needs) { need in
+                            NavigationLink {
+                                SharedPlanCircleEditorScreen(
+                                    model: model,
+                                    store: store,
+                                    circle: circle.key,
+                                    currentUserID: currentUserID,
+                                    identity: identity,
+                                    catalogCircle: catalogCircles[circle.key],
+                                    catalogDataSource: catalogDataSource
+                                )
+                            } label: {
+                                SharedPlanPurchaseSummaryRow(
+                                    need: need,
+                                    circleName: identity.circleName,
+                                    hasConflict: model.conflicts.contains { conflict in
+                                        conflict.path.contains(need.id.uuidString.lowercased())
+                                    }
+                                )
+                            }
+                            .accessibilityIdentifier(
+                                need.id == circle.needs.first?.id
+                                    ? SharedPlanEditorAccessibilityID.circle(circle.key)
+                                    : SharedPlanEditorAccessibilityID.need(need.id)
+                            )
+                        }
                     }
-                    .accessibilityIdentifier(
-                        SharedPlanEditorAccessibilityID.circle(circle.key)
+                } header: {
+                    SharedPlanCircleGroupHeader(
+                        identity: identity,
+                        conflictCount: conflictCount(for: circle.key)
                     )
                 }
             }
-        } header: {
-            Text("Circles and purchases")
         }
+    }
+
+    private var catalogCircleTaskID: String {
+        let circleIDs = model.circles.map(\.key.id).joined(separator: ",")
+        let isReady = catalogDataSource?.readiness == .ready
+        return "\(catalogDataSource?.eventID ?? 0):\(isReady):\(circleIDs)"
+    }
+
+    private func loadCatalogCircles() async {
+        guard let catalogDataSource,
+              catalogDataSource.readiness == .ready,
+              let catalog = catalogDataSource.comiket,
+              model.plan?.comiketNo == catalog.number
+        else {
+            catalogCircles = [:]
+            return
+        }
+
+        var loaded: [SharedPlanCircleKey: CirclemsDataSchema.ComiketCircleWC] = [:]
+        for content in model.circles {
+            guard !Task.isCancelled else { return }
+            if let circle = await catalogDataSource.getCircle(publicCircleID: content.key.wcID) {
+                loaded[content.key] = circle
+            }
+        }
+        catalogCircles = loaded
+    }
+
+    private func circleIdentity(
+        for key: SharedPlanCircleKey
+    ) -> SharedPlanCircleIdentityPresentation {
+        let catalogCircle = catalogCircles[key]
+        let blockName = catalogCircle?.blockId.flatMap { blockID in
+            catalogDataSource?.comiket.blocks.first(where: {
+                $0.externalBlockId == blockID
+            })?.name
+        }
+        return SharedPlanCircleIdentityPresentation(
+            publicCircleID: key.wcID,
+            circleName: catalogCircle?.circleName,
+            penName: catalogCircle?.penName,
+            day: catalogCircle?.day,
+            blockName: blockName,
+            spaceNumber: catalogCircle?.spaceNo,
+            spaceNumberSub: catalogCircle?.spaceNoSub
+        )
     }
 
     private var progressSection: some View {
@@ -858,53 +947,90 @@ private struct SharedPlanProgressMetric: View {
     }
 }
 
-private struct SharedPlanCircleSummaryRow: View {
-    let circle: SharedPlanCircleContent
+private struct SharedPlanCircleGroupHeader: View {
+    let identity: SharedPlanCircleIdentityPresentation
     let conflictCount: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(circle.needs.first.map { need in
-                    let name = need.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return name.isEmpty ? String(localized: "Circle purchases") : name
-                } ?? String(localized: "Circle purchases"))
-                    .font(.headline)
-                Spacer(minLength: 8)
-                presenceLabel
-            }
-            HStack(spacing: 12) {
-                LucideLabel(verbatim: String(localized: "\(circle.needs.count) requests"), icon: "shopping-cart")
-                if conflictCount > 0 {
-                    LucideLabel(verbatim: String(localized: "\(conflictCount) choices"), icon: "triangle-alert")
-                        .foregroundStyle(.orange)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(identity.circleName)
+                    .font(.subheadline.weight(.semibold))
+                if let penName = identity.penName {
+                    Text(penName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            if !circle.memo.isEmpty {
-                Text(circle.memo)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+            Spacer(minLength: 8)
+            if conflictCount > 0 {
+                LucideLabel(
+                    verbatim: String(localized: "\(conflictCount) choices"),
+                    icon: "triangle-alert"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
             }
         }
+        .textCase(nil)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct SharedPlanPurchaseSummaryRow: View {
+    let need: SharedPlanPurchaseNeed
+    let circleName: String
+    let hasConflict: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(displayItemName)
+                    .font(.headline)
+                Spacer(minLength: 8)
+                if let unitPrice = need.unitPrice {
+                    Text(
+                        unitPrice,
+                        format: .currency(code: "JPY").precision(.fractionLength(0))
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            Text(circleName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            SharedPlanPurchaseStageBar(
+                progress: SharedPlanPurchaseProgressPresentation(
+                    need: need,
+                    hasConflict: hasConflict
+                ),
+                accessibilityIdentifier: SharedPlanEditorAccessibilityID.needProgress(need.id)
+            )
+        }
         .padding(.vertical, 3)
+        .accessibilityElement(children: .combine)
     }
 
-    @ViewBuilder
-    private var presenceLabel: some View {
-        switch circle.presence {
-        case .present:
-            LucideLabel("Active", icon: "circle-check-big")
-                .foregroundStyle(.green)
-        case .removed:
-            LucideLabel("Removed", icon: "minus")
+    private var displayItemName: String {
+        let value = need.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? String(localized: "Purchase item") : value
+    }
+}
+
+private struct SharedPlanEmptyPurchaseSummaryRow: View {
+    let identity: SharedPlanCircleIdentityPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("No purchase requests yet")
+                .font(.headline)
+            Text(identity.circleName)
+                .font(.caption)
                 .foregroundStyle(.secondary)
-        case .conflicted:
-            LucideLabel("Needs review", icon: "triangle-alert")
-                .foregroundStyle(.orange)
         }
+        .padding(.vertical, 3)
     }
 }
 
@@ -1182,6 +1308,9 @@ private struct SharedPlanCircleEditorScreen: View {
     let store: SharedPlanStore
     let circle: SharedPlanCircleKey
     let currentUserID: String?
+    let identity: SharedPlanCircleIdentityPresentation
+    let catalogCircle: CirclemsDataSchema.ComiketCircleWC?
+    let catalogDataSource: CirclemsDataSource?
     @State private var presentedSheet: SharedPlanCircleEditorSheet?
     @State private var confirmation: SharedPlanCircleEditorConfirmation?
 
@@ -1189,6 +1318,7 @@ private struct SharedPlanCircleEditorScreen: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
                 if let content {
+                    circleOverview
                     needsSection(content)
                     memoSection
                     presenceSection(content)
@@ -1207,7 +1337,7 @@ private struct SharedPlanCircleEditorScreen: View {
             .padding(.bottom, 36)
         }
         .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("Circle purchases")
+        .modifier(SharedPlanCirclePurchasesNavigationTitle(identity: identity))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
@@ -1217,6 +1347,7 @@ private struct SharedPlanCircleEditorScreen: View {
                     store: store,
                     circle: circle,
                     currentUserID: currentUserID,
+                    identity: identity,
                     presentedSheet: $presentedSheet
                 )
             case .editProgress(let edit):
@@ -1280,37 +1411,48 @@ private struct SharedPlanCircleEditorScreen: View {
         }
     }
 
+    @ViewBuilder
+    private var circleOverview: some View {
+        if let catalogCircle, let catalogDataSource {
+            NavigationLink {
+                CircleDetailView(circle: catalogCircle, dataSource: catalogDataSource)
+            } label: {
+                SharedPlanCircleIdentityOverview(
+                    identity: identity,
+                    showsDisclosureIndicator: true
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the full circle detail page")
+            .accessibilityIdentifier("shared-plan-circle-overview")
+        } else {
+            SharedPlanCircleIdentityOverview(
+                identity: identity,
+                showsDisclosureIndicator: false
+            )
+                .accessibilityIdentifier("shared-plan-circle-overview")
+        }
+    }
+
     private var content: SharedPlanCircleContent? {
         model.circleContent(for: circle)
     }
 
+    @ViewBuilder
     private func presenceSection(_ content: SharedPlanCircleContent) -> some View {
-        SharedPlanCirclePanel(title: String(localized: "Circle")) {
-            HStack {
-                Text("Status")
-                    .font(.body.weight(.medium))
-                Spacer()
+        if model.canEdit || content.presence != .present {
+            SharedPlanCirclePanel(title: String(localized: "Plan")) {
                 switch content.presence {
                 case .present:
-                    LucideLabel("Active", icon: "circle-check-big")
-                        .foregroundStyle(.green)
+                    if model.canEdit {
+                        Button("Remove circle from plan", role: .destructive) {
+                            confirmation = .removeCircle
+                        }
+                        .disabled(model.isPerformingMutation)
+                    }
                 case .removed:
                     LucideLabel("Removed", icon: "minus")
                         .foregroundStyle(.secondary)
-                case .conflicted:
-                    LucideLabel("Needs review", icon: "triangle-alert")
-                        .foregroundStyle(.orange)
-                }
-            }
-
-            if model.canEdit {
-                switch content.presence {
-                case .present:
-                    Button("Remove circle from plan", role: .destructive) {
-                        confirmation = .removeCircle
-                    }
-                    .disabled(model.isPerformingMutation)
-                case .removed:
                     Button {
                         Task {
                             await model.setCirclePresence(.active, circle: circle, using: store)
@@ -1320,9 +1462,13 @@ private struct SharedPlanCircleEditorScreen: View {
                     }
                     .disabled(model.isPerformingMutation)
                 case .conflicted:
-                    Text("Choose whether this circle should stay in the plan.")
-                        .font(.caption)
+                    LucideLabel("Needs review", icon: "triangle-alert")
                         .foregroundStyle(.orange)
+                    if model.canEdit {
+                        Text("Choose whether this circle should stay in the plan.")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
                 }
             }
         }
@@ -1374,6 +1520,7 @@ private struct SharedPlanCircleEditorScreen: View {
                 ForEach(content.needs) { need in
                     SharedPlanNeedEditorRow(
                         need: need,
+                        circleName: identity.circleName,
                         currentUserID: currentUserID,
                         members: model.members,
                         hasConflict: model.conflicts.contains { conflict in
@@ -1446,6 +1593,84 @@ private struct SharedPlanCircleEditorScreen: View {
         case .removeCircle: String(localized: "Remove this circle from the plan?")
         case .deleteNeed: String(localized: "Remove this purchase need?")
         case nil: String(localized: "Confirm change")
+        }
+    }
+}
+
+private struct SharedPlanCircleIdentityOverview: View {
+    let identity: SharedPlanCircleIdentityPresentation
+    let showsDisclosureIndicator: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            LucideIcon("building-2", size: 22)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 32)
+                .accessibilityHidden(true)
+            SharedPlanCircleIdentityText(identity: identity)
+            Spacer(minLength: 8)
+            if showsDisclosureIndicator {
+                LucideIcon("chevron-right", size: 16)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(16)
+        .background(.background, in: .rect(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
+        }
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct SharedPlanCircleIdentityText: View {
+    let identity: SharedPlanCircleIdentityPresentation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(identity.circleName)
+                .font(.headline)
+            if let penName = identity.penName {
+                Text(penName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            LucideLabel(verbatim: identity.dayAndLocation, icon: "map-pin")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct SharedPlanCirclePurchasesNavigationTitle: ViewModifier {
+    let identity: SharedPlanCircleIdentityPresentation
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .navigationTitle("Circle purchases")
+                .navigationSubtitle(identity.navigationSubtitle)
+        } else {
+            content
+                .navigationTitle("")
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        VStack(spacing: 1) {
+                            Text("Circle purchases")
+                                .font(.headline)
+                            Text(identity.navigationSubtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
         }
     }
 }
@@ -1547,6 +1772,7 @@ private struct SharedPlanPurchaseStageBar: View {
 
 private struct SharedPlanNeedEditorRow: View {
     let need: SharedPlanPurchaseNeed
+    let circleName: String
     let currentUserID: String?
     let members: [SharedPlanMember]
     let hasConflict: Bool
@@ -1572,6 +1798,11 @@ private struct SharedPlanNeedEditorRow: View {
                         .lineLimit(2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(circleName)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
 
                 if let unitPrice = need.unitPrice {
                     Text(
@@ -1836,6 +2067,7 @@ private struct SharedPlanCreateNeedSheet: View {
     let store: SharedPlanStore
     let circle: SharedPlanCircleKey
     let currentUserID: String?
+    let identity: SharedPlanCircleIdentityPresentation
     @Binding var presentedSheet: SharedPlanCircleEditorSheet?
     @State private var itemName = ""
     @State private var rawUnitPrice = ""
@@ -1847,6 +2079,9 @@ private struct SharedPlanCreateNeedSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Circle") {
+                    SharedPlanCircleIdentityText(identity: identity)
+                }
                 Section("Purchase need") {
                     TextField(
                         "What should be purchased?",
@@ -1879,7 +2114,7 @@ private struct SharedPlanCreateNeedSheet: View {
                     .accessibilityIdentifier("shared-plan-need-unit-price")
                 }
             }
-            .navigationTitle("Add purchase need")
+            .navigationTitle("Add purchase request")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -2214,6 +2449,16 @@ struct SharedPlanPurchaseUITestSurface: View {
 
     @State private var presentedProgress: SharedPlanPurchaseProgressEdit?
 
+    private let identity = SharedPlanCircleIdentityPresentation(
+        publicCircleID: 101,
+        circleName: "うどん道場",
+        penName: "青井",
+        day: 1,
+        blockName: "東A",
+        spaceNumber: 12,
+        spaceNumberSub: 0
+    )
+
     private let members = [
         SharedPlanMember(
             userID: Self.requesterID,
@@ -2282,6 +2527,19 @@ struct SharedPlanPurchaseUITestSurface: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
+                    NavigationLink {
+                        Text("Circle detail")
+                            .navigationTitle(identity.circleName)
+                            .accessibilityIdentifier("shared-plan-circle-detail-test-surface")
+                    } label: {
+                        SharedPlanCircleIdentityOverview(
+                            identity: identity,
+                            showsDisclosureIndicator: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("shared-plan-circle-overview")
+
                     HStack {
                         Text("Purchases")
                             .font(.title3.weight(.bold))
@@ -2291,6 +2549,7 @@ struct SharedPlanPurchaseUITestSurface: View {
                     ForEach(needs) { need in
                         SharedPlanNeedEditorRow(
                             need: need,
+                            circleName: identity.circleName,
                             currentUserID: Self.requesterID,
                             members: members,
                             hasConflict: false,
@@ -2310,7 +2569,7 @@ struct SharedPlanPurchaseUITestSurface: View {
                 .padding(16)
             }
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Circle purchases")
+            .modifier(SharedPlanCirclePurchasesNavigationTitle(identity: identity))
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier("shared-plan-purchase-test-surface")
         }

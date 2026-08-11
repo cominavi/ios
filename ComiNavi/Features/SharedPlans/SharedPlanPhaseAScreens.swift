@@ -408,7 +408,8 @@ struct SharedPlanNotificationInboxScreen: View {
                 store: store,
                 planID: planID,
                 currentUserID: currentUserID,
-                features: features
+                features: features,
+                catalogDataSource: catalogDataSource
             )
         }
     }

@@ -53,7 +53,8 @@ struct SharedPlansScreen: View {
                             planID: planID,
                             currentUserID: currentUserID,
                             features: features,
-                            favoriteImportService: favoriteImportService
+                            favoriteImportService: favoriteImportService,
+                            catalogDataSource: catalogDataSource
                         )
                     }
                 }
@@ -619,19 +620,22 @@ struct SharedPlanDetailScreen: View {
     let currentUserID: String?
     let features: SharedPlanPresentationFeatures
     let favoriteImportService: any CirclemsFavoriteImportServicing
+    let catalogDataSource: CirclemsDataSource?
 
     init(
         store: SharedPlanStore,
         planID: String,
         currentUserID: String? = nil,
         features: SharedPlanPresentationFeatures = .production,
-        favoriteImportService: any CirclemsFavoriteImportServicing = CominaviServiceClient.shared
+        favoriteImportService: any CirclemsFavoriteImportServicing = CominaviServiceClient.shared,
+        catalogDataSource: CirclemsDataSource? = AppData.catalogLibrary.dataSource
     ) {
         self.store = store
         self.planID = planID
         self.currentUserID = currentUserID
         self.features = features
         self.favoriteImportService = favoriteImportService
+        self.catalogDataSource = catalogDataSource
     }
 
     var body: some View {
@@ -639,7 +643,8 @@ struct SharedPlanDetailScreen: View {
             store: store,
             planID: planID,
             currentUserID: currentUserID,
-            features: features
+            features: features,
+            catalogDataSource: catalogDataSource
         )
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

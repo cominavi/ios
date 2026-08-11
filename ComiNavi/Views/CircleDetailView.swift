@@ -195,7 +195,8 @@ struct CircleDetailView: View {
                     store: AppData.sharedPlanStore,
                     currentUserID: currentUserID,
                     circle: key,
-                    circleName: circle.circleName.nonBlank ?? String(localized: "Unnamed circle")
+                    circleName: circle.circleName.nonBlank ?? String(localized: "Unnamed circle"),
+                    penName: circle.penName.nonBlank
                 ) { planName in
                     sharedPlanConfirmation = String(localized: "Added to \(planName)")
                 }
