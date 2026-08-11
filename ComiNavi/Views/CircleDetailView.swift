@@ -473,10 +473,7 @@ private struct CircleDetailHeader: View {
                 Button {
                     isShowingLightbox = true
                 } label: {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    FittedArtworkImage(image: Image(uiImage: image))
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
@@ -1635,12 +1632,7 @@ private struct ShinagakiRemoteImage: View {
                     isShowingLightbox = true
                 } label: {
                     ZStack(alignment: .bottomTrailing) {
-                        Color(uiColor: .secondarySystemFill)
-
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        FittedArtworkImage(image: Image(uiImage: image))
 
                         LucideIcon("arrow.up.left.and.arrow.down.right")
                             .font(.caption.weight(.bold))

@@ -871,14 +871,7 @@ struct ExploreCircleArtwork: View {
     var body: some View {
         Group {
             if let loadedArtwork {
-                if loadedArtwork.source == .shinagaki {
-                    ExploreShinagakiArtwork(image: loadedArtwork.image)
-                } else {
-                    loadedArtwork.image
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
+                FittedArtworkImage(image: loadedArtwork.image)
             } else {
                 Rectangle()
                     .fill(Color(uiColor: .secondarySystemFill))
@@ -953,28 +946,6 @@ struct ExploreCircleArtwork: View {
 private struct LoadedExploreArtwork {
     let image: Image
     let source: ExploreCoverSource
-}
-
-private struct ExploreShinagakiArtwork: View {
-    let image: Image
-
-    var body: some View {
-        ZStack {
-            image
-                .resizable()
-                .scaledToFill()
-                .saturation(0)
-                .brightness(-0.35)
-                .blur(radius: 12)
-                .scaleEffect(1.12)
-
-            image
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .clipped()
-    }
 }
 
 private struct ExploreFilterSheet: View {
