@@ -195,6 +195,12 @@ struct CirclemsDataSourceDatabases {
     let image: CirclemsDataSourceDatabaseMetadata
 }
 
+struct CatalogNotificationCircle: Equatable, Sendable {
+    let publicCircleID: Int
+    let name: String
+    let coverImageData: Data?
+}
+
 @MainActor
 @Observable
 final class CirclemsDataSource {
@@ -1108,6 +1114,38 @@ final class CirclemsDataSource {
                 arguments: [comiketNumber, circleID]
             )
         }
+    }
+
+    func notificationCircle(publicCircleID: Int) async -> CatalogNotificationCircle? {
+        let comiketNumber = Int(comiketId) ?? 0
+        let circle = try? await sqliteMain.read { database in
+            try CirclemsDataSchema.ComiketCircleWC.fetchOne(
+                database,
+                sql: """
+                    SELECT circle.*
+                    FROM ComiketCircleWC AS circle
+                    JOIN ComiketCircleExtend AS extension
+                      ON extension.comiketNo = circle.comiketNo
+                     AND extension.id = circle.id
+                    WHERE circle.comiketNo = ? AND extension.WCId = ?
+                    LIMIT 1
+                    """,
+                arguments: [comiketNumber, publicCircleID]
+            )
+        }
+        guard let circle else { return nil }
+        let imageData = await getCircleImage(circleId: circle.id)
+        let name = circle.circleName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let displayName = if let name, !name.isEmpty {
+            name
+        } else {
+            String(localized: "Circle")
+        }
+        return CatalogNotificationCircle(
+            publicCircleID: publicCircleID,
+            name: displayName,
+            coverImageData: imageData
+        )
     }
 
     func getCircleExtensions() async -> [CirclemsDataSchema.ComiketCircleExtend] {

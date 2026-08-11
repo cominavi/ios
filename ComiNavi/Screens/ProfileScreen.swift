@@ -6,7 +6,6 @@
 //
 
 import AuthenticationServices
-import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -35,8 +34,7 @@ struct ProfileScreen: View {
     @State private var userState = AppData.userState
     @State private var profileStore = AppData.profileStore
     let sharedLocationInbox: SharedLocationInbox
-    @State private var displayName = ""
-    @State private var selectedAvatarItem: PhotosPickerItem?
+    @State private var isShowingAvatarPicker = false
     @State private var profileIssue: String?
     @State private var isShowingPendingMutationDiscardConfirmation = false
     @State private var favoriteRecoveries: [QuarantinedCanonicalFavoriteMutation] = []
@@ -58,11 +56,32 @@ struct ProfileScreen: View {
         Form {
             Section {
                 HStack {
-                    AuthenticatedProfileAvatar(
-                        url: profileStore.profile?.avatarURL,
-                        size: 44
-                    )
-                    .padding(.trailing, 8)
+                    if profileStore.profile != nil {
+                        Button {
+                            isShowingAvatarPicker = true
+                        } label: {
+                            AuthenticatedProfileAvatar(
+                                url: profileStore.profile?.avatarURL,
+                                size: 88
+                            )
+                            .overlay(alignment: .bottomTrailing) {
+                                Image(systemName: "camera.fill")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(6)
+                                    .background(Color.accentColor, in: .circle)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(profileStore.isSaving)
+                        .accessibilityLabel("アバターを変更")
+                        .accessibilityHint("写真を選択して正方形に切り抜きます")
+                        .accessibilityIdentifier("profile-change-avatar")
+                        .padding(.trailing, 8)
+                    } else {
+                        AuthenticatedProfileAvatar(url: nil, size: 88)
+                            .padding(.trailing, 8)
+                    }
 
                     VStack(alignment: .leading) {
                         Text(isLoggedIn ? "ComiNaviアカウント" : "ログインしていません")
@@ -82,34 +101,17 @@ struct ProfileScreen: View {
 
             if let profile = profileStore.profile {
                 Section("プロフィール") {
-                    TextField("表示名", text: $displayName)
-                        .textContentType(.name)
-                        .submitLabel(.done)
-                        .onSubmit { saveDisplayName() }
-
-                    Button("表示名を保存") { saveDisplayName() }
-                        .disabled(
-                            profileStore.isSaving
-                                || displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-                                    == profile.displayName
-                        )
-
-                    PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
-                        Label("アバターを変更", systemImage: "photo")
+                    NavigationLink {
+                        ProfileEditorScreen(profileStore: profileStore)
+                    } label: {
+                        Label("プロフィールを編集", systemImage: "person.crop.circle.badge.pencil")
                     }
-                    .disabled(profileStore.isSaving)
-
-                    if profile.avatarURL != nil {
-                        Button("アバターを削除", role: .destructive) {
-                            removeAvatar()
-                        }
-                        .disabled(profileStore.isSaving)
-                    }
+                    .accessibilityIdentifier("profile-edit")
 
                     ForEach(profile.identities, id: \.stableID) { identity in
                         LabeledContent(
                             providerDisplayName(identity.provider),
-                            value: identity.environment ?? identity.email ?? "連携済み"
+                            value: identity.profileDisplayDetail
                         )
                     }
 
@@ -154,7 +156,8 @@ struct ProfileScreen: View {
                     NavigationLink {
                         SharedPlanNotificationInboxScreen(
                             store: sharedPlanStore,
-                            currentUserID: profileStore.profile?.id
+                            currentUserID: profileStore.profile?.id,
+                            catalogDataSource: catalogLibrary.dataSource
                         )
                     } label: {
                         HStack {
@@ -191,30 +194,6 @@ struct ProfileScreen: View {
                     }
                     .disabled(profileStore.isSaving)
                 }
-            }
-
-            Section("Data source") {
-                Menu {
-                    ForEach(catalogLibrary.availableModes, id: \.self) { mode in
-                        Button {
-                            catalogLibrary.selectMode(mode)
-                        } label: {
-                            if mode == catalogLibrary.mode {
-                                LucideLabel(verbatim: mode.displayName, icon: "checkmark")
-                            } else {
-                                Text(mode.displayName)
-                            }
-                        }
-                    }
-                } label: {
-                    LabeledContent("Source", value: catalogLibrary.mode.displayName)
-                }
-                .disabled(catalogLibrary.availableModes.count < 2)
-                .accessibilityIdentifier("profile-catalog-data-source")
-
-                Text(catalogLibrary.mode.detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
 
             if !favoriteRecoveries.isEmpty {
@@ -347,8 +326,10 @@ struct ProfileScreen: View {
             }
         }
         .navigationTitle("Profile")
-        .onAppear {
-            displayName = profileStore.profile?.displayName ?? ""
+        .sheet(isPresented: $isShowingAvatarPicker) {
+            SquareAvatarImagePicker { image in
+                saveAvatar(image)
+            }
         }
         .task {
             guard let flow = try? AppData.pendingCirclemsAuthorizationFlow(),
@@ -361,13 +342,6 @@ struct ProfileScreen: View {
         }
         .task(id: catalogLibrary.dataSource?.comiket.number) {
             await loadFavoriteRecoveries()
-        }
-        .onChange(of: profileStore.profile?.displayName) { _, value in
-            displayName = value ?? ""
-        }
-        .onChange(of: selectedAvatarItem) { _, item in
-            guard let item else { return }
-            loadAvatar(item)
         }
         .confirmationDialog(
             "ComiNaviからログアウトしますか？",
@@ -509,33 +483,12 @@ struct ProfileScreen: View {
         }
     }
 
-    private func saveDisplayName() {
+    private func saveAvatar(_ image: UIImage) {
         Task {
             do {
-                try await profileStore.saveDisplayName(displayName)
-                profileIssue = nil
-            } catch { profileIssue = error.localizedDescription }
-        }
-    }
-
-    private func loadAvatar(_ item: PhotosPickerItem) {
-        Task {
-            defer { selectedAvatarItem = nil }
-            do {
-                guard let data = try await item.loadTransferable(type: Data.self),
-                      let image = UIImage(data: data),
-                      let jpeg = image.jpegData(compressionQuality: 0.88)
+                guard let jpeg = AvatarImageProcessor.squareJPEGData(from: image)
                 else { throw CominaviServiceError.invalidResponse }
                 try await profileStore.saveAvatar(jpeg, contentType: "image/jpeg")
-                profileIssue = nil
-            } catch { profileIssue = error.localizedDescription }
-        }
-    }
-
-    private func removeAvatar() {
-        Task {
-            do {
-                try await profileStore.removeAvatar()
                 profileIssue = nil
             } catch { profileIssue = error.localizedDescription }
         }
@@ -614,6 +567,166 @@ struct ProfileScreen: View {
                 profileIssue = error.localizedDescription
             }
         }
+    }
+}
+
+extension CominaviProfileIdentity {
+    var profileDisplayDetail: String {
+        if provider == "circlems" {
+            return email ?? String(localized: "連携済み")
+        }
+        return email ?? environment ?? String(localized: "連携済み")
+    }
+}
+
+private struct ProfileEditorScreen: View {
+    let profileStore: CominaviProfileStore
+    @State private var displayName: String
+    @State private var issueMessage: String?
+
+    init(profileStore: CominaviProfileStore) {
+        self.profileStore = profileStore
+        _displayName = State(initialValue: profileStore.profile?.displayName ?? "")
+    }
+
+    var body: some View {
+        Form {
+            Section("プロフィール") {
+                TextField("表示名", text: $displayName)
+                    .textContentType(.name)
+                    .submitLabel(.done)
+                    .onSubmit(saveDisplayName)
+
+                Button("表示名を保存", action: saveDisplayName)
+                    .disabled(!canSaveDisplayName)
+
+                if profileStore.profile?.avatarURL != nil {
+                    Button("アバターを削除", role: .destructive, action: removeAvatar)
+                        .disabled(profileStore.isSaving)
+                }
+            }
+
+            if let issueMessage {
+                Section {
+                    Text(issueMessage)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+        .navigationTitle("プロフィールを編集")
+        .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: profileStore.profile?.displayName) { _, value in
+            guard let value else { return }
+            displayName = value
+        }
+    }
+
+    private var canSaveDisplayName: Bool {
+        guard let profile = profileStore.profile else { return false }
+        return !profileStore.isSaving
+            && displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                != profile.displayName
+    }
+
+    private func saveDisplayName() {
+        Task {
+            do {
+                try await profileStore.saveDisplayName(displayName)
+                issueMessage = nil
+            } catch {
+                issueMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func removeAvatar() {
+        Task {
+            do {
+                try await profileStore.removeAvatar()
+                issueMessage = nil
+            } catch {
+                issueMessage = error.localizedDescription
+            }
+        }
+    }
+}
+
+private struct SquareAvatarImagePicker: UIViewControllerRepresentable {
+    @Environment(\.dismiss) private var dismiss
+    let onSelect: (UIImage) -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .photoLibrary
+        picker.allowsEditing = true
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSelect: onSelect, dismiss: dismiss)
+    }
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate,
+        UIImagePickerControllerDelegate
+    {
+        private let onSelect: (UIImage) -> Void
+        private let dismiss: DismissAction
+
+        init(onSelect: @escaping (UIImage) -> Void, dismiss: DismissAction) {
+            self.onSelect = onSelect
+            self.dismiss = dismiss
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let image = (info[.editedImage] ?? info[.originalImage]) as? UIImage {
+                onSelect(image)
+            }
+            dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            dismiss()
+        }
+    }
+}
+
+enum AvatarImageProcessor {
+    static func squareJPEGData(
+        from image: UIImage,
+        maxPixelSize: CGFloat = 1_024
+    ) -> Data? {
+        let side = min(image.size.width, image.size.height)
+        guard side > 0 else { return nil }
+
+        let outputSide = min(side, maxPixelSize)
+        let scale = outputSide / side
+        let drawSize = CGSize(
+            width: image.size.width * scale,
+            height: image.size.height * scale
+        )
+        let drawOrigin = CGPoint(
+            x: (outputSide - drawSize.width) / 2,
+            y: (outputSide - drawSize.height) / 2
+        )
+        let format = UIGraphicsImageRendererFormat.preferred()
+        format.scale = 1
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(
+            size: CGSize(width: outputSide, height: outputSide),
+            format: format
+        )
+        let squareImage = renderer.image { context in
+            UIColor.systemBackground.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: outputSide, height: outputSide))
+            image.draw(in: CGRect(origin: drawOrigin, size: drawSize))
+        }
+        return squareImage.jpegData(compressionQuality: 0.88)
     }
 }
 

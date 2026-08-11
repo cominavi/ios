@@ -386,12 +386,6 @@ struct EntryView: View {
             )
         case .signIn:
             SignInView(
-                onUseDemoData: {
-                    leaveForcedSignIn()
-                    #if DEBUG || COMINAVI_STAGING
-                        catalogLibrary.selectMode(.demo)
-                    #endif
-                },
                 googleInvitation: invitationInbox.isGoogleEntryEligible
                     ? invitationInbox.pending
                     : nil,
@@ -431,12 +425,6 @@ struct EntryView: View {
                 .draw(at: CGPoint(x: 150, y: 500), withAttributes: attributes)
         }
     #endif
-
-    private func leaveForcedSignIn() {
-        #if DEBUG
-            isForcingSignInForTesting = false
-        #endif
-    }
 
     @MainActor
     private func receiveGoogleSpecialEntry(_ url: URL) -> Bool {

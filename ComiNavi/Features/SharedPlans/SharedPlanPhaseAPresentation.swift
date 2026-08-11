@@ -436,6 +436,7 @@ extension SharedPlanStore: SharedPlanNotificationServicing {}
 final class SharedPlanNotificationInboxModel {
     private(set) var notifications: [SharedPlanNotificationItem] = []
     private(set) var planNames: [String: String] = [:]
+    private(set) var planComiketNumbers: [String: Int] = [:]
     private(set) var pendingReadIDs: Set<String> = []
     private(set) var readIssues: [String: String] = [:]
     private(set) var canLoadMore = false
@@ -504,6 +505,9 @@ final class SharedPlanNotificationInboxModel {
     func synchronize(from service: any SharedPlanNotificationServicing) {
         notifications = service.notifications
         planNames = Dictionary(uniqueKeysWithValues: service.plans.map { ($0.id, $0.name) })
+        planComiketNumbers = Dictionary(
+            uniqueKeysWithValues: service.plans.map { ($0.id, $0.comiketNo) }
+        )
         pendingReadIDs = service.pendingNotificationReadIDs
         readIssues = service.notificationReadIssues
         canLoadMore = service.notificationNextCursor != nil
@@ -546,6 +550,7 @@ struct SharedPlanNotificationPresentation {
     let detail: String
     let systemImage: String
     let isConflict: Bool
+    let publicCircleID: Int?
 
     static func make(
         notification: SharedPlanNotificationItem,
@@ -563,7 +568,8 @@ struct SharedPlanNotificationPresentation {
                 key: key,
                 title: removed ? "Circle removed from Shared Plan" : "Circle added to Shared Plan",
                 detail: circleDetail(payload.payload, planName: planName),
-                systemImage: removed ? "minus.circle" : "plus.circle"
+                systemImage: removed ? "minus.circle" : "plus.circle",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.circleResolveParent, .operation(let payload)):
             guard payload.operationType == .circleResolveParent else { return nil }
@@ -571,7 +577,8 @@ struct SharedPlanNotificationPresentation {
                 key: key,
                 title: "Circle conflict resolved",
                 detail: circleDetail(payload.payload, planName: planName),
-                systemImage: "checkmark.circle"
+                systemImage: "checkmark.circle",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.circleMemoSplice, .operation(let payload)):
             guard payload.operationType == .circleMemoSplice else { return nil }
@@ -579,7 +586,8 @@ struct SharedPlanNotificationPresentation {
                 key: key,
                 title: "Circle memo updated",
                 detail: circleDetail(payload.payload, planName: planName),
-                systemImage: "note.text"
+                systemImage: "note.text",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.needCreate, .operation(let payload)):
             guard payload.operationType == .needCreate else { return nil }
@@ -587,7 +595,8 @@ struct SharedPlanNotificationPresentation {
                 key: key,
                 title: "Purchase need added",
                 detail: circleDetail(payload.payload, planName: planName),
-                systemImage: "cart.badge.plus"
+                systemImage: "cart.badge.plus",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.needDelete, .operation(let payload)):
             guard payload.operationType == .needDelete else { return nil }
@@ -595,7 +604,8 @@ struct SharedPlanNotificationPresentation {
                 key: key,
                 title: "Purchase need removed",
                 detail: circleDetail(payload.payload, planName: planName),
-                systemImage: "cart.badge.minus"
+                systemImage: "cart.badge.minus",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.needResolveParent, .operation(let payload)):
             guard payload.operationType == .needResolveParent else { return nil }
@@ -603,7 +613,8 @@ struct SharedPlanNotificationPresentation {
                 key: key,
                 title: "Purchase need conflict resolved",
                 detail: circleDetail(payload.payload, planName: planName),
-                systemImage: "checkmark.circle"
+                systemImage: "checkmark.circle",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.needWantedQuantity, .operation(let payload)):
             guard payload.operationType == .needWantedQuantity else { return nil }
@@ -615,7 +626,8 @@ struct SharedPlanNotificationPresentation {
                     quantityKey: "wantedQuantity",
                     planName: planName
                 ),
-                systemImage: "number.circle"
+                systemImage: "number.circle",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.needBuyerAllocation, .operation(let payload)):
             guard payload.operationType == .needBuyerAllocation else { return nil }
@@ -627,7 +639,8 @@ struct SharedPlanNotificationPresentation {
                     quantityKey: "quantity",
                     planName: planName
                 ),
-                systemImage: "person.2"
+                systemImage: "person.2",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.needFulfilledQuantity, .operation(let payload)):
             guard payload.operationType == .needFulfilledQuantity else { return nil }
@@ -639,7 +652,8 @@ struct SharedPlanNotificationPresentation {
                     quantityKey: "fulfilledQuantity",
                     planName: planName
                 ),
-                systemImage: "checkmark.circle"
+                systemImage: "checkmark.circle",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.circleCommunicationSet, .operation(let payload)):
             guard payload.operationType == .circleCommunicationSet else { return nil }
@@ -647,28 +661,21 @@ struct SharedPlanNotificationPresentation {
                 key: key,
                 title: "Circle status updated",
                 detail: circleDetail(payload.payload, planName: planName),
-                systemImage: "bubble.left.and.bubble.right"
+                systemImage: "bubble.left.and.bubble.right",
+                publicCircleID: publicCircleID(in: payload.payload)
             )
         case (.conflict, .conflict(let payload)):
-            let detail: String
-            if let wcID = circleID(in: payload.path) {
-                detail = String.localizedStringWithFormat(
-                    String(localized: "%@ • WCID %lld • Open the plan to review the conflict."),
-                    planName ?? String(localized: "Shared Plan"),
-                    Int64(wcID)
-                )
-            } else {
-                detail = String.localizedStringWithFormat(
-                    String(localized: "%@ • Open the plan to review the conflict."),
-                    planName ?? String(localized: "Shared Plan")
-                )
-            }
+            let detail = String.localizedStringWithFormat(
+                String(localized: "%@ • Open the plan to review the conflict."),
+                planName ?? String(localized: "Shared Plan")
+            )
             return SharedPlanNotificationPresentation(
                 localizationKey: key,
                 title: "Conflict needs review",
                 detail: detail,
                 systemImage: "exclamationmark.triangle.fill",
-                isConflict: true
+                isConflict: true,
+                publicCircleID: circleID(in: payload.path)
             )
         default:
             return nil
@@ -679,14 +686,16 @@ struct SharedPlanNotificationPresentation {
         key: SharedPlanNotificationLocalizationKey,
         title: LocalizedStringResource,
         detail: String,
-        systemImage: String
+        systemImage: String,
+        publicCircleID: Int?
     ) -> SharedPlanNotificationPresentation {
         SharedPlanNotificationPresentation(
             localizationKey: key,
             title: title,
             detail: detail,
             systemImage: systemImage,
-            isConflict: false
+            isConflict: false,
+            publicCircleID: publicCircleID
         )
     }
 
@@ -694,14 +703,7 @@ struct SharedPlanNotificationPresentation {
         _ payload: [String: SharedPlanJSONValue],
         planName: String?
     ) -> String {
-        guard let wcID = payload["wcID"]?.integerValue else {
-            return planName ?? String(localized: "Shared Plan")
-        }
-        return String.localizedStringWithFormat(
-            String(localized: "%@ • WCID %lld"),
-            planName ?? String(localized: "Shared Plan"),
-            wcID
-        )
+        planName ?? String(localized: "Shared Plan")
     }
 
     private static func quantityDetail(
@@ -709,13 +711,11 @@ struct SharedPlanNotificationPresentation {
         quantityKey: String,
         planName: String?
     ) -> String {
-        guard let wcID = payload["wcID"]?.integerValue,
-              let quantity = payload[quantityKey]?.integerValue
+        guard let quantity = payload[quantityKey]?.integerValue
         else { return circleDetail(payload, planName: planName) }
         return String.localizedStringWithFormat(
-            String(localized: "%@ • WCID %lld • Quantity %lld"),
+            String(localized: "%@ • Quantity %lld"),
             planName ?? String(localized: "Shared Plan"),
-            wcID,
             quantity
         )
     }
@@ -724,6 +724,13 @@ struct SharedPlanNotificationPresentation {
         guard let index = path.firstIndex(of: "circles"), path.indices.contains(index + 1)
         else { return nil }
         return Int(path[index + 1])
+    }
+
+    private static func publicCircleID(
+        in payload: [String: SharedPlanJSONValue]
+    ) -> Int? {
+        guard let rawValue = payload["wcID"]?.integerValue else { return nil }
+        return Int(exactly: rawValue)
     }
 }
 

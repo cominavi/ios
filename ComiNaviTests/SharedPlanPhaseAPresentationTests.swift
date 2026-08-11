@@ -338,6 +338,8 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
             )
             XCTAssertFalse(presentation.detail.contains(notification.i18nKey))
             XCTAssertFalse(presentation.detail.contains(notification.eventType))
+            XCTAssertFalse(presentation.detail.contains("WCID"))
+            XCTAssertEqual(presentation.publicCircleID, 9_001)
         }
 
         let conflict = makeConflictNotification(idCharacter: "d")
@@ -349,7 +351,8 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
         )
         XCTAssertEqual(presentation.localizationKey, .conflict)
         XCTAssertTrue(presentation.isConflict)
-        XCTAssertTrue(presentation.detail.contains("WCID"))
+        XCTAssertFalse(presentation.detail.contains("WCID"))
+        XCTAssertEqual(presentation.publicCircleID, 9_001)
 
         let mismatched = SharedPlanNotificationItem(
             id: conflict.id,
