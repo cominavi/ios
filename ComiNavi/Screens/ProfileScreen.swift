@@ -6,6 +6,7 @@
 //
 
 import AuthenticationServices
+import ImageIO
 import SwiftUI
 import UIKit
 
@@ -543,6 +544,7 @@ struct AuthenticatedProfileAvatar: View {
     let url: URL?
     let size: CGFloat
     let revision: Int?
+    @Environment(\.displayScale) private var displayScale
     @State private var image: UIImage?
 
     init(url: URL?, size: CGFloat, revision: Int? = nil) {
@@ -555,9 +557,7 @@ struct AuthenticatedProfileAvatar: View {
         Group {
             if let image {
                 Image(uiImage: image)
-                    .resizable()
                     .renderingMode(.original)
-                    .scaledToFill()
             } else {
                 LucideIcon("circle-user", size: Double(size))
                     .foregroundStyle(.secondary)
@@ -571,12 +571,78 @@ struct AuthenticatedProfileAvatar: View {
             guard let url,
                   let data = try? await CominaviServiceClient.shared.loadAvatarData(from: url)
             else { return }
-            image = UIImage(data: data)
+            image = AvatarImageProcessor.circularImage(
+                from: data,
+                pointSize: size,
+                displayScale: displayScale
+            )
         }
     }
 
     private var loadID: String {
-        "\(url?.relativeString ?? "")#\(revision.map(String.init) ?? "")"
+        "\(url?.relativeString ?? "")#\(revision.map(String.init) ?? "")#\(size)x\(displayScale)"
+    }
+}
+
+extension AvatarImageProcessor {
+    /// Tab bars use the underlying image dimensions and can discard SwiftUI
+    /// sizing and clipping modifiers. Produce a correctly sized circular image
+    /// so an avatar remains bounded even when used as a tab label icon.
+    static func circularImage(
+        from data: Data,
+        pointSize: CGFloat,
+        displayScale: CGFloat
+    ) -> UIImage? {
+        guard !data.isEmpty, pointSize > 0, displayScale > 0 else { return nil }
+
+        let sourceOptions: [CFString: Any] = [
+            kCGImageSourceShouldCache: false,
+        ]
+        guard let source = CGImageSourceCreateWithData(
+            data as CFData,
+            sourceOptions as CFDictionary
+        ) else { return nil }
+
+        let maximumPixelDimension = ceil(pointSize * displayScale)
+        let thumbnailOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maximumPixelDimension,
+        ]
+        guard let thumbnail = CGImageSourceCreateThumbnailAtIndex(
+            source,
+            0,
+            thumbnailOptions as CFDictionary
+        ) else { return nil }
+
+        let sourceImage = UIImage(cgImage: thumbnail)
+        let bounds = CGRect(x: 0, y: 0, width: pointSize, height: pointSize)
+        let sourceSize = sourceImage.size
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return nil }
+
+        let fillScale = max(
+            bounds.width / sourceSize.width,
+            bounds.height / sourceSize.height
+        )
+        let drawSize = CGSize(
+            width: sourceSize.width * fillScale,
+            height: sourceSize.height * fillScale
+        )
+        let drawRect = CGRect(
+            x: bounds.midX - drawSize.width / 2,
+            y: bounds.midY - drawSize.height / 2,
+            width: drawSize.width,
+            height: drawSize.height
+        )
+
+        let format = UIGraphicsImageRendererFormat.preferred()
+        format.scale = displayScale
+        format.opaque = false
+        return UIGraphicsImageRenderer(size: bounds.size, format: format).image { _ in
+            UIBezierPath(ovalIn: bounds).addClip()
+            sourceImage.draw(in: drawRect)
+        }
     }
 }
 
