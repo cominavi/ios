@@ -247,6 +247,17 @@ extension CominaviCatalogInstalling {
 }
 
 actor CominaviCatalogInstaller: CominaviCatalogInstalling {
+    nonisolated static func removeAllDownloadedData(
+        rootDirectory: URL = DirectoryManager.shared.environmentApplicationSupportDirectory
+            .appendingPathComponent("CominaviCatalogs", isDirectory: true)
+    ) async throws {
+        try await Task.detached(priority: .utility) {
+            let fileManager = FileManager.default
+            guard fileManager.fileExists(atPath: rootDirectory.path) else { return }
+            try fileManager.removeItem(at: rootDirectory)
+        }.value
+    }
+
     private struct Checkpoint: Codable, Equatable, Sendable {
         let schemaVersion: Int
         let comiketNo: Int

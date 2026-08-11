@@ -70,6 +70,7 @@ final class CatalogLibraryTests: XCTestCase {
             EntryContentRoute.resolve(
                 accountDeletionPending: false,
                 shouldShowSignIn: false,
+                catalogIsPreparing: false,
                 hasCatalog: false
             ),
             .catalogIndependent
@@ -78,6 +79,31 @@ final class CatalogLibraryTests: XCTestCase {
             EntryContentRoute.resolve(
                 accountDeletionPending: false,
                 shouldShowSignIn: false,
+                catalogIsPreparing: false,
+                hasCatalog: true
+            ),
+            .catalog
+        )
+    }
+
+    func testAuthenticatedUserWaitsForCatalogPreparationBeforeShowingAppShell() {
+        XCTAssertEqual(
+            EntryContentRoute.resolve(
+                accountDeletionPending: false,
+                shouldShowSignIn: false,
+                catalogIsPreparing: true,
+                hasCatalog: false
+            ),
+            .catalogLoading
+        )
+    }
+
+    func testCatalogReplacementKeepsReadyAppShellVisible() {
+        XCTAssertEqual(
+            EntryContentRoute.resolve(
+                accountDeletionPending: false,
+                shouldShowSignIn: false,
+                catalogIsPreparing: true,
                 hasCatalog: true
             ),
             .catalog

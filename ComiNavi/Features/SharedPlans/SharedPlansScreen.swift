@@ -727,7 +727,16 @@ struct SharedPlanDetailScreen: View {
                     )
                 }
             } else {
-                ContentUnavailableView("プランが見つかりません", systemImage: "exclamationmark.triangle")
+                FocusedActionSurface(
+                    symbolName: "exclamationmark.triangle.fill",
+                    tint: .orange
+                ) {
+                    Text("プランが見つかりません")
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    Text("このプランは削除されたか、アクセスできなくなった可能性があります。")
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 12)
+                }
             }
         }
     }
