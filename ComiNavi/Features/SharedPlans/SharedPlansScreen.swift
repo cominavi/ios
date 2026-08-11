@@ -334,14 +334,18 @@ private struct SharedPlanEmptyHome: View {
                 title: "Add",
                 icon: "plus",
                 hint: "Creates a new Shared Plan.",
+                style: .add,
                 action: onAdd
             )
             .disabled(!canCreate)
+            .saturation(canCreate ? 1 : 0.15)
+            .opacity(canCreate ? 1 : 0.45)
 
             actionButton(
                 title: "Join",
                 icon: "person.crop.circle.badge.plus",
                 hint: "Shows how to join a Shared Plan.",
+                style: .join,
                 action: onJoin
             )
         }
@@ -355,24 +359,78 @@ private struct SharedPlanEmptyHome: View {
         title: LocalizedStringKey,
         icon: String,
         hint: LocalizedStringKey,
+        style: ActionStyle,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 14) {
-                LucideIcon(icon, size: 30)
-                Text(title)
-                    .font(.headline)
+            ZStack(alignment: .topTrailing) {
+                Circle()
+                    .fill(style.foreground.opacity(0.10))
+                    .frame(width: 104, height: 104)
+                    .offset(x: 34, y: -38)
+
+                VStack(spacing: 14) {
+                    LucideIcon(icon, size: 30)
+                        .frame(width: 58, height: 58)
+                        .background(style.foreground.opacity(0.14), in: .circle)
+
+                    Text(title)
+                        .font(.headline)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .aspectRatio(1, contentMode: .fit)
-            .background(.background, in: .rect(cornerRadius: 24))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24)
-                    .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
-            }
+            .foregroundStyle(style.foreground)
+            .background(style.background)
+            .clipShape(.rect(cornerRadius: 24))
+            .shadow(color: style.shadow.opacity(0.28), radius: 14, x: 0, y: 8)
+            .contentShape(.rect(cornerRadius: 24))
         }
         .buttonStyle(.plain)
         .accessibilityHint(hint)
+    }
+
+    private enum ActionStyle {
+        case add
+        case join
+
+        var background: LinearGradient {
+            switch self {
+            case .add:
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.72, green: 0.90, blue: 0.20),
+                        Color.accentColor,
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            case .join:
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.06, green: 0.52, blue: 0.68),
+                        Color(red: 0.02, green: 0.32, blue: 0.47),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
+
+        var foreground: Color {
+            switch self {
+            case .add: Color(red: 0.08, green: 0.17, blue: 0.01)
+            case .join: .white
+            }
+        }
+
+        var shadow: Color {
+            switch self {
+            case .add: Color(red: 0.35, green: 0.48, blue: 0.03)
+            case .join: Color(red: 0.01, green: 0.25, blue: 0.38)
+            }
+        }
     }
 }
 

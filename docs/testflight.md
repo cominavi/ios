@@ -53,5 +53,5 @@ into the App Store upload. Xcode 26.6 can otherwise fail its packaging step with
 `rsync` from its ephemeral worker before the archive starts. Keep the archive so
 the matching dSYM remains available for crash symbolication.
 
-Build `1.0 (2026080901)` is the current prepared TestFlight build. Increase
+Build `1.0 (2026081201)` is the current prepared TestFlight build. Increase
 `CURRENT_PROJECT_VERSION` for every subsequent upload.
