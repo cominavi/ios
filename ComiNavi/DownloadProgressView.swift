@@ -210,42 +210,77 @@ struct CatalogErrorSurface<Actions: View>: View {
     }
 
     var body: some View {
-        FocusedActionSurface(symbolName: symbolName, tint: .red) {
-            Text(title)
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+        GeometryReader { geometry in
+            let contentWidth = min(640, max(0, geometry.size.width - 56))
+            let contentHeight = max(0, geometry.size.height - 64)
 
-            Text(advice)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 12)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .center, spacing: 24) {
+                        LucideIcon(symbolName, size: 34)
+                            .foregroundStyle(.red)
+                            .accessibilityHidden(true)
 
-            HStack(alignment: .top, spacing: 12) {
-                LucideIcon("exclamationmark.circle.fill", size: 22)
-                    .foregroundStyle(.red)
+                        Text(message)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 18)
+                            .overlay(alignment: .top) {
+                                Rectangle()
+                                    .fill(Color.red.opacity(0.28))
+                                    .frame(height: 1)
+                            }
+                            .overlay(alignment: .bottom) {
+                                Rectangle()
+                                    .fill(Color.red.opacity(0.16))
+                                    .frame(height: 1)
+                            }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text(message)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityElement(children: .combine)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 18)
-            .overlay(alignment: .top) {
-                Divider().overlay(Color.red.opacity(0.28))
-            }
-            .overlay(alignment: .bottom) {
-                Divider().overlay(Color.red.opacity(0.16))
-            }
-            .padding(.top, 30)
+                    Spacer(minLength: 64)
 
-            VStack(alignment: .leading, spacing: 12) {
-                actions()
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(title)
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                            .foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text(advice)
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 12)
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            actions()
+                        }
+                        .padding(.top, 34)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(width: contentWidth, alignment: .leading)
+                .frame(minHeight: contentHeight, alignment: .topLeading)
+                .padding(.horizontal, 28)
+                .padding(.top, 20)
+                .padding(.bottom, 44)
+                .frame(width: geometry.size.width, alignment: .center)
             }
-            .padding(.top, 26)
+            .scrollIndicators(.hidden)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            Color(uiColor: .systemBackground)
+                .ignoresSafeArea()
+
+            CatalogAmbientBackdrop(
+                symbolName: symbolName,
+                tint: .red,
+                animates: false
+            )
         }
         .accessibilityIdentifier("catalog-error-surface")
     }

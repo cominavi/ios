@@ -118,7 +118,7 @@ private struct CatalogLibraryLoadingSurface: View {
         case .failed(let message):
             CatalogErrorSurface(
                 symbolName: "exclamationmark.triangle.fill",
-                title: String(localized: "Catalogs unavailable"),
+                title: String(localized: "Catalog unavailable"),
                 message: message,
                 advice: catalogLibrary.failureRecovery == .redownload
                     ? String(localized: "Start a fresh download. The incomplete copy will be removed, then the new catalog will be verified before it opens.")
