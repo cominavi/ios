@@ -65,6 +65,20 @@ if ! jq -e --arg catalog_digest "${catalog_source_digest}" '
     type == "array" and length > 0 and
     all(.[];
         (.tweet_id | type == "string" and length > 0) and
+        (
+            (
+                .post_confidence == "high" and
+                .placement_confidence == "high" and
+                (.media | type == "array" and length > 0) and
+                (.matched_circles | type == "array" and length > 0) and
+                ([.matched_circles[].score] | min) == ([.matched_circles[].score] | max)
+            ) or
+            (
+                .post_confidence == "low" and
+                ((.attendance.status // "unknown") != "unknown") and
+                ((.attendance.confidence // "unmatched") | IN("high", "medium"))
+            )
+        ) and
         any(.provenance[]?;
             (.sourceId | type == "string" and length > 0) and
             (.sourceKind | type == "string" and length > 0) and
@@ -92,7 +106,7 @@ if ! jq -e --arg catalog_digest "${catalog_source_digest}" '
         )
     )
 ' "${staged_enrichment}" >/dev/null; then
-    echo "Crawl enrichment is missing complete post or authoritative Circle.ms provenance." >&2
+    echo "Crawl enrichment is missing publishable confidence, complete post, or authoritative Circle.ms provenance." >&2
     exit 1
 fi
 

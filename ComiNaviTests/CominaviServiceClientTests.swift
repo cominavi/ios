@@ -80,7 +80,7 @@ final class CominaviServiceClientTests: XCTestCase {
         ])
     }
 
-    func testAuthenticatesOnceThenSynchronizesFavoritesAndReadsRealtimeCursor() async throws {
+    func testSynchronizesFavoritesAndReadsPublicRealtimeSnapshot() async throws {
         let transport = CominaviServiceTransportStub()
         let client = try CominaviServiceClient(
             baseURL: XCTUnwrap(URL(string: "https://cominavi.net")),
@@ -127,17 +127,14 @@ final class CominaviServiceClientTests: XCTestCase {
                 notificationsEnabled: true
             )]
         )
-        let page = try await client.realtimeUpdates(eventNumber: 108, after: 40)
+        let updates = try await client.realtimeUpdates(eventNumber: 108)
         try await client.revokeSession()
 
-        XCTAssertEqual(page.nextCursor, 41)
-        XCTAssertEqual(page.updates.first?.stateValue, "sold_out")
+        XCTAssertEqual(updates.first?.cursor, 41)
+        XCTAssertEqual(updates.first?.stateValue, "sold_out")
         let requests = await transport.requests()
-        let realtimeQuery = try XCTUnwrap(
-            URLComponents(url: XCTUnwrap(requests[2].url), resolvingAgainstBaseURL: false)
-        ).queryItems
-        XCTAssertEqual(realtimeQuery?.first(where: { $0.name == "after" })?.value, "40")
-        XCTAssertEqual(realtimeQuery?.first(where: { $0.name == "limit" })?.value, "500")
+        XCTAssertNil(requests[2].url?.query)
+        XCTAssertEqual(requests[2].cachePolicy, .useProtocolCachePolicy)
         XCTAssertEqual(requests.map { $0.url?.path }, [
             "/api/v2/me/favorites/108",
             "/api/v2/me/favorites/108",
@@ -149,7 +146,7 @@ final class CominaviServiceClientTests: XCTestCase {
             [
                 "Bearer service-jwt",
                 "Bearer service-jwt",
-                "Bearer service-jwt",
+                nil,
                 "Bearer service-jwt",
             ]
         )
@@ -4190,7 +4187,7 @@ private actor CominaviServiceTransportStub {
             body = #"{"eventNumber":108,"revision":3,"favorites":[{"wcID":23000001,"color":2,"notificationsEnabled":true}]}"#
             statusCode = 200
         case ("/api/v2/events/108/updates", "GET"):
-            body = #"{"eventNumber":108,"updates":[{"cursor":41,"eventKey":"twitterapi:1:inventory_sold_out","updateKind":"inventory_sold_out","stateKind":"inventory","stateValue":"sold_out","confidence":"high","occurredAt":"2026-08-15T03:00:00Z","sourceRevision":1,"post":{"id":"1","url":"https://x.com/circle/status/1","text":"完売しました","author":{"xUserID":"9","handle":"circle","name":"Circle","profileImageURL":null},"media":[]},"circles":[{"eventNumber":108,"wcID":23000001,"circleID":100,"circleName":"Circle","day":1,"areaName":"西","blockName":"ア","spaceNo":1,"spaceNoSub":0,"location":"1日目 西 ア01a"}]}],"nextCursor":41,"hasMore":false,"serverTime":"2026-08-15T03:00:01Z"}"#
+            body = #"{"eventNumber":108,"updates":[{"cursor":41,"eventKey":"twitterapi:1:inventory_sold_out","updateKind":"inventory_sold_out","stateKind":"inventory","stateValue":"sold_out","confidence":"high","occurredAt":"2026-08-15T03:00:00Z","sourceRevision":1,"post":{"id":"1","url":"https://x.com/circle/status/1","text":"完売しました","author":{"xUserID":"9","handle":"circle","name":"Circle","profileImageURL":null},"media":[]},"circles":[{"eventNumber":108,"wcID":23000001,"circleID":100,"circleName":"Circle","day":1,"areaName":"西","blockName":"ア","spaceNo":1,"spaceNoSub":0,"location":"1日目 西 ア01a"}]}]}"#
             statusCode = 200
         case ("/api/v2/auth/logout", "POST"):
             let requestBody = try XCTUnwrap(request.httpBody)

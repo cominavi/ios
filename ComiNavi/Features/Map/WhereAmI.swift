@@ -48,8 +48,14 @@ struct ComiketSpaceAddress: Equatable, Sendable {
         return "\(blockName)\(number)\(side)"
     }
 
+    var canonicalDayText: String { "\(day)日目" }
+
+    var venueLocationText: String {
+        "\(Self.canonicalHallName(hallName)) \(spaceCode)"
+    }
+
     var canonicalText: String {
-        "\(day)日目 \(Self.canonicalHallName(hallName)) \(spaceCode)"
+        "\(canonicalDayText) \(venueLocationText)"
     }
 
     var nearbyText: String { "\(canonicalText)付近" }

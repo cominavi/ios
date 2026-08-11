@@ -680,6 +680,8 @@ final class SharedPlanEditorModel {
 
     func createNeed(
         requesterUserID: String,
+        itemName: String = "Purchase item",
+        unitPrice: Int? = nil,
         wantedQuantity: Int,
         circle: SharedPlanCircleKey,
         id: UUID = UUID(),
@@ -689,8 +691,14 @@ final class SharedPlanEditorModel {
         let need = SharedPlanPurchaseNeed(
             id: id,
             requesterUserID: requesterUserID,
+            itemName: itemName.trimmingCharacters(in: .whitespacesAndNewlines),
+            unitPrice: unitPrice,
             wantedQuantity: wantedQuantity
         )
+        guard !need.itemName.isEmpty else {
+            issueMessage = String(localized: "Enter what should be purchased.")
+            return
+        }
         await performMutation(using: service) {
             try await service.createPurchaseNeed(
                 need,

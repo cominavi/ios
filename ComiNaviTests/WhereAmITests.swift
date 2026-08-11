@@ -14,6 +14,8 @@ final class WhereAmITests: XCTestCase {
         )
 
         XCTAssertEqual(address.spaceCode, "Ａ01a")
+        XCTAssertEqual(address.canonicalDayText, "1日目")
+        XCTAssertEqual(address.venueLocationText, "東1ホール Ａ01a")
         XCTAssertEqual(address.canonicalText, "1日目 東1ホール Ａ01a")
         XCTAssertEqual(address.nearbyText, "1日目 東1ホール Ａ01a付近")
     }
@@ -28,6 +30,21 @@ final class WhereAmITests: XCTestCase {
         )
 
         XCTAssertEqual(address.canonicalText, "2日目 西2ホール あ12b")
+    }
+
+    func testCombinedCircleAddressSupportsTwoLineDayAndVenuePresentation() {
+        let address = ComiketSpaceAddress(
+            day: 1,
+            hallName: "東７",
+            blockName: "Ａ",
+            spaceNumber: 34,
+            subspace: nil,
+            isCombinedAB: true
+        )
+
+        XCTAssertEqual(address.canonicalDayText, "1日目")
+        XCTAssertEqual(address.venueLocationText, "東7ホール Ａ34a+b")
+        XCTAssertEqual(address.canonicalText, "1日目 東7ホール Ａ34a+b")
     }
 
     func testKanaLayoutUsesGojūonColumnsAndVowelOrder() throws {

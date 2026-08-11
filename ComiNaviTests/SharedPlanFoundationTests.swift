@@ -109,6 +109,61 @@ final class SharedPlanFoundationTests: XCTestCase {
     }
 
     @MainActor
+    func testNamedPurchaseRequestWithPriceSurvivesDurableReload() async throws {
+        let userID = "user-1"
+        let serverPlan = makePlan(id: "a171cac7-2dad-4a22-a24a-f3ac0324603f")
+        let serverDocument = try SharedPlanAutomergeDocument(
+            fixturePlanID: serverPlan.id,
+            comiketNo: serverPlan.comiketNo,
+            replicaID: UUID()
+        )
+        let remote = SharedPlanRemoteStub(
+            plan: serverPlan,
+            bootstrap: SharedPlanSyncBootstrap(
+                v: 1,
+                document: await serverDocument.save().base64URLEncodedString,
+                heads: await serverDocument.heads()
+            )
+        )
+        let persistence = InMemorySharedPlanPersistence()
+        let store = SharedPlanStore(
+            persistence: persistence,
+            remote: remote,
+            allowsUnconnectedContentMutations: true,
+            actorUserID: { userID }
+        )
+        await store.load()
+        let plan = try await store.createPlan(name: serverPlan.name, comiketNo: 108)
+        let circle = try XCTUnwrap(SharedPlanCircleKey(comiketNo: 108, wcID: 321))
+        let needID = UUID()
+        _ = try await store.addCircle(circle, to: plan.id)
+        _ = try await store.createPurchaseNeed(
+            SharedPlanPurchaseNeed(
+                id: needID,
+                requesterUserID: userID,
+                itemName: "新幹線のきっぷ",
+                unitPrice: 14_720,
+                wantedQuantity: 2
+            ),
+            circle: circle,
+            planID: plan.id
+        )
+
+        let relaunched = SharedPlanStore(
+            persistence: persistence,
+            remote: remote,
+            allowsUnconnectedContentMutations: true,
+            actorUserID: { userID }
+        )
+        await relaunched.load()
+        let need = try await relaunched.circleContent(circle: circle, planID: plan.id)?
+            .needs.first(where: { $0.id == needID })
+        XCTAssertEqual(need?.itemName, "新幹線のきっぷ")
+        XCTAssertEqual(need?.unitPrice, 14_720)
+        XCTAssertEqual(need?.wantedQuantity, 2)
+    }
+
+    @MainActor
     func testPaginatedBuyerAuthorityRejectsMemberRemovedBeforeMutation() async throws {
         let currentUserID = "11111111111111111111111111111111"
         let otherUserID = "22222222222222222222222222222222"

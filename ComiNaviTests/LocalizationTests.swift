@@ -165,11 +165,11 @@ final class LocalizationTests: XCTestCase {
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
-                forKey: "Plain text only. Unicode characters are edited by scalar position and saved after a short idle pause or when you leave this screen.",
+                forKey: "Your memo is saved after a short pause and when you leave this screen.",
                 value: nil,
                 table: nil
             ),
-            "メモはプレーンテキストです。Unicode文字を正しい位置で扱い、入力が少し止まったとき、またはこの画面を離れるときにまとめて保存します。"
+            "メモは入力が少し止まったときと、この画面を離れるときに保存します。"
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(

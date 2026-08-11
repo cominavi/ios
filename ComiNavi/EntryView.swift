@@ -402,6 +402,10 @@ struct EntryView: View {
                     sharedLocationInbox: sharedLocationInbox
                 )
             } else if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-shared-plan-purchases"
+            ) {
+                SharedPlanPurchaseUITestSurface()
+            } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-shared-plan-list"
             ) {
                 SharedPlanListUITestSurface()

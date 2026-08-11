@@ -29,7 +29,6 @@ actor CominaviRealtimeStore {
     static let shared = CominaviRealtimeStore()
 
     private let client: any CominaviRealtimeFetching
-    private var cursorByEvent: [Int: Int] = [:]
     private var lastRefreshByEvent: [Int: Date] = [:]
     private var headsByEvent: [Int: [Int: [String: CominaviRealtimeUpdate]]] = [:]
 
@@ -43,39 +42,22 @@ actor CominaviRealtimeStore {
         {
             return
         }
-        var cursor = cursorByEvent[eventNumber] ?? 0
-        for _ in 0..<100 {
-            let page = try await client.realtimeUpdates(
-                eventNumber: eventNumber,
-                after: cursor,
-                limit: 500
-            )
-            guard page.nextCursor >= cursor else {
-                throw CominaviServiceError.invalidResponse
-            }
-            for update in page.updates {
-                for circle in update.circles where circle.eventNumber == eventNumber {
-                    var circleHeads = headsByEvent[eventNumber]?[circle.wcID] ?? [:]
-                    if let current = circleHeads[update.stateKind],
-                       !Self.isNewer(update, than: current)
-                    {
-                        continue
-                    }
-                    circleHeads[update.stateKind] = update
-                    headsByEvent[eventNumber, default: [:]][circle.wcID] = circleHeads
+        let updates = try await client.realtimeUpdates(eventNumber: eventNumber)
+        var eventHeads: [Int: [String: CominaviRealtimeUpdate]] = [:]
+        for update in updates {
+            for circle in update.circles where circle.eventNumber == eventNumber {
+                var circleHeads = eventHeads[circle.wcID] ?? [:]
+                if let current = circleHeads[update.stateKind],
+                   !Self.isNewer(update, than: current)
+                {
+                    continue
                 }
-            }
-            cursor = page.nextCursor
-            cursorByEvent[eventNumber] = cursor
-            if !page.hasMore {
-                lastRefreshByEvent[eventNumber] = Date()
-                return
-            }
-            guard !page.updates.isEmpty else {
-                throw CominaviServiceError.invalidResponse
+                circleHeads[update.stateKind] = update
+                eventHeads[circle.wcID] = circleHeads
             }
         }
-        throw CominaviServiceError.invalidResponse
+        headsByEvent[eventNumber] = eventHeads
+        lastRefreshByEvent[eventNumber] = Date()
     }
 
     func enrichment(eventNumber: Int, publicCircleID: Int) -> CatalogCircleEnrichment? {

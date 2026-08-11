@@ -671,7 +671,7 @@ struct SharedPlanDetailScreen: View {
                             Label {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("Circles, memos, and purchases")
-                                    Text("Review collaborative content, conflicts, and saved recovery data.")
+                                    Text("Open purchases, notes, and any choices that need your attention.")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }

@@ -13036,8 +13036,8 @@
     "/api/v2/events/{eventNumber}/updates": {
       "get": {
         "operationId": "listRealtimeUpdates",
-        "summary": "List realtime event updates",
-        "description": "Returns a stable cursor page of realtime circle updates for one Comiket. The optional WCID filter accepts at most 500 entries, deduplicates them, and each page contains at most 500 updates.",
+        "summary": "Get realtime event updates",
+        "description": "Returns one cacheable JSON representation containing every immutable realtime circle update for one Comiket, in ascending cursor order.",
         "tags": [
           "Realtime"
         ],
@@ -13052,48 +13052,6 @@
               "maximum": 10000,
               "exclusiveMinimum": 0
             }
-          },
-          {
-            "name": "after",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 9007199254740991,
-              "default": 0
-            },
-            "allowEmptyValue": true,
-            "allowReserved": true
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 500,
-              "default": 100
-            },
-            "allowEmptyValue": true,
-            "allowReserved": true
-          },
-          {
-            "name": "wcID",
-            "in": "query",
-            "schema": {
-              "type": "array",
-              "maxItems": 500,
-              "items": {
-                "type": "integer",
-                "minimum": -9007199254740991,
-                "maximum": 9007199254740991,
-                "exclusiveMinimum": 0
-              }
-            },
-            "style": "deepObject",
-            "explode": true,
-            "allowEmptyValue": true,
-            "allowReserved": true
           }
         ],
         "responses": {
@@ -13112,7 +13070,6 @@
                     },
                     "updates": {
                       "type": "array",
-                      "maxItems": 500,
                       "items": {
                         "type": "object",
                         "properties": {
@@ -13344,26 +13301,11 @@
                           "circles"
                         ]
                       }
-                    },
-                    "nextCursor": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "hasMore": {
-                      "type": "boolean"
-                    },
-                    "serverTime": {
-                      "type": "string",
-                      "format": "date-time"
                     }
                   },
                   "required": [
                     "eventNumber",
-                    "updates",
-                    "nextCursor",
-                    "hasMore",
-                    "serverTime"
+                    "updates"
                   ]
                 }
               }
@@ -13520,11 +13462,7 @@
             }
           }
         },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
+        "security": []
       }
     },
     "/api/v2/users/{userID}/avatar": {

@@ -44,6 +44,49 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertNotNil(model.issueMessage)
     }
 
+    func testPurchaseRequestRequiresANameAndCarriesRequesterPrice() async {
+        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let model = makeWritableModel()
+        await model.load(using: service)
+
+        await model.createNeed(
+            requesterUserID: Self.userID,
+            itemName: "   ",
+            unitPrice: 2_500,
+            wantedQuantity: 1,
+            circle: Self.circle,
+            using: service,
+            now: Self.now
+        )
+        XCTAssertTrue(service.actions.isEmpty)
+        XCTAssertNotNil(model.issueMessage)
+
+        model.dismissIssue()
+        await model.createNeed(
+            requesterUserID: Self.userID,
+            itemName: "  色紙  ",
+            unitPrice: 2_500,
+            wantedQuantity: 1,
+            circle: Self.circle,
+            id: Self.needID,
+            using: service,
+            now: Self.now
+        )
+
+        XCTAssertEqual(service.actions, [
+            .createNeed(
+                SharedPlanPurchaseNeed(
+                    id: Self.needID,
+                    requesterUserID: Self.userID,
+                    itemName: "色紙",
+                    unitPrice: 2_500,
+                    wantedQuantity: 1
+                ),
+                Self.circle
+            ),
+        ])
+    }
+
     func testAllTenOperationTypesRouteExactTypedPayloads() async throws {
         let circleParent = makeParentConflict(
             id: "circle-parent",
@@ -82,6 +125,8 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         await model.flushMemo(circle: Self.circle, using: service, now: Self.now)
         await model.createNeed(
             requesterUserID: Self.userID,
+            itemName: "新幹線のきっぷ",
+            unitPrice: 14_720,
             wantedQuantity: 3,
             circle: Self.circle,
             id: Self.needID,
@@ -145,6 +190,8 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
                 SharedPlanPurchaseNeed(
                     id: Self.needID,
                     requesterUserID: Self.userID,
+                    itemName: "新幹線のきっぷ",
+                    unitPrice: 14_720,
                     wantedQuantity: 3
                 ),
                 Self.circle
@@ -582,16 +629,20 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(Set(presentations.map(\.title)).count, presentations.count)
         XCTAssertTrue(presentations.allSatisfy { !$0.detail.isEmpty && !$0.systemImage.isEmpty })
         XCTAssertTrue(presentations[4].detail.contains("1,000"))
-        XCTAssertTrue(presentations[5].detail.contains("512"))
+        XCTAssertTrue(presentations[5].detail.contains(String(localized: "Download")))
         XCTAssertTrue(presentations[10].detail.contains("1,001"))
+        let implementationTerms = ["operation", "branch", "frame", "generation", "interoperable"]
+        XCTAssertTrue(presentations.flatMap { [$0.title, $0.detail] }.allSatisfy { text in
+            implementationTerms.allSatisfy { !text.localizedCaseInsensitiveContains($0) }
+        })
     }
 
-    func testConflictPresentationUsesSemanticLabelsAndKeepsTechnicalDetailsSeparate() {
+    func testConflictPresentationUsesPlainLanguageWithoutProtocolDetails() {
         let conflict = makeScalarConflict()
         let presentation = SharedPlanConflictPresentation(conflict: conflict)
 
         XCTAssertEqual(presentation.title, String(localized: "Choose one value"))
-        XCTAssertEqual(presentation.path, String(localized: "Wanted quantity"))
+        XCTAssertEqual(presentation.path, String(localized: "Requested"))
         XCTAssertFalse(presentation.title.contains(Self.hashA))
         XCTAssertEqual(conflict.candidates[0].value.sharedPlanDisplayText, "1")
         XCTAssertEqual(
@@ -599,6 +650,39 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
                 .sharedPlanDisplayText,
             String(localized: "Removed")
         )
+    }
+
+    func testPurchaseProgressUsesRequestedAssignedAndBoughtStages() {
+        func progress(
+            requested: Int = 4,
+            assigned: Int,
+            bought: Int,
+            conflict: Bool = false
+        ) -> SharedPlanPurchaseProgressPresentation {
+            SharedPlanPurchaseProgressPresentation(
+                need: SharedPlanPurchaseNeed(
+                    id: Self.needID,
+                    requesterUserID: Self.userID,
+                    itemName: "新幹線チケット",
+                    unitPrice: 2_000,
+                    wantedQuantity: requested,
+                    buyerAllocations: assigned == 0 ? [:] : [Self.userID: assigned],
+                    fulfilledQuantity: bought
+                ),
+                hasConflict: conflict
+            )
+        }
+
+        XCTAssertEqual(progress(assigned: 0, bought: 0).state, .requested)
+        XCTAssertEqual(progress(assigned: 2, bought: 0).state, .partiallyAssigned)
+        XCTAssertEqual(progress(assigned: 4, bought: 0).state, .assigned)
+        XCTAssertEqual(progress(assigned: 4, bought: 2).state, .partiallyBought)
+        XCTAssertEqual(progress(assigned: 4, bought: 4).state, .bought)
+        XCTAssertEqual(progress(assigned: 5, bought: 0).state, .needsReview)
+        XCTAssertEqual(progress(assigned: 4, bought: 5).state, .needsReview)
+        XCTAssertEqual(progress(assigned: 4, bought: 0, conflict: true).state, .needsReview)
+        XCTAssertEqual(progress(assigned: 2, bought: 1).assignedFraction, 0.5)
+        XCTAssertEqual(progress(assigned: 2, bought: 1).boughtFraction, 0.25)
     }
 
     func testEditorAccessibilityIdentifiersAreStableAndEntityScoped() {
@@ -609,7 +693,6 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
             SharedPlanEditorAccessibilityID.screen,
             SharedPlanEditorAccessibilityID.syncStatus,
             SharedPlanEditorAccessibilityID.readOnly,
-            SharedPlanEditorAccessibilityID.addCircle,
             SharedPlanEditorAccessibilityID.circle(Self.circle),
             SharedPlanEditorAccessibilityID.circle(otherCircle),
             SharedPlanEditorAccessibilityID.memo(Self.circle),

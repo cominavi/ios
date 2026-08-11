@@ -95,6 +95,35 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testSharedPlanPurchaseRowsShowFiveCompactThreeStageRequests() {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-ui-testing-hide-debugger",
+            "-cominavi-ui-testing-shared-plan-purchases",
+            "-AppleLanguages", "(en)",
+        ]
+        app.launch()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["shared-plan-purchase-test-surface"]
+                .waitForExistence(timeout: 8)
+        )
+
+        for index in 1 ... 5 {
+            let id = String(format: "10000000-0000-4000-8000-%012d", index)
+            let row = app.descendants(matching: .any)["shared-plan-editor-need-\(id)"]
+            XCTAssertTrue(row.waitForExistence(timeout: 3), "Request \(index) must be visible")
+            XCTAssertTrue(
+                app.descendants(matching: .any)["shared-plan-editor-need-progress-\(id)"].exists,
+                "Request \(index) must show requested, assigned, and bought progress"
+            )
+        }
+
+        XCTAssertFalse(app.staticTexts["Wanted, assigned, and fulfilled quantities are saved as separate collaborative edits."].exists)
+        takeScreenshot(named: "Shared-Plan-Purchase-Redesign")
+    }
+
+    @MainActor
     func testProductionInvitationSurfaceWhenExplicitlyRequired() throws {
         let environment = ProcessInfo.processInfo.environment
         guard environment["COMINAVI_E2E_INVITATION_UI_REQUIRED"] == "1" else {
@@ -521,10 +550,17 @@ final class ComiNaviUITests: XCTestCase {
         profileTab.tap()
 
         XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 5))
+        let followingImport = app.descendants(matching: .any)["profile-following-import"]
         XCTAssertTrue(
-            app.descendants(matching: .any)["profile-following-import"].exists,
+            followingImport.exists,
             "Profile destinations should remain discoverable inside a navigation container."
         )
+        XCTAssertTrue(
+            followingImport.isEnabled,
+            "The import destination must remain open so authentication errors can provide recovery."
+        )
+        followingImport.tap()
+        XCTAssertTrue(app.navigationBars["X followed circles"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -927,6 +963,53 @@ final class ComiNaviUITests: XCTestCase {
         }
 
         takeScreenshot(named: "Explore-Discovery-Loading")
+    }
+
+    @MainActor
+    func testDemoCircleDetailShowsDayAndVenueWithTrailingCopyFeedback() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-demo-data",
+            "-AppleLanguages", "(ja)",
+            "-AppleLocale", "ja_JP",
+        ]
+        app.launch()
+
+        let exploreTab = app.buttons["探す"].firstMatch
+        XCTAssertTrue(exploreTab.waitForExistence(timeout: 30))
+        exploreTab.tap()
+
+        app.buttons["explore-layout-button"].firstMatch.tap()
+        let firstCircle = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "explore-list-circle-")
+        ).firstMatch
+        XCTAssertTrue(firstCircle.waitForExistence(timeout: 20))
+        firstCircle.tap()
+
+        let detail = app.descendants(matching: .any)["circle-detail-screen"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 10))
+
+        let location = app.buttons["circle-location-map-button"]
+        let copy = app.buttons["circle-location-copy-button"]
+        XCTAssertTrue(location.waitForExistence(timeout: 10))
+        XCTAssertTrue(copy.waitForExistence(timeout: 10))
+        XCTAssertTrue(location.label.contains("日目"))
+        XCTAssertTrue(location.label.contains("ホール"))
+        XCTAssertGreaterThan(copy.frame.minX, location.frame.midX)
+
+        let navigationBar = app.navigationBars.element(boundBy: 0)
+        let subtitle = navigationBar.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "日目", "ホール")
+        ).firstMatch
+        XCTAssertTrue(subtitle.waitForExistence(timeout: 5))
+
+        copy.tap()
+        expectation(
+            for: NSPredicate(format: "value == %@", "コピーしました"),
+            evaluatedWith: copy
+        )
+        waitForExpectations(timeout: 3)
+        takeScreenshot(named: "Circle-Detail-Day-Venue-Copied")
     }
 
     @MainActor

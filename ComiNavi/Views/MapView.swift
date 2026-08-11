@@ -440,7 +440,7 @@ private struct DestinationEntryButton: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(
                             destination.map { String(localized: "Table \($0.spaceCode)") }
-                                ?? String(localized: "Find a table")
+                                ?? String(localized: "Find a Circle")
                         )
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -460,7 +460,7 @@ private struct DestinationEntryButton: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Choose a table and pin it on the map")
+            .accessibilityHint("Choose a circle and pin it on the map")
             .accessibilityIdentifier("find-table-button")
 
             if let destination {
@@ -476,7 +476,7 @@ private struct DestinationEntryButton: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(copied ? "Copied" : "Copy table location")
+                .accessibilityLabel(copied ? "Copied" : "Copy circle location")
                 .accessibilityHint("Copies the venue-aware location and a ComiNavi link")
                 .accessibilityIdentifier("copy-destination-button")
 
@@ -508,7 +508,7 @@ private struct DestinationEntryButton: View {
 
     private var subtitle: String {
         guard destination != nil else {
-            return String(localized: "Pin a table using its Comiket address")
+            return String(localized: "Pin a circle using its Comiket address")
         }
         return String(localized: "Pinned on the map · follow current signs and staff")
     }

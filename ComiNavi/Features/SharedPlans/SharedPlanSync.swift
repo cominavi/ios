@@ -143,6 +143,26 @@ struct SharedPlanSyncErrorFrame: Codable, Equatable, Sendable {
     struct Details: Codable, Equatable, Sendable {
         let maximumNewOperationsPerSyncFrame: Int?
         let receivedChanges: Int?
+        let reason: String?
+        let recovery: String?
+        let localChangesPreserved: Bool?
+        let supportCode: String?
+
+        init(
+            maximumNewOperationsPerSyncFrame: Int? = nil,
+            receivedChanges: Int? = nil,
+            reason: String? = nil,
+            recovery: String? = nil,
+            localChangesPreserved: Bool? = nil,
+            supportCode: String? = nil
+        ) {
+            self.maximumNewOperationsPerSyncFrame = maximumNewOperationsPerSyncFrame
+            self.receivedChanges = receivedChanges
+            self.reason = reason
+            self.recovery = recovery
+            self.localChangesPreserved = localChangesPreserved
+            self.supportCode = supportCode
+        }
     }
 
     let v: Int

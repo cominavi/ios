@@ -12,6 +12,8 @@ struct CircleDetailView: View {
     @State private var isShowingDataSources = false
     @State private var isOpeningMap = false
     @State private var planModel: CircleUserPlanModel
+    @State private var isShowingSharedPlanRequest = false
+    @State private var sharedPlanConfirmation: String?
 
     init(
         circle: CirclemsDataSchema.ComiketCircleWC,
@@ -68,6 +70,7 @@ struct CircleDetailView: View {
 
                 if details?.extensionRecord?.WCId != nil {
                     CircleUserPlanSection(model: planModel)
+                    sharedPlanSection
                 }
 
                 if !withdrawalClaims.isEmpty {
@@ -160,7 +163,7 @@ struct CircleDetailView: View {
         .modifier(
             CircleDetailNavigationTitle(
                 title: circle.circleName.nonBlank ?? String(localized: "Circle"),
-                subtitle: spaceLabel
+                subtitle: navigationSubtitle
             )
         )
         .navigationBarTitleDisplayMode(.inline)
@@ -183,6 +186,31 @@ struct CircleDetailView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingSharedPlanRequest) {
+            if let key = sharedPlanCircleKey,
+               let currentUserID = AppData.profileStore.profile?.id
+            {
+                SharedPlanCircleQuickAddSheet(
+                    store: AppData.sharedPlanStore,
+                    currentUserID: currentUserID,
+                    circle: key,
+                    circleName: circle.circleName.nonBlank ?? String(localized: "Unnamed circle")
+                ) { planName in
+                    sharedPlanConfirmation = String(localized: "Added to \(planName)")
+                }
+            }
+        }
+        .alert(
+            "Purchase request added",
+            isPresented: Binding(
+                get: { sharedPlanConfirmation != nil },
+                set: { if !$0 { sharedPlanConfirmation = nil } }
+            )
+        ) {
+            Button("OK") { sharedPlanConfirmation = nil }
+        } message: {
+            Text(sharedPlanConfirmation ?? "")
         }
         .task(id: circle.id) {
             let loadedDetails = await withTaskGroup(
@@ -226,6 +254,43 @@ struct CircleDetailView: View {
             || circle.memo.nonBlank != nil
     }
 
+    @ViewBuilder
+    private var sharedPlanSection: some View {
+        if AppData.profileStore.isIdentityVerified,
+           AppData.profileStore.profile?.id != nil
+        {
+            CircleDetailSection("Shared Plans") {
+                Button {
+                    isShowingSharedPlanRequest = true
+                } label: {
+                    HStack(spacing: 12) {
+                        LucideIcon("shopping-cart", size: 22)
+                            .foregroundStyle(.accent)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Add a purchase request")
+                                .font(.body.weight(.semibold))
+                            Text("Choose a plan, name the item, and set how many you need.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        LucideIcon("chevron-right", size: 17)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(16)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("circle-add-shared-plan-request")
+            }
+        }
+    }
+
+    private var sharedPlanCircleKey: SharedPlanCircleKey? {
+        guard let publicCircleID = details?.extensionRecord?.WCId else { return nil }
+        return SharedPlanCircleKey(comiketNo: circle.comiketNo, wcID: publicCircleID)
+    }
+
     private var shinagakiPosts: [CatalogShinagakiPost] {
         details?.enrichment?.posts ?? []
     }
@@ -251,6 +316,21 @@ struct CircleDetailView: View {
 
         let side = isCombinedAB ? "a+b" : (circle.spaceNoSub == 1 ? "b" : "a")
         return "\(block.name)\(String(format: "%02d", spaceNumber))\(side)"
+    }
+
+    private var navigationSubtitle: String? {
+        if let circleAddress {
+            return String(
+                localized: "Day \(circleAddress.day) · \(circleAddress.venueLocationText)"
+            )
+        }
+        if let day = circle.day, let spaceLabel {
+            return String(localized: "Day \(day) · \(spaceLabel)")
+        }
+        if let day = circle.day {
+            return String(localized: "Day \(day)")
+        }
+        return spaceLabel
     }
 
     private var externalLinks: [CircleExternalLink] {
@@ -338,21 +418,27 @@ private struct CircleDetailHeader: View {
     @State private var image: UIImage?
     @State private var didFailLoadingImage = false
     @State private var isShowingLightbox = false
+    @State private var copiedLocation = false
+    @State private var copyFeedback = 0
     @ScaledMetric(relativeTo: .title) private var artworkWidth = 154.0
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 14) {
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 16) {
                     artwork(width: min(artworkWidth, 220))
-                    details
+                    identityDetails
                 }
             } else {
                 HStack(alignment: .top, spacing: 16) {
                     artwork(width: artworkWidth)
-                    details
+                    identityDetails
                 }
+            }
+
+            if let spaceLabel {
+                locationRow(spaceLabel: spaceLabel)
             }
         }
         .task(id: circle.id) {
@@ -375,6 +461,7 @@ private struct CircleDetailHeader: View {
                 .presentationBackground(.black)
             }
         }
+        .sensoryFeedback(.success, trigger: copyFeedback)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("circle-detail-header")
     }
@@ -421,7 +508,7 @@ private struct CircleDetailHeader: View {
         }
     }
 
-    private var details: some View {
+    private var identityDetails: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(displayName)
                 .font(.title2.weight(.bold))
@@ -433,53 +520,81 @@ private struct CircleDetailHeader: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }
-
-            if let spaceLabel {
-                HStack(spacing: 4) {
-                    Button(action: onOpenMap) {
-                        HStack(spacing: 7) {
-                            LucideLabel(
-                                verbatim: address?.canonicalText ?? spaceLabel,
-                                icon: "mappin.and.ellipse"
-                            )
-                            if isOpeningMap {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                        }
-                        .font(.headline.monospaced())
-                        .foregroundStyle(Color.accentColor)
-                        .frame(minHeight: 44)
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isOpeningMap)
-                    .accessibilityHint("Shows this circle on the map")
-                    .accessibilityIdentifier("circle-location-map-button")
-
-                    if let address {
-                        Button {
-                            UIPasteboard.general.string = address.canonicalText
-                        } label: {
-                            LucideIcon("doc.on.doc")
-                                .frame(width: 44, height: 44)
-                                .contentShape(.rect)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Copy circle location")
-                        .accessibilityHint("Copies \(address.canonicalText)")
-                        .accessibilityIdentifier("circle-location-copy-button")
-                    }
-                }
-            }
-
-            if let day = circle.day {
-                LucideLabel("Day \(day)", icon: "calendar")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func locationRow(spaceLabel: String) -> some View {
+        HStack(spacing: 8) {
+            Button(action: onOpenMap) {
+                HStack(alignment: .top, spacing: 10) {
+                    LucideIcon("mappin.and.ellipse", size: 20)
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.top, 2)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let day = address?.day ?? circle.day {
+                            Text("Day \(day)")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("circle-location-day")
+                        }
+
+                        Text(verbatim: address?.venueLocationText ?? spaceLabel)
+                            .font(.headline.monospaced().weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("circle-location-venue")
+                    }
+
+                    if isOpeningMap {
+                        ProgressView()
+                            .controlSize(.small)
+                            .padding(.top, 12)
+                    }
+                }
+                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .disabled(isOpeningMap)
+            .accessibilityHint("Shows this circle on the map")
+            .accessibilityIdentifier("circle-location-map-button")
+
+            if let address {
+                Button {
+                    copy(address)
+                } label: {
+                    LucideIcon(copiedLocation ? "checkmark" : "doc.on.doc", size: 20)
+                        .foregroundStyle(copiedLocation ? .green : Color.accentColor)
+                        .frame(width: 44, height: 44)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Copy circle location")
+                .accessibilityValue(copiedLocation ? "Copied" : "")
+                .accessibilityHint("Copies \(address.canonicalText)")
+                .accessibilityIdentifier("circle-location-copy-button")
+                .animation(.default, value: copiedLocation)
+            }
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 4)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.accentColor.opacity(0.08), in: .rect(cornerRadius: 12))
+    }
+
+    private func copy(_ address: ComiketSpaceAddress) {
+        UIPasteboard.general.string = address.canonicalText
+        copiedLocation = true
+        copyFeedback += 1
+        let currentFeedback = copyFeedback
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard copyFeedback == currentFeedback else { return }
+            copiedLocation = false
+        }
     }
 
     private var displayName: String {
@@ -756,13 +871,6 @@ private struct CircleDetailDataSourcesSheet: View {
             LabeledContent("Catalog record") {
                 Text(verbatim: "C\(circle.comiketNo) · \(circle.id)")
                     .monospacedDigit()
-            }
-
-            if let publicCircleID = details?.extensionRecord?.WCId {
-                LabeledContent("Public circle ID") {
-                    Text(publicCircleID, format: .number.grouping(.never))
-                        .monospacedDigit()
-                }
             }
 
             ForEach(officialCatalogLinks) { link in

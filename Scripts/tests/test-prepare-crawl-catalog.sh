@@ -75,6 +75,9 @@ SQL
         [
             {
                 tweet_id: "test-post",
+                post_confidence: "high",
+                placement_confidence: "high",
+                media: [{kind: "photo", url: "https://example.test/menu.jpg"}],
                 provenance: [
                     {
                         sourceId: "test-post-source",
@@ -85,6 +88,7 @@ SQL
                 ],
                 matched_circles: [
                     ($circle + {
+                        score: 100,
                         provenance: [
                             {
                                 sourceId: "circlems_webcatalog",
@@ -140,9 +144,28 @@ run_failure_case() {
     echo "PASS: $1"
 }
 
+run_confidence_failure_case() {
+    prepare_case "$1" "${valid_circle}" "${valid_row}"
+    jq '.[0].post_confidence = "medium"' "${case_enrichment}" >"${case_enrichment}.tmp"
+    mv "${case_enrichment}.tmp" "${case_enrichment}"
+
+    if "${case_project}/Scripts/prepare-crawl-catalog.sh" \
+        "${case_collector}" \
+        "${case_enrichment}" \
+        >"${case_stdout}" 2>"${case_stderr}"; then
+        fail "$1 should have rejected a non-high Shinagaki match"
+    fi
+
+    if ! grep -F "${schema_error}" "${case_stderr}" >/dev/null; then
+        sed -n '1,120p' "${case_stderr}" >&2
+        fail "$1 emitted the wrong validation error"
+    fi
+    echo "PASS: $1"
+}
+
 valid_circle='{"comiket_no":108,"circle_id":10,"wc_id":1000}'
 valid_row='INSERT INTO ComiketCircleExtend (comiketNo, id, WCId) VALUES (108, 10, 1000);'
-schema_error='Crawl enrichment is missing complete post or authoritative Circle.ms provenance.'
+schema_error='Crawl enrichment is missing publishable confidence, complete post, or authoritative Circle.ms provenance.'
 ownership_error='duplicate (comiketNo, WCId) ownership pair(s).'
 resolution_error='without exactly one authoritative ComiketCircleExtend row matching comiket_no, circle_id, and wc_id.'
 
@@ -156,6 +179,8 @@ run_success_case \
     "${valid_row}" \
     catalog \
     '108:10:ComiketCircleExtend.twitterURL:test'
+run_confidence_failure_case \
+    medium_shinagaki_confidence
 run_failure_case \
     missing_comiket_number \
     '{"circle_id":10,"wc_id":1000}' \
