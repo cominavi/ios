@@ -1,9 +1,11 @@
 import SwiftUI
 
+private enum SharedPlansRoute: Hashable {
+    case plan(String)
+}
+
 struct SharedPlansScreen: View {
     let store: SharedPlanStore
-    @State private var selectedPlanID: String?
-    @State private var preferredCompactColumn = NavigationSplitViewColumn.sidebar
     @State private var showsCreateSheet = false
     @State private var recoveryPlanToDiscard: String?
     let comiketNo: Int?
@@ -26,25 +28,20 @@ struct SharedPlansScreen: View {
     }
 
     var body: some View {
-        NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
+        NavigationStack {
             sidebar
-        } detail: {
-            if let plan = selectedPlan {
-                SharedPlanDetailScreen(
-                    store: store,
-                    planID: plan.id,
-                    currentUserID: currentUserID,
-                    features: features,
-                    favoriteImportService: favoriteImportService
-                )
-                    .id(plan.id)
-            } else {
-                ContentUnavailableView(
-                    "プランを選択",
-                    systemImage: "list.bullet.clipboard",
-                    description: Text("共有するサークルと買い物の状況を確認できます。")
-                )
-            }
+                .navigationDestination(for: SharedPlansRoute.self) { route in
+                    switch route {
+                    case let .plan(planID):
+                        SharedPlanDetailScreen(
+                            store: store,
+                            planID: planID,
+                            currentUserID: currentUserID,
+                            features: features,
+                            favoriteImportService: favoriteImportService
+                        )
+                    }
+                }
         }
         .sheet(isPresented: $showsCreateSheet) {
             if let comiketNo {
@@ -96,7 +93,7 @@ struct SharedPlansScreen: View {
     }
 
     private var sidebar: some View {
-        List(selection: $selectedPlanID) {
+        List {
             if !features.writesEnabled {
                 SharedPlanReadOnlyNotice()
             }
@@ -151,10 +148,7 @@ struct SharedPlansScreen: View {
                         && store.plans.contains { $0.id == recovery.planID }
                     SharedPlanRecoveryRow(
                         recovery: recovery,
-                        isVisiblePlan: isVisiblePlan,
-                        onOpen: isVisiblePlan ? {
-                            openPlan(recovery.planID)
-                        } : nil,
+                        planRoute: isVisiblePlan ? .plan(recovery.planID) : nil,
                         onDiscard: isVisiblePlan ? nil : {
                             recoveryPlanToDiscard = recovery.id
                         }
@@ -214,23 +208,14 @@ struct SharedPlansScreen: View {
         }
     }
 
-    private var selectedPlan: SharedPlan? {
-        guard let selectedPlanID else { return nil }
-        return store.plans.first { $0.id == selectedPlanID }
-    }
-
     private func planLink(_ plan: SharedPlan) -> some View {
-        SharedPlanNavigationRow(
-            plan: plan,
-            hasPendingChanges: store.hasPendingChanges(planID: plan.id),
-            open: { openPlan(plan.id) }
-        )
-        .tag(plan.id)
-    }
-
-    private func openPlan(_ planID: String) {
-        selectedPlanID = planID
-        preferredCompactColumn = .detail
+        NavigationLink(value: SharedPlansRoute.plan(plan.id)) {
+            SharedPlanNavigationRow(
+                plan: plan,
+                hasPendingChanges: store.hasPendingChanges(planID: plan.id)
+            )
+        }
+        .accessibilityIdentifier("shared-plan-row-\(plan.id)")
     }
 
     private func discard(_ write: SharedPlanRESTWrite) {
@@ -246,15 +231,14 @@ struct SharedPlansScreen: View {
 
 private struct SharedPlanRecoveryRow: View {
     let recovery: SharedPlanRecoveryDocument
-    let isVisiblePlan: Bool
-    let onOpen: (() -> Void)?
+    let planRoute: SharedPlansRoute?
     let onDiscard: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Label(
-                isVisiblePlan ? "復旧が必要なプラン" : "アクセスできないプラン",
-                systemImage: isVisiblePlan
+                planRoute != nil ? "復旧が必要なプラン" : "アクセスできないプラン",
+                systemImage: planRoute != nil
                     ? "externaldrive.badge.exclamationmark"
                     : "lock.trianglebadge.exclamationmark"
             )
@@ -270,8 +254,8 @@ private struct SharedPlanRecoveryRow: View {
                     Label("書き出す", systemImage: "square.and.arrow.up")
                 }
                 Spacer()
-                if let onOpen {
-                    Button("復旧内容を確認", action: onOpen)
+                if let planRoute {
+                    NavigationLink("復旧内容を確認", value: planRoute)
                 }
                 if let onDiscard {
                     Button("端末から削除", role: .destructive, action: onDiscard)
@@ -290,16 +274,11 @@ private struct SharedPlanRecoveryRow: View {
 private struct SharedPlanNavigationRow: View {
     let plan: SharedPlan
     let hasPendingChanges: Bool
-    let open: () -> Void
 
     var body: some View {
-        Button(action: open) {
-            SharedPlanRow(plan: plan, hasPendingChanges: hasPendingChanges)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("shared-plan-row-\(plan.id)")
+        SharedPlanRow(plan: plan, hasPendingChanges: hasPendingChanges)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(.rect)
     }
 }
 
@@ -358,9 +337,12 @@ private struct SharedPlanRow: View {
 
 #if DEBUG
 struct SharedPlanListUITestSurface: View {
+    private enum Route: Hashable {
+        case plan
+        case invitations
+    }
+
     static let planID = "11111111-1111-4111-8111-111111111111"
-    @State private var selectedPlanID: String?
-    @State private var preferredCompactColumn = NavigationSplitViewColumn.sidebar
 
     private let plan = SharedPlan(
         id: Self.planID,
@@ -376,29 +358,35 @@ struct SharedPlanListUITestSurface: View {
     )
 
     var body: some View {
-        NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
-            List(selection: $selectedPlanID) {
-                SharedPlanNavigationRow(
-                    plan: plan,
-                    hasPendingChanges: false,
-                    open: {
-                        selectedPlanID = plan.id
-                        preferredCompactColumn = .detail
-                    }
-                )
-                .tag(plan.id)
+        NavigationStack {
+            List {
+                NavigationLink(value: Route.plan) {
+                    SharedPlanNavigationRow(
+                        plan: plan,
+                        hasPendingChanges: false
+                    )
+                }
+                .accessibilityIdentifier("shared-plan-row-\(plan.id)")
             }
             .navigationTitle("共有プラン")
-        } detail: {
-            if selectedPlanID == plan.id {
-                Text(plan.name)
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .plan:
+                    List {
+                        NavigationLink(value: Route.invitations) {
+                            Label("Members and invitations", systemImage: "person.2")
+                        }
+                        .accessibilityIdentifier("shared-plan-open-management")
+                    }
                     .navigationTitle(plan.name)
                     .accessibilityIdentifier("shared-plan-test-detail")
-            } else {
-                ContentUnavailableView(
-                    "プランを選択",
-                    systemImage: "list.bullet.clipboard"
-                )
+                case .invitations:
+                    List {
+                        Text("No invitations")
+                    }
+                    .navigationTitle("Members and invitations")
+                    .accessibilityIdentifier("shared-plan-test-invitations")
+                }
             }
         }
     }
@@ -607,6 +595,7 @@ struct SharedPlanDetailScreen: View {
                         } label: {
                             Label("Members and invitations", systemImage: "person.2")
                         }
+                        .accessibilityIdentifier("shared-plan-open-management")
                     }
 
                     Section("Content and purchases") {

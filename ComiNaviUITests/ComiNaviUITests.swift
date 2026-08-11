@@ -33,7 +33,7 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testSharedPlanRowHasIconAndReopensReliably() throws {
+    func testSharedPlanRowReopensAfterReturningFromInvitations() throws {
         let planID = "11111111-1111-4111-8111-111111111111"
         let app = XCUIApplication()
         app.launchArguments += [
@@ -51,13 +51,28 @@ final class ComiNaviUITests: XCTestCase {
             )
             row.tap()
             XCTAssertTrue(
-                app.staticTexts["shared-plan-test-detail"].waitForExistence(timeout: 5),
-                "Tapping the same plan after returning must always reopen it"
+                app.descendants(matching: .any)["shared-plan-test-detail"]
+                    .waitForExistence(timeout: 5),
+                "Tapping a plan must navigate to its detail"
             )
 
-            let backButton = app.navigationBars.buttons.element(boundBy: 0)
-            XCTAssertTrue(backButton.waitForExistence(timeout: 5))
-            backButton.tap()
+            let invitations = app.buttons["shared-plan-open-management"]
+            XCTAssertTrue(invitations.waitForExistence(timeout: 5))
+            invitations.tap()
+            XCTAssertTrue(
+                app.descendants(matching: .any)["shared-plan-test-invitations"]
+                    .waitForExistence(timeout: 5),
+                "The invitations page must be pushed onto the navigation stack"
+            )
+
+            let invitationBackButton = app.navigationBars.buttons.element(boundBy: 0)
+            XCTAssertTrue(invitationBackButton.waitForExistence(timeout: 5))
+            invitationBackButton.tap()
+
+            let planBackButton = app.navigationBars.buttons.element(boundBy: 0)
+            XCTAssertTrue(planBackButton.waitForExistence(timeout: 5))
+            planBackButton.tap()
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
         }
     }
 
