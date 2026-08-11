@@ -26,14 +26,35 @@ struct SharedPlanFavoriteImportScreen: View {
         NavigationStack {
             Group {
                 if model.isLoading, model.items.isEmpty {
-                    ProgressView("Circle.msのお気に入りを確認中…")
+                    FocusedActionSurface(
+                        symbolName: "star",
+                        animatesBackdrop: true
+                    ) {
+                        Text("お気に入りを確認中…")
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        Text("Circle.msから、このプランにまだないサークルを探しています。")
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 12)
+                        CatalogActivityIndicator(
+                            accessibilityLabel: "Circle.msのお気に入りを確認中…"
+                        )
+                        .padding(.top, 30)
+                    }
                 } else if let issue = model.issueMessage, model.items.isEmpty {
-                    ContentUnavailableView {
-                        Label("お気に入りを読み込めません", systemImage: "exclamationmark.triangle")
-                    } description: {
+                    FocusedActionSurface(
+                        symbolName: "exclamationmark.triangle.fill",
+                        tint: .orange
+                    ) {
+                        Text("お気に入りを読み込めません")
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
                         Text(issue)
-                    } actions: {
-                        Button("もう一度試す") { load() }
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 12)
+                        FocusedActionButton(action: load) {
+                            LucideLabel("もう一度試す", icon: "arrow.clockwise")
+                        }
+                        .padding(.top, 28)
                     }
                 } else {
                     favoritesList

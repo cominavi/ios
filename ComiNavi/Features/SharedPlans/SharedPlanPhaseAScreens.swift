@@ -371,19 +371,28 @@ struct SharedPlanNotificationInboxScreen: View {
         }
         .overlay {
             if model.notifications.isEmpty, !model.isRefreshing {
-                VStack(spacing: 12) {
-                    ContentUnavailableView(
-                        "No notifications",
-                        systemImage: "bell.slash",
-                        description: Text(model.issueMessage ?? String(localized: "Shared Plan updates and conflicts will appear here."))
-                    )
+                FocusedActionSurface(
+                    symbolName: model.issueMessage == nil
+                        ? "antenna.radiowaves.left.and.right"
+                        : "exclamationmark.triangle.fill",
+                    tint: model.issueMessage == nil ? .accentColor : .orange
+                ) {
+                    Text(model.issueMessage == nil ? "No notifications" : "Notifications unavailable")
+                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    Text(model.issueMessage ?? String(localized: "Shared Plan updates and conflicts will appear here."))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 12)
                     if model.issueMessage != nil {
-                        Button("Try Again") {
+                        FocusedActionButton {
                             Task { await model.refresh(using: store) }
+                        } label: {
+                            LucideLabel("Try Again", icon: "arrow.clockwise")
                         }
-                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 28)
                     }
                 }
+                .allowsHitTesting(model.issueMessage != nil)
             }
         }
         .navigationTitle("Notifications")

@@ -10,89 +10,20 @@ struct SharedPlanInvitationSheet: View {
     @State private var isLoading = true
     @State private var isAccepting = false
     @State private var issue: String?
+    @State private var canRetryPreview = false
+    @State private var acceptanceTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
-            Form {
-                if isLoading {
-                    Section {
-                        HStack {
-                            ProgressView()
-                            Text("招待を確認しています…")
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-                } else if let preview {
-                    Section("共有プラン") {
-                        LabeledContent("プラン名") {
-                            Text(preview.planName)
-                                .accessibilityIdentifier("shared-plan-invitation-plan-name")
-                        }
-                        LabeledContent("コミケ") {
-                            Text("C\(preview.comiketNo)")
-                                .accessibilityIdentifier("shared-plan-invitation-comiket")
-                        }
-                    }
-
-                    if profileStore.isIdentityVerified, let profile = profileStore.profile {
-                        Section("このアカウントで参加") {
-                            HStack(spacing: 12) {
-                                AuthenticatedProfileAvatar(url: profile.avatarURL, size: 40)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(profile.displayName)
-                                        .font(.headline)
-                                    Text("参加後はメンバー全員がプランを編集できます。")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-
-                            Button {
-                                accept()
-                            } label: {
-                                if isAccepting {
-                                    ProgressView()
-                                        .frame(maxWidth: .infinity)
-                                } else {
-                                    Text("このプランに参加")
-                                        .frame(maxWidth: .infinity)
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(isAccepting)
-                        }
-                    } else {
-                        Section("ログインが必要です") {
-                            Text("参加する本人の名前とプロフィール画像を確認してから追加します。ログインして続けてください。")
-                            Button("ログインして続ける") {
-                                onDismiss()
-                            }
-                        }
-                    }
-
-                    Section {
-                        Text("招待リンクを知っている人は、期限内であればこのプランに参加できます。リンクは信頼できる相手だけに共有してください。")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if let issue {
-                    Section {
-                        Text(issue)
-                            .foregroundStyle(.orange)
-                            .accessibilityIdentifier("shared-plan-invitation-error")
-                    }
-                }
-            }
+            invitationContent
             .navigationTitle("共有プランへの招待")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("キャンセル") {
-                        invitationInbox.clear()
-                        onDismiss()
+                        cancelInvitation()
                     }
+                    .disabled(isAccepting)
                 }
             }
         }
@@ -102,8 +33,116 @@ struct SharedPlanInvitationSheet: View {
         .task(id: pending.token) { await loadPreview() }
     }
 
+    @ViewBuilder
+    private var invitationContent: some View {
+        if isLoading {
+            FocusedActionSurface(
+                symbolName: "person.crop.circle.badge.plus",
+                animatesBackdrop: true
+            ) {
+                Text("招待を確認しています…")
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                Text("共有プランの名前と参加先アカウントを安全に確認しています。")
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 12)
+                CatalogActivityIndicator(accessibilityLabel: "招待を確認しています…")
+                    .padding(.top, 30)
+            }
+        } else if let preview {
+            FocusedActionSurface(symbolName: "person.crop.circle.badge.plus") {
+                Text("C\(preview.comiketNo) · 共有プラン")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityIdentifier("shared-plan-invitation-comiket")
+
+                Text(preview.planName)
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 10)
+                    .accessibilityIdentifier("shared-plan-invitation-plan-name")
+
+                if profileStore.isIdentityVerified, let profile = profileStore.profile {
+                    HStack(spacing: 12) {
+                        AuthenticatedProfileAvatar(url: profile.avatarURL, size: 44)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(profile.displayName)
+                                .font(.headline)
+                            Text("このアカウントで参加します")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.top, 24)
+
+                    if let issue {
+                        invitationIssue(issue)
+                    }
+
+                    FocusedActionButton(action: accept) {
+                        if isAccepting {
+                            ProgressView()
+                        } else {
+                            LucideLabel("このプランに参加", icon: "person.crop.circle.badge.plus")
+                        }
+                    }
+                    .disabled(isAccepting)
+                    .padding(.top, 28)
+                } else {
+                    Text("参加する本人の名前とプロフィール画像を確認してから追加します。ログインして続けてください。")
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 18)
+
+                    FocusedActionButton(action: onDismiss) {
+                        LucideLabel("ログインして続ける", icon: "person.crop.circle.badge.plus")
+                    }
+                    .padding(.top, 28)
+                }
+
+                Text("参加後はメンバー全員がプランを編集できます。招待リンクは信頼できる相手だけに共有してください。")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 18)
+            }
+        } else {
+            FocusedActionSurface(
+                symbolName: "exclamationmark.triangle.fill",
+                tint: .orange
+            ) {
+                Text("招待を確認できません")
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                Text(issue ?? "この招待リンクは利用できません。")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("shared-plan-invitation-error")
+
+                if canRetryPreview {
+                    FocusedActionButton(action: {
+                        Task { await loadPreview() }
+                    }) {
+                        LucideLabel("もう一度確認", icon: "arrow.clockwise")
+                    }
+                    .padding(.top, 28)
+                }
+            }
+        }
+    }
+
+    private func invitationIssue(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            LucideIcon("exclamationmark.circle", size: 20)
+            Text(message)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .foregroundStyle(.orange)
+        .padding(.top, 18)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("shared-plan-invitation-error")
+    }
+
     private func loadPreview() async {
         isLoading = true
+        canRetryPreview = false
         defer { isLoading = false }
         do {
             let loaded = try await CominaviServiceClient.shared.previewInvitation(
@@ -115,22 +154,31 @@ struct SharedPlanInvitationSheet: View {
             }
             preview = loaded
             issue = nil
+            canRetryPreview = false
         } catch {
-            if SharedPlanInvitationFailurePolicy.consumesRouteCapability(after: error) {
+            let consumesCapability = SharedPlanInvitationFailurePolicy
+                .consumesRouteCapability(after: error)
+            if consumesCapability {
                 invitationInbox.removePersistedCapability(token: pending.token)
             }
             preview = nil
             issue = error.localizedDescription
+            canRetryPreview = !consumesCapability
         }
     }
 
     private func accept() {
         guard profileStore.isIdentityVerified,
               let profile = profileStore.profile,
-              !isAccepting
+              !isAccepting,
+              acceptanceTask == nil
         else { return }
         isAccepting = true
-        Task {
+        acceptanceTask = Task {
+            defer {
+                isAccepting = false
+                acceptanceTask = nil
+            }
             do {
                 let store = AppData.sharedPlanStore(for: profile.id)
                 _ = try await store.acceptInvitation(token: pending.token)
@@ -141,7 +189,12 @@ struct SharedPlanInvitationSheet: View {
             } catch {
                 issue = error.localizedDescription
             }
-            isAccepting = false
         }
+    }
+
+    private func cancelInvitation() {
+        guard !isAccepting, acceptanceTask == nil else { return }
+        invitationInbox.clear()
+        onDismiss()
     }
 }

@@ -55,7 +55,9 @@ struct CatalogIndependentContentView: View {
         }
         .accessibilityIdentifier("catalog-independent-shell")
         .task {
-            catalogLibrary.start()
+            if catalogLibrary.phase == .idle {
+                catalogLibrary.start()
+            }
         }
     }
 }
@@ -122,16 +124,11 @@ private struct CatalogLibraryLoadingSurface: View {
                 message: message,
                 advice: String(localized: "Please try again.")
             ) {
-                Button {
+                FocusedActionButton {
                     catalogLibrary.retry()
                 } label: {
                     LucideLabel("Try Again", icon: "arrow.clockwise")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(Color.accentColor)
             }
 
         case .loading(let event):
@@ -141,11 +138,9 @@ private struct CatalogLibraryLoadingSurface: View {
                 title: String(localized: "Opening catalog…"),
                 subtitle: String(localized: "Preparing catalog…")
             ) {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(Color.accentColor)
-                    .frame(width: 32, height: 32)
-                    .accessibilityLabel(Text(String(localized: "Opening catalog…")))
+                CatalogActivityIndicator(
+                    accessibilityLabel: String(localized: "Opening catalog…")
+                )
             }
 
         case .downloading(let event, let progress):
@@ -153,7 +148,7 @@ private struct CatalogLibraryLoadingSurface: View {
                 symbolName: "arrow.down.circle.fill",
                 eyebrow: event.shortName,
                 title: String(localized: "Downloading catalog…"),
-                subtitle: String(localized: "The previous catalog remains available until verification finishes.")
+                subtitle: String(localized: "Downloading databases, this may take a while...")
             ) {
                 DownloadProgressView(progresses: [progress])
             }
@@ -165,11 +160,9 @@ private struct CatalogLibraryLoadingSurface: View {
                 title: String(localized: "Finding available catalogs…"),
                 subtitle: String(localized: "Preparing catalog…")
             ) {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(Color.accentColor)
-                    .frame(width: 32, height: 32)
-                    .accessibilityLabel(Text(String(localized: "Finding available catalogs…")))
+                CatalogActivityIndicator(
+                    accessibilityLabel: String(localized: "Finding available catalogs…")
+                )
             }
 
         case .idle, .ready:
@@ -179,11 +172,9 @@ private struct CatalogLibraryLoadingSurface: View {
                 title: String(localized: "Opening catalog…"),
                 subtitle: String(localized: "Preparing catalog…")
             ) {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(Color.accentColor)
-                    .frame(width: 32, height: 32)
-                    .accessibilityLabel(Text(String(localized: "Opening catalog…")))
+                CatalogActivityIndicator(
+                    accessibilityLabel: String(localized: "Opening catalog…")
+                )
             }
         }
     }
@@ -224,11 +215,9 @@ private struct CatalogContentView: View {
                     title: String(localized: "Preparing catalog…"),
                     subtitle: String(localized: "Opening catalog…")
                 ) {
-                    ProgressView()
-                        .controlSize(.large)
-                        .tint(Color.accentColor)
-                        .frame(width: 32, height: 32)
-                        .accessibilityLabel(Text(String(localized: "Preparing catalog…")))
+                    CatalogActivityIndicator(
+                        accessibilityLabel: String(localized: "Preparing catalog…")
+                    )
 
                     CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
                         .padding(.top, 24)
@@ -241,10 +230,7 @@ private struct CatalogContentView: View {
                     symbolName: "arrow.down.circle.fill",
                     eyebrow: eventName,
                     title: String(localized: "Downloading\ndatabases"),
-                    subtitle: String.localizedStringWithFormat(
-                        String(localized: "Downloading %@ databases…"),
-                        eventName
-                    )
+                    subtitle: String(localized: "Downloading databases, this may take a while...")
                 ) {
                     DownloadProgressView(progresses: progresses)
                     CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
@@ -255,16 +241,12 @@ private struct CatalogContentView: View {
                 let eventName =
                     catalogLibrary.selectedEvent?.shortName ?? String(localized: "catalog")
                 CatalogStatusSurface(
-                    symbolName: "gearshape.2.fill",
+                    symbolName: "map",
                     eyebrow: eventName,
-                    title: String(localized: "Initializing \(eventName)…"),
+                    title: String(localized: "Preparing catalog…"),
                     subtitle: state
                 ) {
-                    ProgressView()
-                        .controlSize(.large)
-                        .tint(Color.accentColor)
-                        .frame(width: 32, height: 32)
-                        .accessibilityLabel(Text(state))
+                    CatalogActivityIndicator(accessibilityLabel: state)
 
                     CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
                         .padding(.top, 24)
@@ -342,16 +324,11 @@ private struct CatalogContentView: View {
                     message: error,
                     advice: String(localized: "Please try again.")
                 ) {
-                    Button {
+                    FocusedActionButton {
                         catalogLibrary.retry()
                     } label: {
                         LucideLabel("Try Again", icon: "arrow.clockwise")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(Color.accentColor)
 
                     CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
                 }

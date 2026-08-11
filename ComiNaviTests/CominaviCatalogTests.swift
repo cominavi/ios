@@ -6,6 +6,30 @@ import XCTest
 @testable import ComiNavi
 
 final class CominaviCatalogTests: XCTestCase {
+    func testRemovingDownloadedDataDeletesOnlyTheCatalogRoot() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let catalogRoot = root.appendingPathComponent("CominaviCatalogs", isDirectory: true)
+        let sibling = root.appendingPathComponent("keep.txt")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try FileManager.default.createDirectory(
+            at: catalogRoot.appendingPathComponent("events/c108", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try Data("partial catalog".utf8).write(
+            to: catalogRoot.appendingPathComponent("events/c108/catalog.partial")
+        )
+        try Data("keep".utf8).write(to: sibling)
+
+        try await CominaviCatalogInstaller.removeAllDownloadedData(
+            rootDirectory: catalogRoot
+        )
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: catalogRoot.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: sibling.path))
+    }
+
     func testCanonicalCatalogFixtureDecodesLiterallyAndFreezesCompatibilitySmokeQuery() throws {
         struct Fixture: Decodable {
             struct Smoke: Decodable {

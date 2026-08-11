@@ -12,17 +12,21 @@ import UserNotifications
 enum EntryContentRoute: Equatable {
     case accountDeletion
     case signIn
+    case catalogLoading
     case catalog
     case catalogIndependent
 
     static func resolve(
         accountDeletionPending: Bool,
         shouldShowSignIn: Bool,
+        catalogIsPreparing: Bool,
         hasCatalog: Bool
     ) -> Self {
         if accountDeletionPending { return .accountDeletion }
         if shouldShowSignIn { return .signIn }
-        return hasCatalog ? .catalog : .catalogIndependent
+        if hasCatalog { return .catalog }
+        if catalogIsPreparing { return .catalogLoading }
+        return .catalogIndependent
     }
 }
 
@@ -34,10 +38,14 @@ struct EntryView: View {
     @State private var sharedLocationInbox = AppData.sharedLocationInbox
     @State private var invitationInbox = AppData.sharedPlanInvitationInbox
     @State private var profileStore = AppData.profileStore
+    @State private var userState = AppData.userState
     @State private var showsInvitationConfirmation = false
     @State private var googleSpecialEntryActive = false
     @State private var accountDeletionPending = AppData.isAccountDeletionPending
     @State private var accountDeletionIssue: String?
+    @State private var showsCatalogResetConfirmation = false
+    @State private var isResettingAfterCatalogError = false
+    @State private var catalogResetIssue: String?
     #if DEBUG
         @State private var isForcingSignInForTesting = ProcessInfo.processInfo.arguments.contains(
             "-cominavi-ui-testing-show-sign-in"
@@ -96,6 +104,9 @@ struct EntryView: View {
                 await recoverCompletedGoogleFlowIfPossible()
                 await recoverCompletedAppleFlowIfPossible()
                 await profileStore.load()
+                if !shouldShowSignIn, catalogLibrary.phase == .idle {
+                    catalogLibrary.start()
+                }
                 if profileStore.isIdentityVerified,
                    let userID = profileStore.profile?.id
                 {
@@ -155,6 +166,9 @@ struct EntryView: View {
             .onChange(of: verifiedProfileID, initial: true) { _, userID in
                 guard let userID else { return }
                 googleSpecialEntryActive = false
+                if catalogLibrary.phase == .idle {
+                    catalogLibrary.start()
+                }
                 if invitationInbox.pending != nil {
                     showsInvitationConfirmation = true
                 }
@@ -195,6 +209,18 @@ struct EntryView: View {
                         onDismiss: { showsInvitationConfirmation = false }
                     )
                 }
+            }
+            .confirmationDialog(
+                "Log out and reset ComiNavi?",
+                isPresented: $showsCatalogResetConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Log Out & Reset", role: .destructive) {
+                    logOutAndResetAfterCatalogError()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes this account's Shared Plans, unsent changes, and downloaded catalog data from this device.")
             }
     }
 
@@ -295,16 +321,26 @@ struct EntryView: View {
     private var appContent: some View {
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-catalog-loading"
+            ) {
+                CatalogStatusSurface(
+                    symbolName: "map",
+                    eyebrow: "C108",
+                    title: String(localized: "Preparing catalog…"),
+                    subtitle: String(localized: "Opening catalog…")
+                ) {
+                    CatalogActivityIndicator(
+                        accessibilityLabel: String(localized: "Preparing catalog…")
+                    )
+                }
+            } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-catalog-download"
             ) {
                 CatalogStatusSurface(
                     symbolName: "arrow.down.circle.fill",
                     eyebrow: "C108",
                     title: String(localized: "Downloading\ndatabases"),
-                    subtitle: String.localizedStringWithFormat(
-                        String(localized: "Downloading %@ databases…"),
-                        "C108"
-                    )
+                    subtitle: String(localized: "Downloading databases, this may take a while...")
                 ) {
                     DownloadProgressView(progresses: [
                         .init(
@@ -332,17 +368,24 @@ struct EntryView: View {
                     ),
                     advice: String(localized: "Please try again.")
                 ) {
-                    Button {
+                    FocusedActionButton {
                         // This debug action is intentionally inert; it exists only
                         // for screenshot and accessibility review.
                     } label: {
                         LucideLabel("Try Again", icon: "arrow.clockwise")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(Color.accentColor)
+
+                    FocusedActionButton(
+                        role: .destructive,
+                        emphasis: .secondary,
+                        tint: .red,
+                        action: {}
+                    ) {
+                        LucideLabel(
+                            "Log Out & Reset",
+                            icon: "person.crop.circle.badge.minus"
+                        )
+                    }
                 }
             } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-shinagaki-lightbox"
@@ -375,7 +418,8 @@ struct EntryView: View {
         switch EntryContentRoute.resolve(
             accountDeletionPending: accountDeletionPending,
             shouldShowSignIn: shouldShowSignIn,
-            hasCatalog: catalogLibrary.dataSource != nil
+            catalogIsPreparing: catalogIsPreparing,
+            hasCatalog: catalogIsReady
         ) {
         case .accountDeletion:
             AccountDeletionPendingView(
@@ -397,6 +441,8 @@ struct EntryView: View {
                     : nil,
                 googleSpecialEntry: googleSpecialEntryActive
             )
+        case .catalogLoading:
+            catalogLoadingView
         case .catalog:
             ContentView(
                 catalogLibrary: catalogLibrary,
@@ -407,6 +453,22 @@ struct EntryView: View {
                 catalogLibrary: catalogLibrary,
                 sharedLocationInbox: sharedLocationInbox
             )
+        }
+    }
+
+    private var catalogIsReady: Bool {
+        catalogLibrary.dataSource?.readiness == .ready
+    }
+
+    private var catalogIsPreparing: Bool {
+        guard !catalogIsReady else { return false }
+        return switch catalogLibrary.phase {
+        case .idle, .discovering, .loading, .downloading:
+            true
+        case .ready:
+            true
+        case .failed:
+            false
         }
     }
 
@@ -525,19 +587,31 @@ struct EntryView: View {
             CatalogErrorSurface(
                 symbolName: "exclamationmark.triangle.fill",
                 title: String(localized: "Catalogs unavailable"),
-                message: message,
+                message: catalogResetIssue ?? message,
                 advice: String(localized: "Please try again.")
             ) {
-                Button {
+                FocusedActionButton {
                     catalogLibrary.retry()
                 } label: {
                     LucideLabel("Try Again", icon: "arrow.clockwise")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .tint(Color.accentColor)
+
+                FocusedActionButton(
+                    role: .destructive,
+                    emphasis: .secondary,
+                    tint: .red,
+                    action: { showsCatalogResetConfirmation = true }
+                ) {
+                    if isResettingAfterCatalogError {
+                        ProgressView()
+                    } else {
+                        LucideLabel(
+                            "Log Out & Reset",
+                            icon: "person.crop.circle.badge.minus"
+                        )
+                    }
+                }
+                .disabled(isResettingAfterCatalogError)
             }
         case .loading(let event):
             CatalogStatusSurface(
@@ -546,18 +620,16 @@ struct EntryView: View {
                 title: String(localized: "Opening catalog…"),
                 subtitle: String(localized: "Preparing catalog…")
             ) {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(Color.accentColor)
-                    .frame(width: 32, height: 32)
-                    .accessibilityLabel(Text(String(localized: "Opening catalog…")))
+                CatalogActivityIndicator(
+                    accessibilityLabel: String(localized: "Opening catalog…")
+                )
             }
         case .downloading(let event, let progress):
             CatalogStatusSurface(
                 symbolName: "arrow.down.circle.fill",
                 eyebrow: event.shortName,
                 title: String(localized: "Downloading catalog…"),
-                subtitle: String(localized: "The previous catalog remains available until verification finishes.")
+                subtitle: String(localized: "Downloading databases, this may take a while...")
             ) {
                 DownloadProgressView(progresses: [progress])
             }
@@ -568,12 +640,46 @@ struct EntryView: View {
                 title: String(localized: "Finding available catalogs…"),
                 subtitle: String(localized: "Preparing catalog…")
             ) {
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(Color.accentColor)
-                    .frame(width: 32, height: 32)
-                    .accessibilityLabel(Text(String(localized: "Finding available catalogs…")))
+                CatalogActivityIndicator(
+                    accessibilityLabel: String(localized: "Finding available catalogs…")
+                )
             }
+        }
+    }
+
+    private func logOutAndResetAfterCatalogError() {
+        guard !isResettingAfterCatalogError else { return }
+        isResettingAfterCatalogError = true
+        catalogResetIssue = nil
+        let dataSource = AppData.circlems
+
+        Task {
+            let coordinator = ProfileLogoutCoordinator(
+                revokeSession: {
+                    try await CominaviServiceClient.shared.revokeSession()
+                },
+                clearLocalUserData: {
+                    await AppData.clearSharedPlanUserData()
+                    profileStore.clear()
+                }
+            )
+            do {
+                try await coordinator.perform()
+            } catch {
+                catalogResetIssue = error.localizedDescription
+                isResettingAfterCatalogError = false
+                return
+            }
+
+            userState.user = nil
+            catalogLibrary.reset()
+            await dataSource?.cleanAllCaches()
+            do {
+                try await CominaviCatalogInstaller.removeAllDownloadedData()
+            } catch {
+                catalogResetIssue = error.localizedDescription
+            }
+            isResettingAfterCatalogError = false
         }
     }
 }
@@ -583,14 +689,27 @@ private struct AccountDeletionPendingView: View {
     let retry: () -> Void
 
     var body: some View {
-        ContentUnavailableView {
-            Label("Deleting your account", systemImage: "person.crop.circle.badge.xmark")
-        } description: {
+        FocusedActionSurface(
+            symbolName: "person.crop.circle.badge.xmark",
+            tint: issue == nil ? .accentColor : .orange
+        ) {
+            Text("Deleting your account")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+
             Text("Your deletion request is stored securely on this device and will finish automatically when the network is available.")
-            if let issue { Text(issue) }
-        } actions: {
-            Button("Try again", action: retry)
-                .buttonStyle(.borderedProminent)
+                .foregroundStyle(.secondary)
+                .padding(.top, 12)
+
+            if let issue {
+                Text(issue)
+                    .foregroundStyle(.orange)
+                    .padding(.top, 18)
+            }
+
+            FocusedActionButton(action: retry) {
+                LucideLabel("Try again", icon: "arrow.clockwise")
+            }
+                .padding(.top, 28)
                 .accessibilityIdentifier("account-deletion-retry")
         }
     }
