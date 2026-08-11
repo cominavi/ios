@@ -1339,7 +1339,7 @@ private struct ShinagakiPostCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
+            HStack(alignment: .top, spacing: 4) {
                 Text(post.authorName.nonBlank ?? "@\(post.authorHandle)")
                     .font(.subheadline.weight(.bold))
                     .lineLimit(1)
@@ -1353,7 +1353,7 @@ private struct ShinagakiPostCard: View {
 
                 Spacer(minLength: 8)
 
-                ShinagakiConfidenceBadge(post: post)
+                ShinagakiConfidenceIndicator(post: post)
             }
 
             if !displayableMedia.isEmpty {
@@ -1451,30 +1451,172 @@ private struct ExpandableShinagakiText: View {
     }
 }
 
-private struct ShinagakiConfidenceBadge: View {
+private struct ShinagakiConfidenceIndicator: View {
     let post: CatalogShinagakiPost
 
+    @State private var isShowingDetails = false
+
     var body: some View {
-        Text(title)
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(post.isHighConfidence ? Color.green : Color.orange)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                (post.isHighConfidence ? Color.green : Color.orange).opacity(0.12),
-                in: .capsule
+        Button {
+            isShowingDetails = true
+        } label: {
+            VStack(spacing: 2) {
+                confidenceLight(for: post.postConfidence)
+                confidenceLight(for: post.placementConfidence)
+                confidenceLight(for: overallConfidence)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 5)
+            .background(Color.secondary.opacity(0.1), in: .rect(cornerRadius: 8))
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Match confidence")
+        .accessibilityValue(accessibilityValue)
+        .accessibilityHint("Shows what each confidence indicator means")
+        .accessibilityIdentifier("shinagaki-confidence-indicator-\(post.id)")
+        .sheet(isPresented: $isShowingDetails) {
+            ShinagakiConfidenceSheet(
+                postConfidence: post.postConfidence,
+                placementConfidence: post.placementConfidence,
+                overallConfidence: overallConfidence
             )
-            .accessibilityLabel(Text(accessibilityLabel))
+            .presentationDetents([.medium])
+        }
     }
 
-    private var title: LocalizedStringResource {
-        post.isHighConfidence ? "High confidence" : "Possible match"
+    private var overallConfidence: CatalogConfidence {
+        [post.postConfidence, post.placementConfidence]
+            .min { $0.indicatorRank < $1.indicatorRank } ?? .unmatched
     }
 
-    private var accessibilityLabel: LocalizedStringResource {
-        post.isHighConfidence
-            ? "High-confidence post and placement match"
-            : "Possible automated placement match"
+    private var accessibilityValue: Text {
+        let postLabel = String(localized: "Post confidence")
+        let postValue = String(localized: post.postConfidence.title)
+        let placementLabel = String(localized: "Placement confidence")
+        let placementValue = String(localized: post.placementConfidence.title)
+        let overallLabel = String(localized: "Overall confidence")
+        let overallValue = String(localized: overallConfidence.title)
+        let value = [
+            "\(postLabel): \(postValue)",
+            "\(placementLabel): \(placementValue)",
+            "\(overallLabel): \(overallValue)",
+        ]
+        .joined(separator: ", ")
+
+        return Text(verbatim: value)
+    }
+
+    private func confidenceLight(for confidence: CatalogConfidence) -> some View {
+        Capsule()
+            .fill(confidence.indicatorColor)
+            .frame(width: 14, height: 4)
+            .accessibilityHidden(true)
+    }
+}
+
+private struct ShinagakiConfidenceSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let postConfidence: CatalogConfidence
+    let placementConfidence: CatalogConfidence
+    let overallConfidence: CatalogConfidence
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    confidenceRow(
+                        title: "Post confidence",
+                        confidence: postConfidence,
+                        explanation: "How strongly the public X post appears to be a shinagaki post."
+                    )
+                    confidenceRow(
+                        title: "Placement confidence",
+                        confidence: placementConfidence,
+                        explanation: "How strongly the post is linked to this circle and its catalog booth placement."
+                    )
+                    confidenceRow(
+                        title: "Overall confidence",
+                        confidence: overallConfidence,
+                        explanation: "The lower of the two confidence levels above, so a weak post or placement match lowers the overall result."
+                    )
+                } footer: {
+                    Text("These are automatic estimates from public information. Check the original post and booth before relying on them.")
+                }
+            }
+            .navigationTitle("Match confidence")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("shinagaki-confidence-sheet")
+    }
+
+    private func confidenceRow(
+        title: LocalizedStringResource,
+        confidence: CatalogConfidence,
+        explanation: LocalizedStringResource
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Capsule()
+                .fill(confidence.indicatorColor)
+                .frame(width: 6, height: 28)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.headline)
+
+                    Spacer(minLength: 12)
+
+                    Text(confidence.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(confidence.indicatorColor)
+                }
+
+                Text(explanation)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private extension CatalogConfidence {
+    var indicatorColor: Color {
+        switch self {
+        case .high:
+            .green
+        case .medium:
+            .orange
+        case .low:
+            .red
+        case .unmatched:
+            .gray
+        }
+    }
+
+    var indicatorRank: Int {
+        switch self {
+        case .high:
+            3
+        case .medium:
+            2
+        case .low:
+            1
+        case .unmatched:
+            0
+        }
     }
 }
 

@@ -5928,6 +5928,26 @@
         }
       }
     },
+    "How strongly the post is linked to this circle and its catalog booth placement." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "投稿がこのサークルとカタログ上の配置に結び付く可能性の高さを示します。"
+          }
+        }
+      }
+    },
+    "How strongly the public X post appears to be a shinagaki post." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開X投稿がお品書きの投稿である可能性の高さを示します。"
+          }
+        }
+      }
+    },
     "How to prepare, what to bring, how to read placements, and day-of etiquette." : {
       "localizations" : {
         "ja" : {
@@ -7094,6 +7114,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "いずれかに一致"
+          }
+        }
+      }
+    },
+    "Match confidence" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "照合の確度"
           }
         }
       }
@@ -8315,6 +8345,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld個分、購入担当が多すぎます"
+          }
+        }
+      }
+    },
+    "Overall confidence" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "総合確度"
           }
         }
       }
@@ -10415,6 +10455,16 @@
         }
       }
     },
+    "Shows what each confidence indicator means" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各確度インジケーターの意味を表示します"
+          }
+        }
+      }
+    },
     "Shows where this circle's information came from" : {
       "localizations" : {
         "ja" : {
@@ -11302,6 +11352,16 @@
         }
       }
     },
+    "The lower of the two confidence levels above, so a weak post or placement match lowers the overall result." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上の2つの確度のうち低い方です。投稿または配置の照合が弱い場合、総合確度も下がります。"
+          }
+        }
+      }
+    },
     "The login request expired. Please try again." : {
       "localizations" : {
         "ja" : {
@@ -11599,6 +11659,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "これらの変更は自動再送されません。内容を確認してから再送または破棄してください。"
+          }
+        }
+      }
+    },
+    "These are automatic estimates from public information. Check the original post and booth before relying on them." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開情報をもとに自動で推定しています。判断に使う前に、元の投稿と配置を確認してください。"
           }
         }
       }
