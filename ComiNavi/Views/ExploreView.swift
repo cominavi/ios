@@ -51,7 +51,7 @@ struct ExploreView<EventDayHeader: View>: View {
 
                 Group {
                     if model.isLoading, model.allCircles.isEmpty {
-                        ProgressView("Organizing circles…")
+                        ExploreLoadingScreen()
                     } else if model.visibleCircles.isEmpty {
                         ContentUnavailableView {
                             LucideLabel("No circles found", icon: "sparkle.magnifyingglass")
@@ -195,6 +195,25 @@ struct ExploreView<EventDayHeader: View>: View {
     }
 }
 
+private struct ExploreLoadingScreen: View {
+    var body: some View {
+        VStack(spacing: 18) {
+            ProgressView()
+                .controlSize(.large)
+                .tint(Color.accentColor)
+
+            Text("Organizing circles…")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(uiColor: .systemBackground))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Organizing circles…")
+        .accessibilityIdentifier("explore-loading-screen")
+    }
+}
+
 private struct ExploreSearchField: View {
     let model: ExploreModel
 
@@ -245,9 +264,9 @@ private struct ExploreDiscoveryCloud: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Discover")
+                    Text("Popular tags")
                         .font(.headline)
-                    Text("Genres, tags, and words from circle descriptions")
+                    Text("Most-used tags for this day")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -257,7 +276,7 @@ private struct ExploreDiscoveryCloud: View {
 
                 if model.selectedDiscoveryTermIDs.count > 1 {
                     Menu {
-                        Picker("Match interests", selection: $model.discoveryMatchMode) {
+                        Picker("Match tags", selection: $model.discoveryMatchMode) {
                             ForEach(ExploreDiscoveryMatchMode.allCases) { mode in
                                 Text(mode.title).tag(mode)
                             }
@@ -270,7 +289,7 @@ private struct ExploreDiscoveryCloud: View {
                             .labelStyle(.titleAndIcon)
                             .font(.subheadline.weight(.semibold))
                     }
-                    .accessibilityLabel("Interest matching")
+                    .accessibilityLabel("Tag matching")
                     .accessibilityValue(Text(model.discoveryMatchMode.title))
                     .accessibilityIdentifier("explore-discovery-match-mode")
                 }
@@ -300,7 +319,7 @@ private struct ExploreDiscoveryCloud: View {
         .padding(.bottom, 10)
         .background(Color(uiColor: .systemBackground))
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Discover interests")
+        .accessibilityLabel("Popular tags")
         .accessibilityIdentifier("explore-discovery-cloud")
     }
 }
@@ -340,7 +359,7 @@ private struct ExploreDiscoverySkeleton: View {
         .frame(minHeight: 96)
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Finding interests…")
+        .accessibilityLabel("Finding popular tags…")
         .accessibilityIdentifier("explore-discovery-loading")
     }
 }
@@ -479,7 +498,7 @@ private struct ExploreDiscoveryTermButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel(term.title)
         .accessibilityValue("\(term.kind.title), \(term.count) circles")
-        .accessibilityHint(isSelected ? "Double tap to remove this interest" : "Double tap to filter by this interest")
+        .accessibilityHint(isSelected ? "Double tap to remove this tag" : "Double tap to filter by this tag")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("explore-discovery-term-\(term.id)")
     }

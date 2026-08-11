@@ -58,6 +58,14 @@ struct CircleDetailView: View {
                     onOpenMap: openOnMap
                 )
 
+                if !combinedTags.isEmpty {
+                    CircleDetailTagsSection(
+                        tags: combinedTags,
+                        day: circle.day ?? 1,
+                        dataSource: dataSource
+                    )
+                }
+
                 if details?.extensionRecord?.WCId != nil {
                     CircleUserPlanSection(model: planModel)
                 }
@@ -68,14 +76,6 @@ struct CircleDetailView: View {
 
                 if !shinagakiPosts.isEmpty {
                     CircleDetailShinagakiSection(posts: shinagakiPosts)
-                }
-
-                if !combinedTags.isEmpty {
-                    CircleDetailTagsSection(
-                        tags: combinedTags,
-                        day: circle.day ?? 1,
-                        dataSource: dataSource
-                    )
                 }
 
                 if hasAboutInformation {

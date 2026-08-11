@@ -3561,12 +3561,32 @@
         }
       }
     },
+    "Double tap to filter by this tag" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダブルタップでこのタグに絞り込みます"
+          }
+        }
+      }
+    },
     "Double tap to remove this interest" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "ダブルタップでこの興味を解除します"
+          }
+        }
+      }
+    },
+    "Double tap to remove this tag" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダブルタップでこのタグを解除します"
           }
         }
       }
@@ -4615,6 +4635,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "興味を分析中…"
+          }
+        }
+      }
+    },
+    "Finding popular tags…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人気のタグを集計中…"
           }
         }
       }
@@ -6203,6 +6233,16 @@
         }
       }
     },
+    "Match tags" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグの組み合わせ"
+          }
+        }
+      }
+    },
     "Matching policy" : {
       "localizations" : {
         "ja" : {
@@ -6303,6 +6343,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "みずほATM・TFT"
+          }
+        }
+      }
+    },
+    "Most-used tags for this day" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この日に多く使われているタグ"
           }
         }
       }
@@ -7527,6 +7577,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "照合候補"
+          }
+        }
+      }
+    },
+    "Popular tags" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人気のタグ"
           }
         }
       }
@@ -9350,6 +9410,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "タグ"
+          }
+        }
+      }
+    },
+    "Tag matching" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タグの組み合わせ"
           }
         }
       }
