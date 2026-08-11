@@ -70,6 +70,37 @@ final class CominaviCatalogTests: XCTestCase {
         XCTAssertTrue(fixture.compatibilitySmoke.query.contains("ComiketCircleImage"))
     }
 
+    func testRecoveryRefreshesManifestBeforeStartingFreshDownload() async throws {
+        let root = try temporaryDirectory(named: "recovery-manifest")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cached = try makeCatalogDatabase(in: root, versionID: "c108-cached-v1")
+        let refreshed = try makeCatalogDatabase(in: root, versionID: "c108-refreshed-v2")
+        let installed = CominaviInstalledCatalog(
+            catalog: refreshed.catalog,
+            url: refreshed.databaseURL,
+            isCurrentVersion: true
+        )
+        let installer = CatalogInstallRecorderStub(installed: installed)
+        let source = CominaviCatalogSource(
+            service: RefreshingCatalogServiceStub(
+                cachedCatalog: cached.catalog,
+                refreshedCatalog: refreshed.catalog
+            ),
+            installer: installer,
+            publicUserIDProvider: { "account-a" }
+        )
+
+        let events = try await source.availableEvents()
+        let event = try XCTUnwrap(events.first)
+        let configuration = try await source.recoveryConfiguration(for: event, progress: nil)
+
+        let installedCatalogs = await installer.standardCatalogs
+        let redownloadedCatalogs = await installer.redownloadedCatalogs
+        XCTAssertTrue(installedCatalogs.isEmpty)
+        XCTAssertEqual(redownloadedCatalogs.map(\.versionID), [refreshed.catalog.versionID])
+        XCTAssertEqual(configuration.main.origin, .local(refreshed.databaseURL))
+    }
+
     func testRangeResumeRefreshesAuthorizationAndInstallsOneRawDatabaseForBothReaders() async throws {
         let root = try temporaryDirectory(named: "range-refresh")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -184,6 +215,62 @@ final class CominaviCatalogTests: XCTestCase {
             resumedRequest.value(forHTTPHeaderField: "If-Range"),
             fixture.catalog.expectedETag
         )
+    }
+
+    func testExplicitRedownloadDiscardsCheckpointAndRestartsAtByteZero() async throws {
+        let root = try temporaryDirectory(named: "fresh-redownload")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fixture = try makeCatalogDatabase(in: root, versionID: "c108-redownload-v1")
+        let installRoot = root.appendingPathComponent("installed")
+        let interruptedInstaller = CominaviCatalogInstaller(
+            authorizer: CatalogAuthorizerStub(),
+            transport: CatalogTransportStub(
+                artifact: try Data(contentsOf: fixture.databaseURL),
+                catalog: fixture.catalog,
+                steps: [.automatic, .cancel]
+            ),
+            rootDirectory: installRoot,
+            chunkBytes: 64 * 1_024,
+            retryDelay: .zero
+        )
+
+        do {
+            _ = try await interruptedInstaller.install(
+                fixture.catalog,
+                publicUserID: "account-a",
+                progress: nil
+            )
+            XCTFail("Expected cancellation")
+        } catch is CancellationError {
+            // The first range remains durable until explicit recovery starts.
+        }
+
+        let freshTransport = CatalogTransportStub(
+            artifact: try Data(contentsOf: fixture.databaseURL),
+            catalog: fixture.catalog
+        )
+        let recoveryInstaller = CominaviCatalogInstaller(
+            authorizer: CatalogAuthorizerStub(),
+            transport: freshTransport,
+            rootDirectory: installRoot,
+            chunkBytes: 64 * 1_024,
+            retryDelay: .zero
+        )
+
+        let installed = try await recoveryInstaller.redownload(
+            fixture.catalog,
+            publicUserID: "account-a",
+            progress: nil
+        )
+
+        XCTAssertTrue(installed.isCurrentVersion)
+        let recoveryRequests = await freshTransport.requests()
+        let firstRecoveryRequest = try XCTUnwrap(recoveryRequests.first)
+        XCTAssertEqual(
+            firstRecoveryRequest.value(forHTTPHeaderField: "Range"),
+            "bytes=0-65535"
+        )
+        XCTAssertNil(firstRecoveryRequest.value(forHTTPHeaderField: "If-Range"))
     }
 
     func test200And416AreHandledWithoutBlessingTheWrongRepresentation() async throws {
@@ -829,6 +916,47 @@ private struct FailingCatalogServiceStub: CominaviCatalogServicing {
 
     func catalog(comiketNo: Int) async throws -> CominaviCatalog {
         throw URLError(.notConnectedToInternet)
+    }
+}
+
+private struct RefreshingCatalogServiceStub: CominaviCatalogServicing {
+    let cachedCatalog: CominaviCatalog
+    let refreshedCatalog: CominaviCatalog
+
+    func catalogs() async throws -> [CominaviCatalog] {
+        [cachedCatalog]
+    }
+
+    func catalog(comiketNo: Int) async throws -> CominaviCatalog {
+        refreshedCatalog
+    }
+}
+
+private actor CatalogInstallRecorderStub: CominaviCatalogInstalling {
+    let installed: CominaviInstalledCatalog
+    private(set) var standardCatalogs: [CominaviCatalog] = []
+    private(set) var redownloadedCatalogs: [CominaviCatalog] = []
+
+    init(installed: CominaviInstalledCatalog) {
+        self.installed = installed
+    }
+
+    func install(
+        _ catalog: CominaviCatalog,
+        publicUserID: String,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CominaviInstalledCatalog {
+        standardCatalogs.append(catalog)
+        return installed
+    }
+
+    func redownload(
+        _ catalog: CominaviCatalog,
+        publicUserID: String,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CominaviInstalledCatalog {
+        redownloadedCatalogs.append(catalog)
+        return installed
     }
 }
 

@@ -143,6 +143,10 @@ private actor CominaviCatalogManifestCache {
     func catalog(comiketNo: Int) -> CominaviCatalog? {
         catalogsByComiket[comiketNo]
     }
+
+    func store(_ catalog: CominaviCatalog) {
+        catalogsByComiket[catalog.comiketNo] = catalog
+    }
 }
 
 struct CominaviCatalogSource: CatalogSource {
@@ -207,6 +211,30 @@ struct CominaviCatalogSource: CatalogSource {
             publicUserID: publicUserID,
             progress: progress
         )
+        return makeConfiguration(installed: installed, publicUserID: publicUserID)
+    }
+
+    func recoveryConfiguration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration {
+        let catalog = try await service.catalog(comiketNo: event.number).validated()
+        await cache.store(catalog)
+        guard let publicUserID = await publicUserIDProvider() else {
+            throw CominaviCatalogError.invalidAccount
+        }
+        let installed = try await installer.redownload(
+            catalog,
+            publicUserID: publicUserID,
+            progress: progress
+        )
+        return makeConfiguration(installed: installed, publicUserID: publicUserID)
+    }
+
+    private func makeConfiguration(
+        installed: CominaviInstalledCatalog,
+        publicUserID: String
+    ) -> CatalogDataSourceConfiguration {
         let database = CatalogDatabaseConfiguration(
             digest: installed.catalog.artifact.sha256,
             origin: .local(installed.url)
@@ -237,10 +265,23 @@ protocol CominaviCatalogInstalling: Sendable {
         publicUserID: String,
         progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
     ) async throws -> CominaviInstalledCatalog
+    func redownload(
+        _ catalog: CominaviCatalog,
+        publicUserID: String,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CominaviInstalledCatalog
     func installedCatalogs(publicUserID: String) async throws -> [CominaviInstalledCatalog]
 }
 
 extension CominaviCatalogInstalling {
+    func redownload(
+        _ catalog: CominaviCatalog,
+        publicUserID: String,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CominaviInstalledCatalog {
+        try await install(catalog, publicUserID: publicUserID, progress: progress)
+    }
+
     func installedCatalogs(publicUserID: String) async throws -> [CominaviInstalledCatalog] {
         []
     }
@@ -329,6 +370,33 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         publicUserID: String,
         progress: (@MainActor @Sendable (Readiness.Progress) -> Void)? = nil
     ) async throws -> CominaviInstalledCatalog {
+        try await install(
+            unvalidatedCatalog,
+            publicUserID: publicUserID,
+            startsFreshDownload: false,
+            progress: progress
+        )
+    }
+
+    func redownload(
+        _ unvalidatedCatalog: CominaviCatalog,
+        publicUserID: String,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)? = nil
+    ) async throws -> CominaviInstalledCatalog {
+        try await install(
+            unvalidatedCatalog,
+            publicUserID: publicUserID,
+            startsFreshDownload: true,
+            progress: progress
+        )
+    }
+
+    private func install(
+        _ unvalidatedCatalog: CominaviCatalog,
+        publicUserID: String,
+        startsFreshDownload: Bool,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CominaviInstalledCatalog {
         let catalog = try unvalidatedCatalog.validated()
         try validatePublicUserID(publicUserID)
         let directory = catalogDirectory(comiketNo: catalog.comiketNo)
@@ -343,18 +411,31 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
                 do {
                     try await validateDatabase(at: destinationURL, catalog: catalog)
                     try saveInstalledReceipt(catalog: catalog, url: destinationURL, in: directory)
-                    try? garbageCollect(in: directory, keeping: destinationURL)
-                    return CominaviInstalledCatalog(
-                        catalog: catalog,
-                        url: destinationURL,
-                        isCurrentVersion: true
-                    )
+                    if !startsFreshDownload {
+                        try? garbageCollect(in: directory, keeping: destinationURL)
+                        return CominaviInstalledCatalog(
+                            catalog: catalog,
+                            url: destinationURL,
+                            isCurrentVersion: true
+                        )
+                    }
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
                     // An immutable digest path that no longer validates must not
                     // short-circuit every later repair attempt.
                     try quarantineInvalidInstalledFile(destinationURL, in: directory)
+                }
+            }
+
+            if startsFreshDownload {
+                try discardPartial(partialURL, checkpointURL: checkpointURL)
+                if let progress {
+                    await progress(Readiness.Progress(
+                        type: .main,
+                        totalBytes: catalog.artifact.bytes,
+                        completedBytes: 0
+                    ))
                 }
             }
 
@@ -1177,6 +1258,16 @@ enum CominaviCatalogError: LocalizedError, Equatable, Sendable {
             String(localized: "The downloaded catalog database is invalid.")
         case .invalidInstalledReceipt:
             String(localized: "The previously installed catalog could not be verified.")
+        }
+    }
+
+    var allowsFreshDownloadRecovery: Bool {
+        switch self {
+        case .invalidResponse, .httpStatus, .checkpointMismatch, .sizeMismatch,
+             .digestMismatch, .invalidDatabase, .identityMismatch, .countMismatch:
+            true
+        case .invalidManifest, .invalidAccount, .invalidInstalledReceipt:
+            false
         }
     }
 }

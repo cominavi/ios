@@ -199,6 +199,36 @@ final class CatalogLibraryTests: XCTestCase {
         )
     }
 
+    func testCatalogVerificationFailureRetriesWithFreshDownloadRecovery() async throws {
+        let event = CatalogEvent(id: 108, number: 108)
+        let recorder = CatalogRecoveryInvocationRecorder()
+        let source = VerificationFailureCatalogSource(event: event, recorder: recorder)
+        let (defaults, suiteName) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let library = CatalogLibrary(
+            sources: [.cominavi: source],
+            defaults: defaults,
+            initialMode: .cominavi
+        )
+
+        library.start()
+        try await waitForFailure(in: library)
+
+        XCTAssertEqual(library.failureRecovery, .redownload)
+        var standardConfigurationCount = await recorder.standardConfigurationCount
+        var recoveryConfigurationCount = await recorder.recoveryConfigurationCount
+        XCTAssertEqual(standardConfigurationCount, 1)
+        XCTAssertEqual(recoveryConfigurationCount, 0)
+
+        library.retry()
+        try await waitForFailure(in: library)
+
+        standardConfigurationCount = await recorder.standardConfigurationCount
+        recoveryConfigurationCount = await recorder.recoveryConfigurationCount
+        XCTAssertEqual(standardConfigurationCount, 1)
+        XCTAssertEqual(recoveryConfigurationCount, 1)
+    }
+
     func testCirclemsSourceUsesBundledCrawlDataAsOptionalEnrichment() async throws {
         let service = CatalogServiceStub(
             eventListResponse: eventListResponse(
@@ -537,6 +567,45 @@ private actor CatalogSourceInvocationRecorder {
 
     func recordConfiguration(eventID: Int) {
         configurationEventIDs.append(eventID)
+    }
+}
+
+private actor CatalogRecoveryInvocationRecorder {
+    private(set) var standardConfigurationCount = 0
+    private(set) var recoveryConfigurationCount = 0
+
+    func recordStandardConfiguration() {
+        standardConfigurationCount += 1
+    }
+
+    func recordRecoveryConfiguration() {
+        recoveryConfigurationCount += 1
+    }
+}
+
+private struct VerificationFailureCatalogSource: CatalogSource {
+    let mode = CatalogDataMode.cominavi
+    let event: CatalogEvent
+    let recorder: CatalogRecoveryInvocationRecorder
+
+    func availableEvents() async throws -> [CatalogEvent] {
+        [event]
+    }
+
+    func configuration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration {
+        await recorder.recordStandardConfiguration()
+        throw CominaviCatalogError.invalidResponse
+    }
+
+    func recoveryConfiguration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration {
+        await recorder.recordRecoveryConfiguration()
+        throw CominaviCatalogError.invalidResponse
     }
 }
 

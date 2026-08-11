@@ -3549,6 +3549,16 @@
         }
       }
     },
+    "Discards the incomplete download and downloads the catalog from the beginning." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード途中のデータを削除し、カタログを最初からダウンロードします。"
+          }
+        }
+      }
+    },
     "Discard and load the server copy" : {
       "localizations" : {
         "ja" : {
@@ -3715,6 +3725,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ダブルタップでスペースを確認できます。長押しすると現在地を設定できます。"
+          }
+        }
+      }
+    },
+    "Download Again" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度ダウンロード"
           }
         }
       }
@@ -9443,6 +9463,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "階段・スタッフ誘導"
+          }
+        }
+      }
+    },
+    "Start a fresh download. The incomplete copy will be removed, then the new catalog will be verified before it opens." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しくダウンロードし直します。未完了のデータを削除し、新しいカタログを検証してから開きます。"
           }
         }
       }

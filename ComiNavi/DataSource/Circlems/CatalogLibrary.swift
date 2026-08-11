@@ -120,11 +120,22 @@ protocol CatalogSource: Sendable {
         for event: CatalogEvent,
         progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
     ) async throws -> CatalogDataSourceConfiguration
+    func recoveryConfiguration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration
 }
 
 extension CatalogSource {
     func configuration(for event: CatalogEvent) async throws -> CatalogDataSourceConfiguration {
         try await configuration(for: event, progress: nil)
+    }
+
+    func recoveryConfiguration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration {
+        try await configuration(for: event, progress: progress)
     }
 }
 
@@ -287,17 +298,24 @@ final class CatalogLibrary {
         case failed(String)
     }
 
+    enum FailureRecovery: Equatable {
+        case retry
+        case redownload
+    }
+
     private(set) var mode: CatalogDataMode
     private(set) var events: [CatalogEvent] = []
     private(set) var selectedEvent: CatalogEvent?
     private(set) var dataSource: CirclemsDataSource?
     private(set) var phase: Phase = .idle
     private(set) var errorMessage: String?
+    private(set) var failureRecovery: FailureRecovery = .retry
 
     @ObservationIgnored private let sources: [CatalogDataMode: any CatalogSource]
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var operationTask: Task<Void, Never>?
     @ObservationIgnored private var pendingDataSource: CirclemsDataSource?
+    @ObservationIgnored private var recoveryEvent: CatalogEvent?
 
     init(
         service: any CatalogEventServicing = CirclemsCatalogEventService(),
@@ -359,6 +377,8 @@ final class CatalogLibrary {
         operationTask?.cancel()
         phase = .discovering
         errorMessage = nil
+        failureRecovery = .retry
+        recoveryEvent = nil
         operationTask = Task { [weak self, source] in
             do {
                 let availableEvents = try await source.availableEvents()
@@ -387,6 +407,7 @@ final class CatalogLibrary {
                 }
                 self.phase = .failed(error.localizedDescription)
                 self.errorMessage = error.localizedDescription
+                self.failureRecovery = .retry
             }
         }
     }
@@ -408,12 +429,16 @@ final class CatalogLibrary {
         selectedEvent = nil
         phase = .idle
         errorMessage = nil
+        failureRecovery = .retry
+        recoveryEvent = nil
         mode = newMode
         defaults.set(newMode.rawValue, forKey: modeDefaultsKey)
     }
 
     func retry() {
-        if let selectedEvent {
+        if failureRecovery == .redownload, let recoveryEvent {
+            load(recoveryEvent, recoversFailedDownload: true)
+        } else if let selectedEvent {
             load(selectedEvent)
         } else {
             phase = .idle
@@ -436,9 +461,11 @@ final class CatalogLibrary {
         selectedEvent = nil
         phase = .idle
         errorMessage = nil
+        failureRecovery = .retry
+        recoveryEvent = nil
     }
 
-    private func load(_ event: CatalogEvent) {
+    private func load(_ event: CatalogEvent, recoversFailedDownload: Bool = false) {
         guard let source = sources[mode] else { return }
 
         operationTask?.cancel()
@@ -451,17 +478,22 @@ final class CatalogLibrary {
         }
         phase = .loading(event)
         errorMessage = nil
+        failureRecovery = .retry
+        recoveryEvent = event
 
         operationTask = Task { [weak self, source] in
             var candidate: CirclemsDataSource?
             do {
-                let configuration = try await source.configuration(
-                    for: event,
-                    progress: { [weak self] progress in
-                        guard let self, self.phase != .ready else { return }
-                        self.phase = .downloading(event, progress)
-                    }
-                )
+                let progress: @MainActor @Sendable (Readiness.Progress) -> Void = {
+                    [weak self] progress in
+                    guard let self, self.phase != .ready else { return }
+                    self.phase = .downloading(event, progress)
+                }
+                let configuration = if recoversFailedDownload {
+                    try await source.recoveryConfiguration(for: event, progress: progress)
+                } else {
+                    try await source.configuration(for: event, progress: progress)
+                }
                 try Task.checkCancellation()
                 guard let self else { return }
 
@@ -492,6 +524,7 @@ final class CatalogLibrary {
                 self.selectedEvent = event
                 self.defaults.set(event.id, forKey: self.selectedEventDefaultsKey)
                 self.phase = .ready
+                self.failureRecovery = .retry
             } catch is CancellationError {
                 candidate?.cancelPreparation()
                 if let self, self.pendingDataSource === candidate {
@@ -510,6 +543,7 @@ final class CatalogLibrary {
                 self.errorMessage = String(
                     localized: "Could not load \(event.shortName): \(error.localizedDescription)"
                 )
+                self.failureRecovery = self.failureRecovery(for: error)
                 self.phase = self.dataSource?.readiness != .ready
                     ? .failed(error.localizedDescription)
                     : .ready
@@ -532,11 +566,22 @@ final class CatalogLibrary {
         selectedEvent = nil
         phase = .idle
         errorMessage = nil
+        failureRecovery = .retry
+        recoveryEvent = nil
         mode = .cominavi
         defaults.set(CatalogDataMode.cominavi.rawValue, forKey: modeDefaultsKey)
         operationTask = nil
         start()
         return true
+    }
+
+    private func failureRecovery(for error: Error) -> FailureRecovery {
+        guard mode == .cominavi,
+              let error = error as? CominaviCatalogError,
+              error.allowsFreshDownloadRecovery
+        else { return .retry }
+
+        return .redownload
     }
 
     private var modeDefaultsKey: String {

@@ -120,13 +120,11 @@ private struct CatalogLibraryLoadingSurface: View {
                 symbolName: "exclamationmark.triangle.fill",
                 title: String(localized: "Catalogs unavailable"),
                 message: message,
-                advice: String(localized: "Please try again.")
+                advice: catalogLibrary.failureRecovery == .redownload
+                    ? String(localized: "Start a fresh download. The incomplete copy will be removed, then the new catalog will be verified before it opens.")
+                    : String(localized: "Please try again.")
             ) {
-                FocusedActionButton {
-                    catalogLibrary.retry()
-                } label: {
-                    LucideLabel("Try Again", icon: "arrow.clockwise")
-                }
+                CatalogRecoveryButton(catalogLibrary: catalogLibrary)
             }
 
         case .loading(let event):
@@ -318,13 +316,11 @@ private struct CatalogContentView: View {
                     symbolName: "exclamationmark.triangle.fill",
                     title: String(localized: "Catalog unavailable"),
                     message: error,
-                    advice: String(localized: "Please try again.")
+                    advice: catalogLibrary.failureRecovery == .redownload
+                        ? String(localized: "Start a fresh download. The incomplete copy will be removed, then the new catalog will be verified before it opens.")
+                        : String(localized: "Please try again.")
                 ) {
-                    FocusedActionButton {
-                        catalogLibrary.retry()
-                    } label: {
-                        LucideLabel("Try Again", icon: "arrow.clockwise")
-                    }
+                    CatalogRecoveryButton(catalogLibrary: catalogLibrary)
 
                     CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
                 }
@@ -375,6 +371,29 @@ private struct CatalogContentView: View {
             selectedDay: selectedDay
         ) {
             showsCatalogSettings = true
+        }
+    }
+}
+
+private struct CatalogRecoveryButton: View {
+    let catalogLibrary: CatalogLibrary
+
+    var body: some View {
+        if catalogLibrary.failureRecovery == .redownload {
+            FocusedActionButton {
+                catalogLibrary.retry()
+            } label: {
+                LucideLabel("Download Again", icon: "download")
+            }
+            .accessibilityHint(
+                Text("Discards the incomplete download and downloads the catalog from the beginning.")
+            )
+        } else {
+            FocusedActionButton {
+                catalogLibrary.retry()
+            } label: {
+                LucideLabel("Try Again", icon: "arrow.clockwise")
+            }
         }
     }
 }
