@@ -38,6 +38,18 @@ final class LocalizationTests: XCTestCase {
             "お品書きの新着順"
         )
         XCTAssertEqual(
+            japaneseBundle.localizedString(forKey: "Popular tags", value: nil, table: nil),
+            "人気のタグ"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Most-used tags for this day",
+                value: nil,
+                table: nil
+            ),
+            "この日に多く使われているタグ"
+        )
+        XCTAssertEqual(
             japaneseBundle.localizedString(
                 forKey: "Log out of Circle.ms?",
                 value: nil,

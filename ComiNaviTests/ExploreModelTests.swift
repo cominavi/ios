@@ -597,68 +597,49 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertEqual(model.visibleCircles.map(\.id), [2])
     }
 
-    func testDiscoveryCloudCombinesGenresTagsAndExtractedKeywords() {
+    func testDiscoveryCloudContainsPopularTagsOrderedByCircleCount() {
         let documents = [
             ExploreDiscoveryDocument(
                 circleID: 1,
-                genreID: 10,
-                genreName: "Animation",
-                tags: ["Cute"],
-                text: "Blue Archive illustration book"
+                tags: ["Cute", "Action"]
             ),
             ExploreDiscoveryDocument(
                 circleID: 2,
-                genreID: 10,
-                genreName: "Animation",
-                tags: ["Action"],
-                text: "Blue Archive character art"
+                tags: ["Action"]
             ),
             ExploreDiscoveryDocument(
                 circleID: 3,
-                genreID: 20,
-                genreName: "Technology",
-                tags: ["Robots"],
-                text: "Robots and hardware book"
+                tags: ["Robots"]
             ),
         ]
 
         let index = ExploreDiscoveryIndexBuilder.build(from: documents)
 
-        XCTAssertTrue(index.terms.contains { $0.id == "genre:10" && $0.count == 2 })
-        XCTAssertTrue(index.terms.contains { $0.id == "tag:cute" && $0.count == 1 })
-        XCTAssertTrue(index.terms.contains { $0.id == "keyword:blue" && $0.count == 2 })
-        XCTAssertEqual(index.circleIDsByTermID["keyword:blue"], [1, 2])
-        XCTAssertFalse(index.terms.contains { $0.title.localizedCaseInsensitiveCompare("book") == .orderedSame })
-        XCTAssertEqual(Set(index.terms.map(\.kind)), [.genre, .tag, .keyword])
+        XCTAssertEqual(index.terms.map(\.id), ["tag:action", "tag:cute", "tag:robots"])
+        XCTAssertEqual(index.terms.map(\.count), [2, 1, 1])
+        XCTAssertEqual(index.circleIDsByTermID["tag:action"], [1, 2])
+        XCTAssertEqual(Set(index.terms.map(\.kind)), [.tag])
+        XCTAssertFalse(index.terms.contains { $0.id.hasPrefix("genre:") })
+        XCTAssertFalse(index.terms.contains { $0.id.hasPrefix("keyword:") })
 
-        let officialNameIndex = ExploreDiscoveryIndexBuilder.build(from: documents.map {
-            ExploreDiscoveryDocument(
-                circleID: $0.circleID,
-                genreID: $0.genreID,
-                genreName: "Blue Archive",
-                tags: $0.tags,
-                text: $0.text
-            )
-        })
-        XCTAssertFalse(officialNameIndex.terms.contains { $0.id == "keyword:blue" })
-        XCTAssertFalse(officialNameIndex.terms.contains { $0.id == "keyword:archive" })
+        let limited = ExploreDiscoveryIndexBuilder.build(from: documents, tagLimit: 2)
+        XCTAssertEqual(limited.terms.map(\.id), ["tag:action", "tag:cute"])
     }
 
-    func testDiscoveryInterestsSupportAnyAndAllMatching() async {
-        let model = ExploreModel(circles: fixtures, selectedDay: 1)
+    func testPopularTagsSupportAnyAndAllMatching() async {
+        var overlappingFixtures = fixtures
+        overlappingFixtures[0].tags = ["Action", "Cute"]
+        overlappingFixtures[1].tags = ["Action"]
+        let model = ExploreModel(circles: overlappingFixtures, selectedDay: 1)
         await model.load()
         await model.waitForDiscoveryIndex()
 
-        model.toggleDiscoveryTerm("genre:10")
-        model.toggleDiscoveryTerm("tag:robots")
-        XCTAssertEqual(model.visibleCircles.map(\.id), [1, 2, 3])
+        model.toggleDiscoveryTerm("tag:action")
+        model.toggleDiscoveryTerm("tag:cute")
+        XCTAssertEqual(model.visibleCircles.map(\.id), [1, 2])
 
         model.discoveryMatchMode = .all
-        XCTAssertTrue(model.visibleCircles.isEmpty)
-
-        model.toggleDiscoveryTerm("tag:robots")
-        model.toggleDiscoveryTerm("tag:cute")
-        XCTAssertEqual(model.visibleCircles.map(\.id), [2])
+        XCTAssertEqual(model.visibleCircles.map(\.id), [1])
     }
 
     func testChangingDayClearsDiscoveryInterestsAndRebuildsTheCloud() async {

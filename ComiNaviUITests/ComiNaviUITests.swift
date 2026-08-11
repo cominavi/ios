@@ -781,7 +781,7 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testDemoExploreDiscoveryCloudSupportsMultipleInterests() throws {
+    func testDemoExplorePopularTagsSupportMultipleSelection() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")
         app.launch()

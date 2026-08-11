@@ -988,16 +988,7 @@ final class ExploreModel {
         let documents = circles.map { circle in
             ExploreDiscoveryDocument(
                 circleID: circle.id,
-                genreID: circle.genreID,
-                genreName: circle.genreName,
-                tags: circle.tags,
-                text: [
-                    circle.circle.bookName,
-                    circle.description,
-                    circle.enrichment?.searchableText,
-                ]
-                    .compactMap { $0 }
-                    .joined(separator: "\n")
+                tags: circle.tags
             )
         }
         discoveryTask = Task { [documents] in
