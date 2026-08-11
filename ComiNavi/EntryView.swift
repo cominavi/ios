@@ -578,7 +578,7 @@ struct EntryView: View {
         case .failed(let message):
             CatalogErrorSurface(
                 symbolName: "exclamationmark.triangle.fill",
-                title: String(localized: "Catalogs unavailable"),
+                title: String(localized: "Catalog unavailable"),
                 message: catalogResetIssue ?? message,
                 advice: String(localized: "Please try again.")
             ) {
