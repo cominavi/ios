@@ -1,0 +1,34 @@
+# Codex desktop-app environment for native iOS worktrees.
+#
+# Keep setup fast and deterministic: validate the local Xcode toolchain and
+# resolve the exact Swift package versions committed in Package.resolved.
+# Builds and tests remain explicit actions because they are slower and may need
+# a developer-selected Simulator.
+version = 1
+name = "ComiNavi iOS"
+
+[setup]
+script = '''
+#!/usr/bin/env bash
+exec bash .codex/worktree-setup.sh
+'''
+
+[[actions]]
+name = "Open in Xcode"
+icon = "tool"
+command = "open ComiNavi.xcodeproj"
+
+[[actions]]
+name = "Build"
+icon = "run"
+command = "bash .codex/xcode.sh build"
+
+[[actions]]
+name = "Unit tests"
+icon = "test"
+command = "bash .codex/xcode.sh test"
+
+[[actions]]
+name = "Resolve packages"
+icon = "debug"
+command = "bash .codex/xcode.sh resolve"
