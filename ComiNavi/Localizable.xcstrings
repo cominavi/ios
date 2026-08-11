@@ -6032,6 +6032,16 @@
     "Increase %@" : {
 
     },
+    "Imports start only when you tap the button. They are limited to once every six hours." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インポートはボタンを押したときだけ実行され、6時間に1回までです。"
+          }
+        }
+      }
+    },
     "Information" : {
       "localizations" : {
         "ja" : {
@@ -7125,6 +7135,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "照合ポリシー"
+          }
+        }
+      }
+    },
+    "Manual import is available after %@. Nothing will start automatically." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手動インポートは%@以降に利用できます。自動では開始されません。"
           }
         }
       }

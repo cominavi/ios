@@ -4,6 +4,7 @@ import UIKit
 struct FollowingImportView: View {
     let dataSource: CirclemsDataSource
     @State private var model: FollowingImportModel
+    @State private var isShowingImportForm = false
 
     init(dataSource: CirclemsDataSource) {
         self.dataSource = dataSource
@@ -11,41 +12,176 @@ struct FollowingImportView: View {
     }
 
     var body: some View {
-        List {
-            Section("X account") {
+        Group {
+            switch model.activity {
+            case .loading:
+                loadingSurface
+            case .importing:
+                importingSurface
+            case .idle, .favoriting:
+                readyContent
+            }
+        }
+        .navigationTitle("X followed circles")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { importToolbar }
+        .task { await model.load() }
+        .onChange(of: model.importState?.importedAt) { oldValue, newValue in
+            guard oldValue != newValue, newValue != nil else { return }
+            isShowingImportForm = false
+        }
+        .onChange(of: model.errorMessage) { _, message in
+            guard let message else { return }
+            AppToast.showError(
+                String(localized: "Could not update followed circles"),
+                subtitle: message
+            )
+            model.dismissError()
+        }
+    }
+
+    @ViewBuilder
+    private var readyContent: some View {
+        if isShowingImportForm || model.importState == nil {
+            importSurface
+        } else if model.importedCircles.isEmpty {
+            emptyResultsSurface
+        } else {
+            importedCirclesList
+        }
+    }
+
+    private var loadingSurface: some View {
+        FocusedActionSurface(
+            symbolName: "person.2.crop.square.stack",
+            animatesBackdrop: true
+        ) {
+            Text("X followed circles")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Preparing catalog…")
+                .foregroundStyle(.secondary)
+                .padding(.top, 12)
+
+            CatalogActivityIndicator(accessibilityLabel: "Preparing catalog…")
+                .padding(.top, 30)
+        }
+        .accessibilityIdentifier("following-import-loading")
+    }
+
+    private var importingSurface: some View {
+        FocusedActionSurface(
+            symbolName: "person.2.crop.square.stack",
+            animatesBackdrop: true
+        ) {
+            Text("Import followed circles")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(
+                "Import the public X accounts you follow and match them to this catalog on your device."
+            )
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 12)
+
+            CatalogActivityIndicator(accessibilityLabel: "Import followed circles")
+                .padding(.top, 30)
+        }
+        .accessibilityIdentifier("following-import-progress")
+    }
+
+    private var importSurface: some View {
+        FocusedActionSurface(symbolName: "person.2.crop.square.stack") {
+            Text("Find followed circles")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Import an X account to find circles it follows in this catalog.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
                     Text(verbatim: "@")
                         .foregroundStyle(.secondary)
+
                     TextField("username", text: $model.twitterUserName)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .textContentType(.username)
+                        .submitLabel(.go)
+                        .onSubmit(model.importNow)
                         .accessibilityIdentifier("following-import-username")
                 }
-
-                TimelineView(.periodic(from: .now, by: 30)) { _ in
-                    Button(action: model.importNow) {
-                        Label("Import followed circles", systemImage: "arrow.down.circle")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .disabled(!model.canImport)
-                    .accessibilityIdentifier("following-import-start")
-                }
-
-                if let nextAllowedAt = model.nextAllowedAt {
-                    LabeledContent("Next import") {
-                        Text(nextAllowedAt, style: .relative)
-                            .monospacedDigit()
-                    }
-                }
-
-                Text(
-                    "ComiNavi sends your Circle.ms session only to cominavi.net for verification. X accounts are matched to circles on this device. Imports are limited to once every six hours."
+                .padding(.horizontal, 16)
+                .frame(minHeight: 52)
+                .background(
+                    Color(uiColor: .secondarySystemBackground),
+                    in: .rect(cornerRadius: 14)
                 )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
 
+                FocusedActionButton(action: model.importNow) {
+                    LucideLabel(
+                        "Import followed circles",
+                        icon: "arrow.down.circle.fill"
+                    )
+                }
+                .disabled(!model.canImport)
+                .accessibilityIdentifier("following-import-start")
+            }
+            .padding(.top, 30)
+
+            Group {
+                if let availableAt = model.manualImportAvailableAt {
+                    Text(
+                        "Manual import is available after \(availableAt.formatted(date: .abbreviated, time: .shortened)). Nothing will start automatically."
+                    )
+                } else {
+                    Text(
+                        "Imports start only when you tap the button. They are limited to once every six hours."
+                    )
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 18)
+
+            Text(
+                "ComiNavi sends your Circle.ms session only to cominavi.net for verification. X accounts are matched to circles on this device. Imports are limited to once every six hours."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 10)
+        }
+        .accessibilityIdentifier("following-import-form")
+    }
+
+    private var emptyResultsSurface: some View {
+        FocusedActionSurface(symbolName: "person.slash") {
+            Text("No imported circles")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Import an X account to find circles it follows in this catalog.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+
+            FocusedActionButton(action: showImportForm) {
+                LucideLabel("Import", icon: "arrow.down.circle.fill")
+            }
+            .padding(.top, 28)
+        }
+        .accessibilityIdentifier("following-import-empty")
+    }
+
+    private var importedCirclesList: some View {
+        List {
             if !model.importedCircles.isEmpty {
                 Section("Favorite imported circles") {
                     ScrollView(.horizontal) {
@@ -91,50 +227,39 @@ struct FollowingImportView: View {
             }
 
             Section {
-                if model.importedCircles.isEmpty {
-                    ContentUnavailableView(
-                        "No imported circles",
-                        systemImage: "person.2.slash",
-                        description: Text(
-                            "Import an X account to find circles it follows in this catalog."
-                        )
-                    )
-                    .listRowBackground(Color.clear)
-                } else {
-                    ForEach(model.importedCircles) { importedCircle in
-                        HStack(alignment: .top, spacing: 10) {
-                            NavigationLink {
-                                CircleDetailView(
-                                    circles: importedCircle.circles,
-                                    dataSource: dataSource
-                                )
-                            } label: {
-                                FollowingImportedCircleRow(
-                                    importedCircle: importedCircle,
-                                    dataSource: dataSource,
-                                    favoriteColor: model.favoriteColor(for: importedCircle)
-                                )
-                            }
-                            .buttonStyle(.plain)
-
-                            Button {
-                                model.favorite(importedCircle)
-                            } label: {
-                                Image(systemName: model.favoriteColor(for: importedCircle) == nil
-                                    ? "star"
-                                    : "star.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(
-                                        model.favoriteColor(for: importedCircle)?.swiftUIColor
-                                            ?? model.selectedColor.swiftUIColor
-                                    )
-                                    .frame(width: 36, height: 44)
-                                    .contentShape(.rect)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(model.activity != .idle)
-                            .accessibilityLabel("Favorite this circle")
+                ForEach(model.importedCircles) { importedCircle in
+                    HStack(alignment: .top, spacing: 10) {
+                        NavigationLink {
+                            CircleDetailView(
+                                circles: importedCircle.circles,
+                                dataSource: dataSource
+                            )
+                        } label: {
+                            FollowingImportedCircleRow(
+                                importedCircle: importedCircle,
+                                dataSource: dataSource,
+                                favoriteColor: model.favoriteColor(for: importedCircle)
+                            )
                         }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            model.favorite(importedCircle)
+                        } label: {
+                            Image(systemName: model.favoriteColor(for: importedCircle) == nil
+                                ? "star"
+                                : "star.fill")
+                                .font(.title3)
+                                .foregroundStyle(
+                                    model.favoriteColor(for: importedCircle)?.swiftUIColor
+                                        ?? model.selectedColor.swiftUIColor
+                                )
+                                .frame(width: 36, height: 44)
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(model.activity != .idle)
+                        .accessibilityLabel("Favorite this circle")
                     }
                 }
             } header: {
@@ -147,17 +272,28 @@ struct FollowingImportView: View {
                 }
             }
         }
-        .navigationTitle("X followed circles")
-        .navigationBarTitleDisplayMode(.inline)
-        .task { await model.load() }
-        .onChange(of: model.errorMessage) { _, message in
-            guard let message else { return }
-            AppToast.showError(
-                String(localized: "Could not update followed circles"),
-                subtitle: message
-            )
-            model.dismissError()
+    }
+
+    @ToolbarContentBuilder
+    private var importToolbar: some ToolbarContent {
+        if model.activity == .idle, model.importState != nil {
+            if isShowingImportForm {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { isShowingImportForm = false }
+                }
+            } else {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Import", systemImage: "arrow.down.circle") {
+                        showImportForm()
+                    }
+                    .accessibilityIdentifier("following-import-open-form")
+                }
+            }
         }
+    }
+
+    private func showImportForm() {
+        isShowingImportForm = true
     }
 }
 

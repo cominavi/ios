@@ -14,7 +14,8 @@ The TwitterAPI.io key and the ComiNavi JWT signing secret must never be compiled
 
 ## Cache behavior
 
-- Both the server and app enforce the six-hour next-import time. The server remains authoritative after reinstall or local data loss.
+- Imports start only when the user opens the X-following import screen and taps the import button. The app does not schedule the next import or retry one automatically.
+- Both the server and app enforce a six-hour interval between user-requested imports. The server remains authoritative after reinstall or local data loss.
 - A failed request does not alter the last successful local import.
 - Each successful import is merged into the local list by stable Circle.ms public circle ID. Circles missing from a later snapshot are retained.
 - The X account that produced each match is retained as provenance.

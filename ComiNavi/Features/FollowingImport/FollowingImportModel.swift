@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class FollowingImportModel {
     enum Activity: Equatable {
+        case loading
         case idle
         case importing
         case favoriting
@@ -13,7 +14,7 @@ final class FollowingImportModel {
     private(set) var importedCircles: [FollowingImportedCircle] = []
     private(set) var importState: FollowingImportState?
     private(set) var favoriteColorsByPublicID: [Int: BookmarkColor] = [:]
-    private(set) var activity: Activity = .idle
+    private(set) var activity: Activity = .loading
     private(set) var errorMessage: String?
     var twitterUserName = ""
     var selectedColor: BookmarkColor = .orange
@@ -36,7 +37,7 @@ final class FollowingImportModel {
             && (importState?.nextAllowedAt ?? .distantPast) <= Date()
     }
 
-    var nextAllowedAt: Date? {
+    var manualImportAvailableAt: Date? {
         guard let date = importState?.nextAllowedAt, date > Date() else { return nil }
         return date
     }
@@ -46,6 +47,8 @@ final class FollowingImportModel {
     }
 
     func load() async {
+        defer { activity = .idle }
+
         do {
             importState = try await dataSource.userPlanStore.followingImportState(
                 eventNumber: dataSource.comiket.number
@@ -64,6 +67,7 @@ final class FollowingImportModel {
         activity = .importing
         errorMessage = nil
         activityTask = Task { [weak self] in
+            await Task.yield()
             await self?.performImport(userName: userName)
         }
     }
@@ -78,11 +82,13 @@ final class FollowingImportModel {
             async let circles = dataSource.getCircles()
             async let extensions = dataSource.getCircleExtensions()
             let (catalogCircles, catalogExtensions) = await (circles, extensions)
-            let matches = FollowingCircleMatcher.match(
-                accounts: payload.followings,
-                circles: catalogCircles,
-                extensions: catalogExtensions
-            )
+            let matches = await Task.detached(priority: .userInitiated) {
+                FollowingCircleMatcher.match(
+                    accounts: payload.followings,
+                    circles: catalogCircles,
+                    extensions: catalogExtensions
+                )
+            }.value
             let eventNumber = dataSource.comiket.number
             let sources = matches.map { match in
                 ImportedCircleSource(
@@ -269,12 +275,15 @@ final class FollowingImportModel {
                 await dataSource.getCircleExtensions()
             }
         let sources = try await storedSources
-        importedCircles = FollowingCircleMatcher.resolveImportedCircles(
-            sources: sources,
-            circles: catalogCircles,
-            extensions: catalogExtensions
-        )
+        let resolvedCircles = await Task.detached(priority: .userInitiated) {
+            FollowingCircleMatcher.resolveImportedCircles(
+                sources: sources,
+                circles: catalogCircles,
+                extensions: catalogExtensions
+            )
+        }.value
         let bookmarks = try await dataSource.userPlanStore.allBookmarks(eventNumber: eventNumber)
+        importedCircles = resolvedCircles
         favoriteColorsByPublicID = Dictionary(
             bookmarks.compactMap { bookmark in
                 bookmark.syncState == .pendingDelete
