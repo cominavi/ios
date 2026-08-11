@@ -686,16 +686,6 @@ struct ExploreGalleryCard: View {
                 model: model,
                 targetPixelSize: artworkPixelSize
             )
-                .overlay(alignment: .bottomLeading) {
-                    if detail != .artworkOnly {
-                        Text(circle.spaceLabel)
-                            .font(.caption.monospaced().weight(.bold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(.thickMaterial, in: .capsule)
-                            .padding(8)
-                        }
-                }
 
             if detail != .artworkOnly {
                 Text(circle.displayName)
@@ -704,9 +694,9 @@ struct ExploreGalleryCard: View {
                     .lineLimit(2)
             }
 
-            if detail == .full, let genreName = circle.genreName {
-                Text(genreName)
-                    .font(.caption)
+            if detail == .full {
+                Text(circle.spaceLabel)
+                    .font(.caption.monospaced().weight(.semibold))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -717,7 +707,7 @@ struct ExploreGalleryCard: View {
     }
 
     private var accessibilityLabel: String {
-        [circle.displayName, circle.penName, circle.spaceLabel, circle.genreName]
+        [circle.displayName, circle.penName, circle.spaceLabel]
             .compactMap { $0 }
             .joined(separator: ", ")
     }
@@ -844,13 +834,6 @@ struct ExploreCircleRow: View {
                         .lineLimit(1)
                 }
 
-                if let genreName = circle.genreName {
-                    Text(genreName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
                 if !circle.tags.isEmpty {
                     Text(circle.tags.prefix(3).map { "#\($0)" }.joined(separator: "  "))
                         .font(.caption)
@@ -874,20 +857,28 @@ struct ExploreCircleArtwork: View {
     let model: ExploreModel
     let targetPixelSize: ExploreArtworkPixelSize
 
-    @State private var image: Image?
+    @State private var loadedArtwork: LoadedExploreArtwork?
     @State private var didFinishLoading = false
 
     private var bookmarkColor: BookmarkColor? {
         model.bookmark(for: circle)?.color
     }
 
+    private var isShowingShinagaki: Bool {
+        loadedArtwork?.source == .shinagaki
+    }
+
     var body: some View {
         Group {
-            if let image {
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let loadedArtwork {
+                if loadedArtwork.source == .shinagaki {
+                    ExploreShinagakiArtwork(image: loadedArtwork.image)
+                } else {
+                    loadedArtwork.image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             } else {
                 Rectangle()
                     .fill(Color(uiColor: .secondarySystemFill))
@@ -906,13 +897,20 @@ struct ExploreCircleArtwork: View {
             ExploreLayoutMetrics.circleArtworkAspectRatio,
             contentMode: .fit
         )
+        .compositingGroup()
         .clipShape(.rect(cornerRadius: 10))
         .overlay {
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
+                .strokeBorder(
+                    isShowingShinagaki
+                        ? bookmarkColor?.swiftUIColor
+                            ?? Color(uiColor: .separator).opacity(0.35)
+                        : Color(uiColor: .separator).opacity(0.35),
+                    lineWidth: isShowingShinagaki && bookmarkColor != nil ? 2 : 0.5
+                )
         }
         .overlay(alignment: .topTrailing) {
-            if circle.preferredCoverURL != nil {
+            if isShowingShinagaki {
                 LucideIcon("doc.richtext.fill")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
@@ -922,32 +920,26 @@ struct ExploreCircleArtwork: View {
                     .accessibilityHidden(true)
             }
         }
-        .overlay(alignment: .bottomTrailing) {
-            if circle.isCombinedAB {
-                Text("A+B")
-                    .font(.caption2.monospaced().weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(.black.opacity(0.72), in: .capsule)
-                    .padding(6)
-                    .accessibilityHidden(true)
+        .overlay {
+            if !isShowingShinagaki {
+                CircleFavoriteMark(color: bookmarkColor)
             }
         }
-        .overlay {
-            CircleFavoriteMark(color: bookmarkColor)
-        }
         .task(id: artworkTaskID) {
-            image = nil
+            loadedArtwork = nil
             didFinishLoading = false
-            let data = await model.coverImageData(
+            let cover = await model.coverImage(
                 for: circle,
                 targetPixelSize: targetPixelSize
             )
             guard !Task.isCancelled else { return }
-            let decodedImage = await Image.asyncInit(data: data)
+            let decodedImage = await Image.asyncInit(data: cover?.data)
             guard !Task.isCancelled else { return }
-            image = decodedImage
+            loadedArtwork = cover.flatMap { cover in
+                decodedImage.map {
+                    LoadedExploreArtwork(image: $0, source: cover.source)
+                }
+            }
             didFinishLoading = true
         }
         .accessibilityHidden(true)
@@ -955,6 +947,33 @@ struct ExploreCircleArtwork: View {
 
     private var artworkTaskID: String {
         "cover-\(circle.id)-\(circle.preferredCoverURL?.absoluteString ?? "circle")-\(targetPixelSize.cacheKey)"
+    }
+}
+
+private struct LoadedExploreArtwork {
+    let image: Image
+    let source: ExploreCoverSource
+}
+
+private struct ExploreShinagakiArtwork: View {
+    let image: Image
+
+    var body: some View {
+        ZStack {
+            image
+                .resizable()
+                .scaledToFill()
+                .saturation(0)
+                .brightness(-0.35)
+                .blur(radius: 12)
+                .scaleEffect(1.12)
+
+            image
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .clipped()
     }
 }
 

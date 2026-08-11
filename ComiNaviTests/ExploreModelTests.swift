@@ -516,6 +516,43 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertEqual(resolved, circleImage)
     }
 
+    func testResolvedCoverPreservesShinagakiProvenance() async {
+        let shinagakiURL = URL(string: "https://example.com/shinagaki.jpg")!
+        let shinagakiImage = Data([1, 2, 3])
+
+        let resolved = await ExploreModel.resolveCoverImage(
+            shinagakiURLs: [shinagakiURL],
+            loadShinagaki: { _ in
+                ExploreCoverCandidate(data: shinagakiImage, targetCoverage: 1)
+            },
+            loadCircleCover: {
+                XCTFail("A loaded Shinagaki should win")
+                return Data([9])
+            }
+        )
+
+        XCTAssertEqual(
+            resolved,
+            ExploreResolvedCover(data: shinagakiImage, source: .shinagaki)
+        )
+    }
+
+    func testResolvedCoverMarksCatalogFallbackAsCircleArtwork() async {
+        let shinagakiURL = URL(string: "https://example.com/missing.jpg")!
+        let circleImage = Data([9, 8, 7])
+
+        let resolved = await ExploreModel.resolveCoverImage(
+            shinagakiURLs: [shinagakiURL],
+            loadShinagaki: { _ in nil },
+            loadCircleCover: { circleImage }
+        )
+
+        XCTAssertEqual(
+            resolved,
+            ExploreResolvedCover(data: circleImage, source: .circle)
+        )
+    }
+
     func testCoverThumbnailDownsamplingCoversMixedSourceAspectsWithoutUpscaling() async throws {
         let targetPixelSize = ExploreLayoutMetrics
             .artworkPixelSize(width: 76, displayScale: 3)

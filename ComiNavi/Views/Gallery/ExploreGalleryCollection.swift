@@ -233,14 +233,14 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                 return CGSize(width: width, height: artworkHeight)
             }
             let headlineHeight = UIFont.preferredFont(forTextStyle: .headline).lineHeight * 2
-            let hasGenre = renderedCardDetail == .full
-                && circleIndex(for: indexPath).map { parent.circles[$0].genreName != nil } == true
-            let genreHeight = hasGenre
+            let hasSubtitle = renderedCardDetail == .full
+                && circleIndex(for: indexPath) != nil
+            let subtitleHeight = hasSubtitle
                 ? 8 + UIFont.preferredFont(forTextStyle: .caption1).lineHeight
                 : 0
             return CGSize(
                 width: width,
-                height: artworkHeight + 8 + headlineHeight + genreHeight
+                height: artworkHeight + 8 + headlineHeight + subtitleHeight
             )
         }
 

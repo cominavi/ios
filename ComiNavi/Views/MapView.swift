@@ -1834,6 +1834,11 @@ private struct CircleMapDetailSheet: View {
                     circles: circles,
                     imageData: selection.imageDataByCircleID[circle.id],
                     dataSource: dataSource,
+                    locationLabel: circles.count == 2
+                        ? selection.selectedAddress.spaceCode
+                        : selection.selectedAddress
+                            .selecting(subspace: circle.subspace)
+                            .spaceCode,
                     favoriteColor: circles.lazy.compactMap { member in
                         member.publicCircleID.flatMap { bookmarks[$0]?.color }
                     }.first,
@@ -1861,6 +1866,7 @@ private struct CircleMapSummaryCard: View {
     let circles: [CatalogMapCircle]
     let imageData: Data?
     let dataSource: CirclemsDataSource?
+    let locationLabel: String
     let favoriteColor: BookmarkColor?
     let onOpenDetail: () -> Void
 
@@ -1870,14 +1876,17 @@ private struct CircleMapSummaryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(isCombinedAB ? "A+B" : (circle.subspace == 0 ? "A" : "B"))
-                .font(.headline.monospaced().weight(.bold))
-                .foregroundStyle(.secondary)
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if !isCombinedAB {
+                Text(circle.subspace == 0 ? "A" : "B")
+                    .font(.headline.monospaced().weight(.bold))
+                    .foregroundStyle(.secondary)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
 
             artworkButton
                 .padding(.horizontal, 10)
+                .padding(.top, isCombinedAB ? 10 : 0)
 
             VStack(alignment: .leading, spacing: 7) {
                 Text(displayName)
@@ -1885,16 +1894,14 @@ private struct CircleMapSummaryCard: View {
                     .foregroundStyle(.primary)
                     .lineLimit(2)
 
+                Text(locationLabel)
+                    .font(.caption.monospaced().weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
                 if !circle.penName.isEmpty {
                     Text(circle.penName)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                if let genreName = circle.genreName, !genreName.isEmpty {
-                    Text(genreName)
-                        .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }

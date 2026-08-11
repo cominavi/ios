@@ -307,8 +307,7 @@ private struct FollowingImportedCircleRow: View {
             FollowingImportedCircleArtwork(
                 circle: importedCircle.circle,
                 dataSource: dataSource,
-                favoriteColor: favoriteColor,
-                isCombinedAB: importedCircle.isCombinedAB
+                favoriteColor: favoriteColor
             )
             .frame(width: 66)
 
@@ -378,7 +377,6 @@ private struct FollowingImportedCircleArtwork: View {
     let circle: CirclemsDataSchema.ComiketCircleWC
     let dataSource: CirclemsDataSource
     let favoriteColor: BookmarkColor?
-    let isCombinedAB: Bool
 
     @State private var image: UIImage?
 
@@ -401,17 +399,6 @@ private struct FollowingImportedCircleArtwork: View {
                 .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
         }
         .overlay { CircleFavoriteMark(color: favoriteColor) }
-        .overlay(alignment: .bottomTrailing) {
-            if isCombinedAB {
-                Text("A+B")
-                    .font(.caption2.monospaced().bold())
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(.black.opacity(0.72), in: .capsule)
-                    .padding(4)
-            }
-        }
         .task(id: circle.id) {
             guard let data = await dataSource.getCircleImage(circleId: circle.id),
                   !Task.isCancelled

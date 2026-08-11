@@ -139,6 +139,16 @@ struct ExploreCoverCandidate: Sendable {
     }
 }
 
+enum ExploreCoverSource: Equatable, Sendable {
+    case shinagaki
+    case circle
+}
+
+struct ExploreResolvedCover: Equatable, Sendable {
+    let data: Data
+    let source: ExploreCoverSource
+}
+
 struct ExploreCircle: Identifiable {
     let circle: CirclemsDataSchema.ComiketCircleWC
     var memberCircles: [CirclemsDataSchema.ComiketCircleWC] = []
@@ -607,13 +617,13 @@ final class ExploreModel {
         return posts.filter { seen.insert($0.id).inserted }
     }
 
-    func coverImageData(
+    func coverImage(
         for circle: ExploreCircle,
         targetPixelSize: ExploreArtworkPixelSize
-    ) async -> Data? {
+    ) async -> ExploreResolvedCover? {
         guard !Task.isCancelled else { return nil }
 
-        return await Self.resolveCoverImageData(
+        return await Self.resolveCoverImage(
             shinagakiURLs: circle.preferredCoverURLs,
             loadShinagaki: { coverURL in
                 await self.thumbnailData(
@@ -631,17 +641,20 @@ final class ExploreModel {
         )
     }
 
-    static func resolveCoverImageData(
+    static func resolveCoverImage(
         shinagakiURLs: [URL],
         loadShinagaki: (URL) async -> ExploreCoverCandidate?,
         loadCircleCover: () async -> Data?
-    ) async -> Data? {
+    ) async -> ExploreResolvedCover? {
         var bestUndersizedShinagaki: ExploreCoverCandidate?
         for url in shinagakiURLs {
             guard !Task.isCancelled else { return nil }
             if let candidate = await loadShinagaki(url) {
                 if candidate.coversTarget {
-                    return candidate.data
+                    return ExploreResolvedCover(
+                        data: candidate.data,
+                        source: .shinagaki
+                    )
                 }
                 if candidate.targetCoverage
                     > (bestUndersizedShinagaki?.targetCoverage ?? -Double.infinity)
@@ -653,9 +666,26 @@ final class ExploreModel {
 
         guard !Task.isCancelled else { return nil }
         if let bestUndersizedShinagaki {
-            return bestUndersizedShinagaki.data
+            return ExploreResolvedCover(
+                data: bestUndersizedShinagaki.data,
+                source: .shinagaki
+            )
         }
-        return await loadCircleCover()
+        return await loadCircleCover().map {
+            ExploreResolvedCover(data: $0, source: .circle)
+        }
+    }
+
+    static func resolveCoverImageData(
+        shinagakiURLs: [URL],
+        loadShinagaki: (URL) async -> ExploreCoverCandidate?,
+        loadCircleCover: () async -> Data?
+    ) async -> Data? {
+        await resolveCoverImage(
+            shinagakiURLs: shinagakiURLs,
+            loadShinagaki: loadShinagaki,
+            loadCircleCover: loadCircleCover
+        )?.data
     }
 
     private func circleCoverImageData(
