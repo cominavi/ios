@@ -280,10 +280,25 @@ struct SharedPlanOperationRecord: Equatable, Identifiable, Sendable {
                   let rawWanted = payload["wantedQuantity"]?.integerValue,
                   let wanted = Int(exactly: rawWanted)
             else { throw SharedPlanError.syncProtocolViolation }
+            let itemName = payload["itemName"]?.stringValue ?? ""
+            let unitPrice: Int?
+            switch payload["unitPrice"] {
+            case .integer(let rawPrice):
+                guard let exactPrice = Int(exactly: rawPrice) else {
+                    throw SharedPlanError.syncProtocolViolation
+                }
+                unitPrice = exactPrice
+            case .null, nil:
+                unitPrice = nil
+            default:
+                throw SharedPlanError.syncProtocolViolation
+            }
             return .createNeed(
                 SharedPlanPurchaseNeed(
                     id: needID,
                     requesterUserID: requester,
+                    itemName: itemName,
+                    unitPrice: unitPrice,
                     wantedQuantity: wanted
                 ),
                 circle: circle

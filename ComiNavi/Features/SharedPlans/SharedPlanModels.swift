@@ -60,6 +60,8 @@ enum SharedPlanSemanticOperationKind: String, Codable, Equatable, Sendable {
 struct SharedPlanPurchaseNeed: Codable, Equatable, Identifiable, Sendable {
     let id: UUID
     var requesterUserID: String
+    var itemName: String
+    var unitPrice: Int?
     var wantedQuantity: Int
     var buyerAllocations: [String: Int]
     var fulfilledQuantity: Int
@@ -67,12 +69,16 @@ struct SharedPlanPurchaseNeed: Codable, Equatable, Identifiable, Sendable {
     init(
         id: UUID,
         requesterUserID: String,
+        itemName: String = "",
+        unitPrice: Int? = nil,
         wantedQuantity: Int,
         buyerAllocations: [String: Int] = [:],
         fulfilledQuantity: Int = 0
     ) {
         self.id = id
         self.requesterUserID = requesterUserID
+        self.itemName = itemName
+        self.unitPrice = unitPrice
         self.wantedQuantity = wantedQuantity
         self.buyerAllocations = buyerAllocations
         self.fulfilledQuantity = fulfilledQuantity
@@ -264,6 +270,10 @@ enum SharedPlanSyncIssue: Codable, Equatable, Sendable {
     case roleChanged
     case conflict(String)
     case unavailable(String)
+    /// The server rejected a locally retained semantic change. The support
+    /// code is safe to show and helps diagnose client/server rollout skew;
+    /// operation payloads and document internals are never exposed.
+    case rejectedLocalChanges(supportCode: String?)
     /// An already-durable snapshot cannot stay within the local document or
     /// retained-operation bounds. It is exportable, but not syncable.
     case compactionRequired

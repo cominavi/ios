@@ -116,7 +116,24 @@
         }
       }
     },
+    "%@ • Quantity %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ • Quantity %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ • 数量 %2$lld点"
+          }
+        }
+      }
+    },
     "%@ • WCID %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -127,6 +144,7 @@
       }
     },
     "%@ • WCID %lld • Open the plan to review the conflict." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -137,6 +155,7 @@
       }
     },
     "%@ • WCID %lld • Quantity %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -229,6 +248,33 @@
         }
       }
     },
+    "%@, assigned %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, assigned %2$lld"
+          }
+        }
+      }
+    },
+    "%@, buying %lld" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, buying %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@、購入担当 %2$lld点"
+          }
+        }
+      }
+    },
     "%@, camera offset %lf %lf, bearing %@ degrees" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -256,6 +302,26 @@
         }
       }
     },
+    "%@, requested %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, requested %2$lld"
+          }
+        }
+      }
+    },
+    "%@, requested %lld, assigned %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, requested %2$lld, assigned %3$lld"
+          }
+        }
+      }
+    },
     "%@, user location %@" : {
       "localizations" : {
         "en" : {
@@ -268,6 +334,67 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@、現在地%2$@"
+          }
+        }
+      }
+    },
+    "%@, wants %lld" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, wants %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@、希望 %2$lld点"
+          }
+        }
+      }
+    },
+    "%@, wants %lld, buying %lld" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, wants %2$lld, buying %3$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@、希望 %2$lld点・購入担当 %3$lld点"
+          }
+        }
+      }
+    },
+    "%@. %@. %lld of %lld purchased. %@" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@. %2$@. %3$lld of %4$lld purchased. %5$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@。%2$@。%4$lld点中%3$lld点を購入済み。%5$@"
+          }
+        }
+      }
+    },
+    "%@. %@. Requested %lld, assigned %lld, bought %lld. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@. %2$@. Requested %3$lld, assigned %4$lld, bought %5$lld. %6$@"
           }
         }
       }
@@ -323,6 +450,19 @@
         }
       }
     },
+    "%lld changes are waiting to upload. Let them finish before editing again. The limit is %lld." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld changes are waiting to upload. Let them finish before editing again. The limit is %2$lld."
+          }
+        }
+      }
+    },
+    "%lld choices" : {
+
+    },
     "%lld circles" : {
       "localizations" : {
         "ja" : {
@@ -334,6 +474,7 @@
       }
     },
     "%lld circles have a member-entered outcome" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -342,6 +483,9 @@
           }
         }
       }
+    },
+    "%lld circles have a recorded result" : {
+
     },
     "%lld columns" : {
       "localizations" : {
@@ -354,6 +498,7 @@
       }
     },
     "%lld conflicts" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -364,11 +509,22 @@
       }
     },
     "%lld content changes and %lld plan changes are retained on this device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "内容の変更%lld件とプラン情報の変更%lld件をこの端末に保持しています。"
+          }
+        }
+      }
+    },
+    "%lld item changes and %lld plan updates are saved on this device." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld item changes and %2$lld plan updates are saved on this device."
           }
         }
       }
@@ -384,11 +540,32 @@
       }
     },
     "%lld needs" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "買い物%lld件"
+          }
+        }
+      }
+    },
+    "%lld of %lld assigned" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld点中%1$lld点を担当"
+          }
+        }
+      }
+    },
+    "%lld of %lld bought" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lld点中%1$lld点を購入済み"
           }
         }
       }
@@ -420,6 +597,7 @@
       }
     },
     "%lld of %lld unsynced changes are retained. The existing changes can continue syncing, but the next edit is blocked." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -429,12 +607,27 @@
         }
       }
     },
+    "%lld requests" : {
+
+    },
     "%lld still unassigned" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "残り%lld個は担当未定"
+          }
+        }
+      }
+    },
+    "%lld unassigned" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未担当 %lld点"
           }
         }
       }
@@ -477,11 +670,29 @@
       }
     },
     "%lld/%lld fulfilled" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld/%lld個完了"
+          }
+        }
+      }
+    },
+    "%lld/%lld purchased" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld purchased"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld/%2$lld点購入済み"
           }
         }
       }
@@ -512,6 +723,12 @@
           }
         }
       }
+    },
+    "•" : {
+      "shouldTranslate" : false
+    },
+    "×%lld" : {
+
     },
     "1F Room 102 · temporary care; ask staff for ambulance assistance" : {
       "localizations" : {
@@ -664,6 +881,16 @@
         }
       }
     },
+    "A selected circle" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したサークル"
+          }
+        }
+      }
+    },
     "A+B" : {
       "localizations" : {
         "ja" : {
@@ -798,6 +1025,7 @@
       }
     },
     "Actor %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -818,6 +1046,7 @@
       }
     },
     "Add a circle by its WCID to begin planning." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -827,7 +1056,18 @@
         }
       }
     },
+    "Add a purchase request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入リクエストを追加"
+          }
+        }
+      }
+    },
     "Add circle" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -838,6 +1078,7 @@
       }
     },
     "Add communication field" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -857,6 +1098,26 @@
         }
       }
     },
+    "Add purchase request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入リクエストを追加"
+          }
+        }
+      }
+    },
+    "Add to" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加先"
+          }
+        }
+      }
+    },
     "Add to Favorites" : {
       "comment" : "Gallery Preview Action: Add to Favorites",
       "localizations" : {
@@ -870,6 +1131,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "お気に入りに追加"
+          }
+        }
+      }
+    },
+    "Added to %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に追加しました"
           }
         }
       }
@@ -900,6 +1171,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "入場にはチケットまたはリストバンドが必要です。当日販売は午後入場リストバンドのみです。"
+          }
+        }
+      }
+    },
+    "Affected circles: %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "影響を受けたサークル: %lld件"
           }
         }
       }
@@ -1114,7 +1395,18 @@
         }
       }
     },
+    "Assign a buyer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入担当者を設定"
+          }
+        }
+      }
+    },
     "Assign buyer" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1125,6 +1417,7 @@
       }
     },
     "Assign part of this request to any active plan member. Other allocations remain unchanged." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1402,6 +1695,16 @@
         }
       }
     },
+    "Bought" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入済み"
+          }
+        }
+      }
+    },
     "Bring enough to drink before entering the East area." : {
       "localizations" : {
         "ja" : {
@@ -1422,6 +1725,17 @@
         }
       }
     },
+    "Buy %lld" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入 %lld点"
+          }
+        }
+      }
+    },
     "Buyer" : {
       "localizations" : {
         "ja" : {
@@ -1433,6 +1747,7 @@
       }
     },
     "Buyer allocation" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1453,6 +1768,7 @@
       }
     },
     "Buyer allocations" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1463,6 +1779,7 @@
       }
     },
     "Buyer allocations and fulfillment start at zero. Add them as separate edits after creating the need." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1478,6 +1795,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "C%lld"
+          }
+        }
+      }
+    },
+    "C%lld · 共有プラン" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C%lld · 共有プラン"
           }
         }
       }
@@ -1670,11 +1997,33 @@
       }
     },
     "Change %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "変更 %@"
+          }
+        }
+      }
+    },
+    "Change assigned quantity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "担当数を変更"
+          }
+        }
+      }
+    },
+    "Change buying quantity" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入担当数を変更"
           }
         }
       }
@@ -1731,7 +2080,29 @@
         }
       }
     },
+    "Change requested quantity" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエスト数を変更"
+          }
+        }
+      }
+    },
+    "Change wanted quantity" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "希望数を変更"
+          }
+        }
+      }
+    },
     "Changes are combined into one saved edit after a short pause." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1842,6 +2213,7 @@
       }
     },
     "Checking notification settings…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1878,22 +2250,43 @@
         }
       }
     },
+    "Choices that need your attention" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確認が必要な項目"
+          }
+        }
+      }
+    },
+    "Choose a circle and pin it on the map" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを選んで地図上に表示します"
+          }
+        }
+      }
+    },
+    "Choose a plan, name the item, and set how many you need." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランを選び、買うものと必要な数を入力します。"
+          }
+        }
+      }
+    },
     "Choose a reminder to allow notifications." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "リマインダーを選ぶと、通知の許可を確認します。"
-          }
-        }
-      }
-    },
-    "Choose a table and pin it on the map" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スペースを選んで地図上に表示します"
           }
         }
       }
@@ -1909,6 +2302,7 @@
       }
     },
     "Choose exactly one retained candidate for this field." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1928,6 +2322,16 @@
         }
       }
     },
+    "Choose one version for this detail." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この項目に残す内容を1つ選んでください。"
+          }
+        }
+      }
+    },
     "Choose removal or the later edit" : {
       "localizations" : {
         "ja" : {
@@ -1938,12 +2342,32 @@
         }
       }
     },
-    "Choose the block letter printed in the destination's Comiket address." : {
+    "Choose the block letter from the circle's Comiket address." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "行き先のコミケ住所にあるブロック文字を選んでください。"
+            "value" : "サークルのスペース番号にあるブロック文字を選んでください。"
+          }
+        }
+      }
+    },
+    "Choose the event day printed on the circle's Comiket address." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルのスペース番号にある参加日を選んでください。"
+          }
+        }
+      }
+    },
+    "Choose the event day, block letter, and space number" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加日、ブロック、スペース番号を選択"
           }
         }
       }
@@ -1958,12 +2382,22 @@
         }
       }
     },
-    "Choose the venue containing the table you want to visit." : {
+    "Choose the venue containing the circle you want to find." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "行きたいスペースがある会場を選んでください。"
+            "value" : "探したいサークルの配置ホールを選んでください。"
+          }
+        }
+      }
+    },
+    "Choose the venue containing the circle you want to visit." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行きたいサークルがある会場を選んでください。"
           }
         }
       }
@@ -1974,6 +2408,49 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "今いる会場を選んでください。位置情報は候補の表示にのみ使用します。"
+          }
+        }
+      }
+    },
+    "Choose the version the plan should keep." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランに残す内容を選んでください。"
+          }
+        }
+      }
+    },
+    "Choose this event day" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この参加日を選択"
+          }
+        }
+      }
+    },
+    "Choose whether this circle should stay in the plan." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサークルをプランに残すか選んでください。"
+          }
+        }
+      }
+    },
+    "Choose which version to keep, then review each highlighted detail." : {
+
+    },
+    "Choose who will try to buy these items and how many." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入を担当する人と、その人が買う数を選びます。"
           }
         }
       }
@@ -2088,6 +2565,16 @@
         }
       }
     },
+    "Circle memo" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルのメモ"
+          }
+        }
+      }
+    },
     "Circle memo updated" : {
       "localizations" : {
         "ja" : {
@@ -2104,6 +2591,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在席中"
+          }
+        }
+      }
+    },
+    "Circle purchases" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサークルの買い物"
           }
         }
       }
@@ -2149,6 +2646,7 @@
       }
     },
     "Circle WCID %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2312,6 +2810,16 @@
         }
       }
     },
+    "Circle.msから、このプランにまだないサークルを探しています。" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msから、このプランにまだないサークルを探しています。"
+          }
+        }
+      }
+    },
     "Circle.msのお気に入りはすべてこのプランに含まれています。" : {
       "localizations" : {
         "ja" : {
@@ -2323,6 +2831,7 @@
       }
     },
     "Circle.msのお気に入りを確認中…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2358,6 +2867,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Circle.msを連携中…"
+          }
+        }
+      }
+    },
+    "Circles and purchase requests will appear here." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルと購入リクエストがここに表示されます。"
           }
         }
       }
@@ -2423,6 +2942,7 @@
       }
     },
     "Clear outcome" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2489,6 +3009,7 @@
       }
     },
     "Collaborative circle content will appear here." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2499,6 +3020,7 @@
       }
     },
     "Collaborative memo" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2618,6 +3140,7 @@
       }
     },
     "ComiNavi keeps every meaningful concurrent value until a person makes an explicit choice." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2689,6 +3212,7 @@
       }
     },
     "Communication" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2699,6 +3223,7 @@
       }
     },
     "Communication: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2729,6 +3254,7 @@
       }
     },
     "Concurrent edits produced more than one value. No value is selected silently." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2829,6 +3355,7 @@
       }
     },
     "Conflicted" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2849,6 +3376,7 @@
       }
     },
     "Conflicts requiring a choice" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3031,16 +3559,6 @@
         }
       }
     },
-    "Copy table location" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スペースの場所をコピー"
-          }
-        }
-      }
-    },
     "Copy venue and map link" : {
       "localizations" : {
         "ja" : {
@@ -3192,6 +3710,7 @@
       }
     },
     "Could not update reminders: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3202,6 +3721,7 @@
       }
     },
     "Covered" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3231,6 +3751,16 @@
         }
       }
     },
+    "Create or join an active plan first, then return to this circle." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先に有効な共有プランを作成するか、共有プランに参加してから、このサークルに戻ってください。"
+          }
+        }
+      }
+    },
     "Create plan" : {
       "localizations" : {
         "ja" : {
@@ -3252,6 +3782,7 @@
       }
     },
     "Creation retained in plan history" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3354,6 +3885,7 @@
       }
     },
     "Data source" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3439,6 +3971,9 @@
         }
       }
     },
+    "Decrease %@" : {
+
+    },
     "Deferred" : {
       "localizations" : {
         "ja" : {
@@ -3509,6 +4044,9 @@
         }
       }
     },
+    "Details" : {
+
+    },
     "Detect locations from clipboard" : {
       "localizations" : {
         "ja" : {
@@ -3549,17 +4087,8 @@
         }
       }
     },
-    "Discards the incomplete download and downloads the catalog from the beginning." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ダウンロード途中のデータを削除し、カタログを最初からダウンロードします。"
-          }
-        }
-      }
-    },
     "Discard and load the server copy" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3580,6 +4109,7 @@
       }
     },
     "Discard local branch" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3600,6 +4130,7 @@
       }
     },
     "Discard the saved local branch?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3639,7 +4170,18 @@
         }
       }
     },
+    "Discards the incomplete download and downloads the catalog from the beginning." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダウンロード途中のデータを削除し、カタログを最初からダウンロードします。"
+          }
+        }
+      }
+    },
     "Discover" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3650,6 +4192,7 @@
       }
     },
     "Discover interests" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3680,6 +4223,7 @@
       }
     },
     "Double tap to filter by this interest" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3700,6 +4244,7 @@
       }
     },
     "Double tap to remove this interest" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3729,12 +4274,42 @@
         }
       }
     },
+    "Download a copy, then choose how to repair or reset this plan." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーを書き出してから、このプランを修復またはリセットしてください。"
+          }
+        }
+      }
+    },
     "Download Again" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "もう一度ダウンロード"
+          }
+        }
+      }
+    },
+    "Download memo" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモを書き出す"
+          }
+        }
+      }
+    },
+    "Download recovery copy" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "復旧用コピーを書き出す"
           }
         }
       }
@@ -3777,6 +4352,7 @@
       }
     },
     "Downloading %@ databases…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4134,6 +4710,7 @@
       }
     },
     "Edit" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4144,6 +4721,7 @@
       }
     },
     "Edit communication field" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4244,12 +4822,12 @@
         }
       }
     },
-    "Enter the one- or two-digit space number from the destination's Comiket address." : {
+    "Enter the one- or two-digit space number from the circle's Comiket address." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "行き先のコミケ住所にある1〜2桁のスペース番号を入力してください。"
+            "value" : "サークルの1桁または2桁のスペース番号を入力してください。"
           }
         }
       }
@@ -4260,6 +4838,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ブロック文字の横に書かれた1〜2桁のスペース番号を入力してください。"
+          }
+        }
+      }
+    },
+    "Enter what should be purchased." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入するものを入力してください。"
           }
         }
       }
@@ -4376,6 +4964,7 @@
       }
     },
     "Error" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4484,6 +5073,7 @@
       }
     },
     "Explore C104 demo data" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4505,6 +5095,7 @@
       }
     },
     "Export memo draft" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4515,6 +5106,7 @@
       }
     },
     "Export recovery data" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4535,6 +5127,7 @@
       }
     },
     "Export the retained branch, then choose an available recovery action." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4544,12 +5137,13 @@
         }
       }
     },
-    "External availability is source-attributed information, not a Shared Plan outcome." : {
+    "External availability always shows its source and never changes your purchase requests." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "外部の在庫・在席情報は出典付きの参考情報であり、共有プラン内の結果ではありません。"
+            "value" : "外部の在庫・在席情報には必ず出典を表示し、購入リクエストは変更しません。"
           }
         }
       }
@@ -4645,6 +5239,7 @@
       }
     },
     "Favorited %lld circles." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4655,6 +5250,7 @@
       }
     },
     "Field" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4665,6 +5261,7 @@
       }
     },
     "Field name" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4714,6 +5311,26 @@
         }
       }
     },
+    "Find a Circle" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを探す"
+          }
+        }
+      }
+    },
+    "Find a circle by table location" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配置場所からサークルを探す"
+          }
+        }
+      }
+    },
     "Find a genre or tag" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4721,26 +5338,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ジャンルまたはタグを検索"
-          }
-        }
-      }
-    },
-    "Find a table" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サークルスペースを探す"
-          }
-        }
-      }
-    },
-    "Find a Table" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サークルスペースを探す"
           }
         }
       }
@@ -4782,6 +5379,7 @@
       }
     },
     "Finding interests…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4921,6 +5519,16 @@
         }
       }
     },
+    "For example: Shinkansen tickets or shikishi" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例：新幹線のきっぷ、色紙など"
+          }
+        }
+      }
+    },
     "For security, the server returns this token only once. ComiNavi keeps it protected on this device until you discard it." : {
       "localizations" : {
         "ja" : {
@@ -4962,6 +5570,7 @@
       }
     },
     "Fulfilled" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4972,6 +5581,7 @@
       }
     },
     "Fulfilled quantity" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4987,6 +5597,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "購入済み数を更新しました"
+          }
+        }
+      }
+    },
+    "Fully assigned" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "担当者設定済み"
           }
         }
       }
@@ -5080,6 +5701,7 @@
       }
     },
     "Genres, tags, and words from circle descriptions" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5253,7 +5875,18 @@
         }
       }
     },
+    "How many items are needed in total." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "必要な合計数です。"
+          }
+        }
+      }
+    },
     "How many items have actually been purchased or otherwise fulfilled." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5264,11 +5897,22 @@
       }
     },
     "How many items the requester wants in total." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "依頼者が合計で欲しい数です。"
+          }
+        }
+      }
+    },
+    "How many items were actually bought." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実際に購入できた数です。"
           }
         }
       }
@@ -5365,6 +6009,7 @@
       }
     },
     "Imported %lld matching circles." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5383,6 +6028,9 @@
           }
         }
       }
+    },
+    "Increase %@" : {
+
     },
     "Information" : {
       "localizations" : {
@@ -5435,6 +6083,7 @@
       }
     },
     "Initializing %@…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5492,6 +6141,7 @@
       }
     },
     "Interest matching" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5651,6 +6301,16 @@
         }
       }
     },
+    "Item name" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "品名"
+          }
+        }
+      }
+    },
     "Japan Post ATM · TFT" : {
       "localizations" : {
         "ja" : {
@@ -5702,6 +6362,7 @@
       }
     },
     "Keyword" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5872,6 +6533,7 @@
       }
     },
     "Live external reports" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5887,6 +6549,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外部からの最新情報を一時的に取得できません。"
+          }
+        }
+      }
+    },
+    "Live reports" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現地レポート"
           }
         }
       }
@@ -5942,6 +6614,7 @@
       }
     },
     "Loading" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6051,6 +6724,16 @@
         }
       }
     },
+    "Loading your plans…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランを読み込み中…"
+          }
+        }
+      }
+    },
     "Local only" : {
       "localizations" : {
         "ja" : {
@@ -6139,6 +6822,7 @@
       }
     },
     "Log in to Circle.ms before importing X followings." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6148,17 +6832,8 @@
         }
       }
     },
-    "Log in to ComiNavi before importing X followings." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Xのフォローをインポートする前にComiNaviへログインしてください。"
-          }
-        }
-      }
-    },
     "Log in to Circle.ms to use authenticated imports." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6179,6 +6854,16 @@
         }
       }
     },
+    "Log in to ComiNavi before importing X followings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xのフォローをインポートする前にComiNaviへログインしてください。"
+          }
+        }
+      }
+    },
     "Log Out" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6192,6 +6877,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ログアウト"
+          }
+        }
+      }
+    },
+    "Log Out & Reset" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログアウトしてリセット"
+          }
+        }
+      }
+    },
+    "Log out and reset ComiNavi?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログアウトしてComiNaviをリセットしますか？"
           }
         }
       }
@@ -6297,6 +7002,7 @@
       }
     },
     "Malformed saved data is never interpreted. It can only be exported or discarded." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6383,6 +7089,7 @@
       }
     },
     "Match interests" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6443,6 +7150,7 @@
       }
     },
     "Member-entered outcome" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6483,6 +7191,7 @@
       }
     },
     "Memo edit retained on this device" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6519,6 +7228,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "みずほATM・TFT"
+          }
+        }
+      }
+    },
+    "More actions for %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@のその他の操作"
           }
         }
       }
@@ -6574,12 +7293,61 @@
         }
       }
     },
+    "Need %lld" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "希望 %lld点"
+          }
+        }
+      }
+    },
+    "Need %lld · Buy %lld" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Need %1$lld · Buy %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "希望 %1$lld点・購入 %2$lld点"
+          }
+        }
+      }
+    },
+    "Needs a buyer" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "担当者募集中"
+          }
+        }
+      }
+    },
     "Needs conflict resolution" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "競合の解決が必要"
+          }
+        }
+      }
+    },
+    "Needs review" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確認が必要"
           }
         }
       }
@@ -6600,6 +7368,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "いいえ"
+          }
+        }
+      }
+    },
+    "No buyer yet" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入担当者なし"
           }
         }
       }
@@ -6676,6 +7455,7 @@
       }
     },
     "No communication fields" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6747,6 +7527,7 @@
       }
     },
     "No longer an active member" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -6824,11 +7605,22 @@
       }
     },
     "No purchase needs" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "買い物はありません"
+          }
+        }
+      }
+    },
+    "No purchase requests yet" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入リクエストはまだありません"
           }
         }
       }
@@ -6866,6 +7658,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Twitterタイムラインが見つかりません。"
+          }
+        }
+      }
+    },
+    "No writable plan for this Comiket" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このコミケで編集できるプランがありません"
           }
         }
       }
@@ -6970,7 +7772,18 @@
         }
       }
     },
+    "Notifications unavailable" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知を利用できません"
+          }
+        }
+      }
+    },
     "Number" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7160,7 +7973,11 @@
         }
       }
     },
+    "One person removed this item while another changed it. Choose what the plan should keep." : {
+
+    },
     "One person removed this item while another changed retained content. Descendant data stays available until you decide." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7186,6 +8003,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@の詳細を開く"
+          }
+        }
+      }
+    },
+    "Open a circle from the catalog to add a purchase request to this plan." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カタログでサークルを開き、このプランに購入リクエストを追加してください。"
           }
         }
       }
@@ -7242,12 +8069,29 @@
         }
       }
     },
+    "Open purchases, notes, and any choices that need your attention." : {
+
+    },
     "Open shinagaki on X" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Xでお品書きを開く"
+          }
+        }
+      }
+    },
+    "Open the circle details for this circle" : {
+
+    },
+    "Open the circle details for this table" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この配置のサークル詳細を開く"
           }
         }
       }
@@ -7303,6 +8147,7 @@
       }
     },
     "Opens an offline catalog without logging in" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7384,6 +8229,7 @@
       }
     },
     "Operation %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7484,6 +8330,7 @@
       }
     },
     "Path" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7544,22 +8391,22 @@
         }
       }
     },
-    "Pin a table using its Comiket address" : {
+    "Pin a circle using its Comiket address" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コミケの配置番号から地図上に表示"
+            "value" : "サークルの配置番号から地図上に表示"
           }
         }
       }
     },
-    "Pin this table on the map; use current signs and staff directions" : {
+    "Pin this circle on the map; use current signs and staff directions" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "この机を地図に固定します。現地の案内表示とスタッフの指示に従ってください"
+            "value" : "このサークルを地図に固定します。現地の案内表示とスタッフの指示に従ってください"
           }
         }
       }
@@ -7615,11 +8462,22 @@
       }
     },
     "Plain text only. Unicode characters are edited by scalar position and saved after a short idle pause or when you leave this screen." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "メモはプレーンテキストです。Unicode文字を正しい位置で扱い、入力が少し止まったとき、またはこの画面を離れるときにまとめて保存します。"
+          }
+        }
+      }
+    },
+    "Plan" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プラン"
           }
         }
       }
@@ -7644,7 +8502,18 @@
         }
       }
     },
+    "Plan detail" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランの内容"
+          }
+        }
+      }
+    },
     "Plan outcome" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7724,6 +8593,16 @@
         }
       }
     },
+    "Popular tags" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人気のタグ"
+          }
+        }
+      }
+    },
     "Positioned from your map press" : {
       "localizations" : {
         "ja" : {
@@ -7760,16 +8639,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "照合候補"
-          }
-        }
-      }
-    },
-    "Popular tags" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "人気のタグ"
           }
         }
       }
@@ -7830,6 +8699,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "地図を長押しして現在地を設定"
+          }
+        }
+      }
+    },
+    "Price" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "価格"
+          }
+        }
+      }
+    },
+    "Price per item (optional)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1点あたりの価格（任意）"
           }
         }
       }
@@ -7901,6 +8790,7 @@
       }
     },
     "Public circle ID" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7936,6 +8826,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "画面を引き下げて更新し、もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "Purchase item" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入するもの"
           }
         }
       }
@@ -7976,6 +8876,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "買い物のお願いを削除しました"
+          }
+        }
+      }
+    },
+    "Purchase progress" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入状況"
+          }
+        }
+      }
+    },
+    "Purchase request added" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入リクエストを追加しました"
+          }
+        }
+      }
+    },
+    "Purchase request could not be added" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入リクエストを追加できませんでした"
+          }
+        }
+      }
+    },
+    "Purchased" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入済み"
           }
         }
       }
@@ -8026,6 +8966,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "数量"
+          }
+        }
+      }
+    },
+    "Quantity %lld" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数量 %lld点"
           }
         }
       }
@@ -8100,7 +9050,21 @@
         }
       }
     },
+    "Ready" : {
+
+    },
+    "Ready to buy" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入待ち"
+          }
+        }
+      }
+    },
     "Rebase is unavailable for this branch. Export it before discarding if you may need the content." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8111,6 +9075,7 @@
       }
     },
     "Rebase onto the server copy" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8121,6 +9086,7 @@
       }
     },
     "Rebase replays valid unsynced operations onto a fresh server document. The original remains protected unless the replacement is saved atomically." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8140,12 +9106,34 @@
         }
       }
     },
+    "Record items bought" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入済み数を記録"
+          }
+        }
+      }
+    },
     "Record outcome" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "結果を記録"
+          }
+        }
+      }
+    },
+    "Record purchases" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入済み数を記録"
           }
         }
       }
@@ -8272,6 +9260,7 @@
       }
     },
     "Remove need" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8287,6 +9276,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "買い物を削除"
+          }
+        }
+      }
+    },
+    "Remove request" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエストを削除"
           }
         }
       }
@@ -8361,6 +9360,26 @@
         }
       }
     },
+    "Repair from latest plan" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新のプランから修復"
+          }
+        }
+      }
+    },
+    "Repair keeps the changes that can be recovered and starts from the latest shared plan." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "修復すると、復元できる変更を残したまま最新の共有プランから再開します。"
+          }
+        }
+      }
+    },
     "Reported by %@" : {
       "localizations" : {
         "ja" : {
@@ -8382,6 +9401,7 @@
       }
     },
     "Request by %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8392,11 +9412,32 @@
       }
     },
     "Request by former member" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "元メンバーの依頼"
+          }
+        }
+      }
+    },
+    "Requested" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエスト"
+          }
+        }
+      }
+    },
+    "Requested %lld, assigned %lld, bought %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Requested %1$lld, assigned %2$lld, bought %3$lld"
           }
         }
       }
@@ -8441,6 +9482,36 @@
         }
       }
     },
+    "Reset saved plan" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存したプランをリセット"
+          }
+        }
+      }
+    },
+    "Reset this saved plan?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存したプランをリセットしますか？"
+          }
+        }
+      }
+    },
+    "Reset to the latest plan" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新のプランにリセット"
+          }
+        }
+      }
+    },
     "Resolve" : {
       "localizations" : {
         "ja" : {
@@ -8462,6 +9533,7 @@
       }
     },
     "Retained operation data reached the 512 KiB safety limit. Export it, then rebase or discard the local branch." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8512,11 +9584,22 @@
       }
     },
     "Review collaborative content, conflicts, and saved recovery data." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "共同編集した内容、競合、保存済みの復旧データを確認します。"
+          }
+        }
+      }
+    },
+    "Review every highlighted detail before saving this version." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この内容を保存する前に、強調された項目をすべて確認してください。"
           }
         }
       }
@@ -8611,6 +9694,16 @@
         }
       }
     },
+    "Saved after a short pause and when you leave." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力が少し止まったときと、画面を閉じたときに保存します。"
+          }
+        }
+      }
+    },
     "Saved circle" : {
       "localizations" : {
         "ja" : {
@@ -8632,6 +9725,7 @@
       }
     },
     "Saved local recovery branch" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8642,11 +9736,22 @@
       }
     },
     "Saved locally" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "端末に保存済み"
+          }
+        }
+      }
+    },
+    "Saved on this device" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この端末に保存済み"
           }
         }
       }
@@ -8662,6 +9767,7 @@
       }
     },
     "Saved on this device first, then synchronized with Circle.ms when online." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8691,7 +9797,28 @@
         }
       }
     },
+    "Saved recovery copy" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "復旧用コピー"
+          }
+        }
+      }
+    },
+    "Saved version" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存された内容"
+          }
+        }
+      }
+    },
     "Saving" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8702,11 +9829,22 @@
       }
     },
     "Saving memo edit on this device…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "メモの変更をこの端末に保存中…"
+          }
+        }
+      }
+    },
+    "Saving…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存中…"
           }
         }
       }
@@ -8733,6 +9871,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ブロック文字を検索"
+          }
+        }
+      }
+    },
+    "Search circle names, creators, or descriptions" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル名、作者、紹介文を検索"
           }
         }
       }
@@ -8795,6 +9943,7 @@
       }
     },
     "Select one creation as the parent, then make an explicit choice for every overlapping field." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -9046,6 +10195,16 @@
         }
       }
     },
+    "Shared Plans" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有プラン"
+          }
+        }
+      }
+    },
     "Shared Plans are read-only" : {
       "localizations" : {
         "ja" : {
@@ -9135,6 +10294,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "すべて表示"
+          }
+        }
+      }
+    },
+    "Show circle" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを表示"
           }
         }
       }
@@ -9326,6 +10495,19 @@
         }
       }
     },
+    "Some changes could not be saved online. Download a copy, then reset from the latest plan." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一部の変更をオンラインに保存できませんでした。コピーを書き出してから、最新のプランにリセットしてください。"
+          }
+        }
+      }
+    },
+    "Some changes could not be saved online. Download a copy, then reset from the latest plan. Support code: %@" : {
+
+    },
     "Some Circle.ms tags are unavailable. Bundled tags still work offline." : {
       "localizations" : {
         "ja" : {
@@ -9342,6 +10524,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "一部のお気に入りを追加できませんでした。失敗したサークルだけを再試行できます。"
+          }
+        }
+      }
+    },
+    "Some saved changes need recovery" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存した変更の一部に復旧が必要です"
           }
         }
       }
@@ -9487,7 +10679,24 @@
         }
       }
     },
+    "Step %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Step %1$lld of %2$lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%2$lldステップ中%1$lld"
+          }
+        }
+      }
+    },
     "Step %lld of 3" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -9513,6 +10722,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "丈夫な買い物バッグ"
+          }
+        }
+      }
+    },
+    "Structured plan details" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランの詳細"
           }
         }
       }
@@ -9569,6 +10788,7 @@
       }
     },
     "Sync authority needs review" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -9705,6 +10925,7 @@
       }
     },
     "Technical details" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -9755,6 +10976,7 @@
       }
     },
     "Text" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -9825,6 +11047,7 @@
       }
     },
     "The branch contains %lld pending operations; the server limit is %lld. It will not retry as one unsplittable frame." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -9886,6 +11109,7 @@
       }
     },
     "The circle is hidden by a collaborative tombstone. Its memo and purchase history remain available for conflict resolution and later reactivation." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -9896,6 +11120,7 @@
       }
     },
     "The circle may have been removed remotely. Any unsaved memo draft remains available from the plan recovery screen." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -9976,6 +11201,7 @@
       }
     },
     "The field remains in collaborative history but has no current value." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10046,6 +11272,7 @@
       }
     },
     "The local branch is preserved and will not retry automatically." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10128,6 +11355,16 @@
         }
       }
     },
+    "The person creating this request can add an estimated whole-yen price." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "依頼を作成する人は、1点あたりのおおよその価格を1円単位で入力できます。"
+          }
+        }
+      }
+    },
     "The post could not be saved." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -10151,6 +11388,7 @@
       }
     },
     "The previous catalog remains available until verification finishes." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10171,6 +11409,7 @@
       }
     },
     "The purchase need is hidden, but retained quantities and allocations remain available if a concurrent edit requires resolution." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10201,11 +11440,54 @@
       }
     },
     "The selected parent takes precedence. Every overlapping descendant below still requires an explicit value." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "選択した元の項目を優先します。重なっている配下の項目は、それぞれ残す値を選ぶ必要があります。"
+          }
+        }
+      }
+    },
+    "The server could not verify one or more saved changes. They remain on this device." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーで一部の保存済み変更を確認できませんでした。変更はこの端末に保持されています。"
+          }
+        }
+      }
+    },
+    "The server could not verify one or more saved changes. They remain on this device. Export them, then rebuild from the latest server copy." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーで一部の保存済み変更を確認できませんでした。変更はこの端末に保持されています。まず書き出してから、サーバー上の最新状態をもとに端末のコピーを作り直してください。"
+          }
+        }
+      }
+    },
+    "The server could not verify one or more saved changes. They remain on this device. Export them, then rebuild from the latest server copy. Support code: %@" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーで一部の保存済み変更を確認できませんでした。変更はこの端末に保持されています。まず書き出してから、サーバー上の最新状態をもとに端末のコピーを作り直してください。サポートコード：%@"
+          }
+        }
+      }
+    },
+    "The server could not verify one or more saved changes. They remain on this device. Support code: %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サーバーで一部の保存済み変更を確認できませんでした。変更はこの端末に保持されています。サポートコード：%@"
           }
         }
       }
@@ -10271,6 +11553,16 @@
         }
       }
     },
+    "There are %lld unsent changes, above the %lld-change upload limit. Download a copy, then repair or reset the plan." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "There are %1$lld unsent changes, above the %2$lld-change upload limit. Download a copy, then repair or reset the plan."
+          }
+        }
+      }
+    },
     "There is no convenience store in the East area. Get drinks before entering." : {
       "localizations" : {
         "ja" : {
@@ -10297,6 +11589,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このカタログには、認識可能な東京ビッグサイトの会場マップが含まれていません。"
+          }
+        }
+      }
+    },
+    "This circle may have been removed. Any saved memo can still be downloaded from plan recovery." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサークルは削除された可能性があります。保存済みのメモはプランの復旧画面から書き出せます。"
+          }
+        }
+      }
+    },
+    "This circle will be removed from the plan. Its notes and purchases remain available if another recent change restores it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサークルをプランから削除します。同時期の変更で元に戻った場合は、メモと購入内容も再び表示されます。"
           }
         }
       }
@@ -10343,6 +11655,7 @@
       }
     },
     "This is a member-entered plan decision. Live external reports below remain separate and never change it automatically." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10382,6 +11695,26 @@
         }
       }
     },
+    "This plan cannot be repaired automatically. Download a copy before resetting it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このプランは自動で修復できません。リセットする前にコピーを書き出してください。"
+          }
+        }
+      }
+    },
+    "This plan has too many saved changes. Download a copy, then repair or reset the plan." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存された変更が多すぎます。コピーを書き出してから、プランを修復またはリセットしてください。"
+          }
+        }
+      }
+    },
     "This plan is archived" : {
       "localizations" : {
         "ja" : {
@@ -10402,6 +11735,9 @@
         }
       }
     },
+    "This plan needs review" : {
+
+    },
     "This protected token is retained only for review or discard and can no longer be shared." : {
       "localizations" : {
         "ja" : {
@@ -10412,12 +11748,53 @@
         }
       }
     },
+    "This purchase request will be removed. If someone changed it at the same time, you can choose which version to keep." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この購入リクエストを削除します。同時に別の人が変更した場合は、残す内容を選べます。"
+          }
+        }
+      }
+    },
+    "This removes this account's Shared Plans, unsent changes, and downloaded catalog data from this device." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアカウントの共有プラン、未送信の変更、ダウンロード済みのカタログデータをこの端末から削除します。"
+          }
+        }
+      }
+    },
     "This saved document is malformed and is never interpreted. Export or discard are the only safe actions." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "この保存データは形式が壊れているため読み取りません。安全に行えるのは書き出しまたは破棄だけです。"
+          }
+        }
+      }
+    },
+    "This saved plan cannot be opened. Download a copy before resetting it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存したプランを開けません。リセットする前にコピーを書き出してください。"
+          }
+        }
+      }
+    },
+    "This saved plan cannot be opened. Download a copy or reset it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存したプランを開けません。コピーを書き出すか、プランをリセットしてください。"
           }
         }
       }
@@ -10464,6 +11841,7 @@
       }
     },
     "Time Sensitive delivery is on." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10716,6 +12094,16 @@
         }
       }
     },
+    "Two people changed this at the same time. Choose the value the plan should keep." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じ内容が同時に変更されました。プランに残す内容を選んでください。"
+          }
+        }
+      }
+    },
     "Unavailable" : {
       "localizations" : {
         "ja" : {
@@ -10778,6 +12166,7 @@
       }
     },
     "Unsynced content is retained for export. Reinstatement starts a fresh editing generation." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10808,6 +12197,7 @@
       }
     },
     "Updating campus…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10818,6 +12208,7 @@
       }
     },
     "Updating venue…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10838,6 +12229,7 @@
       }
     },
     "Use 1–64 characters, beginning with a lowercase letter. Letters, numbers, underscore, period, and hyphen are allowed." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10848,6 +12240,7 @@
       }
     },
     "Use short typed fields such as status, meeting place, or whether contact is complete." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10878,6 +12271,7 @@
       }
     },
     "Use the plan conflict section to choose active or removed explicitly." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10938,6 +12332,7 @@
       }
     },
     "Value" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -10958,6 +12353,7 @@
       }
     },
     "Value type" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11109,6 +12505,16 @@
         }
       }
     },
+    "Waiting for the plan to finish connecting" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランへの接続を待っています"
+          }
+        }
+      }
+    },
     "Waiting for writable sync" : {
       "localizations" : {
         "ja" : {
@@ -11120,6 +12526,7 @@
       }
     },
     "Wanted" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11130,6 +12537,7 @@
       }
     },
     "Wanted quantity" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11150,6 +12558,7 @@
       }
     },
     "Wanted quantity: %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11160,6 +12569,7 @@
       }
     },
     "Wanted, assigned, and fulfilled quantities are saved as separate collaborative edits." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11190,6 +12600,7 @@
       }
     },
     "WCID" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11200,6 +12611,7 @@
       }
     },
     "WCID %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11210,6 +12622,7 @@
       }
     },
     "WCID is the stable circle identifier for this Comiket. Existing retained content is restored when a removed circle is reactivated." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11426,22 +12839,42 @@
         }
       }
     },
-    "What is the destination number?" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "行き先の番号は？"
-          }
-        }
-      }
-    },
     "What number do you see?" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "見えている番号は？"
+          }
+        }
+      }
+    },
+    "What should be purchased?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何を買いますか？"
+          }
+        }
+      }
+    },
+    "What space number is the circle in?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルのスペース番号は何番ですか？"
+          }
+        }
+      }
+    },
+    "What to buy" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "買うもの"
           }
         }
       }
@@ -11507,6 +12940,26 @@
         }
       }
     },
+    "Which block letter is the circle in?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルはどのブロックですか？"
+          }
+        }
+      }
+    },
+    "Which day is the circle in?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルは何日目ですか？"
+          }
+        }
+      }
+    },
     "Which letter do you see?" : {
       "localizations" : {
         "ja" : {
@@ -11517,22 +12970,12 @@
         }
       }
     },
-    "Which letter is your destination?" : {
+    "Which venue is the circle in?" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "行き先の文字は？"
-          }
-        }
-      }
-    },
-    "Which venue is the table in?" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スペースはどの会場にありますか？"
+            "value" : "サークルはどの配置ホールですか？"
           }
         }
       }
@@ -11617,6 +13060,16 @@
         }
       }
     },
+    "Yen" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "円"
+          }
+        }
+      }
+    },
     "Yes" : {
       "localizations" : {
         "ja" : {
@@ -11628,6 +13081,7 @@
       }
     },
     "Yes or no" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11679,6 +13133,7 @@
       }
     },
     "You can review collaborative content and recovery data. Editing will appear after interoperable sync is enabled." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -11689,11 +13144,25 @@
       }
     },
     "You can review plans, members, invitations, notifications, and saved recovery data. Editing and administrative changes will appear after interoperable sync is enabled." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "プラン、メンバー、招待、通知、保存済みの復旧データを確認できます。相互運用できる同期が有効になると、編集と管理操作を利用できます。"
+          }
+        }
+      }
+    },
+    "You can view plans, members, invitations, notifications, and saved recovery copies. Editing will be available in a later update." : {
+
+    },
+    "You can view this plan now. Editing will be available in a later update." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このプランは閲覧できます。編集機能は今後のアップデートで利用できるようになります。"
           }
         }
       }
@@ -11725,6 +13194,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自分の変更"
+          }
+        }
+      }
+    },
+    "Your changes are saved. Review the choices before continuing." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更は保存されています。続ける前に確認が必要な項目を選んでください。"
           }
         }
       }
@@ -11769,6 +13248,17 @@
         }
       }
     },
+    "Your memo is saved after a short pause and when you leave this screen." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモは入力が少し止まったときと、この画面を離れるときに保存します。"
+          }
+        }
+      }
+    },
     "Your plan" : {
       "localizations" : {
         "ja" : {
@@ -11790,11 +13280,22 @@
       }
     },
     "Your request" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "自分の依頼"
+          }
+        }
+      }
+    },
+    "Your unsent changes are saved so you can download a copy." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未送信の変更は保存されています。必要に応じてコピーを書き出せます。"
           }
         }
       }
@@ -11919,6 +13420,16 @@
         }
       }
     },
+    "お気に入りを確認中…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りを確認中…"
+          }
+        }
+      }
+    },
     "お気に入りを読み込めません" : {
       "localizations" : {
         "ja" : {
@@ -11950,11 +13461,22 @@
       }
     },
     "このアカウントで参加" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "このアカウントで参加"
+          }
+        }
+      }
+    },
+    "このアカウントで参加します" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアカウントで参加します"
           }
         }
       }
@@ -12006,6 +13528,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "このプランの変更履歴が上限に達しました。"
+          }
+        }
+      }
+    },
+    "このプランは削除されたか、アクセスできなくなった可能性があります。" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このプランは削除されたか、アクセスできなくなった可能性があります。"
           }
         }
       }
@@ -12290,6 +13822,7 @@
       }
     },
     "プランを選択" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -12339,6 +13872,16 @@
         }
       }
     },
+    "プロフィールを編集" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロフィールを編集"
+          }
+        }
+      }
+    },
     "プロフィールを読み込んでからもう一度お試しください。" : {
       "localizations" : {
         "ja" : {
@@ -12365,6 +13908,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "メモは64 KiB以内にしてください。"
+          }
+        }
+      }
+    },
+    "もう一度確認" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度確認"
           }
         }
       }
@@ -12400,6 +13953,7 @@
       }
     },
     "ログインが必要です" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -12500,6 +14054,7 @@
       }
     },
     "共有するサークルと買い物の状況を確認できます。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -12515,6 +14070,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "共有プラン"
+          }
+        }
+      }
+    },
+    "共有プランの名前と参加先アカウントを安全に確認しています。" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共有プランの名前と参加先アカウントを安全に確認しています。"
           }
         }
       }
@@ -12565,6 +14130,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最新状態でもう一度試す"
+          }
+        }
+      }
+    },
+    "写真を選択して正方形に切り抜きます" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真を選択して正方形に切り抜きます"
           }
         }
       }
@@ -12631,11 +14206,22 @@
       }
     },
     "参加後はメンバー全員がプランを編集できます。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "参加後はメンバー全員がプランを編集できます。"
+          }
+        }
+      }
+    },
+    "参加後はメンバー全員がプランを編集できます。招待リンクは信頼できる相手だけに共有してください。" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加後はメンバー全員がプランを編集できます。招待リンクは信頼できる相手だけに共有してください。"
           }
         }
       }
@@ -12712,11 +14298,23 @@
       }
     },
     "対象 WCID: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "対象 WCID: %@"
+          }
+        }
+      }
+    },
+    "影響を受けたサークル: %lld件" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "影響を受けたサークル: %lld件"
           }
         }
       }
@@ -12782,6 +14380,7 @@
       }
     },
     "招待リンクを知っている人は、期限内であればこのプランに参加できます。リンクは信頼できる相手だけに共有してください。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -12797,6 +14396,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "招待を確認しています…"
+          }
+        }
+      }
+    },
+    "招待を確認できません" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "招待を確認できません"
           }
         }
       }
@@ -13097,6 +14706,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "送信待ちの変更があります"
+          }
+        }
+      }
+    },
+    "連携済み" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連携済み"
           }
         }
       }

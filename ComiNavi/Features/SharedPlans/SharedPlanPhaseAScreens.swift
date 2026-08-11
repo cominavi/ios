@@ -421,7 +421,7 @@ struct SharedPlanReadOnlyNotice: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Shared Plans are read-only")
                         .font(.headline)
-                    Text("You can review plans, members, invitations, notifications, and saved recovery data. Editing and administrative changes will appear after interoperable sync is enabled.")
+                    Text("You can view plans, members, invitations, notifications, and saved recovery copies. Editing will be available in a later update.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

@@ -133,6 +133,8 @@ actor SharedPlanAutomergeDocument {
         static let rootOperationID = "rootOperationID"
         static let operationID = "operationID"
         static let requesterUserID = "requesterUserID"
+        static let itemName = "itemName"
+        static let unitPrice = "unitPrice"
         static let wantedQuantity = "wantedQuantity"
         static let buyerAllocations = "buyerAllocations"
         static let fulfilledQuantity = "fulfilledQuantity"
@@ -685,6 +687,28 @@ actor SharedPlanAutomergeDocument {
               )
         else { return nil }
 
+        let itemName: String
+        if try document.get(obj: needObject, key: Key.itemName) != nil {
+            guard let storedItemName = try Self.string(
+                in: document,
+                object: needObject,
+                key: Key.itemName
+            ) else { return nil }
+            itemName = storedItemName
+        } else {
+            itemName = ""
+        }
+        let unitPrice: Int?
+        switch try document.get(obj: needObject, key: Key.unitPrice) {
+        case let .Scalar(.Int(rawPrice)):
+            guard let exactPrice = Int(exactly: rawPrice) else { return nil }
+            unitPrice = exactPrice
+        case .Scalar(.Null), nil:
+            unitPrice = nil
+        default:
+            return nil
+        }
+
         let allocations = try document.mapEntries(obj: allocationsObject).reduce(
             into: [String: Int]()
         ) { result, entry in
@@ -696,6 +720,8 @@ actor SharedPlanAutomergeDocument {
         return SharedPlanPurchaseNeed(
             id: id,
             requesterUserID: requester,
+            itemName: itemName,
+            unitPrice: unitPrice,
             wantedQuantity: wanted,
             buyerAllocations: allocations,
             fulfilledQuantity: fulfilled
@@ -947,6 +973,8 @@ actor SharedPlanAutomergeDocument {
         let changedFulfilled = current.fulfilledQuantity != need.fulfilledQuantity
         let changedAllocations = current.buyerAllocations != need.buyerAllocations
         guard current.requesterUserID == need.requesterUserID,
+              current.itemName == need.itemName,
+              current.unitPrice == need.unitPrice,
               [changedWanted, changedFulfilled, changedAllocations].filter({ $0 }).count == 1
         else { throw SharedPlanError.syncProtocolViolation }
         if changedWanted {
@@ -1001,6 +1029,9 @@ actor SharedPlanAutomergeDocument {
         try requireMutationAccess(allowingDurableMutation)
         try validate(key)
         try validate(need)
+        guard need.itemName.isEmpty || actorUserID == need.requesterUserID else {
+            throw SharedPlanError.syncProtocolViolation
+        }
         guard let circle = try activeCircleObject(for: key),
               let needs = try mapObject(in: circle, key: Key.needs)
         else { throw SharedPlanError.planNotFound }
@@ -1017,8 +1048,8 @@ actor SharedPlanAutomergeDocument {
             if currentPresence == .active, !hasSemanticConflict {
                 return false
             }
-            // Reactivation intentionally changes only presence, requester, and
-            // wanted quantity. Descendant allocation/fulfillment state is
+            // Reactivation intentionally changes only the root request details.
+            // Descendant allocation/fulfillment state is
             // retained, so a full-model caller must not imply that this one
             // operation also rewrites those fields.
             guard let retained = try purchaseNeed(id: need.id, circleKey: key),
@@ -1037,6 +1068,10 @@ actor SharedPlanAutomergeDocument {
             if let current {
                 try replacePresence(in: current, state: .active, operationID: operationID)
                 try putText(need.requesterUserID, in: current, key: Key.requesterUserID)
+                if !need.itemName.isEmpty {
+                    try putText(need.itemName, in: current, key: Key.itemName)
+                    try putOptionalPrice(need.unitPrice, in: current)
+                }
                 try document.put(
                     obj: current,
                     key: Key.wantedQuantity,
@@ -1047,6 +1082,10 @@ actor SharedPlanAutomergeDocument {
                 try putText(operationID.uuidString.lowercased(), in: created, key: Key.rootOperationID)
                 try replacePresence(in: created, state: .active, operationID: operationID)
                 try putText(need.requesterUserID, in: created, key: Key.requesterUserID)
+                if !need.itemName.isEmpty {
+                    try putText(need.itemName, in: created, key: Key.itemName)
+                    try putOptionalPrice(need.unitPrice, in: created)
+                }
                 try document.put(
                     obj: created,
                     key: Key.wantedQuantity,
@@ -1063,17 +1102,24 @@ actor SharedPlanAutomergeDocument {
                     value: .Int(0)
                 )
             }
+            var payload: [String: SharedPlanJSONValue] = [
+                Key.version: .integer(Self.schemaVersion),
+                Key.wcID: .integer(Int64(key.wcID)),
+                Key.needID: .string(needKey),
+                Key.requesterUserID: .string(need.requesterUserID),
+                Key.wantedQuantity: .integer(Int64(need.wantedQuantity)),
+            ]
+            if !need.itemName.isEmpty {
+                payload[Key.itemName] = .string(need.itemName)
+                payload[Key.unitPrice] = need.unitPrice.map {
+                    .integer(Int64($0))
+                } ?? .null
+            }
             try appendOperation(
                 id: operationID,
                 type: .needCreate,
                 actorUserID: actorUserID,
-                payload: [
-                    Key.version: .integer(Self.schemaVersion),
-                    Key.wcID: .integer(Int64(key.wcID)),
-                    Key.needID: .string(needKey),
-                    Key.requesterUserID: .string(need.requesterUserID),
-                    Key.wantedQuantity: .integer(Int64(need.wantedQuantity)),
-                ]
+                payload: payload
             )
         }
         return true
@@ -2276,7 +2322,7 @@ actor SharedPlanAutomergeDocument {
                       let wanted = record.payload[Key.wantedQuantity]
                 else { throw SharedPlanError.syncProtocolViolation }
                 let base = circlePath + [Key.needs, needID.uuidString.lowercased()]
-                return [
+                var assignments = [
                     LedgerAssignment(
                         path: base + [Key.presence],
                         candidate: candidate(
@@ -2293,6 +2339,19 @@ actor SharedPlanAutomergeDocument {
                         candidate: candidate(wanted, rootOperationID: record.id)
                     ),
                 ]
+                if let itemName = record.payload[Key.itemName] {
+                    assignments.append(LedgerAssignment(
+                        path: base + [Key.itemName],
+                        candidate: candidate(itemName, rootOperationID: record.id)
+                    ))
+                }
+                if let unitPrice = record.payload[Key.unitPrice] {
+                    assignments.append(LedgerAssignment(
+                        path: base + [Key.unitPrice],
+                        candidate: candidate(unitPrice, rootOperationID: record.id)
+                    ))
+                }
+                return assignments
             case .needDelete:
                 let needID = try Self.requiredUUID(record.payload, key: Key.needID)
                 return [LedgerAssignment(
@@ -2988,6 +3047,7 @@ actor SharedPlanAutomergeDocument {
     private static func isResolvableRegisterPath(_ path: [String]) -> Bool {
         guard path.first == Key.circles, let last = path.last else { return false }
         if last == Key.presence || last == Key.requesterUserID
+            || last == Key.itemName || last == Key.unitPrice
             || last == Key.wantedQuantity || last == Key.fulfilledQuantity
         {
             return true
@@ -3027,7 +3087,7 @@ actor SharedPlanAutomergeDocument {
         case .needCreate:
             [
                 Key.version, Key.wcID, Key.needID, Key.requesterUserID,
-                Key.wantedQuantity,
+                Key.itemName, Key.unitPrice, Key.wantedQuantity,
             ]
         case .needDelete:
             [Key.version, Key.wcID, Key.needID]
@@ -3340,7 +3400,14 @@ actor SharedPlanAutomergeDocument {
     private func validate(_ need: SharedPlanPurchaseNeed) throws {
         let quantities = [need.wantedQuantity, need.fulfilledQuantity]
             + Array(need.buyerAllocations.values)
+        let normalizedItemName = need.itemName.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
         guard !need.requesterUserID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              normalizedItemName.isEmpty || (
+                  normalizedItemName.count <= 80 && normalizedItemName.utf8.count <= 512
+              ),
+              need.unitPrice.map({ (0...9_999_999).contains($0) }) ?? true,
               need.buyerAllocations.keys.allSatisfy({
                   !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
               }),
@@ -3349,6 +3416,14 @@ actor SharedPlanAutomergeDocument {
             throw SharedPlanError.documentLimit(
                 String(localized: "数量は0から999の範囲で入力してください。")
             )
+        }
+    }
+
+    private func putOptionalPrice(_ price: Int?, in object: ObjId) throws {
+        if let price {
+            try document.put(obj: object, key: Key.unitPrice, value: .Int(Int64(price)))
+        } else {
+            try document.put(obj: object, key: Key.unitPrice, value: .Null)
         }
     }
 
@@ -3695,9 +3770,13 @@ actor SharedPlanAutomergeDocument {
         let need = try document.putObject(obj: parent, key: key, ty: .Map)
         for field in [
             Key.rootOperationID, Key.presence, Key.requesterUserID,
-            Key.wantedQuantity, Key.buyerAllocations, Key.fulfilledQuantity,
+            Key.itemName, Key.unitPrice, Key.wantedQuantity,
+            Key.buyerAllocations, Key.fulfilledQuantity,
         ] {
-            guard let child = value[field] else { throw SharedPlanError.syncProtocolViolation }
+            guard let child = value[field] else {
+                if field == Key.itemName || field == Key.unitPrice { continue }
+                throw SharedPlanError.syncProtocolViolation
+            }
             try putJSON(child, in: need, key: field)
         }
     }

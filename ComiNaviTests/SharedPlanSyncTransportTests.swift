@@ -786,6 +786,104 @@ final class SharedPlanSyncTransportTests: XCTestCase {
     }
 
     @MainActor
+    func testInvalidOperationPreservesLocalBranchWithActionableRecovery() async throws {
+        let legacyFrame = try JSONDecoder().decode(
+            SharedPlanSyncErrorFrame.self,
+            from: Data(#"{"v":1,"type":"error","code":"invalid_plan_operation","message":"The sync session cannot continue.","retryable":false}"#.utf8)
+        )
+        XCTAssertEqual(legacyFrame.code, "invalid_plan_operation")
+        XCTAssertNil(legacyFrame.details)
+
+        let planID = UUID().uuidString.lowercased()
+        let userID = "11111111111111111111111111111111"
+        let plan = makePlan(id: planID)
+        let persistence = InMemorySharedPlanPersistence()
+        let document = try SharedPlanAutomergeDocument(
+            fixturePlanID: planID,
+            comiketNo: plan.comiketNo,
+            replicaID: try await persistence.replicaID()
+        )
+        try await persistence.saveBootstrappedPlan(
+            plan,
+            document: await document.snapshot(pendingOperationIDs: []),
+            removingWriteID: nil
+        )
+        let socket = ScriptedSharedPlanSyncSocket()
+        await socket.enqueue(try JSONEncoder().encode(SharedPlanSyncHello(
+            v: 1,
+            type: "hello",
+            planID: planID,
+            sessionID: UUID(),
+            nextClientSeq: 1,
+            nextServerSeq: 1,
+            mutationsEnabled: true
+        )))
+        let connector = CountingSharedPlanSyncConnector(socket: socket)
+        let store = SharedPlanStore(
+            persistence: persistence,
+            syncRequestAuthorizer: StaticSharedPlanSyncAuthorizer(),
+            syncConnector: connector,
+            allowsUnconnectedContentMutations: true,
+            actorUserID: { userID }
+        )
+        await store.load()
+        let circle = try XCTUnwrap(
+            SharedPlanCircleKey(comiketNo: plan.comiketNo, wcID: 6_667)
+        )
+        _ = try await store.addCircle(circle, to: planID)
+        XCTAssertEqual(store.documentSnapshots[planID]?.pendingOperationIDs.count, 1)
+
+        await store.startSync(planID: planID)
+        _ = await socket.waitForSentFrame(count: 1)
+        await socket.enqueue(try JSONEncoder().encode(SharedPlanSyncErrorFrame(
+            v: 1,
+            type: "error",
+            code: "invalid_plan_operation",
+            message: "One or more saved changes could not be verified.",
+            retryable: false,
+            details: .init(
+                reason: "operation_payload",
+                recovery: "export_and_rebuild_local_copy",
+                localChangesPreserved: true,
+                supportCode: "SP-OP-202"
+            )
+        )))
+        await socket.waitForClose(count: 1)
+
+        XCTAssertEqual(
+            store.documentSnapshots[planID]?.syncIssue,
+            .rejectedLocalChanges(supportCode: "SP-OP-202")
+        )
+        XCTAssertEqual(store.documentSnapshots[planID]?.pendingOperationIDs.count, 1)
+        let recovery = try XCTUnwrap(
+            store.recoveryDocuments.first(where: { $0.planID == planID })
+        )
+        XCTAssertEqual(recovery.pendingOperationCount, 1)
+        XCTAssertTrue(recovery.exportText.contains("automergeSave"))
+
+        let snapshot = try await store.editorSnapshot(planID: planID)
+        XCTAssertTrue(snapshot.recoveryRebaseAvailable)
+        XCTAssertNotNil(snapshot.recoveryDocument)
+
+        let relaunched = SharedPlanStore(
+            persistence: persistence,
+            actorUserID: { userID }
+        )
+        await relaunched.load()
+        XCTAssertEqual(
+            relaunched.documentSnapshots[planID]?.syncIssue,
+            .rejectedLocalChanges(supportCode: "SP-OP-202")
+        )
+        XCTAssertEqual(
+            relaunched.documentSnapshots[planID]?.pendingOperationIDs.count,
+            1
+        )
+        XCTAssertTrue(
+            relaunched.recoveryDocuments.contains(where: { $0.planID == planID })
+        )
+    }
+
+    @MainActor
     func testLocalOneThousandOperationLimitPersistsButLegalBacklogStillSyncs() async throws {
         let planID = UUID().uuidString.lowercased()
         let plan = makePlan(id: planID)

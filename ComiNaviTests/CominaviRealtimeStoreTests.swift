@@ -4,33 +4,29 @@ import XCTest
 
 final class CominaviRealtimeStoreTests: XCTestCase {
     func testKeepsNewestHeadAndConvertsRealtimeArtworkAndAttendance() async throws {
-        let client = RealtimeFetchingStub(pages: [
-            (
-                updates: [
-                    try update(
-                        cursor: 2,
-                        stateKind: "shinagaki",
-                        stateValue: "new",
-                        occurredAt: "2026-08-15T03:05:00Z",
-                        mediaURL: "https://pbs.twimg.com/media/new.jpg"
-                    ),
-                    try update(
-                        cursor: 1,
-                        stateKind: "shinagaki",
-                        stateValue: "old",
-                        occurredAt: "2026-08-15T03:00:00Z",
-                        mediaURL: "https://pbs.twimg.com/media/old.jpg"
-                    ),
-                    try update(
-                        cursor: 3,
-                        stateKind: "attendance",
-                        stateValue: "absent",
-                        occurredAt: "2026-08-15T03:06:00Z"
-                    ),
-                ],
-                nextCursor: 3,
-                hasMore: false
-            ),
+        let client = RealtimeFetchingStub(snapshots: [
+            [
+                try update(
+                    cursor: 2,
+                    stateKind: "shinagaki",
+                    stateValue: "new",
+                    occurredAt: "2026-08-15T03:05:00Z",
+                    mediaURL: "https://pbs.twimg.com/media/new.jpg"
+                ),
+                try update(
+                    cursor: 1,
+                    stateKind: "shinagaki",
+                    stateValue: "old",
+                    occurredAt: "2026-08-15T03:00:00Z",
+                    mediaURL: "https://pbs.twimg.com/media/old.jpg"
+                ),
+                try update(
+                    cursor: 3,
+                    stateKind: "attendance",
+                    stateValue: "absent",
+                    occurredAt: "2026-08-15T03:06:00Z"
+                ),
+            ],
         ])
         let store = CominaviRealtimeStore(client: client)
 
@@ -49,24 +45,20 @@ final class CominaviRealtimeStoreTests: XCTestCase {
     }
 
     func testSharedPlanExternalStatesRemainSourceAttributedAndSeparate() async throws {
-        let client = RealtimeFetchingStub(pages: [(
-            updates: [
-                try update(
-                    cursor: 1,
-                    stateKind: "inventory",
-                    stateValue: "sold_out",
-                    occurredAt: "2026-08-15T03:00:00Z"
-                ),
-                try update(
-                    cursor: 2,
-                    stateKind: "presence",
-                    stateValue: "temporarily_away",
-                    occurredAt: "2026-08-15T03:05:00Z"
-                ),
-            ],
-            nextCursor: 2,
-            hasMore: false
-        )])
+        let client = RealtimeFetchingStub(snapshots: [[
+            try update(
+                cursor: 1,
+                stateKind: "inventory",
+                stateValue: "sold_out",
+                occurredAt: "2026-08-15T03:00:00Z"
+            ),
+            try update(
+                cursor: 2,
+                stateKind: "presence",
+                stateValue: "temporarily_away",
+                occurredAt: "2026-08-15T03:05:00Z"
+            ),
+        ]])
         let store = CominaviRealtimeStore(client: client)
 
         let states = try await store.sharedPlanExternalStates(
@@ -136,30 +128,18 @@ final class CominaviRealtimeStoreTests: XCTestCase {
 }
 
 private actor RealtimeFetchingStub: CominaviRealtimeFetching {
-    typealias Page = (
-        updates: [CominaviRealtimeUpdate],
-        nextCursor: Int,
-        hasMore: Bool
-    )
-
-    private var pages: [Page]
+    private var snapshots: [[CominaviRealtimeUpdate]]
     private var requests = 0
 
-    init(pages: [Page]) {
-        self.pages = pages
+    init(snapshots: [[CominaviRealtimeUpdate]]) {
+        self.snapshots = snapshots
     }
 
-    func realtimeUpdates(
-        eventNumber: Int,
-        after cursor: Int,
-        limit: Int
-    ) async throws -> Page {
+    func realtimeUpdates(eventNumber: Int) async throws -> [CominaviRealtimeUpdate] {
         XCTAssertEqual(eventNumber, 108)
-        XCTAssertEqual(cursor, 0)
-        XCTAssertEqual(limit, 500)
         requests += 1
-        guard !pages.isEmpty else { throw CominaviServiceError.invalidResponse }
-        return pages.removeFirst()
+        guard !snapshots.isEmpty else { throw CominaviServiceError.invalidResponse }
+        return snapshots.removeFirst()
     }
 
     func requestCount() -> Int {

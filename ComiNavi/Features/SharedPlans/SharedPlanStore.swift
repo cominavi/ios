@@ -2504,6 +2504,10 @@ final class SharedPlanStore {
         guard syncCoordinatorBindings[planID] == bindingID else { return nil }
         let issue: SharedPlanSyncIssue?
         switch error.code {
+        case "invalid_plan_operation":
+            issue = .rejectedLocalChanges(
+                supportCode: Self.safeSyncSupportCode(error.details?.supportCode)
+            )
         case "plan_compaction_required":
             issue = .serverCompactionRequired
         case "plan_sync_backlog_limit":
@@ -3082,11 +3086,19 @@ final class SharedPlanStore {
 
     private static func canRebuildContent(after issue: SharedPlanSyncIssue) -> Bool {
         switch issue {
-        case .compactionRequired, .serverCompactionRequired, .backlogLimit, .unavailable:
+        case .compactionRequired, .serverCompactionRequired, .backlogLimit,
+             .unavailable, .rejectedLocalChanges:
             true
         case .membershipRevoked, .roleChanged, .conflict:
             false
         }
+    }
+
+    private static func safeSyncSupportCode(_ value: String?) -> String? {
+        guard let value,
+              value.range(of: #"^SP-[A-Z]{2}-[0-9]{3}$"#, options: .regularExpression) != nil
+        else { return nil }
+        return value
     }
 
     private static func canRebaseRecoverySnapshot(
@@ -3472,6 +3484,12 @@ final class SharedPlanStore {
             .planSyncBacklogLimit(maximum: maximum, received: received)
         case .conflict: .revisionConflict
         case .unavailable(let message): .documentLimit(message)
+        case .rejectedLocalChanges(let supportCode):
+            .documentLimit(
+                supportCode.map {
+                    String(localized: "The server could not verify one or more saved changes. They remain on this device. Support code: \($0)")
+                } ?? String(localized: "The server could not verify one or more saved changes. They remain on this device.")
+            )
         }
     }
 
@@ -3489,7 +3507,8 @@ final class SharedPlanStore {
         case nil:
             true
         case .membershipRevoked, .roleChanged, .conflict, .unavailable,
-             .compactionRequired, .serverCompactionRequired, .backlogLimit:
+             .rejectedLocalChanges, .compactionRequired,
+             .serverCompactionRequired, .backlogLimit:
             false
         }
     }

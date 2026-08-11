@@ -2,10 +2,19 @@ import SwiftUI
 import UIKit
 
 struct ProfileEditorScreen: View {
+    private enum AvatarChange {
+        case unchanged
+        case selected(UIImage)
+        case removed
+    }
+
+    @Environment(\.dismiss) private var dismiss
     let profileStore: CominaviProfileStore
 
     @State private var displayName: String
     @State private var isShowingAvatarPicker = false
+    @State private var avatarChange = AvatarChange.unchanged
+    @State private var isSavingChanges = false
     @State private var issueMessage: String?
 
     init(profileStore: CominaviProfileStore) {
@@ -20,18 +29,14 @@ struct ProfileEditorScreen: View {
                     isShowingAvatarPicker = true
                 } label: {
                     VStack(spacing: 10) {
-                        AuthenticatedProfileAvatar(
-                            url: profileStore.profile?.avatarURL,
-                            size: 104,
-                            revision: profileStore.profile?.revision
-                        )
-                        .overlay(alignment: .bottomTrailing) {
-                            Image(systemName: "camera.fill")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .padding(7)
-                                .background(Color.accentColor, in: .circle)
-                        }
+                        editorAvatar
+                            .overlay(alignment: .bottomTrailing) {
+                                Image(systemName: "camera.fill")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(7)
+                                    .background(Color.accentColor, in: .circle)
+                            }
 
                         Text("アバターを変更")
                             .font(.subheadline)
@@ -40,14 +45,14 @@ struct ProfileEditorScreen: View {
                     .padding(.vertical, 8)
                 }
                 .buttonStyle(.plain)
-                .disabled(profileStore.isSaving)
+                .disabled(isSavingChanges || profileStore.isSaving)
                 .accessibilityLabel("アバターを変更")
                 .accessibilityHint("写真を選択して正方形に切り抜きます")
                 .accessibilityIdentifier("profile-change-avatar")
 
-                if profileStore.profile?.avatarURL != nil {
-                    Button("アバターを削除", role: .destructive, action: removeAvatar)
-                        .disabled(profileStore.isSaving)
+                if canRemoveAvatar {
+                    Button("アバターを削除", role: .destructive, action: stageAvatarRemoval)
+                        .disabled(isSavingChanges)
                         .accessibilityIdentifier("profile-remove-avatar")
                 }
             }
@@ -56,12 +61,12 @@ struct ProfileEditorScreen: View {
                 TextField("表示名", text: $displayName)
                     .textContentType(.name)
                     .submitLabel(.done)
-                    .onSubmit(saveDisplayName)
+                    .onSubmit {
+                        guard canSaveChanges else { return }
+                        saveChanges()
+                    }
+                    .disabled(isSavingChanges)
                     .accessibilityIdentifier("profile-display-name")
-
-                Button("表示名を保存", action: saveDisplayName)
-                    .disabled(!canSaveDisplayName)
-                    .accessibilityIdentifier("profile-save-display-name")
             }
 
             if let issueMessage {
@@ -73,57 +78,115 @@ struct ProfileEditorScreen: View {
         }
         .navigationTitle("プロフィールを編集")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("キャンセル", action: dismiss.callAsFunction)
+                    .disabled(isSavingChanges)
+            }
+
+            ToolbarItem(placement: .confirmationAction) {
+                Button("保存", action: saveChanges)
+                    .disabled(!canSaveChanges)
+                    .accessibilityIdentifier("profile-save")
+            }
+        }
         .sheet(isPresented: $isShowingAvatarPicker) {
             SquareAvatarImagePicker { image in
-                saveAvatar(image)
+                avatarChange = .selected(image)
             }
         }
-        .onChange(of: profileStore.profile?.displayName) { _, value in
-            guard let value else { return }
-            displayName = value
+        .interactiveDismissDisabled(isSavingChanges)
+    }
+
+    @ViewBuilder
+    private var editorAvatar: some View {
+        switch avatarChange {
+        case .unchanged:
+            AuthenticatedProfileAvatar(
+                url: profileStore.profile?.avatarURL,
+                size: 104,
+                revision: profileStore.profile?.revision
+            )
+        case .selected(let image):
+            Image(uiImage: image)
+                .resizable()
+                .renderingMode(.original)
+                .scaledToFill()
+                .frame(width: 104, height: 104)
+                .clipShape(.circle)
+                .accessibilityLabel("プロフィール画像")
+        case .removed:
+            Image(systemName: "person.crop.circle.fill")
+                .resizable()
+                .foregroundStyle(.secondary)
+                .frame(width: 104, height: 104)
+                .accessibilityLabel("プロフィール画像なし")
         }
     }
 
-    private var canSaveDisplayName: Bool {
+    private var hasDisplayNameChange: Bool {
         guard let profile = profileStore.profile else { return false }
-        return !profileStore.isSaving
-            && displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-                != profile.displayName
+        return displayName.trimmingCharacters(in: .whitespacesAndNewlines) != profile.displayName
     }
 
-    private func saveDisplayName() {
+    private var hasAvatarChange: Bool {
+        if case .unchanged = avatarChange {
+            return false
+        }
+        return true
+    }
+
+    private var canSaveChanges: Bool {
+        return !isSavingChanges
+            && !profileStore.isSaving
+            && (hasDisplayNameChange || hasAvatarChange)
+    }
+
+    private var canRemoveAvatar: Bool {
+        switch avatarChange {
+        case .selected:
+            true
+        case .unchanged:
+            profileStore.profile?.avatarURL != nil
+        case .removed:
+            false
+        }
+    }
+
+    private func saveChanges() {
+        guard canSaveChanges else { return }
+        let shouldSaveDisplayName = hasDisplayNameChange
+        let displayName = displayName
+        let avatarChange = avatarChange
+        isSavingChanges = true
         Task {
+            defer { isSavingChanges = false }
             do {
-                try await profileStore.saveDisplayName(displayName)
+                if shouldSaveDisplayName {
+                    try await profileStore.saveDisplayName(displayName)
+                }
+
+                switch avatarChange {
+                case .unchanged:
+                    break
+                case .selected(let image):
+                    guard let jpeg = AvatarImageProcessor.squareJPEGData(from: image)
+                    else { throw CominaviServiceError.invalidResponse }
+                    try await profileStore.saveAvatar(jpeg, contentType: "image/jpeg")
+                case .removed:
+                    try await profileStore.removeAvatar()
+                }
+
                 issueMessage = nil
+                dismiss()
             } catch {
                 issueMessage = error.localizedDescription
             }
         }
     }
 
-    private func saveAvatar(_ image: UIImage) {
-        Task {
-            do {
-                guard let jpeg = AvatarImageProcessor.squareJPEGData(from: image)
-                else { throw CominaviServiceError.invalidResponse }
-                try await profileStore.saveAvatar(jpeg, contentType: "image/jpeg")
-                issueMessage = nil
-            } catch {
-                issueMessage = error.localizedDescription
-            }
-        }
-    }
-
-    private func removeAvatar() {
-        Task {
-            do {
-                try await profileStore.removeAvatar()
-                issueMessage = nil
-            } catch {
-                issueMessage = error.localizedDescription
-            }
-        }
+    private func stageAvatarRemoval() {
+        avatarChange = profileStore.profile?.avatarURL == nil ? .unchanged : .removed
     }
 }
 

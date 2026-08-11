@@ -4,6 +4,81 @@ import Foundation
 import XCTest
 
 final class SharedPlanSwiftAuthoredFixtureTests: XCTestCase {
+    func testGenerateNamedPurchaseRequestInteropFixture() async throws {
+        let source = try loadSourceFixture()
+        let document = try SharedPlanAutomergeDocument(
+            data: try unwrapBase64URL(source.bootstrap.document),
+            replicaID: Self.clientReplicaID
+        )
+        let actorUserID = "11111111111111111111111111111111"
+        let circle = try XCTUnwrap(
+            SharedPlanCircleKey(comiketNo: source.comiketNo, wcID: 9_102)
+        )
+        let circleOperationID = UUID(
+            uuidString: "91919191-9191-4191-8191-919191919191"
+        )!
+        _ = try await authorVector(
+            document: document,
+            mutation: .setCirclePresence(circle, .active),
+            operationID: circleOperationID,
+            actorUserID: actorUserID,
+            authoredAt: Date(timeIntervalSince1970: 1_700_001_000),
+            pendingOperationIDs: [circleOperationID],
+            scenario: "named purchase request setup",
+            kind: "circle"
+        )
+        let needOperationID = UUID(
+            uuidString: "92929292-9292-4292-8292-929292929292"
+        )!
+        let vector = try await authorVector(
+            document: document,
+            mutation: .createNeed(
+                SharedPlanPurchaseNeed(
+                    id: UUID(uuidString: "93939393-9393-4393-8393-939393939393")!,
+                    requesterUserID: actorUserID,
+                    itemName: "新幹線のきっぷ",
+                    unitPrice: 14_720,
+                    wantedQuantity: 2
+                ),
+                circle: circle
+            ),
+            operationID: needOperationID,
+            actorUserID: actorUserID,
+            authoredAt: Date(timeIntervalSince1970: 1_700_001_001),
+            pendingOperationIDs: [circleOperationID, needOperationID],
+            scenario: "named purchase request",
+            kind: "need"
+        )
+        let fixture = SwiftNamedNeedFixture(
+            fixtureVersion: 1,
+            planID: source.planID,
+            comiketNo: source.comiketNo,
+            replicaID: Self.clientReplicaID.uuidString.lowercased(),
+            actorID: await document.actorID(),
+            userPublicID: actorUserID,
+            vector: vector
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        let encoded = try encoder.encode(fixture) + Data("\n".utf8)
+        let checkedIn = try loadFixtureData(named: "automerge-swift-named-need-v1")
+        if encoded != checkedIn {
+            let attachment = XCTAttachment(
+                data: encoded,
+                uniformTypeIdentifier: "public.json"
+            )
+            attachment.name = "automerge-swift-named-need-v1.json"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        XCTAssertEqual(encoded, checkedIn)
+        try await assertVectorReplays(
+            vector,
+            planID: source.planID,
+            comiketNo: source.comiketNo
+        )
+    }
+
     func testGenerateAndValidateDeterministicSwiftAuthoredFixture() async throws {
         let source = try loadSourceFixture()
         let generated = try await makeFixture(source: source)
@@ -563,6 +638,16 @@ private struct SwiftAuthoredFixture: Codable {
     let swiftSync: SwiftSyncDialogue
     let javascriptSync: JavaScriptSyncHandoff
     let transportReceipts: SwiftTransportReceipts
+}
+
+private struct SwiftNamedNeedFixture: Codable {
+    let fixtureVersion: Int
+    let planID: String
+    let comiketNo: Int
+    let replicaID: String
+    let actorID: String
+    let userPublicID: String
+    let vector: SwiftAuthoredOperationVector
 }
 
 private struct SwiftFixtureProducer: Codable {

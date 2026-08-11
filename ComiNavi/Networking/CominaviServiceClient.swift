@@ -144,11 +144,7 @@ protocol CirclemsFavoriteImportServicing: Sendable {
 }
 
 protocol CominaviRealtimeFetching: Sendable {
-    func realtimeUpdates(
-        eventNumber: Int,
-        after cursor: Int,
-        limit: Int
-    ) async throws -> (updates: [CominaviRealtimeUpdate], nextCursor: Int, hasMore: Bool)
+    func realtimeUpdates(eventNumber: Int) async throws -> [CominaviRealtimeUpdate]
 }
 
 struct CominaviProviderFlowPublicationLease: Equatable, Sendable {
@@ -540,11 +536,9 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         let nextAllowedAt: Date?
     }
 
-    private struct RealtimePage: Decodable {
+    private struct RealtimeSnapshot: Decodable {
         let eventNumber: Int
         let updates: [CominaviRealtimeUpdate]
-        let nextCursor: Int
-        let hasMore: Bool
     }
 
     private let baseURL: URL
@@ -1241,40 +1235,34 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         requiresExplicitAuthentication = true
     }
 
-    func realtimeUpdates(
-        eventNumber: Int,
-        after cursor: Int,
-        limit: Int = 500
-    ) async throws -> (updates: [CominaviRealtimeUpdate], nextCursor: Int, hasMore: Bool) {
-        guard (1...10_000).contains(eventNumber),
-              cursor >= 0,
-              (1...500).contains(limit)
-        else { throw CominaviServiceError.invalidResponse }
-        let output = try await generatedAuthorizedRequest(
-            operation: {
-                try await $0.listRealtimeUpdates(.init(
-                    path: .init(eventNumber: eventNumber),
-                    query: .init(after: cursor, limit: limit)
-                ))
-            },
-            isUnauthorized: { if case .unauthorized = $0 { true } else { false } },
-            validatesErrorResponses: true
-        )
-        let page: RealtimePage
+    func realtimeUpdates(eventNumber: Int) async throws -> [CominaviRealtimeUpdate] {
+        guard (1...10_000).contains(eventNumber) else {
+            throw CominaviServiceError.invalidResponse
+        }
+        let output = try await performGeneratedOperation {
+            try await generatedClient(
+                validatesErrorResponses: true,
+                cachePolicy: .useProtocolCachePolicy
+            ).listRealtimeUpdates(.init(path: .init(eventNumber: eventNumber)))
+        }
+        let snapshot: RealtimeSnapshot
         switch output {
         case .ok(let response):
-            page = try generatedDomainValue(RealtimePage.self, from: response.body.json)
+            snapshot = try generatedDomainValue(
+                RealtimeSnapshot.self,
+                from: response.body.json
+            )
         case .unauthorized(let response):
             throw generatedServiceError(try response.body.json, status: 401)
         default:
             throw CominaviServiceError.invalidResponse
         }
-        guard page.eventNumber == eventNumber,
-              page.updates.count <= limit,
-              page.nextCursor >= cursor,
-              page.updates.allSatisfy({ update in
-                  update.cursor > cursor
-                      && update.cursor <= page.nextCursor
+        let cursors = snapshot.updates.map(\.cursor)
+        guard snapshot.eventNumber == eventNumber,
+              cursors == cursors.sorted(),
+              Set(cursors).count == cursors.count,
+              snapshot.updates.allSatisfy({ update in
+                  update.cursor > 0
                       && update.sourceRevision > 0
                       && !update.eventKey.isEmpty
                       && !update.updateKind.isEmpty
@@ -1285,7 +1273,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
                       }
               })
         else { throw CominaviServiceError.invalidResponse }
-        return (page.updates, page.nextCursor, page.hasMore)
+        return snapshot.updates
     }
 
     func invalidateSession() async throws {
@@ -3373,14 +3361,15 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
     private func generatedClient(
         accessToken: String? = nil,
         exactRequestBody: Data? = nil,
-        validatesErrorResponses: Bool = false
+        validatesErrorResponses: Bool = false,
+        cachePolicy: URLRequest.CachePolicy = .reloadIgnoringLocalCacheData
     ) -> Client {
         let requestTransport = transport
         return CominaviAPIClientFactory.makeClient(
             serverURL: baseURL,
             transport: { request in
                 var request = request
-                request.cachePolicy = .reloadIgnoringLocalCacheData
+                request.cachePolicy = cachePolicy
                 request.timeoutInterval = 30
                 if let exactRequestBody {
                     request.httpBody = exactRequestBody

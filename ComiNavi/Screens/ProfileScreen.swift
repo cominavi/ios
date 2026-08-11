@@ -25,6 +25,10 @@ struct ProfileLogoutCoordinator {
 }
 
 struct ProfileScreen: View {
+    private struct ProfileEditorPresentation: Identifiable {
+        let id: String
+    }
+
     @AppStorage(SharedLocationClipboardImporter.enabledDefaultsKey)
     private var automaticallyReadsSharedLocations = false
     @State private var isShowingLogoutConfirmation = false
@@ -36,6 +40,7 @@ struct ProfileScreen: View {
     let sharedLocationInbox: SharedLocationInbox
     @State private var profileIssue: String?
     @State private var isShowingPendingMutationDiscardConfirmation = false
+    @State private var profileEditorPresentation: ProfileEditorPresentation?
     @State private var favoriteRecoveries: [QuarantinedCanonicalFavoriteMutation] = []
     @State private var favoriteRecoveryIssue: String?
     @State private var favoriteRecoveryPendingDiscard: QuarantinedCanonicalFavoriteMutation?
@@ -63,7 +68,7 @@ struct ProfileScreen: View {
                     .accessibilityIdentifier("profile-avatar")
                     .padding(.trailing, 8)
 
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(isLoggedIn ? "ComiNaviアカウント" : "ログインしていません")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -74,45 +79,67 @@ struct ProfileScreen: View {
                                 ?? String(localized: "Not logged in")
                         )
                             .font(.title3)
+
+                        if let profile = profileStore.profile {
+                            HStack(spacing: 12) {
+                                if let identity = profile.identities.first(where: {
+                                    $0.provider == "circlems"
+                                }) {
+                                    Label {
+                                        Text("Circle.ms · \(identity.profileDisplayDetail)")
+                                            .lineLimit(1)
+                                    } icon: {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(.green)
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("profile-circlems-status")
+                                } else {
+                                    Button {
+                                        linkCirclemsIdentity(profile.id)
+                                    } label: {
+                                        if circlemsLinkViewModel.state == .authenticating {
+                                            HStack(spacing: 5) {
+                                                ProgressView()
+                                                Text("Circle.msを連携中…")
+                                            }
+                                        } else {
+                                            Label("Circle.msを連携", systemImage: "link")
+                                        }
+                                    }
+                                    .disabled(
+                                        !profileStore.isIdentityVerified
+                                            || circlemsLinkViewModel.state == .authenticating
+                                    )
+                                    .accessibilityIdentifier("profile-link-circlems")
+                                }
+
+                                Spacer(minLength: 0)
+
+                                Button {
+                                    profileEditorPresentation = .init(id: profile.id)
+                                } label: {
+                                    Label("編集", systemImage: "pencil")
+                                }
+                                .disabled(!profileStore.isIdentityVerified)
+                                .accessibilityIdentifier("profile-edit")
+                            }
+                            .font(.caption)
+                            .buttonStyle(.borderless)
+                            .padding(.top, 5)
+                        }
                     }
                 }
                 .padding(.vertical, 8)
             }
 
-            if let profile = profileStore.profile {
+            if !nonCirclemsIdentities.isEmpty {
                 Section("プロフィール") {
-                    NavigationLink {
-                        ProfileEditorScreen(profileStore: profileStore)
-                    } label: {
-                        Label("プロフィールを編集", systemImage: "person.crop.circle.badge.pencil")
-                    }
-                    .accessibilityIdentifier("profile-edit")
-
-                    ForEach(profile.identities, id: \.stableID) { identity in
+                    ForEach(nonCirclemsIdentities, id: \.stableID) { identity in
                         LabeledContent(
                             providerDisplayName(identity.provider),
                             value: identity.profileDisplayDetail
                         )
-                    }
-
-                    if !profile.identities.contains(where: { $0.provider == "circlems" }) {
-                        Button {
-                            linkCirclemsIdentity(profile.id)
-                        } label: {
-                            if circlemsLinkViewModel.state == .authenticating {
-                                HStack {
-                                    ProgressView()
-                                    Text("Circle.msを連携中…")
-                                }
-                            } else {
-                                Label("Circle.msを連携", systemImage: "link")
-                            }
-                        }
-                        .disabled(
-                            !profileStore.isIdentityVerified
-                                || circlemsLinkViewModel.state == .authenticating
-                        )
-                        .accessibilityIdentifier("profile-link-circlems")
                     }
                 }
             }
@@ -161,7 +188,7 @@ struct ProfileScreen: View {
                                 .foregroundStyle(.secondary)
                             if !recovery.affectedPublicCircleIDs.isEmpty {
                                 Text(
-                                    "対象 WCID: \(recovery.affectedPublicCircleIDs.map(String.init).joined(separator: ", "))"
+                                    "Affected circles: \(recovery.affectedPublicCircleIDs.count)"
                                 )
                                 .font(.caption.monospacedDigit())
                                 .textSelection(.enabled)
@@ -200,20 +227,17 @@ struct ProfileScreen: View {
                     NavigationLink {
                         FollowingImportView(dataSource: dataSource)
                     } label: {
-                        LabeledContent {
+                        HStack(spacing: 12) {
+                            LucideIcon("users", size: 24)
+                                .foregroundStyle(Color.accentColor)
+                            Text("Find followed circles")
+                            Spacer()
                             Text("Import")
-                        } label: {
-                            Label("Find followed circles", systemImage: "person.2")
                         }
                     }
-                    .disabled(userState.user == nil)
                     .accessibilityIdentifier("profile-following-import")
 
-                    Text(
-                        userState.user == nil
-                            ? "Log in to Circle.ms to use authenticated imports."
-                            : "Import the public X accounts you follow and match them to this catalog on your device."
-                    )
+                    Text("Import the public X accounts you follow and match them to this catalog on your device.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
@@ -280,6 +304,11 @@ struct ProfileScreen: View {
             }
         }
         .navigationTitle("Profile")
+        .sheet(item: $profileEditorPresentation) { _ in
+            NavigationStack {
+                ProfileEditorScreen(profileStore: profileStore)
+            }
+        }
         .task {
             guard let flow = try? AppData.pendingCirclemsAuthorizationFlow(),
                   flow.purpose == .link,
@@ -357,6 +386,10 @@ struct ProfileScreen: View {
 
     private var isLoggedIn: Bool {
         profileStore.profile != nil || userState.user != nil
+    }
+
+    private var nonCirclemsIdentities: [CominaviProfileIdentity] {
+        profileStore.profile?.identities.filter { $0.provider != "circlems" } ?? []
     }
 
     private func returnToAuthentication() {
@@ -526,8 +559,7 @@ struct AuthenticatedProfileAvatar: View {
                     .renderingMode(.original)
                     .scaledToFill()
             } else {
-                Image(systemName: "person.crop.circle.fill")
-                    .resizable()
+                LucideIcon("circle-user", size: Double(size))
                     .foregroundStyle(.secondary)
             }
         }

@@ -96,7 +96,7 @@ struct SharedPlanFavoriteImportScreen: View {
                 Section("追加できなかったサークル") {
                     ForEach(model.failures) { failure in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("WCID \(failure.wcID)")
+                            Text("A selected circle")
                                 .font(.headline)
                             Text(failure.message)
                                 .font(.caption)
@@ -126,10 +126,7 @@ struct SharedPlanFavoriteImportScreen: View {
                             )
                         ) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(item.circleName.isEmpty ? "WCID \(item.wcID)" : item.circleName)
-                                Text("WCID \(item.wcID)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                Text(item.circleName.isEmpty ? String(localized: "Unnamed circle") : item.circleName)
                                 if !item.memo.isEmpty {
                                     Text(item.memo)
                                         .font(.caption)

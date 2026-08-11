@@ -10,7 +10,7 @@ private enum ComiketLocationPickerPurpose: Equatable {
     var flowTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "Where Am I"
-        case .destination: "Find a Table"
+        case .destination: "Find a Circle"
         case .circleSearch: "Find a Circle"
         }
     }
@@ -18,7 +18,7 @@ private enum ComiketLocationPickerPurpose: Equatable {
     var venueTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "Where are you?"
-        case .destination: "Which venue is the table in?"
+        case .destination: "Which venue is the circle in?"
         case .circleSearch: "Which venue is the circle in?"
         }
     }
@@ -28,7 +28,7 @@ private enum ComiketLocationPickerPurpose: Equatable {
         case .currentLocation:
             "Choose the venue you are standing in. Location is only used to suggest an answer."
         case .destination:
-            "Choose the venue containing the table you want to visit."
+            "Choose the venue containing the circle you want to visit."
         case .circleSearch:
             "Choose the venue containing the circle you want to find."
         }
@@ -37,7 +37,7 @@ private enum ComiketLocationPickerPurpose: Equatable {
     var characterTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "Which letter do you see?"
-        case .destination: "Which letter is your destination?"
+        case .destination: "Which block letter is the circle in?"
         case .circleSearch: "Which block letter is the circle in?"
         }
     }
@@ -47,7 +47,7 @@ private enum ComiketLocationPickerPurpose: Equatable {
         case .currentLocation:
             "Look for the large block letter nearest to you, then tap the same character below."
         case .destination:
-            "Choose the block letter printed in the destination's Comiket address."
+            "Choose the block letter from the circle's Comiket address."
         case .circleSearch:
             "Choose the block letter from the circle's Comiket address."
         }
@@ -56,7 +56,7 @@ private enum ComiketLocationPickerPurpose: Equatable {
     var numberTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "What number do you see?"
-        case .destination: "What is the destination number?"
+        case .destination: "What space number is the circle in?"
         case .circleSearch: "What space number is the circle in?"
         }
     }
@@ -66,7 +66,7 @@ private enum ComiketLocationPickerPurpose: Equatable {
         case .currentLocation:
             "Enter the one- or two-digit space number printed beside the block letter."
         case .destination:
-            "Enter the one- or two-digit space number from the destination's Comiket address."
+            "Enter the one- or two-digit space number from the circle's Comiket address."
         case .circleSearch:
             "Enter the one- or two-digit space number from the circle's Comiket address."
         }
@@ -1048,9 +1048,9 @@ private struct NumberSelectionScreen: View {
         case .currentLocation:
             "Place your position on the venue map"
         case .destination:
-            "Pin this table on the map; use current signs and staff directions"
+            "Pin this circle on the map; use current signs and staff directions"
         case .circleSearch:
-            "Open the circle details for this table"
+            "Open the circle details for this circle"
         }
     }
 
