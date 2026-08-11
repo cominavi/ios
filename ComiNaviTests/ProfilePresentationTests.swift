@@ -55,6 +55,7 @@ final class ProfilePresentationTests: XCTestCase {
         XCTAssertEqual(result.scale, 3, accuracy: 0.01)
         XCTAssertEqual(result.cgImage?.width, 72)
         XCTAssertEqual(result.cgImage?.height, 72)
+        XCTAssertEqual(result.renderingMode, .alwaysOriginal)
         let alphaInfo = try XCTUnwrap(result.cgImage?.alphaInfo)
         XCTAssertFalse([.none, .noneSkipFirst, .noneSkipLast].contains(alphaInfo))
     }

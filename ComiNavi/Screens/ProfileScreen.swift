@@ -639,10 +639,11 @@ extension AvatarImageProcessor {
         let format = UIGraphicsImageRendererFormat.preferred()
         format.scale = displayScale
         format.opaque = false
-        return UIGraphicsImageRenderer(size: bounds.size, format: format).image { _ in
+        let image = UIGraphicsImageRenderer(size: bounds.size, format: format).image { _ in
             UIBezierPath(ovalIn: bounds).addClip()
             sourceImage.draw(in: drawRect)
         }
+        return image.withRenderingMode(.alwaysOriginal)
     }
 }
 
