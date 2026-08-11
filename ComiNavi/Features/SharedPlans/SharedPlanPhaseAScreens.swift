@@ -327,22 +327,24 @@ struct SharedPlanNotificationInboxScreen: View {
     let features: SharedPlanPresentationFeatures
     let currentUserID: String?
     let catalogDataSource: CirclemsDataSource?
+    let onOpenPlan: (String) -> Void
     @State private var model = SharedPlanNotificationInboxModel()
 
     init(
         store: SharedPlanStore,
         currentUserID: String? = nil,
         catalogDataSource: CirclemsDataSource? = nil,
-        features: SharedPlanPresentationFeatures = .production
+        features: SharedPlanPresentationFeatures = .production,
+        onOpenPlan: @escaping (String) -> Void
     ) {
         self.store = store
         self.currentUserID = currentUserID
         self.catalogDataSource = catalogDataSource
         self.features = features
+        self.onOpenPlan = onOpenPlan
     }
 
     var body: some View {
-        @Bindable var model = model
         List {
             if let issue = model.issueMessage, !model.notifications.isEmpty {
                 SharedPlanInlineIssue(message: issue) {
@@ -360,6 +362,7 @@ struct SharedPlanNotificationInboxScreen: View {
                     catalogDataSource: catalogDataSource
                 ) {
                     Task { await model.open(notification, using: store) }
+                    onOpenPlan(notification.planID)
                 } onRetryRead: {
                     Task { await model.retryRead(notification, using: store) }
                 }
@@ -403,15 +406,6 @@ struct SharedPlanNotificationInboxScreen: View {
         .navigationTitle("Notifications")
         .refreshable { await model.refresh(using: store) }
         .task { await model.load(using: store) }
-        .navigationDestination(item: $model.selectedPlanID) { planID in
-            SharedPlanDetailScreen(
-                store: store,
-                planID: planID,
-                currentUserID: currentUserID,
-                features: features,
-                catalogDataSource: catalogDataSource
-            )
-        }
     }
 }
 

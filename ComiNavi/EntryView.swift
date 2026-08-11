@@ -409,6 +409,10 @@ struct EntryView: View {
                 "-cominavi-ui-testing-shared-plan-list"
             ) {
                 SharedPlanListUITestSurface()
+            } else if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-shared-plan-empty"
+            ) {
+                SharedPlanEmptyUITestSurface()
             } else {
                 regularAppContent
             }

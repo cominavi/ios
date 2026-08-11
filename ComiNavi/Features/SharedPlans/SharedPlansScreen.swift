@@ -7,24 +7,33 @@ private enum SharedPlansRoute: Hashable {
 private enum SharedPlansSheet: Identifiable {
     case create(comiketNo: Int)
     case notifications
+    case planSwitcher(required: Bool)
+    case joinGuide
 
     var id: String {
         switch self {
         case .create(let comiketNo): "create-\(comiketNo)"
         case .notifications: "notifications"
+        case .planSwitcher(let required): "plan-switcher-\(required)"
+        case .joinGuide: "join-guide"
         }
     }
 }
 
 struct SharedPlansScreen: View {
     let store: SharedPlanStore
+    @State private var navigationPath: [SharedPlansRoute] = []
     @State private var presentedSheet: SharedPlansSheet?
-    @State private var recoveryPlanToDiscard: String?
+    @State private var queuedSheet: SharedPlansSheet?
+    @State private var queuedRoute: SharedPlansRoute?
+    @State private var primaryPlanID: String?
+    @State private var hasLoadedPrimaryPreference = false
     let comiketNo: Int?
     let currentUserID: String?
     let features: SharedPlanPresentationFeatures
     let favoriteImportService: any CirclemsFavoriteImportServicing
     let catalogDataSource: CirclemsDataSource?
+    private let primaryPlanPreference: SharedPlanPrimaryPlanPreference
 
     init(
         store: SharedPlanStore,
@@ -32,7 +41,8 @@ struct SharedPlansScreen: View {
         currentUserID: String? = nil,
         features: SharedPlanPresentationFeatures = .production,
         favoriteImportService: any CirclemsFavoriteImportServicing = CominaviServiceClient.shared,
-        catalogDataSource: CirclemsDataSource? = AppData.catalogLibrary.dataSource
+        catalogDataSource: CirclemsDataSource? = AppData.catalogLibrary.dataSource,
+        primaryPlanDefaults: UserDefaults = .standard
     ) {
         self.store = store
         self.comiketNo = comiketNo
@@ -40,11 +50,12 @@ struct SharedPlansScreen: View {
         self.features = features
         self.favoriteImportService = favoriteImportService
         self.catalogDataSource = catalogDataSource
+        primaryPlanPreference = SharedPlanPrimaryPlanPreference(defaults: primaryPlanDefaults)
     }
 
     var body: some View {
-        NavigationStack {
-            sidebar
+        NavigationStack(path: $navigationPath) {
+            primaryPlanHome
                 .navigationDestination(for: SharedPlansRoute.self) { route in
                     switch route {
                     case let .plan(planID):
@@ -59,25 +70,60 @@ struct SharedPlansScreen: View {
                     }
                 }
         }
-        .sheet(item: $presentedSheet) { sheet in
+        .sheet(item: $presentedSheet, onDismiss: completeQueuedSheetTransition) { sheet in
             switch sheet {
             case .create(let comiketNo):
                 SharedPlanCreateSheet(
                     store: store,
-                    comiketNo: comiketNo
+                    comiketNo: comiketNo,
+                    onCreated: selectPrimaryPlan
                 )
             case .notifications:
                 SharedPlanNotificationInboxSheet(
                     store: store,
                     currentUserID: currentUserID,
                     features: features,
-                    catalogDataSource: catalogDataSource
+                    catalogDataSource: catalogDataSource,
+                    onOpenPlan: queueOpeningPlan
                 )
+            case .planSwitcher(let required):
+                SharedPlanSwitcherSheet(
+                    activePlans: activePlans,
+                    archivedPlans: archivedPlans,
+                    recoveryDocuments: store.recoveryDocuments,
+                    visiblePlanIDs: Set(store.plans.map(\.id)),
+                    primaryPlanID: primaryPlanID,
+                    required: required,
+                    pendingPlanIDs: pendingPlanIDs,
+                    canCreate: canCreatePlan,
+                    comiketNo: comiketNo,
+                    onSelectPrimary: selectPrimaryPlan,
+                    onOpenArchived: queueOpeningPlan,
+                    onCreate: { queueSheet(.create(comiketNo: $0)) },
+                    onJoin: { queueSheet(.joinGuide) }
+                )
+            case .joinGuide:
+                SharedPlanJoinGuideSheet()
             }
         }
-        .task {
+        .task(id: primaryPreferenceKey) {
+            hasLoadedPrimaryPreference = false
+            let storedPlanID = primaryPlanPreference.planID(
+                userID: currentUserID,
+                comiketNo: comiketNo
+            )
             await store.load()
+            primaryPlanID = storedPlanID
+            hasLoadedPrimaryPreference = true
+            reconcilePrimaryPlan()
             await store.refresh()
+            reconcilePrimaryPlan()
+        }
+        .onChange(of: activePlanSignature) {
+            reconcilePrimaryPlan()
+        }
+        .onChange(of: store.isLoaded) {
+            reconcilePrimaryPlan()
         }
         .alert(
             "共有プランを更新できませんでした",
@@ -90,135 +136,166 @@ struct SharedPlansScreen: View {
         } message: {
             Text(store.issueMessage ?? "しばらくしてからもう一度お試しください。")
         }
-        .confirmationDialog(
-            "この復旧データを端末から削除しますか？",
-            isPresented: Binding(
-                get: { recoveryPlanToDiscard != nil },
-                set: { if !$0 { recoveryPlanToDiscard = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("削除", role: .destructive) {
-                guard let recoveryID = recoveryPlanToDiscard else { return }
-                recoveryPlanToDiscard = nil
-                Task {
-                    do {
-                        try await store.discardRecoveryDocument(id: recoveryID)
-                    } catch {
-                        store.issueMessage = error.localizedDescription
-                    }
-                }
-            }
-            Button("キャンセル", role: .cancel) { recoveryPlanToDiscard = nil }
-        } message: {
-            Text("先に「書き出す」で保存できます。削除したデータは元に戻せません。")
-        }
     }
 
-    private var sidebar: some View {
-        List {
-            if !features.writesEnabled {
-                SharedPlanReadOnlyNotice()
-            }
-            pendingSection
-            recoverySection
-            activeSection
-            archiveSection
-        }
-        .navigationTitle("共有プラン")
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                if store.isRefreshing || store.isDrainingOutbox {
-                    ProgressView()
-                        .accessibilityLabel("プランを同期中")
-                }
-            }
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    presentedSheet = .notifications
-                } label: {
-                    Label(
-                        "Shared Plan notifications",
-                        systemImage: unreadNotificationCount > 0 ? "bell.badge" : "bell"
-                    )
-                }
-                .accessibilityValue(notificationAccessibilityValue)
-                .accessibilityIdentifier("shared-plan-notifications-button")
-
-                if features.writesEnabled, let comiketNo {
+    @ViewBuilder
+    private var primaryPlanHome: some View {
+        if !store.isLoaded || !hasLoadedPrimaryPreference {
+            ProgressView("Loading your plans…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle("Shared Plans")
+        } else if let primaryPlan {
+            SharedPlanDetailScreen(
+                store: store,
+                planID: primaryPlan.id,
+                currentUserID: currentUserID,
+                features: features,
+                favoriteImportService: favoriteImportService,
+                catalogDataSource: catalogDataSource
+            )
+            .id(primaryPlan.id)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        presentedSheet = .create(comiketNo: comiketNo)
+                        presentedSheet = .planSwitcher(required: false)
                     } label: {
-                        Label("プランを作成", systemImage: "plus")
+                        Label("Switch primary plan", systemImage: "rectangle.2.swap")
                     }
-                    .disabled(!store.createAvailability(comiketNo: comiketNo).canCreate)
+                    .accessibilityIdentifier("shared-plan-switcher-button")
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    notificationButton
                 }
             }
-        }
-        .refreshable { await store.refresh() }
-    }
-
-    @ViewBuilder
-    private var pendingSection: some View {
-        if !pendingWrites.isEmpty {
-            Section("送信待ち") {
-                ForEach(pendingWrites) { write in
-                    SharedPlanPendingRow(
-                        write: write,
-                        issue: store.restWriteIssues[write.id],
-                        onDiscard: write.isQuarantined ? { discard(write) } : nil
-                    )
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var recoverySection: some View {
-        if !store.recoveryDocuments.isEmpty {
-            Section {
-                ForEach(store.recoveryDocuments) { recovery in
-                    let isVisiblePlan = recovery.id == recovery.planID
-                        && store.plans.contains { $0.id == recovery.planID }
-                    SharedPlanRecoveryRow(
-                        recovery: recovery,
-                        planRoute: isVisiblePlan ? .plan(recovery.planID) : nil,
-                        onDiscard: isVisiblePlan ? nil : {
-                            recoveryPlanToDiscard = recovery.id
+        } else if activePlans.isEmpty {
+            SharedPlanEmptyHome(
+                canCreate: canCreatePlan,
+                onAdd: presentCreateSheet,
+                onJoin: { presentedSheet = .joinGuide }
+            )
+            .navigationTitle("Shared Plans")
+            .accessibilityIdentifier("shared-plan-empty-home")
+            .toolbar {
+                if !archivedPlans.isEmpty {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            presentedSheet = .planSwitcher(required: false)
+                        } label: {
+                            Label("View archived plans", systemImage: "archive")
                         }
-                    )
+                        .accessibilityIdentifier("shared-plan-switcher-button")
+                    }
                 }
-            } header: {
-                Text("復旧データ")
-            } footer: {
-                Text("表示中のプランは詳細画面で復旧方法を選べます。アクセスできない以前のデータは、書き出してから端末から削除できます。")
             }
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle("Shared Plans")
         }
     }
 
-    private var activeSection: some View {
-        Section("有効なプラン") {
-            if activePlans.isEmpty {
-                ContentUnavailableView(
-                    "プランはまだありません",
-                    systemImage: "list.bullet.clipboard",
-                    description: Text(features.writesEnabled
-                        ? String(localized: "サークルや買い物を共有するプランを作成できます。")
-                        : String(localized: "No Shared Plans are available."))
-                )
-            } else {
-                ForEach(activePlans) { plan in planLink(plan) }
-            }
+    private var notificationButton: some View {
+        Button {
+            presentedSheet = .notifications
+        } label: {
+            Label(
+                "Shared Plan notifications",
+                systemImage: unreadNotificationCount > 0 ? "bell.badge" : "bell"
+            )
+        }
+        .accessibilityValue(notificationAccessibilityValue)
+        .accessibilityIdentifier("shared-plan-notifications-button")
+    }
+
+    private var primaryPlan: SharedPlan? {
+        guard let primaryPlanID else { return nil }
+        return activePlans.first { $0.id == primaryPlanID }
+    }
+
+    private var primaryPreferenceKey: String {
+        SharedPlanPrimaryPlanPreference.storageKey(
+            userID: currentUserID,
+            comiketNo: comiketNo
+        )
+    }
+
+    private var activePlanSignature: String {
+        activePlans.map(\.id).joined(separator: ",")
+    }
+
+    private var canCreatePlan: Bool {
+        guard features.writesEnabled, let comiketNo else { return false }
+        return store.createAvailability(comiketNo: comiketNo).canCreate
+    }
+
+    private var pendingPlanIDs: Set<String> {
+        Set((store.pendingRESTWrites + store.quarantinedRESTWrites).map(\.planID))
+    }
+
+    private func reconcilePrimaryPlan() {
+        guard store.isLoaded, hasLoadedPrimaryPreference else { return }
+        let validPlanID = SharedPlanPrimaryPlanPreference.validPlanID(
+            primaryPlanID,
+            among: activePlans
+        )
+        if validPlanID != primaryPlanID {
+            primaryPlanID = validPlanID
+            primaryPlanPreference.setPlanID(
+                validPlanID,
+                userID: currentUserID,
+                comiketNo: comiketNo
+            )
+            navigationPath.removeAll()
+        }
+        guard validPlanID == nil, !activePlans.isEmpty else { return }
+        if presentedSheet == nil {
+            presentedSheet = .planSwitcher(required: true)
         }
     }
 
-    @ViewBuilder
-    private var archiveSection: some View {
-        if !archivedPlans.isEmpty {
-            Section("アーカイブ") {
-                ForEach(archivedPlans) { plan in planLink(plan) }
-            }
+    private func selectPrimaryPlan(_ planID: String) {
+        guard activePlans.contains(where: { $0.id == planID }) else { return }
+        primaryPlanID = planID
+        primaryPlanPreference.setPlanID(
+            planID,
+            userID: currentUserID,
+            comiketNo: comiketNo
+        )
+        navigationPath.removeAll()
+        presentedSheet = nil
+    }
+
+    private func queueOpeningPlan(_ planID: String) {
+        queuedRoute = .plan(planID)
+        presentedSheet = nil
+    }
+
+    private func queueSheet(_ sheet: SharedPlansSheet) {
+        queuedSheet = sheet
+        presentedSheet = nil
+    }
+
+    private func completeQueuedSheetTransition() {
+        if let queuedSheet {
+            self.queuedSheet = nil
+            presentedSheet = queuedSheet
+            return
         }
+        if let queuedRoute {
+            self.queuedRoute = nil
+            switch queuedRoute {
+            case .plan(let planID):
+                navigationPath = planID == primaryPlanID ? [] : [queuedRoute]
+            }
+            return
+        }
+        reconcilePrimaryPlan()
+    }
+
+    private func presentCreateSheet() {
+        guard let comiketNo else { return }
+        presentedSheet = .create(comiketNo: comiketNo)
     }
 
     private var activePlans: [SharedPlan] {
@@ -235,13 +312,6 @@ struct SharedPlansScreen: View {
         }
     }
 
-    private var pendingWrites: [SharedPlanRESTWrite] {
-        (store.pendingRESTWrites + store.quarantinedRESTWrites).filter {
-            ($0.kind == .create && (comiketNo == nil || $0.comiketNo == comiketNo))
-                || $0.kind == .acceptInvitation
-        }
-    }
-
     private var unreadNotificationCount: Int {
         store.notifications.count {
             $0.readAt == nil && !store.pendingNotificationReadIDs.contains($0.id)
@@ -251,156 +321,330 @@ struct SharedPlansScreen: View {
     private var notificationAccessibilityValue: Text {
         Text("\(unreadNotificationCount) unread notifications")
     }
+}
 
-    private func planLink(_ plan: SharedPlan) -> some View {
-        NavigationLink(value: SharedPlansRoute.plan(plan.id)) {
-            SharedPlanNavigationRow(
-                plan: plan,
-                hasPendingChanges: store.hasPendingChanges(planID: plan.id)
+private struct SharedPlanEmptyHome: View {
+    let canCreate: Bool
+    let onAdd: () -> Void
+    let onJoin: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            actionButton(
+                title: "Add",
+                icon: "plus",
+                hint: "Creates a new Shared Plan.",
+                action: onAdd
+            )
+            .disabled(!canCreate)
+
+            actionButton(
+                title: "Join",
+                icon: "person.crop.circle.badge.plus",
+                hint: "Shows how to join a Shared Plan.",
+                action: onJoin
             )
         }
-        .accessibilityIdentifier("shared-plan-row-\(plan.id)")
+        .frame(maxWidth: 360)
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(uiColor: .systemGroupedBackground))
     }
 
-    private func discard(_ write: SharedPlanRESTWrite) {
-        Task {
-            do {
-                try await store.discardQuarantinedWrite(id: write.id)
-            } catch {
-                store.issueMessage = error.localizedDescription
+    private func actionButton(
+        title: LocalizedStringKey,
+        icon: String,
+        hint: LocalizedStringKey,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 14) {
+                LucideIcon(icon, size: 30)
+                Text(title)
+                    .font(.headline)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+            .background(.background, in: .rect(cornerRadius: 24))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24)
+                    .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
             }
         }
+        .buttonStyle(.plain)
+        .accessibilityHint(hint)
     }
 }
 
-private struct SharedPlanRecoveryRow: View {
+private struct SharedPlanSwitcherSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let activePlans: [SharedPlan]
+    let archivedPlans: [SharedPlan]
+    let recoveryDocuments: [SharedPlanRecoveryDocument]
+    let visiblePlanIDs: Set<String>
+    let primaryPlanID: String?
+    let required: Bool
+    let pendingPlanIDs: Set<String>
+    let canCreate: Bool
+    let comiketNo: Int?
+    let onSelectPrimary: (String) -> Void
+    let onOpenArchived: (String) -> Void
+    let onCreate: (Int) -> Void
+    let onJoin: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Your plans") {
+                    ForEach(activePlans) { plan in
+                        Button {
+                            onSelectPrimary(plan.id)
+                        } label: {
+                            SharedPlanPickerRow(
+                                plan: plan,
+                                hasPendingChanges: pendingPlanIDs.contains(plan.id),
+                                isSelected: plan.id == primaryPlanID,
+                                isArchived: false
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("shared-plan-picker-\(plan.id)")
+                    }
+                }
+
+                if !required, !archivedPlans.isEmpty {
+                    Section("Archived") {
+                        ForEach(archivedPlans) { plan in
+                            Button {
+                                onOpenArchived(plan.id)
+                            } label: {
+                                SharedPlanPickerRow(
+                                    plan: plan,
+                                    hasPendingChanges: pendingPlanIDs.contains(plan.id),
+                                    isSelected: false,
+                                    isArchived: true
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if !required, !recoveryDocuments.isEmpty {
+                    Section("Recovery") {
+                        ForEach(recoveryDocuments) { recovery in
+                            SharedPlanRecoveryPickerRow(
+                                recovery: recovery,
+                                canOpenPlan: visiblePlanIDs.contains(recovery.planID),
+                                onOpenPlan: onOpenArchived
+                            )
+                        }
+                    }
+                }
+
+                Section {
+                    if canCreate, let comiketNo {
+                        Button {
+                            onCreate(comiketNo)
+                        } label: {
+                            Label("Create plan", systemImage: "plus")
+                        }
+                    }
+                    Button(action: onJoin) {
+                        Label("How to join a plan", systemImage: "person.crop.circle.badge.plus")
+                    }
+                }
+            }
+            .navigationTitle(required ? "Choose a primary plan" : "Switch plan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if !required {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }
+                    }
+                }
+            }
+        }
+        .interactiveDismissDisabled(required)
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("shared-plan-switcher-sheet")
+    }
+}
+
+private struct SharedPlanRecoveryPickerRow: View {
     let recovery: SharedPlanRecoveryDocument
-    let planRoute: SharedPlansRoute?
-    let onDiscard: (() -> Void)?
+    let canOpenPlan: Bool
+    let onOpenPlan: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Label(
-                planRoute != nil ? "復旧が必要なプラン" : "アクセスできないプラン",
-                systemImage: planRoute != nil
-                    ? "externaldrive.badge.exclamationmark"
-                    : "lock.trianglebadge.exclamationmark"
-            )
-            .font(.headline)
-            Text(recovery.planID)
-                .font(.caption.monospaced())
-                .textSelection(.enabled)
-            Text(summary)
+            LucideLabel("Saved recovery copy", icon: "database")
+                .font(.headline)
+            Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are saved on this device.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack {
                 ShareLink(item: recovery.exportText) {
-                    Label("書き出す", systemImage: "square.and.arrow.up")
+                    LucideLabel("Download recovery copy", icon: "share")
                 }
                 Spacer()
-                if let planRoute {
-                    NavigationLink("復旧内容を確認", value: planRoute)
-                }
-                if let onDiscard {
-                    Button("端末から削除", role: .destructive, action: onDiscard)
+                if canOpenPlan {
+                    Button("Open") { onOpenPlan(recovery.planID) }
                 }
             }
             .buttonStyle(.borderless)
         }
         .padding(.vertical, 3)
     }
-
-    private var summary: String {
-        "未同期の編集 \(recovery.pendingOperationCount)件・プラン情報の変更 \(recovery.metadataIntentCount)件"
-    }
 }
 
-private struct SharedPlanNavigationRow: View {
+private struct SharedPlanPickerRow: View {
     let plan: SharedPlan
     let hasPendingChanges: Bool
-
-    var body: some View {
-        SharedPlanRow(plan: plan, hasPendingChanges: hasPendingChanges)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
-    }
-}
-
-private struct SharedPlanRow: View {
-    let plan: SharedPlan
-    let hasPendingChanges: Bool
+    let isSelected: Bool
+    let isArchived: Bool
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: plan.lifecycle == .archived
-                ? "archivebox"
-                : "list.bullet.clipboard")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(plan.lifecycle == .archived ? Color.secondary : Color.accentColor)
-                .frame(width: 28, height: 32)
-                .accessibilityLabel("共有プラン")
-                .accessibilityIdentifier("shared-plan-row-icon-\(plan.id)")
-
-            VStack(alignment: .leading, spacing: 5) {
-                HStack {
-                    Text(plan.name)
-                        .font(.headline)
-                    Spacer(minLength: 8)
-                    if hasPendingChanges {
-                        Label("送信待ち", systemImage: "icloud.and.arrow.up")
-                            .labelStyle(.iconOnly)
-                            .foregroundStyle(.orange)
-                            .accessibilityLabel("送信待ちの変更があります")
-                    }
-                }
-                HStack(spacing: 8) {
-                    Text("C\(plan.comiketNo)")
-                    Text("サークル \(plan.circleKeys.count)件")
-                    Text(roleLabel)
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            Image(systemName: "chevron.forward")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
+            LucideIcon(isArchived ? "archive" : "list-checks", size: 22)
+                .foregroundStyle(isArchived ? Color.secondary : Color.accentColor)
+                .frame(width: 28)
                 .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(plan.name)
+                    .font(.headline)
+                Text("C\(plan.comiketNo) · \(plan.circleKeys.count) circles")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            if hasPendingChanges {
+                LucideIcon("cloud-upload", size: 16)
+                    .foregroundStyle(.orange)
+                    .accessibilityLabel("Pending changes")
+            }
+            if isSelected {
+                LucideIcon("check", size: 18)
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityLabel("Primary plan")
+            } else if isArchived {
+                LucideIcon("chevron-right", size: 16)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
         }
         .padding(.vertical, 3)
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+private struct SharedPlanJoinGuideSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    guideStep(
+                        number: 1,
+                        title: "Get an invitation link",
+                        detail: "Ask the plan owner to create and share an invitation from Plan information, then Members and invitations."
+                    )
+                    guideStep(
+                        number: 2,
+                        title: "Open the link on this iPhone",
+                        detail: "The invitation opens in ComiNavi so you can confirm the plan before joining."
+                    )
+                    guideStep(
+                        number: 3,
+                        title: "Confirm your account",
+                        detail: "Sign in as the person who should join, then accept the invitation."
+                    )
+                } footer: {
+                    Text("Joining starts from an invitation link; there is no code to enter on this screen.")
+                }
+            }
+            .navigationTitle("How to join a plan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .accessibilityIdentifier("shared-plan-join-guide")
     }
 
-    private var roleLabel: LocalizedStringKey {
-        switch plan.role {
-        case .owner: "オーナー"
-        case .editor: "編集者"
-        case .viewer: "閲覧者"
+    private func guideStep(
+        number: Int,
+        title: LocalizedStringKey,
+        detail: LocalizedStringKey
+    ) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text(number, format: .number)
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(width: 30, height: 30)
+                .background(Color.accentColor, in: .circle)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .padding(.vertical, 5)
+        .accessibilityElement(children: .combine)
     }
 }
 
 #if DEBUG
 struct SharedPlanListUITestSurface: View {
     private enum Route: Hashable {
-        case plan
+        case plan(String)
         case information
         case invitations
     }
 
     static let planID = "11111111-1111-4111-8111-111111111111"
+    static let secondPlanID = "11111111-1111-4111-8111-111111111112"
 
-    private let plan = SharedPlan(
-        id: Self.planID,
-        name: "買い物リスト",
-        comiketNo: 108,
-        ownership: .owned,
-        role: .owner,
-        lifecycle: .active,
-        revision: 1,
-        circleKeys: [],
-        createdAt: Date(timeIntervalSince1970: 1_786_276_800),
-        updatedAt: Date(timeIntervalSince1970: 1_786_276_800)
-    )
+    @State private var navigationPath: [Route] = []
+    @State private var primaryPlanID = Self.planID
+    @State private var showsSwitcher = false
+    @State private var showsNotifications = false
+    @State private var queuedNotificationPlanID: String?
+
+    private let plans = [
+        SharedPlan(
+            id: Self.planID,
+            name: "買い物リスト",
+            comiketNo: 108,
+            ownership: .owned,
+            role: .owner,
+            lifecycle: .active,
+            revision: 1,
+            circleKeys: [],
+            createdAt: Date(timeIntervalSince1970: 1_786_276_800),
+            updatedAt: Date(timeIntervalSince1970: 1_786_276_800)
+        ),
+        SharedPlan(
+            id: Self.secondPlanID,
+            name: "Travel team",
+            comiketNo: 108,
+            ownership: .joined,
+            role: .editor,
+            lifecycle: .active,
+            revision: 2,
+            circleKeys: [],
+            createdAt: Date(timeIntervalSince1970: 1_786_276_800),
+            updatedAt: Date(timeIntervalSince1970: 1_786_276_800)
+        ),
+    ]
 
     private let progress = SharedPlanProgressSummary(
         circles: [
@@ -428,38 +672,12 @@ struct SharedPlanListUITestSurface: View {
     )
 
     var body: some View {
-        NavigationStack {
-            List {
-                NavigationLink(value: Route.plan) {
-                    SharedPlanNavigationRow(
-                        plan: plan,
-                        hasPendingChanges: false
-                    )
-                }
-                .accessibilityIdentifier("shared-plan-row-\(plan.id)")
-            }
-            .navigationTitle("共有プラン")
+        NavigationStack(path: $navigationPath) {
+            planDetail(primaryPlan)
             .navigationDestination(for: Route.self) { route in
                 switch route {
-                case .plan:
-                    List {
-                        Section("Plan progress") {
-                            SharedPlanProgressOverview(progress: progress)
-                        }
-                        Section("Circles and purchases") {
-                            Text("No circles in this plan")
-                        }
-                    }
-                    .navigationTitle(plan.name)
-                    .accessibilityIdentifier("shared-plan-test-detail")
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
-                            NavigationLink(value: Route.information) {
-                                Label("Plan information", systemImage: "info.circle")
-                            }
-                            .accessibilityIdentifier("shared-plan-information-button")
-                        }
-                    }
+                case .plan(let planID):
+                    planDetail(plans.first { $0.id == planID } ?? primaryPlan)
                 case .information:
                     List {
                         NavigationLink(value: Route.invitations) {
@@ -478,49 +696,142 @@ struct SharedPlanListUITestSurface: View {
                 }
             }
         }
+        .sheet(isPresented: $showsSwitcher) {
+            SharedPlanSwitcherSheet(
+                activePlans: plans,
+                archivedPlans: [],
+                recoveryDocuments: [],
+                visiblePlanIDs: Set(plans.map(\.id)),
+                primaryPlanID: primaryPlanID,
+                required: false,
+                pendingPlanIDs: [],
+                canCreate: true,
+                comiketNo: 108,
+                onSelectPrimary: { planID in
+                    primaryPlanID = planID
+                    navigationPath.removeAll()
+                    showsSwitcher = false
+                },
+                onOpenArchived: { _ in },
+                onCreate: { _ in },
+                onJoin: {}
+            )
+        }
+        .sheet(
+            isPresented: $showsNotifications,
+            onDismiss: openQueuedNotificationPlan
+        ) {
+            NavigationStack {
+                List {
+                    Button {
+                        queuedNotificationPlanID = Self.secondPlanID
+                        showsNotifications = false
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Travel team updated a purchase")
+                                .font(.headline)
+                            Text("Open the plan to review this update.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("shared-plan-test-notification")
+                }
+                .navigationTitle("Notifications")
+            }
+            .accessibilityIdentifier("shared-plan-notifications-sheet")
+        }
+    }
+
+    private var primaryPlan: SharedPlan {
+        plans.first { $0.id == primaryPlanID } ?? plans[0]
+    }
+
+    private func planDetail(_ plan: SharedPlan) -> some View {
+        List {
+            Section("Plan progress") {
+                SharedPlanProgressOverview(progress: progress)
+            }
+            Section("Circles and purchases") {
+                Text("No circles in this plan")
+            }
+        }
+        .navigationTitle(plan.name)
+        .accessibilityIdentifier("shared-plan-test-detail")
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    showsSwitcher = true
+                } label: {
+                    Label("Switch primary plan", systemImage: "rectangle.2.swap")
+                }
+                .accessibilityIdentifier("shared-plan-switcher-button")
+            }
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    showsNotifications = true
+                } label: {
+                    Label("Shared Plan notifications", systemImage: "bell")
+                }
+                .accessibilityIdentifier("shared-plan-notifications-button")
+
+                NavigationLink(value: Route.information) {
+                    Label("Plan information", systemImage: "info.circle")
+                }
+                .accessibilityIdentifier("shared-plan-information-button")
+            }
+        }
+    }
+
+    private func openQueuedNotificationPlan() {
+        guard let queuedNotificationPlanID else { return }
+        self.queuedNotificationPlanID = nil
+        navigationPath = queuedNotificationPlanID == primaryPlanID
+            ? []
+            : [.plan(queuedNotificationPlanID)]
+    }
+}
+
+struct SharedPlanEmptyUITestSurface: View {
+    private enum Sheet: Identifiable {
+        case create
+        case join
+
+        var id: String {
+            switch self {
+            case .create: "create"
+            case .join: "join"
+            }
+        }
+    }
+
+    @State private var presentedSheet: Sheet?
+
+    var body: some View {
+        NavigationStack {
+            SharedPlanEmptyHome(
+                canCreate: true,
+                onAdd: { presentedSheet = .create },
+                onJoin: { presentedSheet = .join }
+            )
+            .navigationTitle("Shared Plans")
+            .accessibilityIdentifier("shared-plan-empty-home")
+        }
+        .sheet(item: $presentedSheet) { sheet in
+            switch sheet {
+            case .create:
+                NavigationStack {
+                    Text("Create plan")
+                        .navigationTitle("Create plan")
+                        .accessibilityIdentifier("shared-plan-create-test-surface")
+                }
+            case .join:
+                SharedPlanJoinGuideSheet()
+            }
+        }
     }
 }
 #endif
-
-private struct SharedPlanPendingRow: View {
-    let write: SharedPlanRESTWrite
-    let issue: String?
-    let onDiscard: (() -> Void)?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline) {
-                Image(systemName: write.isQuarantined ? "exclamationmark.triangle.fill" : "clock.arrow.circlepath")
-                    .foregroundStyle(write.isQuarantined ? .orange : .secondary)
-                Text(title)
-                    .font(.headline)
-                Spacer()
-                if let onDiscard {
-                    Button("破棄", role: .destructive, action: onDiscard)
-                        .buttonStyle(.borderless)
-                }
-            }
-            Text(issue ?? (write.isQuarantined
-                ? "自動送信を停止しました。内容を確認して破棄してください。"
-                : "ネットワーク接続後に自動で再送します。"))
-                .font(.caption)
-                .foregroundStyle(issue == nil ? Color.secondary : Color.orange)
-        }
-    }
-
-    private var title: String {
-        switch write.kind {
-        case .create: write.name ?? "新しいプラン"
-        case .acceptInvitation: "招待への参加"
-        case .rename, .archive, .reopen: "プランの更新"
-        case .revokeMember: "メンバーの参加解除"
-        case .reinstateMember: "メンバーの再参加"
-        case .transferOwnership: "オーナーの変更"
-        case .createInvitation: "招待の作成"
-        case .revokeInvitation: "招待の取り消し"
-        }
-    }
-}
 
 private struct SharedPlanNotificationInboxSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -528,6 +839,7 @@ private struct SharedPlanNotificationInboxSheet: View {
     let currentUserID: String?
     let features: SharedPlanPresentationFeatures
     let catalogDataSource: CirclemsDataSource?
+    let onOpenPlan: (String) -> Void
 
     var body: some View {
         NavigationStack {
@@ -535,7 +847,8 @@ private struct SharedPlanNotificationInboxSheet: View {
                 store: store,
                 currentUserID: currentUserID,
                 catalogDataSource: catalogDataSource,
-                features: features
+                features: features,
+                onOpenPlan: onOpenPlan
             )
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -553,10 +866,21 @@ private struct SharedPlanNotificationInboxSheet: View {
 private struct SharedPlanCreateSheet: View {
     @Environment(\.dismiss) private var dismiss
     let store: SharedPlanStore
+    let onCreated: (String) -> Void
     @State private var name = ""
     @State private var isSaving = false
     @State private var issue: String?
     let comiketNo: Int
+
+    init(
+        store: SharedPlanStore,
+        comiketNo: Int,
+        onCreated: @escaping (String) -> Void = { _ in }
+    ) {
+        self.store = store
+        self.comiketNo = comiketNo
+        self.onCreated = onCreated
+    }
 
     var body: some View {
         NavigationStack {
@@ -599,7 +923,8 @@ private struct SharedPlanCreateSheet: View {
         isSaving = true
         Task {
             do {
-                _ = try await store.createPlan(name: name, comiketNo: comiketNo)
+                let plan = try await store.createPlan(name: name, comiketNo: comiketNo)
+                onCreated(plan.id)
                 dismiss()
             } catch {
                 issue = error.localizedDescription

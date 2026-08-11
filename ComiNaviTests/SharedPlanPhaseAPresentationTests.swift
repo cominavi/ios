@@ -4,6 +4,32 @@ import XCTest
 
 @MainActor
 final class SharedPlanPhaseAPresentationTests: XCTestCase {
+    func testPrimaryPlanPreferenceIsLocalScopedAndRejectsArchivedPlans() throws {
+        let suiteName = "SharedPlanPrimaryPlanPreferenceTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let preference = SharedPlanPrimaryPlanPreference(defaults: defaults)
+
+        preference.setPlanID(planID, userID: userA, comiketNo: 108)
+
+        XCTAssertEqual(preference.planID(userID: userA, comiketNo: 108), planID)
+        XCTAssertNil(preference.planID(userID: userB, comiketNo: 108))
+        XCTAssertNil(preference.planID(userID: userA, comiketNo: 109))
+        XCTAssertEqual(
+            SharedPlanPrimaryPlanPreference.validPlanID(planID, among: [makePlan()]),
+            planID
+        )
+
+        var archived = makePlan()
+        archived.lifecycle = .archived
+        XCTAssertNil(
+            SharedPlanPrimaryPlanPreference.validPlanID(planID, among: [archived])
+        )
+
+        preference.setPlanID(nil, userID: userA, comiketNo: 108)
+        XCTAssertNil(preference.planID(userID: userA, comiketNo: 108))
+    }
+
     func testProductionSharedPlanWritesAreEnabled() {
         XCTAssertTrue(SharedPlanPresentationFeatures.production.writesEnabled)
 
@@ -314,7 +340,6 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
         let readAt = cached.createdAt.addingTimeInterval(60)
         store.notificationReadAt = readAt
         await model.open(cached, using: store, now: cached.createdAt.addingTimeInterval(10))
-        XCTAssertEqual(model.selectedPlanID, planID)
         XCTAssertEqual(model.notifications.first(where: { $0.id == cached.id })?.readAt, readAt)
         XCTAssertEqual(store.markedNotificationIDs, [cached.id])
         XCTAssertEqual(store.drainReadCount, 1)

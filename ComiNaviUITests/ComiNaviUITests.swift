@@ -35,6 +35,7 @@ final class ComiNaviUITests: XCTestCase {
     @MainActor
     func testSharedPlanOverviewAndInformationReopenAfterReturningFromInvitations() throws {
         let planID = "11111111-1111-4111-8111-111111111111"
+        let secondPlanID = "11111111-1111-4111-8111-111111111112"
         let app = XCUIApplication()
         app.launchArguments += [
             "-cominavi-ui-testing-hide-debugger",
@@ -42,19 +43,25 @@ final class ComiNaviUITests: XCTestCase {
         ]
         app.launch()
 
-        for _ in 0 ..< 5 {
-            let row = app.buttons["shared-plan-row-\(planID)"]
-            XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["shared-plan-test-detail"]
+                .waitForExistence(timeout: 5),
+            "The primary plan must open directly"
+        )
+        XCTAssertTrue(app.navigationBars["買い物リスト"].exists)
+
+        for _ in 0 ..< 3 {
+            let switcher = app.buttons["shared-plan-switcher-button"]
+            XCTAssertTrue(switcher.waitForExistence(timeout: 5))
+            switcher.tap()
             XCTAssertTrue(
-                app.images["shared-plan-row-icon-\(planID)"].exists,
-                "Every Shared Plan row needs a visible plan icon"
+                app.descendants(matching: .any)["shared-plan-switcher-sheet"]
+                    .waitForExistence(timeout: 5)
             )
-            row.tap()
-            XCTAssertTrue(
-                app.descendants(matching: .any)["shared-plan-test-detail"]
-                    .waitForExistence(timeout: 5),
-                "Tapping a plan must navigate to its detail"
-            )
+            let secondPlan = app.buttons["shared-plan-picker-\(secondPlanID)"]
+            XCTAssertTrue(secondPlan.waitForExistence(timeout: 5))
+            secondPlan.tap()
+            XCTAssertTrue(app.navigationBars["Travel team"].waitForExistence(timeout: 5))
 
             let information = app.buttons["shared-plan-information-button"]
             XCTAssertTrue(information.waitForExistence(timeout: 5))
@@ -81,30 +88,75 @@ final class ComiNaviUITests: XCTestCase {
             let informationBackButton = app.navigationBars.buttons.element(boundBy: 0)
             XCTAssertTrue(informationBackButton.waitForExistence(timeout: 5))
             informationBackButton.tap()
+            XCTAssertTrue(app.navigationBars["Travel team"].waitForExistence(timeout: 5))
 
-            let planBackButton = app.navigationBars.buttons.element(boundBy: 0)
-            XCTAssertTrue(planBackButton.waitForExistence(timeout: 5))
-            planBackButton.tap()
-            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            switcher.tap()
+            let firstPlan = app.buttons["shared-plan-picker-\(planID)"]
+            XCTAssertTrue(firstPlan.waitForExistence(timeout: 5))
+            firstPlan.tap()
+            XCTAssertTrue(app.navigationBars["買い物リスト"].waitForExistence(timeout: 5))
         }
     }
 
     @MainActor
-    func testSharedPlanNotificationsOpenFromPlanToolbar() {
+    func testSharedPlanNotificationDismissesBeforeOpeningItsPlan() {
         let app = XCUIApplication()
-        app.launchArguments.append("-cominavi-ui-testing-no-catalog-shell")
+        app.launchArguments += [
+            "-cominavi-ui-testing-hide-debugger",
+            "-cominavi-ui-testing-shared-plan-list",
+        ]
         app.launch()
 
         let notificationsButton = app.buttons["shared-plan-notifications-button"]
         XCTAssertTrue(notificationsButton.waitForExistence(timeout: 5))
         notificationsButton.tap()
 
-        XCTAssertTrue(app.navigationBars["Notifications"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["shared-plan-notifications-done"].exists)
-        XCTAssertTrue(app.descendants(matching: .any)["shared-plan-notifications-sheet"].exists)
+        let notification = app.buttons["shared-plan-test-notification"]
+        XCTAssertTrue(notification.waitForExistence(timeout: 5))
+        notification.tap()
 
-        app.buttons["shared-plan-notifications-done"].tap()
-        XCTAssertFalse(app.navigationBars["Notifications"].waitForExistence(timeout: 2))
+        XCTAssertFalse(
+            app.descendants(matching: .any)["shared-plan-notifications-sheet"]
+                .waitForExistence(timeout: 2)
+        )
+        XCTAssertTrue(
+            app.navigationBars["Travel team"].waitForExistence(timeout: 5),
+            "The notification's plan should open after the sheet closes"
+        )
+    }
+
+    @MainActor
+    func testSharedPlanEmptyHomeOffersAddAndJoinAsTwoSquareActions() {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-ui-testing-hide-debugger",
+            "-cominavi-ui-testing-shared-plan-empty",
+            "-AppleLanguages", "(en)",
+        ]
+        app.launch()
+
+        let add = app.buttons["Add"]
+        let join = app.buttons["Join"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        XCTAssertTrue(join.waitForExistence(timeout: 5))
+        XCTAssertEqual(add.frame.midY, join.frame.midY, accuracy: 2)
+        XCTAssertEqual(add.frame.width, add.frame.height, accuracy: 3)
+        XCTAssertEqual(join.frame.width, join.frame.height, accuracy: 3)
+
+        add.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["shared-plan-create-test-surface"]
+                .waitForExistence(timeout: 5)
+        )
+
+        app.terminate()
+        app.launch()
+        XCTAssertTrue(join.waitForExistence(timeout: 5))
+        join.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["shared-plan-join-guide"]
+                .waitForExistence(timeout: 5)
+        )
     }
 
     @MainActor

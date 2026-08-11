@@ -9,6 +9,47 @@ struct SharedPlanPresentationFeatures: Equatable, Sendable {
     let writesEnabled: Bool
 }
 
+struct SharedPlanPrimaryPlanPreference {
+    private static let keyPrefix = "shared-plans.primary-plan"
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    static func storageKey(userID: String?, comiketNo: Int?) -> String {
+        let account = userID?.lowercased() ?? "anonymous"
+        let event = comiketNo.map(String.init) ?? "all"
+        return "\(keyPrefix).\(account).\(event)"
+    }
+
+    func planID(userID: String?, comiketNo: Int?) -> String? {
+        defaults.string(forKey: Self.storageKey(userID: userID, comiketNo: comiketNo))
+    }
+
+    func setPlanID(_ planID: String?, userID: String?, comiketNo: Int?) {
+        let key = Self.storageKey(userID: userID, comiketNo: comiketNo)
+        if let planID {
+            defaults.set(planID, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    static func validPlanID(
+        _ storedPlanID: String?,
+        among plans: [SharedPlan]
+    ) -> String? {
+        guard let storedPlanID,
+              plans.contains(where: {
+                  $0.id == storedPlanID && $0.lifecycle == .active
+              })
+        else { return nil }
+        return storedPlanID
+    }
+}
+
 @MainActor
 protocol SharedPlanManagementServicing: AnyObject {
     var plans: [SharedPlan] { get }
@@ -443,7 +484,6 @@ final class SharedPlanNotificationInboxModel {
     private(set) var isRefreshing = false
     private(set) var isLoadingMore = false
     private(set) var issueMessage: String?
-    var selectedPlanID: String?
 
     var unreadCount: Int {
         notifications.count { $0.readAt == nil && !pendingReadIDs.contains($0.id) }
@@ -490,7 +530,6 @@ final class SharedPlanNotificationInboxModel {
         using service: any SharedPlanNotificationServicing,
         now: Date = Date()
     ) async {
-        selectedPlanID = notification.planID
         await markRead(notification, using: service, now: now)
     }
 

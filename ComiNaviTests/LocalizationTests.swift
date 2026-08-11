@@ -95,6 +95,14 @@ final class LocalizationTests: XCTestCase {
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
+                forKey: "Choose a primary plan",
+                value: nil,
+                table: nil
+            ),
+            "メインプランを選択"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
                 forKey: "Circle added to Shared Plan",
                 value: nil,
                 table: nil
@@ -205,6 +213,9 @@ final class LocalizationTests: XCTestCase {
                 "Circle": "社团",
                 "Catalog": "目录",
                 "No Shared Plans are available.": "目前没有可显示的共享计划。",
+                "Choose a primary plan": "选择主要计划",
+                "How to join a plan": "如何加入计划",
+                "Join": "加入",
             ],
             "zh-Hant": [
                 "Map": "地圖",
@@ -220,6 +231,9 @@ final class LocalizationTests: XCTestCase {
                 "Circle": "社團",
                 "Catalog": "目錄",
                 "No Shared Plans are available.": "目前沒有可顯示的共享計畫。",
+                "Choose a primary plan": "選擇主要計畫",
+                "How to join a plan": "如何加入計畫",
+                "Join": "加入",
             ],
             "ko": [
                 "Map": "지도",
@@ -235,6 +249,9 @@ final class LocalizationTests: XCTestCase {
                 "Circle": "서클",
                 "Catalog": "카탈로그",
                 "No Shared Plans are available.": "현재 표시할 수 있는 공유 플랜이 없습니다.",
+                "Choose a primary plan": "기본 플랜 선택",
+                "How to join a plan": "플랜 참여 방법",
+                "Join": "참여",
             ],
         ]
 
