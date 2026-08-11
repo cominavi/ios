@@ -1886,6 +1886,7 @@ private struct SharedPlanQuantityEditorSheet: View {
     @Binding var presentedSheet: SharedPlanCircleEditorSheet?
     @State private var quantity: Int
     @State private var selectedBuyerUserID: String?
+    @ScaledMetric(relativeTo: .body) private var buyerAvatarSize = 32.0
 
     init(
         model: SharedPlanEditorModel,
@@ -1912,10 +1913,7 @@ private struct SharedPlanQuantityEditorSheet: View {
                     if edit.field == .allocation {
                         Picker("Buyer", selection: $selectedBuyerUserID) {
                             ForEach(model.members) { member in
-                                Text(SharedPlanMemberPresentation.label(
-                                    member,
-                                    currentUserID: currentUserID
-                                ))
+                                buyerLabel(for: member)
                                 .tag(String?.some(member.userID))
                                 .disabled(member.membershipStatus != .active)
                             }
@@ -1954,6 +1952,21 @@ private struct SharedPlanQuantityEditorSheet: View {
             }
         }
         .presentationDetents([.medium])
+    }
+
+    private func buyerLabel(for member: SharedPlanMember) -> some View {
+        HStack(spacing: 10) {
+            AuthenticatedProfileAvatar(
+                url: member.avatarURL,
+                size: buyerAvatarSize
+            )
+            .accessibilityHidden(true)
+
+            Text(SharedPlanMemberPresentation.label(
+                member,
+                currentUserID: currentUserID
+            ))
+        }
     }
 
     private var range: ClosedRange<Int> {
