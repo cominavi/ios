@@ -733,6 +733,7 @@ private struct SharedPlanCreatedInvitationSheet: View {
     let store: SharedPlanStore
     @State private var copied = false
     @State private var confirmsDiscard = false
+    @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
         NavigationStack {
@@ -779,6 +780,7 @@ private struct SharedPlanCreatedInvitationSheet: View {
                     Button {
                         UIPasteboard.general.url = invitation.canonicalURL
                         copied = true
+                        hapticFeedback?.play(.copyConfirmation)
                     } label: {
                         Label(
                             copied ? "Invitation link copied" : "Copy invitation link",

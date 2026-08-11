@@ -9,6 +9,7 @@ struct ProfileEditorScreen: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appHapticFeedback) private var hapticFeedback
     let profileStore: CominaviProfileStore
 
     @State private var displayName: String
@@ -178,9 +179,11 @@ struct ProfileEditorScreen: View {
                 }
 
                 issueMessage = nil
+                hapticFeedback?.play(.completion)
                 dismiss()
             } catch {
                 issueMessage = error.localizedDescription
+                hapticFeedback?.play(.error)
             }
         }
     }

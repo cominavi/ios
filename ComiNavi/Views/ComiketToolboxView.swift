@@ -72,9 +72,6 @@ struct ComiketToolboxView: View {
             )
             reminderStore.dismissError()
         }
-        .sensoryFeedback(.success, trigger: copiedVenue) { oldValue, newValue in
-            !oldValue && newValue
-        }
     }
 }
 
@@ -259,6 +256,7 @@ private struct C108ToolboxNotice: View {
 
 private struct ToolboxQuickAccess: View {
     @Binding var copiedVenue: Bool
+    @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
         Section("Quick access") {
@@ -278,6 +276,7 @@ private struct ToolboxQuickAccess: View {
                 UIPasteboard.general.string =
                     "\(venue)\n\(address)\n\(ComiketToolboxCatalog.venueMapsURL.absoluteString)"
                 copiedVenue = true
+                hapticFeedback?.play(.copyConfirmation)
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(2))
                     copiedVenue = false

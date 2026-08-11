@@ -5,6 +5,7 @@ struct FollowingImportView: View {
     let dataSource: CirclemsDataSource
     @State private var model: FollowingImportModel
     @State private var isShowingImportForm = false
+    @Environment(\.appHapticFeedback) private var hapticFeedback
 
     init(dataSource: CirclemsDataSource) {
         self.dataSource = dataSource
@@ -29,6 +30,7 @@ struct FollowingImportView: View {
         .onChange(of: model.importState?.importedAt) { oldValue, newValue in
             guard oldValue != newValue, newValue != nil else { return }
             isShowingImportForm = false
+            hapticFeedback?.play(.completion)
         }
         .onChange(of: model.errorMessage) { _, message in
             guard let message else { return }

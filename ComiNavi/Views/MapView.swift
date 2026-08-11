@@ -426,8 +426,8 @@ private struct DestinationEntryButton: View {
     let clearAction: () -> Void
 
     @State private var copied = false
-    @State private var copyFeedback = 0
     @ScaledMetric(relativeTo: .headline) private var minimumHeight = 58.0
+    @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
         HStack(spacing: 0) {
@@ -500,7 +500,6 @@ private struct DestinationEntryButton: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
         }
-        .sensoryFeedback(.success, trigger: copyFeedback)
         .onChange(of: destination?.selectedAt) {
             copied = false
         }
@@ -525,7 +524,7 @@ private struct DestinationEntryButton: View {
                 locationText: destination.canonicalLocationText
             ) ?? destination.canonicalLocationText
         copied = true
-        copyFeedback += 1
+        hapticFeedback?.play(.copyConfirmation)
     }
 }
 
@@ -1722,8 +1721,8 @@ private struct InteractiveMapCanvas: View {
 
 private struct CircleMapDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appHapticFeedback) private var hapticFeedback
     @State private var copiedAddress = false
-    @State private var copyFeedback = 0
 
     let selection: MapScreenModel.Selection
     let bookmarks: [Int: MapBookmark]
@@ -1766,7 +1765,6 @@ private struct CircleMapDetailSheet: View {
                 }
             }
         }
-        .sensoryFeedback(.success, trigger: copyFeedback)
         .onChange(of: selection.selectedCircleID) {
             copiedAddress = false
         }
@@ -1786,7 +1784,7 @@ private struct CircleMapDetailSheet: View {
                     locationText: selection.selectedAddress.canonicalText
                 ) ?? selection.selectedAddress.canonicalText
             copiedAddress = true
-            copyFeedback += 1
+            hapticFeedback?.play(.copyConfirmation)
         } label: {
             HStack(spacing: 14) {
                 LucideIcon(copiedAddress ? "checkmark.circle.fill" : "mappin.and.ellipse")

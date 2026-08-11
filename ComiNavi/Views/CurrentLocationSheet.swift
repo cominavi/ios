@@ -3,13 +3,13 @@ import UIKit
 
 struct CurrentLocationSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appHapticFeedback) private var hapticFeedback
 
     let location: LocatedMapUser
     let eventNumber: Int
     let onUpdateLocation: () -> Void
 
     @State private var copied = false
-    @State private var copyFeedback = 0
 
     var body: some View {
         NavigationStack {
@@ -42,7 +42,6 @@ struct CurrentLocationSheet: View {
                 }
             }
         }
-        .sensoryFeedback(.success, trigger: copyFeedback)
         .accessibilityIdentifier("current-location-sheet")
     }
 
@@ -124,7 +123,7 @@ struct CurrentLocationSheet: View {
                 locationText: location.canonicalLocationText
             ) ?? location.canonicalLocationText
             copied = true
-            copyFeedback += 1
+            hapticFeedback?.play(.copyConfirmation)
         } label: {
             LucideLabel(
                 resource:

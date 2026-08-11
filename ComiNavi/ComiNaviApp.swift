@@ -107,13 +107,20 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 @main
 struct ComiNaviApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var hapticFeedback = AppHapticFeedback()
 
     var body: some Scene {
         WindowGroup {
-            if isCominaviE2ESessionBridgeActive {
-                Color.clear
-            } else {
-                EntryView()
+            Group {
+                if isCominaviE2ESessionBridgeActive {
+                    Color.clear
+                } else {
+                    EntryView()
+                }
+            }
+            .environment(\.appHapticFeedback, hapticFeedback)
+            .sensoryFeedback(trigger: hapticFeedback.event) { _, event in
+                event.cue?.sensoryFeedback
             }
         }
     }

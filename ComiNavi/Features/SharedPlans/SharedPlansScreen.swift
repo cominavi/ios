@@ -923,6 +923,7 @@ private struct SharedPlanNotificationInboxSheet: View {
 
 private struct SharedPlanCreateSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appHapticFeedback) private var hapticFeedback
     let store: SharedPlanStore
     let onCreated: (String) -> Void
     @State private var name = ""
@@ -983,13 +984,17 @@ private struct SharedPlanCreateSheet: View {
             do {
                 let plan = try await store.createPlan(name: name, comiketNo: comiketNo)
                 onCreated(plan.id)
+                hapticFeedback?.play(.completion)
                 dismiss()
             } catch {
                 issue = error.localizedDescription
                 if store.pendingRESTWrites.contains(where: {
                     $0.kind == .create && $0.name == name && $0.comiketNo == comiketNo
                 }) {
+                    hapticFeedback?.play(.completion)
                     dismiss()
+                } else {
+                    hapticFeedback?.play(.error)
                 }
             }
             isSaving = false

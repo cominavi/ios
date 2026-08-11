@@ -12,6 +12,7 @@ struct SharedPlanInvitationSheet: View {
     @State private var issue: String?
     @State private var canRetryPreview = false
     @State private var acceptanceTask: Task<Void, Never>?
+    @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
         NavigationStack {
@@ -185,9 +186,11 @@ struct SharedPlanInvitationSheet: View {
                 // The durable acceptance outbox now owns a protected Keychain
                 // copy, so the route capability can be deleted immediately.
                 invitationInbox.consume(token: pending.token)
+                hapticFeedback?.play(.completion)
                 onDismiss()
             } catch {
                 issue = error.localizedDescription
+                hapticFeedback?.play(.error)
             }
         }
     }

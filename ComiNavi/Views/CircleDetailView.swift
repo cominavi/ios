@@ -421,9 +421,10 @@ private struct CircleDetailHeader: View {
     @State private var didFailLoadingImage = false
     @State private var isShowingLightbox = false
     @State private var copiedLocation = false
-    @State private var copyFeedback = 0
+    @State private var copyGeneration = 0
     @ScaledMetric(relativeTo: .title) private var artworkWidth = 154.0
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -463,7 +464,6 @@ private struct CircleDetailHeader: View {
                 .presentationBackground(.black)
             }
         }
-        .sensoryFeedback(.success, trigger: copyFeedback)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("circle-detail-header")
     }
@@ -587,11 +587,12 @@ private struct CircleDetailHeader: View {
     private func copy(_ address: ComiketSpaceAddress) {
         UIPasteboard.general.string = address.canonicalText
         copiedLocation = true
-        copyFeedback += 1
-        let currentFeedback = copyFeedback
+        copyGeneration += 1
+        hapticFeedback?.play(.copyConfirmation)
+        let currentGeneration = copyGeneration
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(2))
-            guard copyFeedback == currentFeedback else { return }
+            guard copyGeneration == currentGeneration else { return }
             copiedLocation = false
         }
     }
