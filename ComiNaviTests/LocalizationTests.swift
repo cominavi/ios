@@ -187,14 +187,6 @@ final class LocalizationTests: XCTestCase {
             ),
             "メンバーが記録した結果"
         )
-        XCTAssertEqual(
-            japaneseBundle.localizedString(
-                forKey: "Live external reports",
-                value: nil,
-                table: nil
-            ),
-            "外部からの最新情報"
-        )
     }
 
     func testNewLocalizationsResolveRepresentativeInterfaceCopy() throws {

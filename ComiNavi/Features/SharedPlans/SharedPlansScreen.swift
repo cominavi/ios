@@ -382,6 +382,7 @@ private struct SharedPlanRow: View {
 struct SharedPlanListUITestSurface: View {
     private enum Route: Hashable {
         case plan
+        case information
         case invitations
     }
 
@@ -400,6 +401,31 @@ struct SharedPlanListUITestSurface: View {
         updatedAt: Date(timeIntervalSince1970: 1_786_276_800)
     )
 
+    private let progress = SharedPlanProgressSummary(
+        circles: [
+            SharedPlanCircleContent(
+                key: SharedPlanCircleKey(comiketNo: 108, wcID: 101)!,
+                presence: .present,
+                memo: "",
+                needs: [
+                    SharedPlanPurchaseNeed(
+                        id: UUID(uuidString: "22222222-2222-4222-8222-222222222222")!,
+                        requesterUserID: "33333333-3333-4333-8333-333333333333",
+                        itemName: "New release set",
+                        unitPrice: 2_000,
+                        wantedQuantity: 7,
+                        buyerAllocations: [
+                            "33333333-3333-4333-8333-333333333333": 5,
+                        ],
+                        fulfilledQuantity: 3
+                    ),
+                ],
+                communicationState: [:]
+            ),
+        ],
+        conflictCount: 0
+    )
+
     var body: some View {
         NavigationStack {
             List {
@@ -416,13 +442,32 @@ struct SharedPlanListUITestSurface: View {
                 switch route {
                 case .plan:
                     List {
+                        Section("Plan progress") {
+                            SharedPlanProgressOverview(progress: progress)
+                        }
+                        Section("Circles and purchases") {
+                            Text("No circles in this plan")
+                        }
+                    }
+                    .navigationTitle(plan.name)
+                    .accessibilityIdentifier("shared-plan-test-detail")
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            NavigationLink(value: Route.information) {
+                                Label("Plan information", systemImage: "info.circle")
+                            }
+                            .accessibilityIdentifier("shared-plan-information-button")
+                        }
+                    }
+                case .information:
+                    List {
                         NavigationLink(value: Route.invitations) {
                             Label("Members and invitations", systemImage: "person.2")
                         }
                         .accessibilityIdentifier("shared-plan-open-management")
                     }
-                    .navigationTitle(plan.name)
-                    .accessibilityIdentifier("shared-plan-test-detail")
+                    .navigationTitle("Plan information")
+                    .accessibilityIdentifier("shared-plan-test-information")
                 case .invitations:
                     List {
                         Text("No invitations")
@@ -570,9 +615,6 @@ private struct SharedPlanCreateSheet: View {
 
 struct SharedPlanDetailScreen: View {
     let store: SharedPlanStore
-    @State private var editedName = ""
-    @State private var issue: String?
-    @State private var showsFavoriteImport = false
     let planID: String
     let currentUserID: String?
     let features: SharedPlanPresentationFeatures
@@ -591,6 +633,40 @@ struct SharedPlanDetailScreen: View {
         self.features = features
         self.favoriteImportService = favoriteImportService
     }
+
+    var body: some View {
+        SharedPlanEditorScreen(
+            store: store,
+            planID: planID,
+            currentUserID: currentUserID,
+            features: features
+        )
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    SharedPlanInformationScreen(
+                        store: store,
+                        planID: planID,
+                        features: features,
+                        favoriteImportService: favoriteImportService
+                    )
+                } label: {
+                    Label("Plan information", systemImage: "info.circle")
+                }
+                .accessibilityIdentifier("shared-plan-information-button")
+            }
+        }
+    }
+}
+
+private struct SharedPlanInformationScreen: View {
+    let store: SharedPlanStore
+    @State private var editedName = ""
+    @State private var issue: String?
+    @State private var showsFavoriteImport = false
+    let planID: String
+    let features: SharedPlanPresentationFeatures
+    let favoriteImportService: any CirclemsFavoriteImportServicing
 
     var body: some View {
         Group {
@@ -659,28 +735,7 @@ struct SharedPlanDetailScreen: View {
                         .accessibilityIdentifier("shared-plan-open-management")
                     }
 
-                    Section("Content and purchases") {
-                        NavigationLink {
-                            SharedPlanEditorScreen(
-                                store: store,
-                                planID: plan.id,
-                                currentUserID: currentUserID,
-                                features: features
-                            )
-                        } label: {
-                            Label {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Circles, memos, and purchases")
-                                    Text("Open purchases, notes, and any choices that need your attention.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            } icon: {
-                                Image(systemName: "list.bullet.clipboard")
-                            }
-                        }
-                        .accessibilityIdentifier(SharedPlanEditorAccessibilityID.openEditor)
-
+                    Section("Circle import") {
                         Button {
                             showsFavoriteImport = true
                         } label: {
@@ -697,6 +752,21 @@ struct SharedPlanDetailScreen: View {
                         }
                     }
 
+                    if features.writesEnabled, plan.role == .owner {
+                        Section {
+                            Button(archiveButtonTitle(for: plan)) {
+                                toggleArchive(plan)
+                            }
+                            .disabled(!quarantinedChanges.isEmpty)
+                        } header: {
+                            Text("Plan status")
+                        } footer: {
+                            Text(plan.lifecycle == .active
+                                ? String(localized: "Archived plans remain available but cannot be edited.")
+                                : String(localized: "Reopen this plan to make it editable again."))
+                        }
+                    }
+
                     if let issue {
                         Section {
                             Text(issue)
@@ -704,17 +774,9 @@ struct SharedPlanDetailScreen: View {
                         }
                     }
                 }
-                .navigationTitle(plan.name)
-                .toolbar {
-                    if features.writesEnabled, plan.role == .owner {
-                        ToolbarItem(placement: .primaryAction) {
-                            Button(archiveButtonTitle(for: plan)) {
-                                toggleArchive(plan)
-                            }
-                            .disabled(!quarantinedChanges.isEmpty)
-                        }
-                    }
-                }
+                .navigationTitle("Plan information")
+                .navigationBarTitleDisplayMode(.inline)
+                .accessibilityIdentifier("shared-plan-information-screen")
                 .onAppear { editedName = plan.name }
                 .onChange(of: plan.name) { _, value in editedName = value }
                 .sheet(isPresented: $showsFavoriteImport) {

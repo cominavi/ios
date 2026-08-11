@@ -1,7 +1,6 @@
 import SwiftUI
 
 enum SharedPlanEditorAccessibilityID {
-    static let openEditor = "shared-plan-open-editor"
     static let screen = "shared-plan-editor"
     static let syncStatus = "shared-plan-editor-sync-status"
     static let readOnly = "shared-plan-editor-read-only"
@@ -451,13 +450,13 @@ struct SharedPlanEditorScreen: View {
     var body: some View {
         @Bindable var model = model
         List {
-            statusSection
+            progressSection
+            circleSection
+            conflictSection
             readOnlySection
             recoverySection
             memoRecoverySection
-            conflictSection
-            progressSection
-            circleSection
+            statusSection
         }
         .accessibilityIdentifier(SharedPlanEditorAccessibilityID.screen)
         .navigationTitle(model.plan?.name ?? String(localized: "Plan content"))
@@ -714,32 +713,18 @@ struct SharedPlanEditorScreen: View {
     private var progressSection: some View {
         let progress = model.progress
         return Section("Plan progress") {
-            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 7) {
-                GridRow {
-                    Text("Requested")
-                    Text(progress.wanted, format: .number)
-                    Text("Assigned")
-                    Text(progress.assigned, format: .number)
-                }
-                GridRow {
-                    Text("Ready")
-                    Text(progress.covered, format: .number)
-                    Text("Bought")
-                    Text(progress.fulfilled, format: .number)
-                }
-                GridRow {
-                    Text("Outstanding")
-                    Text(progress.outstanding, format: .number)
-                    Text("Conflicts")
-                    Text(progress.conflicted, format: .number)
-                }
-            }
-            .monospacedDigit()
-            .accessibilityElement(children: .combine)
+            SharedPlanProgressOverview(progress: progress)
 
             if progress.overAssigned > 0 {
                 LucideLabel(
                     verbatim: String(localized: "Over-assigned by \(progress.overAssigned)"),
+                    icon: "triangle-alert"
+                )
+                .foregroundStyle(.orange)
+            }
+            if progress.conflicted > 0 {
+                LucideLabel(
+                    verbatim: String(localized: "\(progress.conflicted) choices need attention"),
                     icon: "triangle-alert"
                 )
                 .foregroundStyle(.orange)
@@ -766,6 +751,104 @@ struct SharedPlanEditorScreen: View {
         case .success: .green
         case .warning: .orange
         }
+    }
+}
+
+struct SharedPlanProgressOverview: View {
+    let progress: SharedPlanProgressSummary
+
+    var body: some View {
+        if progress.wanted == 0 {
+            Label {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("No purchase requests yet")
+                        .font(.headline)
+                    Text("Add a purchase request to start tracking this plan.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } icon: {
+                LucideIcon("shopping-cart")
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(verbatim: "\(progress.fulfilledPercentage)%")
+                        .font(.system(.title, design: .rounded, weight: .bold))
+                    Text("bought")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(progress.outstanding) remaining")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                GeometryReader { geometry in
+                    let width = geometry.size.width
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(.secondary.opacity(0.18))
+                        Capsule()
+                            .fill(Color.accentColor.opacity(0.45))
+                            .frame(width: width * progress.assignedFraction)
+                        Capsule()
+                            .fill(.green)
+                            .frame(width: width * progress.fulfilledFraction)
+                    }
+                }
+                .frame(height: 12)
+                .accessibilityHidden(true)
+
+                HStack(spacing: 8) {
+                    SharedPlanProgressMetric(
+                        title: String(localized: "Requested"),
+                        value: progress.wanted,
+                        color: .secondary
+                    )
+                    SharedPlanProgressMetric(
+                        title: String(localized: "Assigned"),
+                        value: progress.assigned,
+                        color: .accentColor
+                    )
+                    SharedPlanProgressMetric(
+                        title: String(localized: "Bought"),
+                        value: progress.fulfilled,
+                        color: .green
+                    )
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Plan progress")
+            .accessibilityValue(
+                "Requested \(progress.wanted), assigned \(progress.assigned), bought \(progress.fulfilled), \(progress.outstanding) remaining"
+            )
+        }
+    }
+}
+
+private struct SharedPlanProgressMetric: View {
+    let title: String
+    let value: Int
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 7, height: 7)
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text(value, format: .number)
+                .font(.headline)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -1095,8 +1178,6 @@ private struct SharedPlanCircleEditorScreen: View {
     let currentUserID: String?
     @State private var presentedSheet: SharedPlanCircleEditorSheet?
     @State private var confirmation: SharedPlanCircleEditorConfirmation?
-    @State private var externalStates: [SharedPlanExternalCircleState] = []
-    @State private var externalStateIssue: String?
 
     var body: some View {
         ScrollView {
@@ -1105,7 +1186,6 @@ private struct SharedPlanCircleEditorScreen: View {
                     needsSection(content)
                     memoSection
                     presenceSection(content)
-                    externalAvailabilitySection
                 } else {
                     LucideContentUnavailableView(
                         "Circle content is unavailable",
@@ -1191,9 +1271,6 @@ private struct SharedPlanCircleEditorScreen: View {
                 // Navigation cancellation is the structured flush signal.
             }
             await model.flushMemo(circle: circle, using: store)
-        }
-        .task(id: "external:\(circle.id)") {
-            await loadExternalStates()
         }
     }
 
@@ -1348,47 +1425,6 @@ private struct SharedPlanCircleEditorScreen: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-
-    @ViewBuilder
-    private var externalAvailabilitySection: some View {
-        SharedPlanCirclePanel(title: String(localized: "Live reports")) {
-            if externalStates.isEmpty {
-                Text(externalStateIssue ?? String(localized: "No live external report"))
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(externalStates) { state in
-                    VStack(alignment: .leading, spacing: 4) {
-                        LucideLabel(verbatim: state.title, icon: "radio-tower")
-                            .font(.headline)
-                        HStack(spacing: 5) {
-                            Text("Reported by \(state.sourceName)")
-                            Text("·")
-                            Text(state.occurredAt, style: .relative)
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        if let sourceURL = state.sourceURL {
-                            Link("View source", destination: sourceURL)
-                                .font(.caption)
-                        }
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-            }
-        }
-    }
-
-    private func loadExternalStates() async {
-        do {
-            externalStates = try await CominaviRealtimeStore.shared.sharedPlanExternalStates(
-                eventNumber: circle.comiketNo,
-                publicCircleID: circle.wcID
-            )
-            externalStateIssue = nil
-        } catch {
-            externalStateIssue = String(localized: "Live external reports are temporarily unavailable.")
         }
     }
 

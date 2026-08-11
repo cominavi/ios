@@ -716,7 +716,6 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         let otherCircle = SharedPlanCircleKey(comiketNo: 108, wcID: 102)!
         let otherNeed = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
         let identifiers = [
-            SharedPlanEditorAccessibilityID.openEditor,
             SharedPlanEditorAccessibilityID.screen,
             SharedPlanEditorAccessibilityID.syncStatus,
             SharedPlanEditorAccessibilityID.readOnly,
@@ -935,6 +934,14 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(progress.overAssigned, 1)
         XCTAssertEqual(progress.conflicted, 2)
         XCTAssertEqual(progress.terminalOutcomeCircles, 1)
+        XCTAssertEqual(progress.assignedFraction, 0.875)
+        XCTAssertEqual(progress.fulfilledFraction, 0.625)
+        XCTAssertEqual(progress.fulfilledPercentage, 63)
+
+        let emptyProgress = SharedPlanProgressSummary(circles: [], conflictCount: 0)
+        XCTAssertEqual(emptyProgress.assignedFraction, 0)
+        XCTAssertEqual(emptyProgress.fulfilledFraction, 0)
+        XCTAssertEqual(emptyProgress.fulfilledPercentage, 0)
 
         let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()

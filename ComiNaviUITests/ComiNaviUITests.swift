@@ -33,7 +33,7 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testSharedPlanRowReopensAfterReturningFromInvitations() throws {
+    func testSharedPlanOverviewAndInformationReopenAfterReturningFromInvitations() throws {
         let planID = "11111111-1111-4111-8111-111111111111"
         let app = XCUIApplication()
         app.launchArguments += [
@@ -56,6 +56,15 @@ final class ComiNaviUITests: XCTestCase {
                 "Tapping a plan must navigate to its detail"
             )
 
+            let information = app.buttons["shared-plan-information-button"]
+            XCTAssertTrue(information.waitForExistence(timeout: 5))
+            information.tap()
+            XCTAssertTrue(
+                app.descendants(matching: .any)["shared-plan-test-information"]
+                    .waitForExistence(timeout: 5),
+                "The info button must open Plan Information"
+            )
+
             let invitations = app.buttons["shared-plan-open-management"]
             XCTAssertTrue(invitations.waitForExistence(timeout: 5))
             invitations.tap()
@@ -68,6 +77,10 @@ final class ComiNaviUITests: XCTestCase {
             let invitationBackButton = app.navigationBars.buttons.element(boundBy: 0)
             XCTAssertTrue(invitationBackButton.waitForExistence(timeout: 5))
             invitationBackButton.tap()
+
+            let informationBackButton = app.navigationBars.buttons.element(boundBy: 0)
+            XCTAssertTrue(informationBackButton.waitForExistence(timeout: 5))
+            informationBackButton.tap()
 
             let planBackButton = app.navigationBars.buttons.element(boundBy: 0)
             XCTAssertTrue(planBackButton.waitForExistence(timeout: 5))
@@ -472,10 +485,6 @@ final class ComiNaviUITests: XCTestCase {
                 throw XCTSkip("No preserved live Shared Plan test fixture is installed")
             }
             plan.tap()
-
-            let openEditor = app.buttons["shared-plan-open-editor"]
-            XCTAssertTrue(openEditor.waitForExistence(timeout: 10))
-            openEditor.tap()
 
             let recovery = app.descendants(matching: .any)[
                 "shared-plan-editor-recovery"

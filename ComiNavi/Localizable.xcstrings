@@ -1125,6 +1125,34 @@
         }
       }
     },
+    "%lld choices need attention": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認が必要な選択肢が%lld件あります"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "확인이 필요한 선택 항목이 %lld개 있습니다"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有%lld个选项需要确认"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有%lld個選項需要確認"
+          }
+        }
+      }
+    },
     "%lld circles": {
       "localizations": {
         "ja": {
@@ -1530,6 +1558,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "未同步的更改保留了%lld件（上限%lld件）。 這些同步還在繼續，但不接受下一個編輯。"
+          }
+        }
+      }
+    },
+    "%lld remaining": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "残り%lld件"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld개 남음"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剩余%lld个"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剩餘%lld個"
           }
         }
       }
@@ -2861,6 +2917,34 @@
         }
       }
     },
+    "Add a purchase request to start tracking this plan.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入リクエストを追加すると、プランの進捗を確認できます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "구매 요청을 추가하면 플랜 진행 상황을 확인할 수 있습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加购买请求后，即可查看计划进度。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增購買請求後，即可查看計畫進度。"
+          }
+        }
+      }
+    },
     "Add circle": {
       "extractionState": "stale",
       "localizations": {
@@ -3594,6 +3678,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "計畫存檔"
+          }
+        }
+      }
+    },
+    "Archived plans remain available but cannot be edited.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アーカイブしたプランは引き続き表示できますが、編集はできません。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "보관한 플랜은 계속 볼 수 있지만 편집할 수 없습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已存档的计划仍可查看，但无法编辑。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已封存的計畫仍可查看，但無法編輯。"
           }
         }
       }
@@ -6851,6 +6963,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "社團畫廊"
+          }
+        }
+      }
+    },
+    "Circle import": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サークルの読み込み"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "서클 가져오기"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导入社团"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入社團"
           }
         }
       }
@@ -17828,91 +17968,6 @@
         }
       }
     },
-    "Live external reports": {
-      "extractionState": "stale",
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "外部からの最新情報"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "외부로부터의 최신 정보"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "来自外部的最新信息"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "來自外部的最新資訊"
-          }
-        }
-      }
-    },
-    "Live external reports are temporarily unavailable.": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "外部からの最新情報を一時的に取得できません。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "외부로부터의 최신 정보를 일시적으로 가져올 수 없습니다."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "暂时无法从外部获取最新信息。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "暫時無法從外部獲取最新資訊。"
-          }
-        }
-      }
-    },
-    "Live reports": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "現地レポート"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "현지 보고서"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "当地报告"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "當地報告"
-          }
-        }
-      }
-    },
     "Live service and arrival information for Tokyo metropolitan buses.": {
       "localizations": {
         "ja": {
@@ -23436,6 +23491,34 @@
         }
       }
     },
+    "Plan information": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プラン情報"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플랜 정보"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划信息"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "計畫資訊"
+          }
+        }
+      }
+    },
     "Plan outcome": {
       "extractionState": "stale",
       "localizations": {
@@ -23489,6 +23572,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "計畫的進度"
+          }
+        }
+      }
+    },
+    "Plan status": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プランの状態"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "플랜 상태"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "计划状态"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "計畫狀態"
           }
         }
       }
@@ -25719,6 +25830,34 @@
         }
       }
     },
+    "Reopen this plan to make it editable again.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再開すると、このプランを再び編集できるようになります。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이 플랜을 다시 편집하려면 재개하세요."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新开启此计划后即可再次编辑。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新開啟此計畫後即可再次編輯。"
+          }
+        }
+      }
+    },
     "Repair from latest plan": {
       "localizations": {
         "ja": {
@@ -25947,6 +26086,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "請求%1$lld點，負責%2$lld點，已購買%3$lld點"
+          }
+        }
+      }
+    },
+    "Requested %lld, assigned %lld, bought %lld, %lld remaining": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Requested %1$lld, assigned %2$lld, bought %3$lld, %4$lld remaining"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リクエスト%1$lld件、担当%2$lld件、購入済み%3$lld件、残り%4$lld件"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "요청 %1$lld개, 배정 %2$lld개, 구매 완료 %3$lld개, 남음 %4$lld개"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求%1$lld个，已分配%2$lld个，已购买%3$lld个，剩余%4$lld个"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請求%1$lld個、已分配%2$lld個、已購買%3$lld個、剩餘%4$lld個"
           }
         }
       }
@@ -32159,35 +32332,6 @@
         }
       }
     },
-    "This is a member-entered plan decision. Live external reports below remain separate and never change it automatically.": {
-      "extractionState": "stale",
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "これはメンバーが入力したプラン内の判断です。下の外部情報とは別に保持され、自動的に書き換わることはありません。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "이는 멤버가 입력한 플랜 내의 판단입니다. 아래 외부 정보와는 별도로 보관되며 자동으로 다시 작성되지 않습니다."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "这是成员输入的计划内的判断。 与下面的外部信息分开保存，不会自动改写。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "這是成員輸入的計畫內的判斷。 與下面的外部資訊分開保留，不會自動改寫。"
-          }
-        }
-      }
-    },
     "This location could not be found in the official catalog.": {
       "localizations": {
         "ja": {
@@ -36798,6 +36942,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "b"
+          }
+        }
+      }
+    },
+    "bought": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入済み"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "구매 완료"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已购买"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已購買"
           }
         }
       }

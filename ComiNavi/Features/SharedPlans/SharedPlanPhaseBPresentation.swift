@@ -169,6 +169,23 @@ struct SharedPlanProgressSummary: Equatable, Sendable {
             SharedPlanMemberOutcome.value(in: $0) != nil
         }.count
     }
+
+    var assignedFraction: Double {
+        fraction(for: assigned)
+    }
+
+    var fulfilledFraction: Double {
+        fraction(for: fulfilled)
+    }
+
+    var fulfilledPercentage: Int {
+        Int((fulfilledFraction * 100).rounded())
+    }
+
+    private func fraction(for value: Int) -> Double {
+        guard wanted > 0 else { return 0 }
+        return min(1, max(0, Double(value) / Double(wanted)))
+    }
 }
 
 enum SharedPlanParentTarget: Equatable, Sendable {
