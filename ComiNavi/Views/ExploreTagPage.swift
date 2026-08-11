@@ -138,12 +138,16 @@ private struct ExploreTagFilterSheet: View {
         NavigationStack {
             Form {
                 Section("Catalog") {
-                    Picker("Day", selection: Binding(
-                        get: { model.selectedDay },
-                        set: { model.select(day: $0) }
-                    )) {
-                        ForEach(dataSource.comiket.days, id: \.dayIndex) { day in
-                            Text("Day \(day.dayIndex)").tag(day.dayIndex)
+                    ExploreExpandedFilterField(title: "Day") {
+                        ExploreFilterFlowLayout {
+                            ForEach(dataSource.comiket.days, id: \.dayIndex) { day in
+                                ExploreFilterChoice(
+                                    isSelected: model.selectedDay == day.dayIndex,
+                                    action: { model.select(day: day.dayIndex) }
+                                ) {
+                                    Text("Day \(day.dayIndex)")
+                                }
+                            }
                         }
                     }
 
@@ -154,74 +158,74 @@ private struct ExploreTagFilterSheet: View {
                         }
                     }
 
-                    Picker("Shinagaki", selection: $model.shinagakiFilter) {
-                        ForEach(ExploreShinagakiFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
+                    ExploreExpandedFilterField(title: "Shinagaki") {
+                        ExploreFilterFlowLayout {
+                            ForEach(ExploreShinagakiFilter.allCases) { filter in
+                                ExploreFilterChoice(
+                                    isSelected: model.shinagakiFilter == filter,
+                                    action: { model.shinagakiFilter = filter }
+                                ) {
+                                    Text(filter.title)
+                                }
+                            }
                         }
                     }
 
-                    Picker("Attendance", selection: $model.attendanceFilter) {
-                        ForEach(ExploreAttendanceFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
+                    ExploreExpandedFilterField(title: "Attendance") {
+                        ExploreFilterFlowLayout {
+                            ForEach(ExploreAttendanceFilter.allCases) { filter in
+                                ExploreFilterChoice(
+                                    isSelected: model.attendanceFilter == filter,
+                                    action: { model.attendanceFilter = filter }
+                                ) {
+                                    Text(filter.title)
+                                }
+                            }
                         }
                     }
 
-                    Picker("Space", selection: $model.spaceFilter) {
-                        ForEach(ExploreSpaceFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
+                    ExploreExpandedFilterField(title: "Space") {
+                        ExploreFilterFlowLayout {
+                            ForEach(ExploreSpaceFilter.allCases) { filter in
+                                ExploreFilterChoice(
+                                    isSelected: model.spaceFilter == filter,
+                                    action: { model.spaceFilter = filter }
+                                ) {
+                                    Text(filter.title)
+                                }
+                            }
                         }
                     }
                 }
 
                 Section("Your plan") {
-                    Picker("Saved", selection: $model.favoriteFilter) {
-                        ForEach(ExploreFavoriteFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
-                        }
-                    }
-
-                    ScrollView(.horizontal) {
-                        HStack(spacing: 10) {
-                            ForEach(BookmarkColor.selectableColors) { color in
-                                Button {
-                                    if model.selectedFavoriteColors.contains(color) {
-                                        model.selectedFavoriteColors.remove(color)
-                                    } else {
-                                        model.selectedFavoriteColors.insert(color)
-                                    }
-                                } label: {
-                                    Circle()
-                                        .fill(color.swiftUIColor)
-                                        .frame(width: 30, height: 30)
-                                        .padding(7)
-                                        .overlay {
-                                            Circle()
-                                                .stroke(
-                                                    model.selectedFavoriteColors.contains(color)
-                                                        ? Color.primary
-                                                        : Color.clear,
-                                                    lineWidth: 2
-                                                )
-                                        }
-                                        .contentShape(.circle)
+                    ExploreExpandedFilterField(title: "Saved") {
+                        ExploreFilterFlowLayout {
+                            ForEach(ExploreFavoriteFilter.allCases) { filter in
+                                ExploreFilterChoice(
+                                    isSelected: model.favoriteFilter == filter,
+                                    action: { model.favoriteFilter = filter }
+                                ) {
+                                    Text(filter.title)
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(color.displayName)
-                                .accessibilityValue(
-                                    model.selectedFavoriteColors.contains(color)
-                                        ? "Selected"
-                                        : "Not selected"
-                                )
                             }
                         }
                     }
-                    .scrollIndicators(.hidden)
+
+                    ExploreFavoriteColorFilter(selection: $model.selectedFavoriteColors)
                 }
 
                 Section("Order") {
-                    Picker("Sort", selection: $model.sort) {
-                        ForEach(ExploreSort.allCases) { sort in
-                            Text(sort.title).tag(sort)
+                    ExploreExpandedFilterField(title: "Sort") {
+                        ExploreFilterFlowLayout {
+                            ForEach(ExploreSort.allCases) { sort in
+                                ExploreFilterChoice(
+                                    isSelected: model.sort == sort,
+                                    action: { model.sort = sort }
+                                ) {
+                                    Text(sort.title)
+                                }
+                            }
                         }
                     }
                 }

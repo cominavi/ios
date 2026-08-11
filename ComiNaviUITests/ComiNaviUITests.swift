@@ -319,11 +319,10 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["explore-filter-sheet"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["explore-genre-picker"].exists)
         XCTAssertTrue(app.buttons["explore-tag-picker"].exists)
-        XCTAssertTrue(app.buttons["explore-shinagaki-picker"].exists)
-        XCTAssertTrue(app.buttons["explore-attendance-picker"].exists)
-        XCTAssertTrue(app.buttons["explore-space-picker"].exists)
-        XCTAssertTrue(app.buttons["explore-saved-picker"].exists)
-        takeScreenshot(named: "Explore-Filters-Compact")
+        XCTAssertTrue(app.buttons["explore-shinagaki-all"].exists)
+        XCTAssertTrue(app.buttons["explore-attendance-all"].exists)
+        XCTAssertTrue(app.buttons["explore-space-all"].exists)
+        takeScreenshot(named: "Explore-Filters-Expanded")
         app.buttons["Done"].tap()
 
         eventDayBanner.tap()
@@ -514,7 +513,7 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testDemoExploreCompactFiltersFitOnIPad() {
+    func testDemoExploreExpandedFiltersScrollAndFit() {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")
         app.launch()
@@ -528,15 +527,32 @@ final class ComiNaviUITests: XCTestCase {
         for identifier in [
             "explore-genre-picker",
             "explore-tag-picker",
-            "explore-shinagaki-picker",
-            "explore-attendance-picker",
-            "explore-space-picker",
-            "explore-saved-picker",
+            "explore-shinagaki-all",
+            "explore-attendance-all",
+            "explore-space-all",
         ] {
-            XCTAssertTrue(app.buttons[identifier].exists, "Missing compact filter \(identifier)")
+            XCTAssertTrue(app.buttons[identifier].exists, "Missing expanded filter \(identifier)")
         }
+
+        let filterSheet = app.otherElements["explore-filter-sheet"]
+        let savedFilter = app.buttons["explore-saved-all"]
+        for _ in 0 ..< 4 {
+            if savedFilter.exists { break }
+            filterSheet.swipeUp()
+        }
+        XCTAssertTrue(savedFilter.exists)
+
+        let lastFavoriteColor = app.buttons["explore-favorite-color-9"]
+        for _ in 0 ..< 4 {
+            if lastFavoriteColor.isHittable { break }
+            filterSheet.swipeUp()
+        }
+        XCTAssertTrue(lastFavoriteColor.isHittable)
+        lastFavoriteColor.tap()
+        XCTAssertEqual(lastFavoriteColor.value as? String, "Selected")
+
         XCTAssertTrue(app.buttons["Done"].isHittable)
-        takeScreenshot(named: "Explore-Filters-Compact-iPad")
+        takeScreenshot(named: "Explore-Filters-Expanded")
     }
 
     @MainActor
