@@ -77,6 +77,24 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testSharedPlanNotificationsOpenFromPlanToolbar() {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-ui-testing-no-catalog-shell")
+        app.launch()
+
+        let notificationsButton = app.buttons["shared-plan-notifications-button"]
+        XCTAssertTrue(notificationsButton.waitForExistence(timeout: 5))
+        notificationsButton.tap()
+
+        XCTAssertTrue(app.navigationBars["Notifications"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["shared-plan-notifications-done"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["shared-plan-notifications-sheet"].exists)
+
+        app.buttons["shared-plan-notifications-done"].tap()
+        XCTAssertFalse(app.navigationBars["Notifications"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testProductionInvitationSurfaceWhenExplicitlyRequired() throws {
         let environment = ProcessInfo.processInfo.environment
         guard environment["COMINAVI_E2E_INVITATION_UI_REQUIRED"] == "1" else {

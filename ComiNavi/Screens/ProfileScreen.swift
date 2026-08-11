@@ -149,31 +149,6 @@ struct ProfileScreen: View {
                 }
             }
 
-            if profileStore.profile != nil {
-                Section("Notifications") {
-                    NavigationLink {
-                        SharedPlanNotificationInboxScreen(
-                            store: sharedPlanStore,
-                            currentUserID: profileStore.profile?.id
-                        )
-                    } label: {
-                        HStack {
-                            Label("Shared Plan notifications", systemImage: "bell")
-                            Spacer()
-                            if unreadSharedPlanNotificationCount > 0 {
-                                Text(unreadSharedPlanNotificationCount, format: .number)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                    .accessibilityLabel(
-                                        Text("\(unreadSharedPlanNotificationCount) unread notifications")
-                                    )
-                            }
-                        }
-                    }
-                    .accessibilityIdentifier("profile-shared-plan-notifications")
-                }
-            }
-
             if profileStore.hasPendingMutation {
                 Section("送信待ちのプロフィール変更") {
                     if let description = profileStore.pendingMutationDescription {
@@ -434,17 +409,6 @@ struct ProfileScreen: View {
 
     private var isLoggedIn: Bool {
         profileStore.profile != nil || userState.user != nil
-    }
-
-    private var sharedPlanStore: SharedPlanStore {
-        AppData.sharedPlanStore
-    }
-
-    private var unreadSharedPlanNotificationCount: Int {
-        sharedPlanStore.notifications.count {
-            $0.readAt == nil
-                && !sharedPlanStore.pendingNotificationReadIDs.contains($0.id)
-        }
     }
 
     private func returnToAuthentication() {

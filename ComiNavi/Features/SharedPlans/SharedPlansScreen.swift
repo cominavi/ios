@@ -4,9 +4,21 @@ private enum SharedPlansRoute: Hashable {
     case plan(String)
 }
 
+private enum SharedPlansSheet: Identifiable {
+    case create(comiketNo: Int)
+    case notifications
+
+    var id: String {
+        switch self {
+        case .create(let comiketNo): "create-\(comiketNo)"
+        case .notifications: "notifications"
+        }
+    }
+}
+
 struct SharedPlansScreen: View {
     let store: SharedPlanStore
-    @State private var showsCreateSheet = false
+    @State private var presentedSheet: SharedPlansSheet?
     @State private var recoveryPlanToDiscard: String?
     let comiketNo: Int?
     let currentUserID: String?
@@ -43,12 +55,18 @@ struct SharedPlansScreen: View {
                     }
                 }
         }
-        .sheet(isPresented: $showsCreateSheet) {
-            if let comiketNo {
+        .sheet(item: $presentedSheet) { sheet in
+            switch sheet {
+            case .create(let comiketNo):
                 SharedPlanCreateSheet(
                     store: store,
-                    comiketNo: comiketNo,
-                    isPresented: $showsCreateSheet
+                    comiketNo: comiketNo
+                )
+            case .notifications:
+                SharedPlanNotificationInboxSheet(
+                    store: store,
+                    currentUserID: currentUserID,
+                    features: features
                 )
             }
         }
@@ -110,10 +128,21 @@ struct SharedPlansScreen: View {
                         .accessibilityLabel("プランを同期中")
                 }
             }
-            if features.writesEnabled, let comiketNo {
-                ToolbarItem(placement: .primaryAction) {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    presentedSheet = .notifications
+                } label: {
+                    Label(
+                        "Shared Plan notifications",
+                        systemImage: unreadNotificationCount > 0 ? "bell.badge" : "bell"
+                    )
+                }
+                .accessibilityValue(notificationAccessibilityValue)
+                .accessibilityIdentifier("shared-plan-notifications-button")
+
+                if features.writesEnabled, let comiketNo {
                     Button {
-                        showsCreateSheet = true
+                        presentedSheet = .create(comiketNo: comiketNo)
                     } label: {
                         Label("プランを作成", systemImage: "plus")
                     }
@@ -206,6 +235,16 @@ struct SharedPlansScreen: View {
             ($0.kind == .create && (comiketNo == nil || $0.comiketNo == comiketNo))
                 || $0.kind == .acceptInvitation
         }
+    }
+
+    private var unreadNotificationCount: Int {
+        store.notifications.count {
+            $0.readAt == nil && !store.pendingNotificationReadIDs.contains($0.id)
+        }
+    }
+
+    private var notificationAccessibilityValue: Text {
+        Text("\(unreadNotificationCount) unread notifications")
     }
 
     private func planLink(_ plan: SharedPlan) -> some View {
@@ -433,23 +472,39 @@ private struct SharedPlanPendingRow: View {
     }
 }
 
+private struct SharedPlanNotificationInboxSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let store: SharedPlanStore
+    let currentUserID: String?
+    let features: SharedPlanPresentationFeatures
+
+    var body: some View {
+        NavigationStack {
+            SharedPlanNotificationInboxScreen(
+                store: store,
+                currentUserID: currentUserID,
+                features: features
+            )
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .accessibilityIdentifier("shared-plan-notifications-done")
+                }
+            }
+        }
+        .accessibilityIdentifier("shared-plan-notifications-sheet")
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
 private struct SharedPlanCreateSheet: View {
+    @Environment(\.dismiss) private var dismiss
     let store: SharedPlanStore
     @State private var name = ""
     @State private var isSaving = false
     @State private var issue: String?
     let comiketNo: Int
-    @Binding var isPresented: Bool
-
-    init(
-        store: SharedPlanStore,
-        comiketNo: Int,
-        isPresented: Binding<Bool>
-    ) {
-        self.store = store
-        self.comiketNo = comiketNo
-        _isPresented = isPresented
-    }
 
     var body: some View {
         NavigationStack {
@@ -475,7 +530,7 @@ private struct SharedPlanCreateSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { isPresented = false }
+                    Button("キャンセル") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("作成") { create() }
@@ -493,13 +548,13 @@ private struct SharedPlanCreateSheet: View {
         Task {
             do {
                 _ = try await store.createPlan(name: name, comiketNo: comiketNo)
-                isPresented = false
+                dismiss()
             } catch {
                 issue = error.localizedDescription
                 if store.pendingRESTWrites.contains(where: {
                     $0.kind == .create && $0.name == name && $0.comiketNo == comiketNo
                 }) {
-                    isPresented = false
+                    dismiss()
                 }
             }
             isSaving = false
