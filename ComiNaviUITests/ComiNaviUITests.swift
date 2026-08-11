@@ -109,13 +109,27 @@ final class ComiNaviUITests: XCTestCase {
                 .waitForExistence(timeout: 8)
         )
 
+        var rowHeights: [CGFloat] = []
         for index in 1 ... 5 {
             let id = String(format: "10000000-0000-4000-8000-%012d", index)
             let row = app.descendants(matching: .any)["shared-plan-editor-need-\(id)"]
             XCTAssertTrue(row.waitForExistence(timeout: 3), "Request \(index) must be visible")
+            rowHeights.append(row.frame.height)
             XCTAssertTrue(
                 app.descendants(matching: .any)["shared-plan-editor-need-progress-\(id)"].exists,
                 "Request \(index) must show requested, assigned, and bought progress"
+            )
+        }
+
+        guard let expectedRowHeight = rowHeights.first else {
+            return XCTFail("Purchase rows must be visible")
+        }
+        for rowHeight in rowHeights.dropFirst() {
+            XCTAssertEqual(
+                rowHeight,
+                expectedRowHeight,
+                accuracy: 0.5,
+                "Purchase request rows must have a consistent height"
             )
         }
 

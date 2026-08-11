@@ -1519,9 +1519,18 @@ private struct SharedPlanNeedEditorRow: View {
     var body: some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 5) {
-                Text(displayItemName)
-                    .font(.headline)
-                    .lineLimit(2)
+                ZStack(alignment: .topLeading) {
+                    Text(verbatim: " \n ")
+                        .font(.headline)
+                        .hidden()
+                        .accessibilityHidden(true)
+
+                    Text(displayItemName)
+                        .font(.headline)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 if let unitPrice = need.unitPrice {
                     Text(
                         unitPrice,
@@ -1529,6 +1538,11 @@ private struct SharedPlanNeedEditorRow: View {
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                } else {
+                    Text(verbatim: "0")
+                        .font(.caption)
+                        .hidden()
+                        .accessibilityHidden(true)
                 }
                 if canEdit {
                     Button(action: onEditProgress) {
