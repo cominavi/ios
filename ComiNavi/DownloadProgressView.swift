@@ -171,6 +171,7 @@ struct CatalogStatusSurface<Content: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 34)
         }
+        .scrollDisabled(true)
         .accessibilityIdentifier("catalog-status-surface")
     }
 }
