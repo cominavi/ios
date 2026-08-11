@@ -6128,6 +6128,16 @@
         }
       }
     },
+    "Log in to ComiNavi before importing X followings." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xのフォローをインポートする前にComiNaviへログインしてください。"
+          }
+        }
+      }
+    },
     "Log in to Circle.ms to use authenticated imports." : {
       "localizations" : {
         "ja" : {
