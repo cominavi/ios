@@ -966,6 +966,53 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testDemoCircleDetailShowsDayAndVenueWithTrailingCopyFeedback() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-demo-data",
+            "-AppleLanguages", "(ja)",
+            "-AppleLocale", "ja_JP",
+        ]
+        app.launch()
+
+        let exploreTab = app.buttons["探す"].firstMatch
+        XCTAssertTrue(exploreTab.waitForExistence(timeout: 30))
+        exploreTab.tap()
+
+        app.buttons["explore-layout-button"].firstMatch.tap()
+        let firstCircle = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "explore-list-circle-")
+        ).firstMatch
+        XCTAssertTrue(firstCircle.waitForExistence(timeout: 20))
+        firstCircle.tap()
+
+        let detail = app.descendants(matching: .any)["circle-detail-screen"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 10))
+
+        let location = app.buttons["circle-location-map-button"]
+        let copy = app.buttons["circle-location-copy-button"]
+        XCTAssertTrue(location.waitForExistence(timeout: 10))
+        XCTAssertTrue(copy.waitForExistence(timeout: 10))
+        XCTAssertTrue(location.label.contains("日目"))
+        XCTAssertTrue(location.label.contains("ホール"))
+        XCTAssertGreaterThan(copy.frame.minX, location.frame.midX)
+
+        let navigationBar = app.navigationBars.element(boundBy: 0)
+        let subtitle = navigationBar.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", "日目", "ホール")
+        ).firstMatch
+        XCTAssertTrue(subtitle.waitForExistence(timeout: 5))
+
+        copy.tap()
+        expectation(
+            for: NSPredicate(format: "value == %@", "コピーしました"),
+            evaluatedWith: copy
+        )
+        waitForExpectations(timeout: 3)
+        takeScreenshot(named: "Circle-Detail-Day-Venue-Copied")
+    }
+
+    @MainActor
     func testC104DemoMapSupportsSearchZoomAndSelection() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")
