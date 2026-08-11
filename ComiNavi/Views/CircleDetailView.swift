@@ -213,6 +213,10 @@ struct CircleDetailView: View {
             Text(sharedPlanConfirmation ?? "")
         }
         .task(id: circle.id) {
+            circleAddress = nil
+            await loadCircleAddress()
+        }
+        .task(id: circle.id) {
             let loadedDetails = await withTaskGroup(
                 of: (Int, CatalogCircleDetails).self,
                 returning: [Int: CatalogCircleDetails].self
@@ -243,7 +247,6 @@ struct CircleDetailView: View {
                     $0[$1.key] = publicCircleID
                 }
             })
-            await loadCircleAddress()
         }
         .accessibilityIdentifier("circle-detail-screen")
     }
@@ -320,9 +323,7 @@ struct CircleDetailView: View {
 
     private var navigationSubtitle: String? {
         if let circleAddress {
-            return String(
-                localized: "Day \(circleAddress.day) · \(circleAddress.venueLocationText)"
-            )
+            return circleAddress.navigationSubtitle
         }
         if let day = circle.day, let spaceLabel {
             return String(localized: "Day \(day) · \(spaceLabel)")

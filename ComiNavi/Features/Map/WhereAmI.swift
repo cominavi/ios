@@ -54,6 +54,10 @@ struct ComiketSpaceAddress: Equatable, Sendable {
         "\(Self.canonicalHallName(hallName)) \(spaceCode)"
     }
 
+    var navigationSubtitle: String {
+        String(localized: "Day \(day) · \(venueLocationText)")
+    }
+
     var canonicalText: String {
         "\(canonicalDayText) \(venueLocationText)"
     }
