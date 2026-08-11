@@ -32,7 +32,7 @@
       }
     },
     "·" : {
-
+      "shouldTranslate" : false
     },
     "@%@" : {
       "localizations" : {
@@ -60,6 +60,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$@ · %2$lld more"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@・ほか%2$lld件"
           }
         }
       }
@@ -424,7 +430,14 @@
       }
     },
     "%lld still unassigned" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "残り%lld個は担当未定"
+          }
+        }
+      }
     },
     "%lld unread notifications" : {
       "localizations" : {
@@ -474,7 +487,14 @@
       }
     },
     "%lld件は重複せずにスキップしました。" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld件は重複せずにスキップしました。"
+          }
+        }
+      }
     },
     "%lld日目" : {
       "extractionState" : "stale",
@@ -855,7 +875,14 @@
       }
     },
     "Additional structured details" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その他の詳細"
+          }
+        }
+      }
     },
     "Admission and wristbands" : {
       "localizations" : {
@@ -1088,13 +1115,34 @@
       }
     },
     "Assign buyer" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入担当を割り当てる"
+          }
+        }
+      }
     },
     "Assign part of this request to any active plan member. Other allocations remain unchanged." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この依頼の一部を、現在参加中のメンバーに割り当てます。他の購入担当数は変更されません。"
+          }
+        }
+      }
     },
     "Assigned" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入担当数"
+          }
+        }
+      }
     },
     "At Tokyo Big Sight" : {
       "localizations" : {
@@ -1375,7 +1423,14 @@
       }
     },
     "Buyer" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入担当"
+          }
+        }
+      }
     },
     "Buyer allocation" : {
       "localizations" : {
@@ -1398,7 +1453,14 @@
       }
     },
     "Buyer allocations" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購入担当数"
+          }
+        }
+      }
     },
     "Buyer allocations and fulfillment start at zero. Add them as separate edits after creating the need." : {
       "localizations" : {
@@ -1618,10 +1680,24 @@
       }
     },
     "Change by %@" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@による変更"
+          }
+        }
+      }
     },
     "Change by member" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メンバーによる変更"
+          }
+        }
+      }
     },
     "Change by member %@" : {
       "extractionState" : "stale",
@@ -2237,13 +2313,34 @@
       }
     },
     "Circle.msのお気に入りはすべてこのプランに含まれています。" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msのお気に入りはすべてこのプランに含まれています。"
+          }
+        }
+      }
     },
     "Circle.msのお気に入りを確認中…" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msのお気に入りを確認中…"
+          }
+        }
+      }
     },
     "Circle.msのお気に入りを読み込む" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msのお気に入りを読み込む"
+          }
+        }
+      }
     },
     "Circle.msを連携" : {
       "localizations" : {
@@ -2276,7 +2373,14 @@
       }
     },
     "Circles, memos, and purchases" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル・メモ・買い物"
+          }
+        }
+      }
     },
     "Clear" : {
       "localizations" : {
@@ -2735,7 +2839,14 @@
       }
     },
     "Conflicts" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "競合"
+          }
+        }
+      }
     },
     "Conflicts requiring a choice" : {
       "localizations" : {
@@ -2778,7 +2889,14 @@
       }
     },
     "Content and purchases" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "内容と買い物"
+          }
+        }
+      }
     },
     "Copied" : {
       "localizations" : {
@@ -3996,7 +4114,14 @@
       }
     },
     "Edit" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集"
+          }
+        }
+      }
     },
     "Edit communication field" : {
       "localizations" : {
@@ -4039,7 +4164,14 @@
       }
     },
     "Empty collection" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "項目がありません"
+          }
+        }
+      }
     },
     "Empty text" : {
       "localizations" : {
@@ -4790,7 +4922,14 @@
       }
     },
     "Former member" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元メンバー"
+          }
+        }
+      }
     },
     "Free Wi-Fi at Big Sight" : {
       "localizations" : {
@@ -6314,7 +6453,14 @@
       }
     },
     "Memo edit retained on this device" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモの変更をこの端末に保持しています"
+          }
+        }
+      }
     },
     "Memo edit waiting to save" : {
       "extractionState" : "stale",
@@ -6571,7 +6717,14 @@
       }
     },
     "No longer an active member" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在はプランに参加していません"
+          }
+        }
+      }
     },
     "No map locations were available for these circles." : {
       "localizations" : {
@@ -8209,7 +8362,14 @@
       }
     },
     "Request by former member" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元メンバーの依頼"
+          }
+        }
+      }
     },
     "Requester" : {
       "localizations" : {
@@ -8322,7 +8482,14 @@
       }
     },
     "Review collaborative content, conflicts, and saved recovery data." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "共同編集した内容、競合、保存済みの復旧データを確認します。"
+          }
+        }
+      }
     },
     "Revoke invitation" : {
       "localizations" : {
@@ -8505,7 +8672,14 @@
       }
     },
     "Saving memo edit on this device…" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メモの変更をこの端末に保存中…"
+          }
+        }
+      }
     },
     "SE" : {
       "localizations" : {
@@ -10149,7 +10323,14 @@
       }
     },
     "This member is no longer active. Reload the plan before assigning a quantity." : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このメンバーは現在プランに参加していません。購入担当数を割り当てる前に、プランを再読み込みしてください。"
+          }
+        }
+      }
     },
     "This physical table has no public circle for the selected day." : {
       "localizations" : {
@@ -11689,10 +11870,24 @@
       }
     },
     "お気に入りから追加" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りから追加"
+          }
+        }
+      }
     },
     "お気に入りを読み込めません" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りを読み込めません"
+          }
+        }
+      }
     },
     "お気に入り同期の要確認" : {
       "localizations" : {
@@ -11786,7 +11981,14 @@
       }
     },
     "このプランは現在読み取り専用です。お気に入りの確認だけできます。" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このプランは現在読み取り専用です。お気に入りの確認だけできます。"
+          }
+        }
+      }
     },
     "このプランへの参加権限が取り消されました。未同期の変更は端末に残っています。" : {
       "localizations" : {
@@ -11890,7 +12092,14 @@
       }
     },
     "サークルを追加中…" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを追加中…"
+          }
+        }
+      }
     },
     "サーバー上の最新状態を表示しています。端末に残した変更は自動送信されません。" : {
       "localizations" : {
@@ -11981,10 +12190,24 @@
       }
     },
     "プランにまだないお気に入り" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランにまだないお気に入り"
+          }
+        }
+      }
     },
     "プランにまだないサークルだけを確認して追加します。" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランにまだないサークルだけを確認して追加します。"
+          }
+        }
+      }
     },
     "プランの保存データが上限を超えています。" : {
       "localizations" : {
@@ -12107,7 +12330,14 @@
       }
     },
     "もう一度試す" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度試す"
+          }
+        }
+      }
     },
     "ログアウト" : {
       "localizations" : {
@@ -12452,7 +12682,14 @@
       }
     },
     "復旧が必要なプラン" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "復旧が必要なプラン"
+          }
+        }
+      }
     },
     "復旧データ" : {
       "localizations" : {
@@ -12465,7 +12702,14 @@
       }
     },
     "復旧内容を確認" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "復旧内容を確認"
+          }
+        }
+      }
     },
     "拒否された変更は自動再送せず保存しています。ほかのお気に入り変更は引き続き同期されます。" : {
       "localizations" : {
@@ -12558,7 +12802,14 @@
       }
     },
     "未保存のメモを同期できないため、端末に保持しています。" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未保存のメモを同期できないため、端末に保持しています。"
+          }
+        }
+      }
     },
     "未同期の変更が1,000件の上限に達しました。内容を確認して書き出すか、同期済みの状態からやり直してください。" : {
       "localizations" : {
@@ -12641,10 +12892,24 @@
       }
     },
     "編集権限がないため、未保存のメモを端末に保持しています。" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集権限がないため、未保存のメモを端末に保持しています。"
+          }
+        }
+      }
     },
     "編集権限が変わったため、未保存のメモを端末に保持しています。" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集権限が変わったため、未保存のメモを端末に保持しています。"
+          }
+        }
+      }
     },
     "編集者" : {
       "localizations" : {
@@ -12657,7 +12922,14 @@
       }
     },
     "表示中のプランは詳細画面で復旧方法を選べます。アクセスできない以前のデータは、書き出してから端末から削除できます。" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "表示中のプランは詳細画面で復旧方法を選べます。アクセスできない以前のデータは、書き出してから端末から削除できます。"
+          }
+        }
+      }
     },
     "表示名" : {
       "localizations" : {
@@ -12690,19 +12962,54 @@
       }
     },
     "追加（%lld件）" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加（%lld件）"
+          }
+        }
+      }
     },
     "追加してもCircle.msやComiNaviのお気に入りは変更されません。" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加してもCircle.msやComiNaviのお気に入りは変更されません。"
+          }
+        }
+      }
     },
     "追加できなかったサークル" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加できなかったサークル"
+          }
+        }
+      }
     },
     "追加できるサークルはありません" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加できるサークルはありません"
+          }
+        }
+      }
     },
     "追加済み・登録済み" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加済み・登録済み"
+          }
+        }
+      }
     },
     "送信できなかったお気に入り変更" : {
       "localizations" : {
@@ -12755,13 +13062,34 @@
       }
     },
     "選択したサークルを再試行" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したサークルを再試行"
+          }
+        }
+      }
     },
     "閉じる" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じる"
+          }
+        }
+      }
     },
     "閲覧者" : {
-
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閲覧者"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
