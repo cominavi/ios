@@ -757,6 +757,8 @@ struct SharedPlanEditorScreen: View {
 struct SharedPlanProgressOverview: View {
     let progress: SharedPlanProgressSummary
 
+    @ScaledMetric(relativeTo: .body) private var barHeight = 12.0
+
     var body: some View {
         if progress.wanted == 0 {
             Label {
@@ -792,14 +794,18 @@ struct SharedPlanProgressOverview: View {
                         Capsule()
                             .fill(.secondary.opacity(0.18))
                         Capsule()
-                            .fill(Color.accentColor.opacity(0.45))
+                            .fill(.orange)
                             .frame(width: width * progress.assignedFraction)
                         Capsule()
                             .fill(.green)
                             .frame(width: width * progress.fulfilledFraction)
                     }
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
+                    }
                 }
-                .frame(height: 12)
+                .frame(height: barHeight)
                 .accessibilityHidden(true)
 
                 HStack(spacing: 8) {
@@ -811,7 +817,7 @@ struct SharedPlanProgressOverview: View {
                     SharedPlanProgressMetric(
                         title: String(localized: "Assigned"),
                         value: progress.assigned,
-                        color: .accentColor
+                        color: .orange
                     )
                     SharedPlanProgressMetric(
                         title: String(localized: "Bought"),
