@@ -24,16 +24,9 @@ struct FollowingImportView: View {
                 }
 
                 TimelineView(.periodic(from: .now, by: 30)) { _ in
-                    Button {
-                        Task { await model.importNow() }
-                    } label: {
-                        HStack {
-                            Label("Import followed circles", systemImage: "arrow.down.circle")
-                            Spacer()
-                            if model.activity == .importing {
-                                ProgressView()
-                            }
-                        }
+                    Button(action: model.importNow) {
+                        Label("Import followed circles", systemImage: "arrow.down.circle")
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .disabled(!model.canImport)
                     .accessibilityIdentifier("following-import-start")
@@ -87,32 +80,13 @@ struct FollowingImportView: View {
                     }
                     .scrollIndicators(.hidden)
 
-                    Button {
-                        Task { await model.favoriteAll() }
-                    } label: {
-                        HStack {
-                            Label("Favorite all imported circles", systemImage: "star.fill")
-                            Spacer()
-                            if model.activity == .favoriting {
-                                ProgressView()
-                            }
-                        }
-                        .foregroundStyle(model.selectedColor.swiftUIColor)
+                    Button(action: model.favoriteAll) {
+                        Label("Favorite all imported circles", systemImage: "star.fill")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .foregroundStyle(model.selectedColor.swiftUIColor)
                     }
                     .disabled(model.activity != .idle)
                     .accessibilityIdentifier("following-import-favorite-all")
-                }
-            }
-
-            if let errorMessage = model.errorMessage {
-                Section {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                }
-            } else if let successMessage = model.successMessage {
-                Section {
-                    Label(successMessage, systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
                 }
             }
 
@@ -144,7 +118,7 @@ struct FollowingImportView: View {
                             .buttonStyle(.plain)
 
                             Button {
-                                Task { await model.favorite(importedCircle) }
+                                model.favorite(importedCircle)
                             } label: {
                                 Image(systemName: model.favoriteColor(for: importedCircle) == nil
                                     ? "star"
@@ -176,6 +150,14 @@ struct FollowingImportView: View {
         .navigationTitle("X followed circles")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
+        .onChange(of: model.errorMessage) { _, message in
+            guard let message else { return }
+            AppToast.showError(
+                String(localized: "Could not update followed circles"),
+                subtitle: message
+            )
+            model.dismissError()
+        }
     }
 }
 

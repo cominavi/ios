@@ -97,6 +97,42 @@ final class ComiketEventReminderTests: XCTestCase {
         XCTAssertTrue(scheduled.isEmpty)
     }
 
+    func testToggleUpdatesImmediatelyBeforeSchedulingCompletes() throws {
+        let suiteName = "ComiketEventReminderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let scheduler = ReminderSchedulerSpy(
+            authorization: .authorized(timeSensitiveEnabled: true)
+        )
+        let store = ComiketReminderStore(scheduler: scheduler, defaults: defaults)
+
+        store.setEnabledOptimistically(true, for: .pmEntry)
+
+        XCTAssertTrue(store.isEnabled(.pmEntry))
+    }
+
+    func testSchedulingFailureRollsBackOptimisticSelection() async throws {
+        let suiteName = "ComiketEventReminderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let scheduler = ReminderSchedulerSpy(
+            authorization: .authorized(timeSensitiveEnabled: true),
+            replacementError: ReminderSchedulerTestError.replacementFailed
+        )
+        let store = ComiketReminderStore(scheduler: scheduler, defaults: defaults)
+
+        await store.setEnabled(true, for: .circleClose)
+
+        XCTAssertFalse(store.isEnabled(.circleClose))
+        XCTAssertNotNil(store.errorMessage)
+
+        let reopened = ComiketReminderStore(
+            scheduler: scheduler,
+            defaults: defaults
+        )
+        XCTAssertFalse(reopened.isEnabled(.circleClose))
+    }
+
     private func date(_ value: String) throws -> Date {
         try XCTUnwrap(ISO8601DateFormatter().date(from: value))
     }
@@ -104,11 +140,16 @@ final class ComiketEventReminderTests: XCTestCase {
 
 private actor ReminderSchedulerSpy: ComiketNotificationScheduling {
     private var currentAuthorization: ComiketNotificationAuthorization
+    private let replacementError: ReminderSchedulerTestError?
     private var requestCount = 0
     private var replacements: [[ComiketReminderRequest]] = []
 
-    init(authorization: ComiketNotificationAuthorization) {
+    init(
+        authorization: ComiketNotificationAuthorization,
+        replacementError: ReminderSchedulerTestError? = nil
+    ) {
         currentAuthorization = authorization
+        self.replacementError = replacementError
     }
 
     func authorization() async -> ComiketNotificationAuthorization {
@@ -122,6 +163,7 @@ private actor ReminderSchedulerSpy: ComiketNotificationScheduling {
     }
 
     func replaceOwnedRequests(with requests: [ComiketReminderRequest]) async throws {
+        if let replacementError { throw replacementError }
         replacements.append(requests)
     }
 
@@ -132,4 +174,8 @@ private actor ReminderSchedulerSpy: ComiketNotificationScheduling {
     func latestRequests() -> [ComiketReminderRequest] {
         replacements.last ?? []
     }
+}
+
+private enum ReminderSchedulerTestError: Error {
+    case replacementFailed
 }

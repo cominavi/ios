@@ -3033,6 +3033,36 @@
         }
       }
     },
+    "Could not save circle" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルを保存できませんでした"
+          }
+        }
+      }
+    },
+    "Could not update followed circles" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォロー中のサークルを更新できませんでした"
+          }
+        }
+      }
+    },
+    "Could not update map" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マップを更新できませんでした"
+          }
+        }
+      }
+    },
     "Could not update reminders" : {
       "localizations" : {
         "ja" : {

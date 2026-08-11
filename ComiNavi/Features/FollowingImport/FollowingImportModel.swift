@@ -15,12 +15,12 @@ final class FollowingImportModel {
     private(set) var favoriteColorsByPublicID: [Int: BookmarkColor] = [:]
     private(set) var activity: Activity = .idle
     private(set) var errorMessage: String?
-    private(set) var successMessage: String?
     var twitterUserName = ""
     var selectedColor: BookmarkColor = .orange
 
     @ObservationIgnored private let dataSource: CirclemsDataSource
     @ObservationIgnored private let client: FollowingImportAPIClient
+    @ObservationIgnored private var activityTask: Task<Void, Never>?
 
     init(
         dataSource: CirclemsDataSource,
@@ -59,11 +59,16 @@ final class FollowingImportModel {
         }
     }
 
-    func importNow() async {
+    func importNow() {
         guard let userName = normalizedTwitterUserName, canImport else { return }
         activity = .importing
         errorMessage = nil
-        successMessage = nil
+        activityTask = Task { [weak self] in
+            await self?.performImport(userName: userName)
+        }
+    }
+
+    private func performImport(userName: String) async {
         defer { activity = .idle }
 
         do {
@@ -109,9 +114,6 @@ final class FollowingImportModel {
                 circles: catalogCircles,
                 extensions: catalogExtensions
             )
-            successMessage = String(
-                localized: "Imported \(state.matchedCircleCount) matching circles."
-            )
         } catch {
             if case FollowingImportAPIError.server(_, _, let nextAllowedAt) = error,
                 let nextAllowedAt,
@@ -131,12 +133,12 @@ final class FollowingImportModel {
         }
     }
 
-    func favorite(_ importedCircle: FollowingImportedCircle) async {
-        await favorite(circles: [importedCircle])
+    func favorite(_ importedCircle: FollowingImportedCircle) {
+        favorite(circles: [importedCircle])
     }
 
-    func favoriteAll() async {
-        await favorite(circles: importedCircles)
+    func favoriteAll() {
+        favorite(circles: importedCircles)
     }
 
     func favoriteColor(for importedCircle: FollowingImportedCircle) -> BookmarkColor? {
@@ -153,11 +155,33 @@ final class FollowingImportModel {
         return value.lowercased()
     }
 
-    private func favorite(circles imported: [FollowingImportedCircle]) async {
+    func dismissError() {
+        errorMessage = nil
+    }
+
+    private func favorite(circles imported: [FollowingImportedCircle]) {
         guard activity == .idle, !imported.isEmpty else { return }
         activity = .favoriting
         errorMessage = nil
-        successMessage = nil
+        let previousFavoriteColors = favoriteColorsByPublicID
+        let color = selectedColor
+        for publicCircleID in imported.flatMap(\.publicCircleIDsByCatalogID.values) {
+            favoriteColorsByPublicID[publicCircleID] = color
+        }
+        activityTask = Task { [weak self] in
+            await self?.persistFavorites(
+                imported,
+                color: color,
+                restoring: previousFavoriteColors
+            )
+        }
+    }
+
+    private func persistFavorites(
+        _ imported: [FollowingImportedCircle],
+        color: BookmarkColor,
+        restoring previousFavoriteColors: [Int: BookmarkColor]
+    ) async {
         defer { activity = .idle }
 
         do {
@@ -184,7 +208,7 @@ final class FollowingImportModel {
                     eventNumber: dataSource.comiket.number,
                     publicCircleID: publicCircleID
                 ) {
-                    existing.color = selectedColor
+                    existing.color = color
                     existing.modifiedAt = now
                     existing.syncState = .pendingUpsert
                     bookmarks.append(existing)
@@ -199,7 +223,7 @@ final class FollowingImportModel {
                             mapID: location.mapID,
                             tableID: location.tableID,
                             subspace: location.subspace,
-                            color: selectedColor,
+                            color: color,
                             memo: "",
                             modifiedAt: now,
                             syncState: .pendingUpsert
@@ -210,14 +234,21 @@ final class FollowingImportModel {
                 throw FollowingImportModelError.locationsUnavailable
             }
             try await dataSource.userPlanStore.upsert(bookmarks)
+            favoriteColorsByPublicID = previousFavoriteColors
             for bookmark in bookmarks {
                 favoriteColorsByPublicID[bookmark.publicCircleID] = bookmark.color
             }
-            successMessage = String(localized: "Favorited \(bookmarks.count) circles.")
             if let coordinator = dataSource.bookmarkSyncCoordinator {
-                Task { try? await coordinator.sync() }
+                Task { [weak self] in
+                    do {
+                        try await coordinator.sync()
+                    } catch {
+                        self?.errorMessage = error.localizedDescription
+                    }
+                }
             }
         } catch {
+            favoriteColorsByPublicID = previousFavoriteColors
             errorMessage = error.localizedDescription
         }
     }

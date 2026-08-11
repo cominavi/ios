@@ -277,7 +277,7 @@ struct CatalogEventDaySheet: View {
             Text("Event day")
                 .font(.headline)
 
-            if isOpeningCatalog || availableDays.isEmpty {
+            if availableDays.isEmpty {
                 HStack(spacing: 12) {
                     ProgressView()
                     Text(openingLabel)
@@ -314,16 +314,9 @@ struct CatalogEventDaySheet: View {
         return catalogLibrary.selectedEvent
     }
 
-    private var isOpeningCatalog: Bool {
-        if case .loading = catalogLibrary.phase { return true }
-        if case .downloading = catalogLibrary.phase { return true }
-        guard let dataSource = catalogLibrary.dataSource else { return true }
-        return dataSource.readiness != .ready
-    }
-
     private var availableDays: [UFDSchema.Day] {
-        guard !isOpeningCatalog,
-              let dataSource = catalogLibrary.dataSource,
+        guard let dataSource = catalogLibrary.dataSource,
+              dataSource.readiness == .ready,
               let comiket = dataSource.comiket
         else { return [] }
         return comiket.days
@@ -367,7 +360,6 @@ private struct CatalogEventSelectionView: View {
                     ) {
                         catalogLibrary.select(event)
                     }
-                    .disabled(isOpeningCatalog)
                     .accessibilityLabel(
                         [event.displayName, dateDescription]
                             .compactMap { $0 }
@@ -393,12 +385,6 @@ private struct CatalogEventSelectionView: View {
             return event
         }
         return catalogLibrary.selectedEvent
-    }
-
-    private var isOpeningCatalog: Bool {
-        if case .loading = catalogLibrary.phase { return true }
-        if case .downloading = catalogLibrary.phase { return true }
-        return catalogLibrary.isSwitching
     }
 
     private func dateDescription(for event: CatalogEvent) -> String? {

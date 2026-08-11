@@ -15,6 +15,9 @@ final class CircleUserPlanModel {
     private(set) var saveState: SaveState = .idle
     var memo = ""
 
+    private var favoriteOverride: Bool?
+    private var colorOverride: BookmarkColor?
+
     @ObservationIgnored private let circles: [CirclemsDataSchema.ComiketCircleWC]
     @ObservationIgnored private let dataSource: CirclemsDataSource
     @ObservationIgnored private var publicCircleIDsByCatalogID: [Int: Int] = [:]
@@ -40,16 +43,17 @@ final class CircleUserPlanModel {
     }
 
     deinit {
+        saveTask?.cancel()
         memoTask?.cancel()
     }
 
     var isFavorite: Bool {
-        bookmark?.syncState != .pendingDelete && bookmark != nil
+        favoriteOverride ?? (bookmark?.syncState != .pendingDelete && bookmark != nil)
     }
 
     var selectedColor: BookmarkColor? {
         guard isFavorite else { return nil }
-        return bookmark?.color
+        return colorOverride ?? bookmark?.color
     }
 
     func load(publicCircleID: Int?) async {
@@ -95,7 +99,15 @@ final class CircleUserPlanModel {
 
     func toggleFavorite() {
         if isFavorite {
-            guard !groupBookmarks.isEmpty else { return }
+            guard !groupBookmarks.isEmpty else {
+                saveTask?.cancel()
+                favoriteOverride = nil
+                colorOverride = nil
+                saveState = .idle
+                return
+            }
+            let previousBookmarks = groupBookmarks
+            let previousMemo = memo
             let now = Date()
             let pendingDeletes = groupBookmarks.map { stored in
                 var stored = stored
@@ -106,7 +118,13 @@ final class CircleUserPlanModel {
             groupBookmarks = pendingDeletes
             bookmark = preferredBookmark(in: pendingDeletes)
             memo = ""
-            persist(pendingDeletes)
+            favoriteOverride = false
+            colorOverride = nil
+            persist(
+                pendingDeletes,
+                restoring: previousBookmarks,
+                memo: previousMemo
+            )
         } else {
             createOrUpdate(color: .orange, memo: memo)
         }
@@ -123,7 +141,7 @@ final class CircleUserPlanModel {
                 try await Task.sleep(for: .milliseconds(350))
                 guard let self else { return }
                 self.createOrUpdate(
-                    color: self.bookmark?.color ?? .memoOnly,
+                    color: self.selectedColor ?? .memoOnly,
                     memo: self.memo
                 )
             } catch is CancellationError {
@@ -137,11 +155,19 @@ final class CircleUserPlanModel {
     func flushMemo() {
         memoTask?.cancel()
         guard memo != bookmark?.memo else { return }
-        createOrUpdate(color: bookmark?.color ?? .memoOnly, memo: memo)
+        createOrUpdate(color: selectedColor ?? .memoOnly, memo: memo)
+    }
+
+    func dismissSaveError() {
+        guard case .failed = saveState else { return }
+        saveState = .idle
     }
 
     private func createOrUpdate(color: BookmarkColor, memo: String) {
         saveTask?.cancel()
+        let previousBookmarks = groupBookmarks
+        favoriteOverride = true
+        colorOverride = color
         saveState = .saving
         saveTask = Task { [weak self] in
             guard let self else { return }
@@ -193,24 +219,41 @@ final class CircleUserPlanModel {
                 self.groupBookmarks = updated
                 self.bookmark = self.preferredBookmark(in: updated)
                 try await self.persistLocally(updated)
+                self.favoriteOverride = nil
+                self.colorOverride = nil
             } catch is CancellationError {
                 return
             } catch {
+                self.groupBookmarks = previousBookmarks
+                self.bookmark = self.preferredBookmark(in: previousBookmarks)
+                self.favoriteOverride = nil
+                self.colorOverride = nil
                 self.saveState = .failed(error.localizedDescription)
             }
         }
     }
 
-    private func persist(_ bookmarks: [MapBookmark]) {
+    private func persist(
+        _ bookmarks: [MapBookmark],
+        restoring previousBookmarks: [MapBookmark],
+        memo previousMemo: String
+    ) {
         saveTask?.cancel()
         saveState = .saving
         saveTask = Task { [weak self] in
             guard let self else { return }
             do {
                 try await self.persistLocally(bookmarks)
+                self.favoriteOverride = nil
+                self.colorOverride = nil
             } catch is CancellationError {
                 return
             } catch {
+                self.groupBookmarks = previousBookmarks
+                self.bookmark = self.preferredBookmark(in: previousBookmarks)
+                self.memo = previousMemo
+                self.favoriteOverride = nil
+                self.colorOverride = nil
                 self.saveState = .failed(error.localizedDescription)
             }
         }
@@ -222,8 +265,12 @@ final class CircleUserPlanModel {
         saveState = .saved
 
         guard let coordinator = dataSource.bookmarkSyncCoordinator else { return }
-        Task {
-            try? await coordinator.sync()
+        Task { [weak self] in
+            do {
+                try await coordinator.sync()
+            } catch {
+                self?.saveState = .failed(error.localizedDescription)
+            }
         }
     }
 

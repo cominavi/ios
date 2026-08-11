@@ -209,7 +209,7 @@ struct ProfileScreen: View {
                 } label: {
                     LabeledContent("Source", value: catalogLibrary.mode.displayName)
                 }
-                .disabled(catalogLibrary.availableModes.count < 2 || catalogLibrary.isSwitching)
+                .disabled(catalogLibrary.availableModes.count < 2)
                 .accessibilityIdentifier("profile-catalog-data-source")
 
                 Text(catalogLibrary.mode.detail)

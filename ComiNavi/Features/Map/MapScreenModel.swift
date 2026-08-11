@@ -69,9 +69,8 @@ final class MapScreenModel {
     private(set) var showsGenreOverlay = false
     private(set) var genrePlacements: [CatalogMapGenrePlacement] = []
     private(set) var bookmarks: [Int: MapBookmark] = [:]
-    private(set) var isMutatingBookmark = false
-    private(set) var isSyncingBookmarks = false
     private(set) var bookmarkError: String?
+    private(set) var sceneError: String?
     private(set) var locatedUser: LocatedMapUser?
     private(set) var destination: MapDestination?
     var selection: Selection?
@@ -146,6 +145,7 @@ final class MapScreenModel {
         searchMatches = []
         genrePlacements = []
         bookmarks = [:]
+        sceneError = nil
         if locatedUser?.sceneID.day != selectedDay {
             locatedUser = nil
         }
@@ -234,7 +234,12 @@ final class MapScreenModel {
                 else {
                     return
                 }
-                self.phase = .failed(error.localizedDescription)
+                if self.campusScene != nil || self.scene != nil {
+                    self.phase = .ready
+                    self.sceneError = error.localizedDescription
+                } else {
+                    self.phase = .failed(error.localizedDescription)
+                }
             }
         }
     }
@@ -598,7 +603,6 @@ final class MapScreenModel {
 
         bookmarkTask?.cancel()
         bookmarkError = nil
-        isMutatingBookmark = true
 
         if var existing = bookmarks[publicCircleID] {
             let previousBookmarks = bookmarks
@@ -609,13 +613,11 @@ final class MapScreenModel {
                 do {
                     try await userPlanStore.upsert(existing)
                     guard let self else { return }
-                    self.isMutatingBookmark = false
                     self.scheduleBookmarkSync()
                 } catch {
                     guard let self else { return }
                     self.bookmarks = previousBookmarks
                     self.bookmarkError = error.localizedDescription
-                    self.isMutatingBookmark = false
                 }
             }
             return
@@ -668,8 +670,9 @@ final class MapScreenModel {
         bookmark.color = color
         bookmark.modifiedAt = Date()
         bookmark.syncState = .pendingUpsert
+        let previousBookmarks = bookmarks
         bookmarks[publicCircleID] = bookmark
-        persist(bookmark)
+        persist(bookmark, restoring: previousBookmarks)
     }
 
     private func persist(
@@ -678,12 +681,10 @@ final class MapScreenModel {
     ) {
         bookmarkTask?.cancel()
         bookmarkError = nil
-        isMutatingBookmark = true
         bookmarkTask = Task { [weak self, userPlanStore] in
             do {
                 try await userPlanStore.upsert(bookmark)
                 guard let self else { return }
-                self.isMutatingBookmark = false
                 self.scheduleBookmarkSync()
             } catch {
                 guard let self else { return }
@@ -693,7 +694,6 @@ final class MapScreenModel {
                     self.bookmarks[bookmark.publicCircleID] = nil
                 }
                 self.bookmarkError = error.localizedDescription
-                self.isMutatingBookmark = false
             }
         }
     }
@@ -730,8 +730,6 @@ final class MapScreenModel {
         let eventNumber = eventNumber
         let day = selectedDay
         let mapID = selectedMapID
-        isSyncingBookmarks = true
-
         bookmarkSyncTask = Task { [weak self, userPlanStore] in
             do {
                 if delay != .zero {
@@ -750,10 +748,8 @@ final class MapScreenModel {
                     self.bookmarks = Dictionary(
                         uniqueKeysWithValues: bookmarks.map { ($0.publicCircleID, $0) })
                 }
-                self.isSyncingBookmarks = false
             } catch is CancellationError {
-                guard let self else { return }
-                self.isSyncingBookmarks = false
+                return
             } catch {
                 guard let self else { return }
                 Self.logger.error(
@@ -763,9 +759,16 @@ final class MapScreenModel {
                     print("Bookmark synchronization failed: \(error)")
                 #endif
                 self.bookmarkError = error.localizedDescription
-                self.isSyncingBookmarks = false
             }
         }
+    }
+
+    func dismissBookmarkError() {
+        bookmarkError = nil
+    }
+
+    func dismissSceneError() {
+        sceneError = nil
     }
 
     private func loadGenrePlacements() {

@@ -497,24 +497,20 @@ private struct CircleUserPlanSection: View {
 
         CircleDetailSection("Your plan") {
             VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 12) {
-                    Button(action: model.toggleFavorite) {
-                        LucideLabel(
-                            resource:
-                            model.isFavorite
-                                ? LocalizedStringResource("Saved circle")
-                                : LocalizedStringResource("Save circle"),
-                            icon: model.isFavorite ? "star.fill" : "star"
-                        )
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(model.selectedColor?.swiftUIColor ?? Color.accentColor)
-                    .accessibilityIdentifier("circle-favorite-button")
-
-                    CirclePlanSaveStateView(state: model.saveState)
+                Button(action: model.toggleFavorite) {
+                    LucideLabel(
+                        resource:
+                        model.isFavorite
+                            ? LocalizedStringResource("Saved circle")
+                            : LocalizedStringResource("Save circle"),
+                        icon: model.isFavorite ? "star.fill" : "star"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, minHeight: 44)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(model.selectedColor?.swiftUIColor ?? Color.accentColor)
+                .accessibilityIdentifier("circle-favorite-button")
 
                 if model.isFavorite {
                     VStack(alignment: .leading, spacing: 10) {
@@ -567,20 +563,19 @@ private struct CircleUserPlanSection: View {
                             }
                             .accessibilityIdentifier("circle-private-note")
 
-                        Text("Saved on this device first, then synchronized with Circle.ms when online.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
-                }
-
-                if case .failed(let message) = model.saveState {
-                    LucideLabel(verbatim: message, icon: "exclamationmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.red)
                 }
             }
         }
         .accessibilityIdentifier("circle-user-plan-section")
+        .onChange(of: model.saveState) { _, state in
+            guard case .failed(let message) = state else { return }
+            AppToast.showError(
+                String(localized: "Could not save circle"),
+                subtitle: message
+            )
+            model.dismissSaveError()
+        }
         .onDisappear {
             model.flushMemo()
         }
@@ -620,25 +615,6 @@ private struct CirclePlanColorButton: View {
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("circle-favorite-color-\(color.rawValue)")
-    }
-}
-
-private struct CirclePlanSaveStateView: View {
-    let state: CircleUserPlanModel.SaveState
-
-    var body: some View {
-        switch state {
-        case .saving:
-            ProgressView()
-                .controlSize(.small)
-                .accessibilityLabel("Saving")
-        case .saved:
-            LucideIcon("checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .accessibilityLabel("Saved locally")
-        case .idle, .failed:
-            EmptyView()
-        }
     }
 }
 

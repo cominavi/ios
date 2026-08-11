@@ -118,6 +118,22 @@ struct MapView: View {
                 selectedDay = day
             }
         }
+        .onChange(of: model.bookmarkError) { _, message in
+            guard let message else { return }
+            AppToast.showError(
+                String(localized: "Could not save circle"),
+                subtitle: message
+            )
+            model.dismissBookmarkError()
+        }
+        .onChange(of: model.sceneError) { _, message in
+            guard let message else { return }
+            AppToast.showError(
+                String(localized: "Could not update map"),
+                subtitle: message
+            )
+            model.dismissSceneError()
+        }
         .sheet(item: $model.selection) { selection in
             CircleMapDetailSheet(
                 selection: selection,
@@ -315,13 +331,6 @@ struct MapView: View {
                 )
             }
 
-            if model.phase == .loading,
-                model.campusScene != nil || model.scene != nil
-            {
-                MapRefreshIndicator(
-                    message: model.scope == .campus ? "Updating campus…" : "Updating venue…"
-                )
-            }
         }
     }
 
@@ -815,29 +824,6 @@ private struct MapLoadingView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-private struct MapRefreshIndicator: View {
-    let message: LocalizedStringResource
-
-    var body: some View {
-        HStack(spacing: 10) {
-            ProgressView()
-                .controlSize(.small)
-            Text(message)
-                .font(.footnote.weight(.semibold))
-        }
-        .padding(.horizontal, 14)
-        .frame(height: 42)
-        .background(.regularMaterial, in: .capsule)
-        .overlay {
-            Capsule()
-                .stroke(Color(uiColor: .separator).opacity(0.25), lineWidth: 0.5)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("map-refresh-indicator")
-        .allowsHitTesting(false)
     }
 }
 

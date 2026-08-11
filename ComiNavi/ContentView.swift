@@ -90,31 +90,13 @@ struct ContentView: View {
                 CatalogLibraryLoadingSurface(catalogLibrary: catalogLibrary)
             }
         }
-        .overlay(alignment: .top) {
-            if catalogLibrary.isSwitching,
-               let event = catalogLibrary.phase.eventBeingLoaded
-            {
-                LucideLabel("Opening \(event.shortName)…", icon: "arrow.triangle.2.circlepath")
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.regularMaterial, in: .capsule)
-                    .safeAreaPadding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
-        }
-        .alert(
-            "Catalog switch failed",
-            isPresented: Binding(
-                get: { catalogLibrary.errorMessage != nil },
-                set: { if !$0 { catalogLibrary.dismissError() } }
+        .onChange(of: catalogLibrary.errorMessage) { _, message in
+            guard let message, catalogLibrary.dataSource?.readiness == .ready else { return }
+            AppToast.showError(
+                String(localized: "Catalog switch failed"),
+                subtitle: message
             )
-        ) {
-            Button("OK") {
-                catalogLibrary.dismissError()
-            }
-        } message: {
-            Text(catalogLibrary.errorMessage ?? String(localized: "Please try again."))
+            catalogLibrary.dismissError()
         }
         .sheet(isPresented: $showsCatalogSettings) {
             CatalogEventDaySheet(
@@ -125,7 +107,6 @@ struct ContentView: View {
             .presentationDragIndicator(.visible)
             .presentationContentInteraction(.scrolls)
         }
-        .animation(.default, value: catalogLibrary.phase)
     }
 }
 
@@ -446,7 +427,6 @@ private struct CatalogLoadingEventPicker: View {
                 LucideLabel("Choose another catalog", icon: "arrow.left.arrow.right")
             }
             .buttonStyle(.bordered)
-            .disabled(catalogLibrary.isSwitching)
             .accessibilityIdentifier("catalog-loading-event-selector")
         }
     }

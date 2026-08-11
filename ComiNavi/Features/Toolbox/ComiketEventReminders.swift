@@ -231,13 +231,13 @@ final class ComiketReminderStore {
     }
 
     private(set) var state: State = .checking
-    private(set) var isUpdating = false
     private(set) var errorMessage: String?
     private(set) var enabledKinds: Set<ComiketReminderKind>
 
     @ObservationIgnored private let scheduler: any ComiketNotificationScheduling
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let now: @Sendable () -> Date
+    @ObservationIgnored private var updateRevision = 0
 
     private static let enabledKindsKey = "comiket.event-reminders.c108.enabled-kinds.v1"
 
@@ -264,32 +264,61 @@ final class ComiketReminderStore {
     }
 
     func setEnabled(_ enabled: Bool, for kind: ComiketReminderKind) async {
-        guard !isUpdating else { return }
-        isUpdating = true
-        errorMessage = nil
-        defer { isUpdating = false }
+        let mutation = applyOptimisticSelection(enabled, for: kind)
+        await finishSelection(mutation)
+    }
 
+    func setEnabledOptimistically(_ enabled: Bool, for kind: ComiketReminderKind) {
+        let mutation = applyOptimisticSelection(enabled, for: kind)
+        Task { [weak self] in
+            await self?.finishSelection(mutation)
+        }
+    }
+
+    private func applyOptimisticSelection(
+        _ enabled: Bool,
+        for kind: ComiketReminderKind
+    ) -> ReminderSelectionMutation {
+        updateRevision += 1
+        errorMessage = nil
+        let previousEnabledKinds = enabledKinds
+        if enabled {
+            enabledKinds.insert(kind)
+        } else {
+            enabledKinds.remove(kind)
+        }
+        persistSelection()
+        return ReminderSelectionMutation(
+            revision: updateRevision,
+            enabled: enabled,
+            kind: kind,
+            previousEnabledKinds: previousEnabledKinds
+        )
+    }
+
+    private func finishSelection(_ mutation: ReminderSelectionMutation) async {
         do {
             var authorization = await scheduler.authorization()
-            if enabled, authorization == .notDetermined {
+            if mutation.enabled, authorization == .notDetermined {
                 _ = try await scheduler.requestAuthorization()
                 authorization = await scheduler.authorization()
             }
+            guard mutation.revision == updateRevision else { return }
             state = state(for: authorization)
 
-            if enabled {
-                guard case .authorized = authorization else { return }
-                enabledKinds.insert(kind)
-            } else {
-                enabledKinds.remove(kind)
+            if mutation.enabled, case .authorized = authorization {
+                // The optimistic selection is already applied.
+            } else if mutation.enabled {
+                enabledKinds.remove(mutation.kind)
+                persistSelection()
+                return
             }
-            persistSelection()
             try await scheduleSelection()
         } catch {
-            errorMessage = String.localizedStringWithFormat(
-                String(localized: "Could not update reminders: %@"),
-                error.localizedDescription
-            )
+            guard mutation.revision == updateRevision else { return }
+            enabledKinds = mutation.previousEnabledKinds
+            persistSelection()
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -301,16 +330,17 @@ final class ComiketReminderStore {
         do {
             try await scheduleSelection()
         } catch {
-            errorMessage = String.localizedStringWithFormat(
-                String(localized: "Could not update reminders: %@"),
-                error.localizedDescription
-            )
+            errorMessage = error.localizedDescription
         }
     }
 
     private func scheduleSelection() async throws {
-        let requests = ComiketEventReminderCatalog.requests(for: enabledKinds, now: now())
-        try await scheduler.replaceOwnedRequests(with: requests)
+        while true {
+            let scheduledRevision = updateRevision
+            let requests = ComiketEventReminderCatalog.requests(for: enabledKinds, now: now())
+            try await scheduler.replaceOwnedRequests(with: requests)
+            guard scheduledRevision != updateRevision else { return }
+        }
     }
 
     private func persistSelection() {
@@ -325,4 +355,11 @@ final class ComiketReminderStore {
             .authorized(timeSensitiveEnabled: timeSensitiveEnabled)
         }
     }
+}
+
+private struct ReminderSelectionMutation: Sendable {
+    let revision: Int
+    let enabled: Bool
+    let kind: ComiketReminderKind
+    let previousEnabledKinds: Set<ComiketReminderKind>
 }

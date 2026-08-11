@@ -64,18 +64,13 @@ struct ComiketToolboxView: View {
             guard scenePhase == .active else { return }
             Task { await reminderStore.refresh() }
         }
-        .alert(
-            "Could not update reminders",
-            isPresented: Binding(
-                get: { reminderStore.errorMessage != nil },
-                set: { if !$0 { reminderStore.dismissError() } }
+        .onChange(of: reminderStore.errorMessage) { _, message in
+            guard let message else { return }
+            AppToast.showError(
+                String(localized: "Could not update reminders"),
+                subtitle: message
             )
-        ) {
-            Button("OK") {
-                reminderStore.dismissError()
-            }
-        } message: {
-            Text(reminderStore.errorMessage ?? String(localized: "Please try again."))
+            reminderStore.dismissError()
         }
         .sensoryFeedback(.success, trigger: copiedVenue) { oldValue, newValue in
             !oldValue && newValue
@@ -126,7 +121,7 @@ private struct ToolboxReminderSection: View {
                     isOn: Binding(
                         get: { store.isEnabled(kind) },
                         set: { enabled in
-                            Task { await store.setEnabled(enabled, for: kind) }
+                            store.setEnabledOptimistically(enabled, for: kind)
                         }
                     )
                 ) {
@@ -144,7 +139,6 @@ private struct ToolboxReminderSection: View {
                         }
                     }
                 }
-                .disabled(store.isUpdating)
                 .accessibilityIdentifier("toolbox-reminder-\(kind.rawValue)")
             }
 
@@ -171,29 +165,14 @@ private struct ToolboxReminderSection: View {
     @ViewBuilder
     private var reminderStatus: some View {
         switch store.state {
-        case .checking:
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Checking notification settings…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-        case .notDetermined:
-            Label("Choose a reminder to allow notifications.", systemImage: "bell")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        case .checking, .notDetermined:
+            EmptyView()
         case .denied:
             Label("Notifications are off for ComiNavi.", systemImage: "bell.slash")
                 .font(.caption)
                 .foregroundStyle(.orange)
         case .authorized(let timeSensitiveEnabled):
-            if timeSensitiveEnabled {
-                Label("Time Sensitive delivery is on.", systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.green)
-            } else {
+            if !timeSensitiveEnabled {
                 Label(
                     "Time Sensitive delivery is off in Settings; alerts may be delayed.",
                     systemImage: "exclamationmark.triangle.fill"
