@@ -87,6 +87,26 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         ])
     }
 
+    func testPurchaseProgressUpdateRoutesRequestedAndBoughtTogether() async {
+        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let model = makeWritableModel()
+        await model.load(using: service)
+
+        await model.setPurchaseProgress(
+            requestedQuantity: 4,
+            boughtQuantity: 3,
+            needID: Self.needID,
+            circle: Self.circle,
+            using: service,
+            now: Self.now
+        )
+
+        XCTAssertEqual(service.actions, [
+            .wanted(4, Self.needID, Self.circle),
+            .fulfilled(3, Self.needID, Self.circle),
+        ])
+    }
+
     func testAllTenOperationTypesRouteExactTypedPayloads() async throws {
         let circleParent = makeParentConflict(
             id: "circle-parent",
@@ -683,6 +703,13 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(progress(assigned: 4, bought: 0, conflict: true).state, .needsReview)
         XCTAssertEqual(progress(assigned: 2, bought: 1).assignedFraction, 0.5)
         XCTAssertEqual(progress(assigned: 2, bought: 1).boughtFraction, 0.25)
+
+        let matchingAssignedAndBought = progress(assigned: 3, bought: 3)
+        XCTAssertEqual(matchingAssignedAndBought.requested, 4)
+        XCTAssertEqual(matchingAssignedAndBought.assigned, 3)
+        XCTAssertEqual(matchingAssignedAndBought.bought, 3)
+        XCTAssertEqual(matchingAssignedAndBought.assignedFraction, 0.75)
+        XCTAssertEqual(matchingAssignedAndBought.boughtFraction, 0.75)
     }
 
     func testEditorAccessibilityIdentifiersAreStableAndEntityScoped() {
@@ -699,6 +726,8 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
             SharedPlanEditorAccessibilityID.addNeed(Self.circle),
             SharedPlanEditorAccessibilityID.need(Self.needID),
             SharedPlanEditorAccessibilityID.need(otherNeed),
+            SharedPlanEditorAccessibilityID.needProgress(Self.needID),
+            SharedPlanEditorAccessibilityID.needProgressPreview(Self.needID),
             SharedPlanEditorAccessibilityID.conflict("scalar-wanted"),
         ]
 

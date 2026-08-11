@@ -743,6 +743,60 @@ final class SharedPlanEditorModel {
         }
     }
 
+    func setPurchaseProgress(
+        requestedQuantity: Int,
+        boughtQuantity: Int,
+        needID: UUID,
+        circle: SharedPlanCircleKey,
+        using service: any SharedPlanEditorServicing,
+        now: Date = Date()
+    ) async {
+        guard let need = circleContent(for: circle)?.needs.first(where: { $0.id == needID })
+        else {
+            issueMessage = SharedPlanError.planNotFound.localizedDescription
+            return
+        }
+        let requestedChanged = requestedQuantity != need.wantedQuantity
+        let boughtChanged = boughtQuantity != need.fulfilledQuantity
+        guard requestedChanged || boughtChanged else { return }
+
+        await performMutation(using: service) {
+            var changed = false
+
+            if boughtChanged, boughtQuantity < need.fulfilledQuantity {
+                changed = try await service.setFulfilledQuantity(
+                    boughtQuantity,
+                    needID: needID,
+                    circle: circle,
+                    planID: self.planID,
+                    now: now
+                ) || changed
+            }
+
+            if requestedChanged {
+                changed = try await service.setWantedQuantity(
+                    requestedQuantity,
+                    needID: needID,
+                    circle: circle,
+                    planID: self.planID,
+                    now: now
+                ) || changed
+            }
+
+            if boughtChanged, boughtQuantity >= need.fulfilledQuantity {
+                changed = try await service.setFulfilledQuantity(
+                    boughtQuantity,
+                    needID: needID,
+                    circle: circle,
+                    planID: self.planID,
+                    now: now
+                ) || changed
+            }
+
+            return changed
+        }
+    }
+
     func setBuyerAllocation(
         _ quantity: Int,
         buyerUserID: String,

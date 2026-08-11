@@ -119,6 +119,35 @@ final class ComiNaviUITests: XCTestCase {
             )
         }
 
+        XCTAssertFalse(app.staticTexts["Needs a buyer"].exists)
+
+        let firstNeedID = "10000000-0000-4000-8000-000000000001"
+        let progressButton = app.buttons[
+            "shared-plan-editor-need-progress-\(firstNeedID)"
+        ]
+        XCTAssertTrue(progressButton.waitForExistence(timeout: 3))
+        progressButton.tap()
+
+        XCTAssertTrue(app.navigationBars["Purchase progress"].waitForExistence(timeout: 3))
+        let preview = app.descendants(matching: .any)[
+            "shared-plan-editor-need-progress-preview-\(firstNeedID)"
+        ]
+        XCTAssertTrue(preview.waitForExistence(timeout: 3))
+        XCTAssertEqual(
+            preview.value as? String,
+            "Requested 2, assigned 0, bought 0"
+        )
+        app.buttons["Done"].tap()
+        XCTAssertFalse(app.navigationBars["Purchase progress"].waitForExistence(timeout: 2))
+
+        let firstRowMenu = app.buttons["More actions for 新幹線チケット"]
+        XCTAssertTrue(firstRowMenu.waitForExistence(timeout: 3))
+        firstRowMenu.tap()
+        let purchaseProgressAction = app.buttons["Purchase progress"].firstMatch
+        XCTAssertTrue(purchaseProgressAction.waitForExistence(timeout: 3))
+        purchaseProgressAction.tap()
+        XCTAssertTrue(app.navigationBars["Purchase progress"].waitForExistence(timeout: 3))
+
         XCTAssertFalse(app.staticTexts["Wanted, assigned, and fulfilled quantities are saved as separate collaborative edits."].exists)
         takeScreenshot(named: "Shared-Plan-Purchase-Redesign")
     }

@@ -32,6 +32,10 @@ enum SharedPlanEditorAccessibilityID {
         "shared-plan-editor-need-progress-\(needID.uuidString.lowercased())"
     }
 
+    static func needProgressPreview(_ needID: UUID) -> String {
+        "shared-plan-editor-need-progress-preview-\(needID.uuidString.lowercased())"
+    }
+
     static func conflict(_ conflictID: String) -> String {
         "shared-plan-editor-conflict-\(conflictID)"
     }
@@ -53,11 +57,24 @@ struct SharedPlanPurchaseProgressPresentation: Equatable, Sendable {
     let state: State
 
     init(need: SharedPlanPurchaseNeed, hasConflict: Bool) {
-        requested = max(need.wantedQuantity, 1)
-        assigned = need.buyerAllocations.values.reduce(0, +)
-        bought = need.fulfilledQuantity
+        self.init(
+            requested: need.wantedQuantity,
+            assigned: need.buyerAllocations.values.reduce(0, +),
+            bought: need.fulfilledQuantity,
+            hasConflict: hasConflict
+        )
+    }
 
-        if hasConflict || assigned > requested || bought > requested || bought > assigned {
+    init(requested: Int, assigned: Int, bought: Int, hasConflict: Bool) {
+        self.requested = max(requested, 1)
+        self.assigned = assigned
+        self.bought = bought
+
+        if hasConflict
+            || assigned > self.requested
+            || bought > self.requested
+            || bought > assigned
+        {
             state = .needsReview
         } else if bought >= requested {
             state = .bought
@@ -1047,12 +1064,14 @@ private struct SharedPlanParentResolutionSheet: View {
 
 private enum SharedPlanCircleEditorSheet: Identifiable {
     case createNeed
-    case editQuantity(SharedPlanQuantityEdit)
+    case editProgress(SharedPlanPurchaseProgressEdit)
+    case editAllocation(SharedPlanBuyerAllocationEdit)
 
     var id: String {
         switch self {
         case .createNeed: "create-need"
-        case .editQuantity(let edit): "quantity:\(edit.id)"
+        case .editProgress(let edit): "progress:\(edit.id)"
+        case .editAllocation(let edit): "allocation:\(edit.id)"
         }
     }
 }
@@ -1114,8 +1133,16 @@ private struct SharedPlanCircleEditorScreen: View {
                     currentUserID: currentUserID,
                     presentedSheet: $presentedSheet
                 )
-            case .editQuantity(let edit):
-                SharedPlanQuantityEditorSheet(
+            case .editProgress(let edit):
+                SharedPlanPurchaseProgressSheet(
+                    model: model,
+                    store: store,
+                    circle: circle,
+                    edit: edit,
+                    presentedSheet: $presentedSheet
+                )
+            case .editAllocation(let edit):
+                SharedPlanBuyerAllocationSheet(
                     model: model,
                     store: store,
                     circle: circle,
@@ -1270,11 +1297,16 @@ private struct SharedPlanCircleEditorScreen: View {
                             conflict.path.contains(need.id.uuidString.lowercased())
                         },
                         canEdit: model.canEdit && !model.isPerformingMutation,
-                        onEditWanted: {
-                            presentedSheet = .editQuantity(.wanted(need))
+                        onEditProgress: {
+                            presentedSheet = .editProgress(.init(
+                                need: need,
+                                hasConflict: model.conflicts.contains { conflict in
+                                    conflict.path.contains(need.id.uuidString.lowercased())
+                                }
+                            ))
                         },
                         onEditAllocation: { buyerUserID in
-                            presentedSheet = .editQuantity(.allocation(
+                            presentedSheet = .editAllocation(.init(
                                 need,
                                 buyerUserID: buyerUserID
                             ))
@@ -1283,13 +1315,10 @@ private struct SharedPlanCircleEditorScreen: View {
                             guard let buyer = model.activeMembers.first(where: {
                                 $0.userID == currentUserID
                             }) ?? model.activeMembers.first else { return }
-                            presentedSheet = .editQuantity(.allocation(
+                            presentedSheet = .editAllocation(.init(
                                 need,
                                 buyerUserID: buyer.userID
                             ))
-                        },
-                        onEditFulfilled: {
-                            presentedSheet = .editQuantity(.fulfilled(need))
                         },
                         onDelete: { confirmation = .deleteNeed(need.id) }
                     )
@@ -1427,32 +1456,50 @@ private struct SharedPlanPurchaseStageLegend: View {
 
 private struct SharedPlanPurchaseStageBar: View {
     let progress: SharedPlanPurchaseProgressPresentation
-    let needID: UUID
+    let accessibilityIdentifier: String
 
-    @ScaledMetric(relativeTo: .caption) private var width = 92.0
+    @ScaledMetric(relativeTo: .caption) private var barHeight = 7.0
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            Capsule()
-                .fill(.secondary.opacity(0.22))
-            Capsule()
-                .fill(.orange)
-                .frame(width: width * progress.assignedFraction)
-            Capsule()
-                .fill(.green)
-                .frame(width: width * progress.boughtFraction)
-        }
-        .frame(width: width, height: 7)
-        .overlay {
-            Capsule()
-                .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
+        VStack(spacing: 3) {
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.secondary.opacity(0.22))
+                    Capsule()
+                        .fill(.orange)
+                        .frame(width: geometry.size.width * progress.assignedFraction)
+                    Capsule()
+                        .fill(.green)
+                        .frame(width: geometry.size.width * progress.boughtFraction)
+                }
+                .overlay {
+                    Capsule()
+                        .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
+                }
+            }
+            .frame(height: barHeight)
+
+            HStack(spacing: 0) {
+                quantityLabel(progress.requested, color: .secondary)
+                quantityLabel(progress.assigned, color: .orange)
+                quantityLabel(progress.bought, color: .green)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Purchase progress")
         .accessibilityValue(
             "Requested \(progress.requested), assigned \(progress.assigned), bought \(progress.bought)"
         )
-        .accessibilityIdentifier(SharedPlanEditorAccessibilityID.needProgress(needID))
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private func quantityLabel(_ quantity: Int, color: Color) -> some View {
+        Text(quantity.formatted())
+            .font(.caption2.weight(.bold))
+            .monospacedDigit()
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity)
     }
 }
 
@@ -1462,10 +1509,9 @@ private struct SharedPlanNeedEditorRow: View {
     let members: [SharedPlanMember]
     let hasConflict: Bool
     let canEdit: Bool
-    let onEditWanted: () -> Void
+    let onEditProgress: () -> Void
     let onEditAllocation: (String) -> Void
     let onAddAllocation: () -> Void
-    let onEditFulfilled: () -> Void
     let onDelete: () -> Void
 
     @ScaledMetric(relativeTo: .body) private var avatarSize = 60.0
@@ -1484,11 +1530,22 @@ private struct SharedPlanNeedEditorRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
-                Text(statusText)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(statusColor)
-                    .lineLimit(2)
-                SharedPlanPurchaseStageBar(progress: progress, needID: need.id)
+                if canEdit {
+                    Button(action: onEditProgress) {
+                        progressBar
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Purchase progress")
+                    .accessibilityValue(
+                        "Requested \(progress.requested), assigned \(progress.assigned), bought \(progress.bought)"
+                    )
+                    .accessibilityIdentifier(
+                        SharedPlanEditorAccessibilityID.needProgress(need.id)
+                    )
+                } else {
+                    progressBar
+                }
             }
             .frame(width: 102, alignment: .leading)
 
@@ -1505,10 +1562,9 @@ private struct SharedPlanNeedEditorRow: View {
 
             if canEdit {
                 Menu {
-                    Button("Change requested quantity", action: onEditWanted)
+                    Button("Purchase progress", action: onEditProgress)
                     Button("Assign a buyer", action: onAddAllocation)
                         .disabled(activeMembers.isEmpty)
-                    Button("Record items bought", action: onEditFulfilled)
                     Button("Remove request", role: .destructive, action: onDelete)
                 } label: {
                     LucideIcon("ellipsis", size: 22)
@@ -1557,7 +1613,7 @@ private struct SharedPlanNeedEditorRow: View {
         if canEdit, participant.member?.membershipStatus == .active {
             Menu {
                 if participant.isRequester {
-                    Button("Change requested quantity", action: onEditWanted)
+                    Button("Purchase progress", action: onEditProgress)
                 }
                 Button("Change assigned quantity") {
                     onEditAllocation(participant.userID)
@@ -1619,6 +1675,13 @@ private struct SharedPlanNeedEditorRow: View {
         SharedPlanPurchaseProgressPresentation(need: need, hasConflict: hasConflict)
     }
 
+    private var progressBar: some View {
+        SharedPlanPurchaseStageBar(
+            progress: progress,
+            accessibilityIdentifier: SharedPlanEditorAccessibilityID.needProgress(need.id)
+        )
+    }
+
     private var statusColor: Color {
         switch progress.state {
         case .requested: .secondary
@@ -1637,26 +1700,9 @@ private struct SharedPlanNeedEditorRow: View {
         }
     }
 
-    private var statusText: String {
-        switch progress.state {
-        case .requested:
-            String(localized: "Needs a buyer")
-        case .partiallyAssigned:
-            String(localized: "\(progress.assigned) of \(progress.requested) assigned")
-        case .assigned:
-            String(localized: "Ready to buy")
-        case .partiallyBought:
-            String(localized: "\(progress.bought) of \(progress.requested) bought")
-        case .bought:
-            String(localized: "Bought")
-        case .needsReview:
-            String(localized: "Needs review")
-        }
-    }
-
     private var accessibilitySummary: String {
         let participantSummary = participants.map(\.accessibilityLabel).formatted()
-        return String(localized: "\(displayItemName). \(statusText). Requested \(progress.requested), assigned \(progress.assigned), bought \(progress.bought). \(participantSummary)")
+        return String(localized: "\(displayItemName). Requested \(progress.requested), assigned \(progress.assigned), bought \(progress.bought). \(participantSummary)")
     }
 
     private struct Participant: Identifiable {
@@ -1826,58 +1872,171 @@ private struct SharedPlanCreateNeedSheet: View {
     }
 }
 
-private struct SharedPlanQuantityEdit: Identifiable {
-    enum Field: String {
-        case wanted
-        case allocation
-        case fulfilled
+private struct SharedPlanPurchaseProgressEdit: Identifiable {
+    let needID: UUID
+    let itemName: String
+    let requestedQuantity: Int
+    let assignedQuantity: Int
+    let boughtQuantity: Int
+    let hasConflict: Bool
+
+    init(need: SharedPlanPurchaseNeed, hasConflict: Bool) {
+        needID = need.id
+        let normalizedName = need.itemName.trimmingCharacters(in: .whitespacesAndNewlines)
+        itemName = normalizedName.isEmpty ? String(localized: "Purchase item") : normalizedName
+        requestedQuantity = need.wantedQuantity
+        assignedQuantity = need.buyerAllocations.values.reduce(0, +)
+        boughtQuantity = need.fulfilledQuantity
+        self.hasConflict = hasConflict
     }
 
-    let field: Field
+    var id: UUID { needID }
+}
+
+private struct SharedPlanPurchaseProgressForm: View {
+    let edit: SharedPlanPurchaseProgressEdit
+    @Binding var requestedQuantity: Int
+    @Binding var boughtQuantity: Int
+
+    var body: some View {
+        Form {
+            Section {
+                SharedPlanPurchaseStageBar(
+                    progress: previewProgress,
+                    accessibilityIdentifier: SharedPlanEditorAccessibilityID.needProgressPreview(
+                        edit.needID
+                    )
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+            } header: {
+                Text(verbatim: edit.itemName)
+            }
+
+            Section {
+                SharedPlanQuantityControl(
+                    title: String(localized: "Requested"),
+                    quantity: $requestedQuantity,
+                    range: 1...SharedPlanAutomergeDocument.maximumQuantity
+                )
+                LabeledContent("Assigned", value: edit.assignedQuantity.formatted())
+                SharedPlanQuantityControl(
+                    title: String(localized: "Bought"),
+                    quantity: $boughtQuantity,
+                    range: 0...SharedPlanAutomergeDocument.maximumQuantity
+                )
+            } footer: {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("How many items are needed in total.")
+                    Text("How many items were actually bought.")
+                }
+            }
+        }
+    }
+
+    private var previewProgress: SharedPlanPurchaseProgressPresentation {
+        SharedPlanPurchaseProgressPresentation(
+            requested: requestedQuantity,
+            assigned: edit.assignedQuantity,
+            bought: boughtQuantity,
+            hasConflict: edit.hasConflict
+        )
+    }
+}
+
+private struct SharedPlanPurchaseProgressSheet: View {
+    @Bindable var model: SharedPlanEditorModel
+    let store: SharedPlanStore
+    let circle: SharedPlanCircleKey
+    let edit: SharedPlanPurchaseProgressEdit
+    @Binding var presentedSheet: SharedPlanCircleEditorSheet?
+    @State private var requestedQuantity: Int
+    @State private var boughtQuantity: Int
+
+    init(
+        model: SharedPlanEditorModel,
+        store: SharedPlanStore,
+        circle: SharedPlanCircleKey,
+        edit: SharedPlanPurchaseProgressEdit,
+        presentedSheet: Binding<SharedPlanCircleEditorSheet?>
+    ) {
+        self.model = model
+        self.store = store
+        self.circle = circle
+        self.edit = edit
+        _presentedSheet = presentedSheet
+        _requestedQuantity = State(initialValue: edit.requestedQuantity)
+        _boughtQuantity = State(initialValue: edit.boughtQuantity)
+    }
+
+    var body: some View {
+        NavigationStack {
+            SharedPlanPurchaseProgressForm(
+                edit: edit,
+                requestedQuantity: $requestedQuantity,
+                boughtQuantity: $boughtQuantity
+            )
+            .navigationTitle("Purchase progress")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { presentedSheet = nil }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save)
+                        .disabled(!canSave)
+                }
+            }
+        }
+        .presentationDetents([.fraction(0.62)])
+    }
+
+    private var canSave: Bool {
+        !model.isPerformingMutation
+            && (1...SharedPlanAutomergeDocument.maximumQuantity).contains(requestedQuantity)
+            && (0...SharedPlanAutomergeDocument.maximumQuantity).contains(boughtQuantity)
+            && (requestedQuantity != edit.requestedQuantity
+                || boughtQuantity != edit.boughtQuantity)
+    }
+
+    private func save() {
+        Task {
+            await model.setPurchaseProgress(
+                requestedQuantity: requestedQuantity,
+                boughtQuantity: boughtQuantity,
+                needID: edit.needID,
+                circle: circle,
+                using: store
+            )
+            if model.issueMessage == nil { presentedSheet = nil }
+        }
+    }
+}
+
+private struct SharedPlanBuyerAllocationEdit: Identifiable {
     let needID: UUID
     let initialValue: Int
     let buyerUserID: String?
 
     var id: String {
-        "\(needID.uuidString.lowercased()):\(field.rawValue):\(buyerUserID ?? "-")"
+        "\(needID.uuidString.lowercased()):\(buyerUserID ?? "-")"
     }
 
-    static func wanted(_ need: SharedPlanPurchaseNeed) -> SharedPlanQuantityEdit {
-        SharedPlanQuantityEdit(
-            field: .wanted,
-            needID: need.id,
-            initialValue: need.wantedQuantity,
-            buyerUserID: nil
-        )
-    }
-
-    static func allocation(
+    init(
         _ need: SharedPlanPurchaseNeed,
         buyerUserID: String
-    ) -> SharedPlanQuantityEdit {
-        SharedPlanQuantityEdit(
-            field: .allocation,
-            needID: need.id,
-            initialValue: need.buyerAllocations[buyerUserID] ?? 0,
-            buyerUserID: buyerUserID
-        )
-    }
-
-    static func fulfilled(_ need: SharedPlanPurchaseNeed) -> SharedPlanQuantityEdit {
-        SharedPlanQuantityEdit(
-            field: .fulfilled,
-            needID: need.id,
-            initialValue: need.fulfilledQuantity,
-            buyerUserID: nil
-        )
+    ) {
+        needID = need.id
+        initialValue = need.buyerAllocations[buyerUserID] ?? 0
+        self.buyerUserID = buyerUserID
     }
 }
 
-private struct SharedPlanQuantityEditorSheet: View {
+private struct SharedPlanBuyerAllocationSheet: View {
     @Bindable var model: SharedPlanEditorModel
     let store: SharedPlanStore
     let circle: SharedPlanCircleKey
-    let edit: SharedPlanQuantityEdit
+    let edit: SharedPlanBuyerAllocationEdit
     let currentUserID: String?
     @Binding var presentedSheet: SharedPlanCircleEditorSheet?
     @State private var quantity: Int
@@ -1888,7 +2047,7 @@ private struct SharedPlanQuantityEditorSheet: View {
         model: SharedPlanEditorModel,
         store: SharedPlanStore,
         circle: SharedPlanCircleKey,
-        edit: SharedPlanQuantityEdit,
+        edit: SharedPlanBuyerAllocationEdit,
         currentUserID: String?,
         presentedSheet: Binding<SharedPlanCircleEditorSheet?>
     ) {
@@ -1905,33 +2064,31 @@ private struct SharedPlanQuantityEditorSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(title) {
-                    if edit.field == .allocation {
-                        Picker("Buyer", selection: $selectedBuyerUserID) {
-                            ForEach(model.members) { member in
-                                buyerLabel(for: member)
-                                .tag(String?.some(member.userID))
-                                .disabled(member.membershipStatus != .active)
-                            }
-                        }
-                        .onChange(of: selectedBuyerUserID) { _, buyerUserID in
-                            guard let buyerUserID else { return }
-                            quantity = currentNeed?.buyerAllocations[buyerUserID] ?? 0
+                Section("Assigned") {
+                    Picker("Buyer", selection: $selectedBuyerUserID) {
+                        ForEach(model.members) { member in
+                            buyerLabel(for: member)
+                            .tag(String?.some(member.userID))
+                            .disabled(member.membershipStatus != .active)
                         }
                     }
+                    .onChange(of: selectedBuyerUserID) { _, buyerUserID in
+                        guard let buyerUserID else { return }
+                        quantity = currentNeed?.buyerAllocations[buyerUserID] ?? 0
+                    }
                     SharedPlanQuantityControl(
-                        title: title,
+                        title: String(localized: "Assigned"),
                         quantity: $quantity,
-                        range: range
+                        range: 0...SharedPlanAutomergeDocument.maximumQuantity
                     )
                 }
                 Section {
-                    Text(helpText)
+                    Text("Choose who will try to buy these items and how many.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle(title)
+            .navigationTitle("Assigned")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1940,9 +2097,9 @@ private struct SharedPlanQuantityEditorSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
                         .disabled(
-                            !range.contains(quantity)
+                            !(0...SharedPlanAutomergeDocument.maximumQuantity).contains(quantity)
                                 || model.isPerformingMutation
-                                || (edit.field == .allocation && !selectedBuyerIsActive)
+                                || !selectedBuyerIsActive
                         )
                 }
             }
@@ -1965,64 +2122,21 @@ private struct SharedPlanQuantityEditorSheet: View {
         }
     }
 
-    private var range: ClosedRange<Int> {
-        switch edit.field {
-        case .wanted: 1...SharedPlanAutomergeDocument.maximumQuantity
-        case .allocation, .fulfilled: 0...SharedPlanAutomergeDocument.maximumQuantity
-        }
-    }
-
-    private var title: String {
-        switch edit.field {
-        case .wanted: String(localized: "Requested")
-        case .allocation: String(localized: "Assigned")
-        case .fulfilled: String(localized: "Bought")
-        }
-    }
-
-    private var helpText: String {
-        switch edit.field {
-        case .wanted:
-            String(localized: "How many items are needed in total.")
-        case .allocation:
-            String(localized: "Choose who will try to buy these items and how many.")
-        case .fulfilled:
-            String(localized: "How many items were actually bought.")
-        }
-    }
-
     private func save() {
         Task {
-            switch edit.field {
-            case .wanted:
-                await model.setWantedQuantity(
-                    quantity,
-                    needID: edit.needID,
-                    circle: circle,
-                    using: store
-                )
-            case .allocation:
-                guard let buyerUserID = selectedBuyerUserID,
-                      model.member(userID: buyerUserID)?.membershipStatus == .active
-                else {
-                    model.reportStaleAllocationMember()
-                    return
-                }
-                await model.setBuyerAllocation(
-                    quantity,
-                    buyerUserID: buyerUserID,
-                    needID: edit.needID,
-                    circle: circle,
-                    using: store
-                )
-            case .fulfilled:
-                await model.setFulfilledQuantity(
-                    quantity,
-                    needID: edit.needID,
-                    circle: circle,
-                    using: store
-                )
+            guard let buyerUserID = selectedBuyerUserID,
+                  model.member(userID: buyerUserID)?.membershipStatus == .active
+            else {
+                model.reportStaleAllocationMember()
+                return
             }
+            await model.setBuyerAllocation(
+                quantity,
+                buyerUserID: buyerUserID,
+                needID: edit.needID,
+                circle: circle,
+                using: store
+            )
             if model.issueMessage == nil { presentedSheet = nil }
         }
     }
@@ -2032,7 +2146,6 @@ private struct SharedPlanQuantityEditorSheet: View {
     }
 
     private var selectedBuyerIsActive: Bool {
-        guard edit.field == .allocation else { return true }
         guard let selectedBuyerUserID else { return false }
         return model.member(userID: selectedBuyerUserID)?.membershipStatus == .active
     }
@@ -2042,6 +2155,8 @@ private struct SharedPlanQuantityEditorSheet: View {
 struct SharedPlanPurchaseUITestSurface: View {
     private static let requesterID = "11111111-1111-4111-8111-111111111111"
     private static let buyerID = "22222222-2222-4222-8222-222222222222"
+
+    @State private var presentedProgress: SharedPlanPurchaseProgressEdit?
 
     private let members = [
         SharedPlanMember(
@@ -2124,10 +2239,14 @@ struct SharedPlanPurchaseUITestSurface: View {
                             members: members,
                             hasConflict: false,
                             canEdit: true,
-                            onEditWanted: {},
+                            onEditProgress: {
+                                presentedProgress = SharedPlanPurchaseProgressEdit(
+                                    need: need,
+                                    hasConflict: false
+                                )
+                            },
                             onEditAllocation: { _ in },
                             onAddAllocation: {},
-                            onEditFulfilled: {},
                             onDelete: {}
                         )
                     }
@@ -2139,6 +2258,40 @@ struct SharedPlanPurchaseUITestSurface: View {
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier("shared-plan-purchase-test-surface")
         }
+        .sheet(item: $presentedProgress) { edit in
+            SharedPlanPurchaseProgressPreviewSheet(edit: edit)
+        }
+    }
+}
+
+private struct SharedPlanPurchaseProgressPreviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let edit: SharedPlanPurchaseProgressEdit
+    @State private var requestedQuantity: Int
+    @State private var boughtQuantity: Int
+
+    init(edit: SharedPlanPurchaseProgressEdit) {
+        self.edit = edit
+        _requestedQuantity = State(initialValue: edit.requestedQuantity)
+        _boughtQuantity = State(initialValue: edit.boughtQuantity)
+    }
+
+    var body: some View {
+        NavigationStack {
+            SharedPlanPurchaseProgressForm(
+                edit: edit,
+                requestedQuantity: $requestedQuantity,
+                boughtQuantity: $boughtQuantity
+            )
+            .navigationTitle("Purchase progress")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.fraction(0.62)])
     }
 }
 #endif
