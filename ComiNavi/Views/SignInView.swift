@@ -6,6 +6,7 @@
 //
 
 import AuthenticationServices
+import GoogleSignIn
 import SpriteKit
 import SwiftUI
 import UIKit
@@ -59,33 +60,6 @@ enum ConventionFloorRoutePlanning {
     }
 }
 
-enum CirclemsAuthorizationURLBuilder {
-    static func makeURL(
-        serviceEnvironment: CirclemsServiceEnvironment,
-        clientID: String,
-        redirectURL: URL,
-        state: String
-    ) -> URL? {
-        guard
-            var components = URLComponents(
-                url: serviceEnvironment.authenticationBaseURL.appending(path: "OAuth2/"),
-                resolvingAgainstBaseURL: false
-            )
-        else {
-            return nil
-        }
-        components.queryItems = [
-            URLQueryItem(name: "response_type", value: "code"),
-            URLQueryItem(name: "client_id", value: clientID),
-            URLQueryItem(name: "redirect_uri", value: redirectURL.absoluteString),
-            URLQueryItem(
-                name: "scope", value: "circle_read favorite_read favorite_write user_info"),
-            URLQueryItem(name: "state", value: state),
-        ]
-        return components.url
-    }
-}
-
 private enum SignInError: LocalizedError {
     case environmentChanged
 
@@ -100,208 +74,467 @@ private enum SignInError: LocalizedError {
 }
 
 @MainActor
-class SignInViewModel: NSObject, ObservableObject, ASWebAuthenticationPresentationContextProviding {
+final class SignInViewModel: NSObject, ObservableObject,
+    ASWebAuthenticationPresentationContextProviding
+{
     @Published var state: DemoState = .anonymous
     @Published var authenticationError: String?
     private var authenticationSession: ASWebAuthenticationSession?
+    private let appleProvider = AppleSignInAuthorizationProvider()
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        return ASPresentationAnchor()
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+            ?? ASPresentationAnchor()
     }
 
     func signIn() {
         guard state == .anonymous else { return }
-
-        let environment = AppEnvironment.current
-        let serviceEnvironment = environment.circlems
-        let storageNamespace = environment.storageNamespace
+        state = .authenticating
         authenticationError = nil
-        self.state = .authenticating
-
         Task {
             do {
-                try await self.doSignIn(
-                    environment: environment,
-                    serviceEnvironment: serviceEnvironment
+                _ = try await perform(
+                    purpose: .authenticate,
+                    expectedPublicUserID: nil
                 )
-                try await self.populateUserInfo(
-                    serviceEnvironment: serviceEnvironment
-                )
+                await AppData.profileStore.load()
+                state = .anonymous
             } catch {
-                self.state = .anonymous
-                if AppEnvironment.current.storageNamespace == storageNamespace {
-                    AppData.userState.user = nil
-                }
-                // see if it is a user cancelled error
-                if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue
-                {
-                    return
-                }
-
-                self.authenticationError = error.localizedDescription
+                state = .anonymous
+                if isCancellation(error) { return }
+                authenticationError = error.localizedDescription
             }
         }
     }
 
-    func doSignIn(
-        environment: AppEnvironment = .current,
-        serviceEnvironment: CirclemsServiceEnvironment? = nil
-    ) async throws {
-        let serviceEnvironment = serviceEnvironment ?? environment.circlems
-        let oauthState = UUID().uuidString
-        guard
-            let authURL = CirclemsAuthorizationURLBuilder.makeURL(
-                serviceEnvironment: serviceEnvironment,
-                clientID: environment.circlemsClientID,
-                redirectURL: environment.oauthRedirectURL,
-                state: oauthState
-            )
-        else {
-            preconditionFailure("Failed to construct the Circle.ms authorization URL.")
+    func resumePendingSignInIfNeeded() {
+        guard state == .anonymous,
+              let flow = try? AppData.pendingCirclemsAuthorizationFlow(),
+              flow.purpose == .authenticate,
+              flow.isReadyToComplete
+        else { return }
+        signIn()
+    }
+
+    func signInWithGoogle(
+        entryContext: GoogleAuthenticationFlow.EntryContext,
+        invitationToken: String? = nil
+    ) {
+        guard state == .anonymous else { return }
+        if entryContext == .invitation {
+            guard let invitationToken,
+                  SharedPlanInvitationLink.isValid(token: invitationToken)
+            else { return }
         }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(
-                url: authURL,
-                callbackURLScheme: environment.oauthCallbackScheme
-            ) { responseURL, error in
-                self.authenticationSession = nil
-                if let error = error {
-                    return continuation.resume(throwing: error)
-                }
-                guard let url = responseURL else {
-                    continuation.resume(throwing: URLError(.badURL))
-                    return
-                }
-                guard url.scheme == environment.oauthCallbackScheme,
-                    url.host == "oauth",
-                    url.path == "/circlems/landing"
-                else {
-                    continuation.resume(throwing: URLError(.redirectToNonExistentLocation))
-                    return
-                }
-                guard let status = url.queryValue(for: "status"), status == "succeeded" else {
-                    let errorCode = url.queryValue(for: "error") ?? "unknown"
-                    return continuation.resume(
-                        throwing: NSError(
-                            domain: "SignInViewModel",
-                            code: 1,
-                            userInfo: [
-                                NSLocalizedDescriptionKey: String(
-                                    localized: "Authentication failed: \(errorCode)"
-                                )
-                            ]
-                        ))
-                }
-                guard oauthState == url.queryValue(for: "state") else {
-                    return continuation.resume(
-                        throwing: NSError(
-                            domain: "SignInViewModel",
-                            code: 1,
-                            userInfo: [
-                                NSLocalizedDescriptionKey: String(
-                                    localized:
-                                        "The login response could not be verified. Please try again."
-                                )
-                            ]
-                        ))
-                }
-                guard let tokenType = url.queryValue(for: "token_type"), tokenType == "Bearer"
-                else {
-                    return continuation.resume(
-                        throwing: NSError(
-                            domain: "SignInViewModel",
-                            code: 1,
-                            userInfo: [
-                                NSLocalizedDescriptionKey: String(
-                                    localized: "Circle.ms returned an unsupported login response."
-                                )
-                            ]
-                        ))
-                }
-                guard let accessToken = url.queryValue(for: "access_token") else {
-                    return continuation.resume(
-                        throwing: NSError(
-                            domain: "SignInViewModel",
-                            code: 1,
-                            userInfo: [
-                                NSLocalizedDescriptionKey: String(
-                                    localized: "The login response did not include an access token."
-                                )
-                            ]
-                        ))
-                }
-                guard let refreshToken = url.queryValue(for: "refresh_token") else {
-                    return continuation.resume(
-                        throwing: NSError(
-                            domain: "SignInViewModel",
-                            code: 1,
-                            userInfo: [
-                                NSLocalizedDescriptionKey: String(
-                                    localized: "The login response did not include a refresh token."
-                                )
-                            ]
-                        ))
-                }
-                guard let expiresInSecondsStr = url.queryValue(for: "expires_in"),
-                    let expiresInSeconds = Int(expiresInSecondsStr)
-                else {
-                    return continuation.resume(
-                        throwing: NSError(
-                            domain: "SignInViewModel",
-                            code: 1,
-                            userInfo: [
-                                NSLocalizedDescriptionKey: String(
-                                    localized:
-                                        "The login response did not include an expiration time."
-                                )
-                            ]
-                        ))
-                }
-                guard AppEnvironment.current.circlems == serviceEnvironment else {
-                    return continuation.resume(throwing: SignInError.environmentChanged)
-                }
-
-                AppData.userState.user = User(
-                    accessToken: accessToken,
-                    accessTokenExpiresAt: Date().addingTimeInterval(TimeInterval(expiresInSeconds)),
-                    refreshToken: refreshToken
+        state = .authenticating
+        authenticationError = nil
+        Task {
+            do {
+                try await performGoogleAuthentication(
+                    entryContext: entryContext,
+                    invitationToken: invitationToken
                 )
+                await AppData.profileStore.load()
+                state = .anonymous
+            } catch {
+                state = .anonymous
+                if isGoogleCancellation(error) { return }
+                authenticationError = error.localizedDescription
+            }
+        }
+    }
 
-                return continuation.resume()
+    func resumePendingGoogleAuthenticationIfNeeded(
+        entryContext: GoogleAuthenticationFlow.EntryContext,
+        invitationToken: String? = nil
+    ) {
+        guard state == .anonymous,
+              let flow = try? AppData.pendingGoogleAuthenticationFlow(),
+              flow.entryContext == entryContext,
+              flow.isReadyToAuthenticate,
+              (flow.submissionAttemptedAt != nil
+                  || flow.entryGrantExpiresAt.map({ $0 > Date() }) == true)
+        else { return }
+        signInWithGoogle(
+            entryContext: entryContext,
+            invitationToken: invitationToken
+        )
+    }
+
+    func signInWithApple(
+        entryContext: AppleAuthenticationFlow.EntryContext,
+        invitationToken: String? = nil
+    ) {
+        guard state == .anonymous else { return }
+        if entryContext == .invitation {
+            guard let invitationToken,
+                  SharedPlanInvitationLink.isValid(token: invitationToken)
+            else { return }
+        }
+        state = .authenticating
+        authenticationError = nil
+        Task {
+            do {
+                try await performAppleAuthentication(
+                    entryContext: entryContext,
+                    invitationToken: invitationToken
+                )
+                await AppData.profileStore.load()
+                state = .anonymous
+            } catch {
+                state = .anonymous
+                if isAppleCancellation(error) { return }
+                authenticationError = error.localizedDescription
+            }
+        }
+    }
+
+    func resumePendingAppleAuthenticationIfNeeded(
+        entryContext: AppleAuthenticationFlow.EntryContext,
+        invitationToken: String? = nil
+    ) {
+        guard state == .anonymous,
+              let flow = try? AppData.pendingAppleAuthenticationFlow(),
+              flow.entryContext == entryContext,
+              flow.isReadyToAuthenticate,
+              (flow.submissionAttemptedAt != nil
+                  || flow.entryGrantExpiresAt.map({ $0 > Date() }) == true)
+        else { return }
+        signInWithApple(
+            entryContext: entryContext,
+            invitationToken: invitationToken
+        )
+    }
+
+    func linkCirclems(publicUserID: String) async throws -> CominaviUserProfile {
+        guard state == .anonymous else {
+            throw CirclemsAuthorizationFlowError.flowPending
+        }
+        state = .authenticating
+        defer { state = .anonymous }
+        return try await perform(purpose: .link, expectedPublicUserID: publicUserID)
+    }
+
+    private func perform(
+        purpose: CirclemsAuthorizationFlow.Purpose,
+        expectedPublicUserID: String?
+    ) async throws -> CominaviUserProfile {
+        let environment = AppEnvironment.current
+        var flow = try AppData.prepareCirclemsAuthorizationFlow(
+            purpose: purpose,
+            expectedPublicUserID: expectedPublicUserID
+        )
+        do {
+            var publication: CirclemsAuthorizationPublication
+            if flow.authorizationURL == nil {
+                switch purpose {
+                case .authenticate:
+                    publication = try await CominaviServiceClient.shared
+                        .startCirclemsAuthentication(flow)
+                case .link:
+                    publication = try await CominaviServiceClient.shared
+                        .startCirclemsLink(flow)
+                }
+                flow = publication.flow
+                guard environment.storageNamespace == AppEnvironment.current.storageNamespace else {
+                    throw SignInError.environmentChanged
+                }
+            } else {
+                publication = try await CominaviServiceClient.shared
+                    .circlemsAuthorizationPublication(for: flow)
             }
 
+            if !flow.isReadyToComplete {
+                guard let authorizationURL = flow.authorizationURL else {
+                    throw CominaviServiceError.invalidResponse
+                }
+                let callback = try await openBrowser(
+                    authorizationURL,
+                    callbackScheme: environment.oauthCallbackScheme
+                )
+                guard environment.storageNamespace == AppEnvironment.current.storageNamespace else {
+                    throw SignInError.environmentChanged
+                }
+                publication = try await CominaviServiceClient.shared
+                    .recordCirclemsAuthorizationCallback(
+                        callback,
+                        callbackScheme: environment.oauthCallbackScheme,
+                        publication: publication
+                    )
+                flow = publication.flow
+            }
+
+            publication = try await CominaviServiceClient.shared
+                .recordCirclemsAuthorizationSubmission(for: publication)
+            flow = publication.flow
+
+            let profile: CominaviUserProfile
+            let receipt: CirclemsCredentialReceipt
+            switch purpose {
+            case .authenticate:
+                let completion = try await CominaviServiceClient.shared
+                    .completeCirclemsAuthentication(flow)
+                guard let completedProfile = completion.session.user else {
+                    throw CominaviServiceError.invalidResponse
+                }
+                profile = completedProfile
+                receipt = completion.credentialReceipt
+            case .link:
+                let completion = try await CominaviServiceClient.shared
+                    .completeCirclemsLink(flow)
+                profile = completion.profile
+                receipt = completion.credentialReceipt
+            }
+            try AppData.finalizeCirclemsAuthorizationFlow(
+                flow,
+                receipt: receipt,
+                profile: profile
+            )
+            try await CominaviServiceClient.shared.clearCirclemsAuthorizationCompletion(
+                flowRequestID: flow.requestID
+            )
+            return profile
+        } catch {
+            if isCancellation(error) || isTerminal(error, flow: flow) {
+                try? AppData.clearCirclemsAuthorizationFlow()
+            }
+            throw error
+        }
+    }
+
+    private func performGoogleAuthentication(
+        entryContext: GoogleAuthenticationFlow.EntryContext,
+        invitationToken: String?
+    ) async throws {
+        var flow = try AppData.prepareGoogleAuthenticationFlow(
+            entryContext: entryContext
+        )
+        do {
+            var publication: GoogleAuthenticationPublication
+            if flow.entryGrant == nil {
+                switch entryContext {
+                case .invitation:
+                    guard let invitationToken else {
+                        throw GoogleAuthenticationFlowError.unavailable
+                    }
+                    publication = try await CominaviServiceClient.shared.googleEntryGrant(
+                        for: flow,
+                        invitationToken: invitationToken
+                    )
+                    flow = publication.flow
+                case .special:
+                    guard let authorizationURL = GoogleSpecialEntryLink.authorizationURL(
+                        nonce: flow.nonce
+                    ) else { throw GoogleAuthenticationFlowError.unavailable }
+                    publication = try await CominaviServiceClient.shared
+                        .googleAuthenticationPublication(for: flow)
+                    let callback = try await openBrowser(
+                        authorizationURL,
+                        callbackScheme: AppEnvironment.current.oauthCallbackScheme
+                    )
+                    publication = try await CominaviServiceClient.shared
+                        .recordGoogleEntryGrantCallback(
+                            callback,
+                            publication: publication
+                        )
+                    flow = publication.flow
+                }
+            } else {
+                publication = try await CominaviServiceClient.shared
+                    .googleAuthenticationPublication(for: flow)
+            }
+            if flow.idToken == nil {
+                let provider = try GoogleSignInIDTokenProvider()
+                let idToken = try await provider.idToken(nonce: flow.nonce)
+                publication = try await CominaviServiceClient.shared.recordGoogleIDToken(
+                    idToken,
+                    publication: publication
+                )
+                flow = publication.flow
+            }
+            publication = try await CominaviServiceClient.shared
+                .recordGoogleAuthenticationSubmission(for: publication)
+            flow = publication.flow
+            let authentication = try await CominaviServiceClient.shared
+                .authenticateWithGoogle(flow)
+            guard authentication.googleAuthenticationCompletion
+                == GoogleAuthenticationCompletionMarker(
+                    flowRequestID: flow.requestID,
+                    publicUserID: authentication.user?.id ?? ""
+                )
+            else { throw CominaviServiceError.invalidResponse }
+            try AppData.clearGoogleAuthenticationFlow()
+            try await CominaviServiceClient.shared.clearGoogleAuthenticationCompletion(
+                flowRequestID: flow.requestID
+            )
+        } catch {
+            if isTerminalGoogleAuthentication(error, flow: flow) {
+                try? AppData.clearGoogleAuthenticationFlow()
+            }
+            throw error
+        }
+    }
+
+    private func performAppleAuthentication(
+        entryContext: AppleAuthenticationFlow.EntryContext,
+        invitationToken: String?
+    ) async throws {
+        var flow = try AppData.prepareAppleAuthenticationFlow(entryContext: entryContext)
+        do {
+            var publication: AppleAuthenticationPublication
+            if flow.entryGrant == nil {
+                switch entryContext {
+                case .invitation:
+                    guard let invitationToken else {
+                        throw AppleAuthenticationFlowError.unavailable
+                    }
+                    publication = try await CominaviServiceClient.shared.appleEntryGrant(
+                        for: flow,
+                        invitationToken: invitationToken
+                    )
+                    flow = publication.flow
+                case .special:
+                    guard let authorizationURL = AppleSpecialEntryLink.authorizationURL(
+                        nonce: flow.nonce
+                    ) else { throw AppleAuthenticationFlowError.unavailable }
+                    publication = try await CominaviServiceClient.shared
+                        .appleAuthenticationPublication(for: flow)
+                    let callback = try await openBrowser(
+                        authorizationURL,
+                        callbackScheme: AppEnvironment.current.oauthCallbackScheme
+                    )
+                    publication = try await CominaviServiceClient.shared
+                        .recordAppleEntryGrantCallback(callback, publication: publication)
+                    flow = publication.flow
+                }
+            } else {
+                publication = try await CominaviServiceClient.shared
+                    .appleAuthenticationPublication(for: flow)
+            }
+            if flow.identityToken == nil || flow.authorizationCode == nil {
+                let credential = try await appleProvider.credential(nonce: flow.nonce)
+                publication = try await CominaviServiceClient.shared.recordAppleCredential(
+                    credential,
+                    publication: publication
+                )
+                flow = publication.flow
+            }
+            publication = try await CominaviServiceClient.shared
+                .recordAppleAuthenticationSubmission(for: publication)
+            flow = publication.flow
+            let authentication = try await CominaviServiceClient.shared
+                .authenticateWithApple(flow)
+            guard authentication.appleAuthenticationCompletion
+                == AppleAuthenticationCompletionMarker(
+                    flowRequestID: flow.requestID,
+                    publicUserID: authentication.user?.id ?? ""
+                )
+            else { throw CominaviServiceError.invalidResponse }
+            try AppData.clearAppleAuthenticationFlow()
+            try await CominaviServiceClient.shared.clearAppleAuthenticationCompletion(
+                flowRequestID: flow.requestID
+            )
+        } catch {
+            if isTerminalAppleAuthentication(error, flow: flow) {
+                try? AppData.clearAppleAuthenticationFlow()
+            }
+            throw error
+        }
+    }
+
+    private func openBrowser(
+        _ url: URL,
+        callbackScheme: String
+    ) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(
+                url: url,
+                callback: .customScheme(callbackScheme)
+            ) { [weak self] responseURL, error in
+                Task { @MainActor in
+                    self?.authenticationSession = nil
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else if let responseURL {
+                        continuation.resume(returning: responseURL)
+                    } else {
+                        continuation.resume(throwing: CominaviServiceError.invalidResponse)
+                    }
+                }
+            }
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = true
-            self.authenticationSession = session
+            authenticationSession = session
             session.start()
         }
     }
 
-    func populateUserInfo(
-        serviceEnvironment: CirclemsServiceEnvironment = AppEnvironment.current.circlems
-    ) async throws {
-        guard AppEnvironment.current.circlems == serviceEnvironment,
-            let authenticatedUser = AppData.userState.user,
-            let refreshToken = authenticatedUser.refreshToken
-        else {
-            throw SignInError.environmentChanged
+    private func isCancellation(_ error: Error) -> Bool {
+        let value = error as NSError
+        return value.domain == ASWebAuthenticationSessionError.errorDomain
+            && value.code == ASWebAuthenticationSessionError.canceledLogin.rawValue
+    }
+
+    private func isTerminal(_ error: Error, flow: CirclemsAuthorizationFlow) -> Bool {
+        // After the completion POST may have escaped, even an expired-code
+        // response is committed-or-unknown. Retain the exact protected body
+        // for receipt replay instead of opening a second provider login.
+        if flow.submissionAttemptedAt != nil { return false }
+        if let flowError = error as? CirclemsAuthorizationFlowError {
+            return flowError != .flowPending
         }
-        let userInfo = try await CirclemsAPI.getUserInfo()
-        guard AppEnvironment.current.circlems == serviceEnvironment,
-            AppData.userState.user?.refreshToken == refreshToken
-        else {
-            throw SignInError.environmentChanged
+        if case CominaviServiceError.server(_, _, let status) = error {
+            return [400, 401, 403, 404, 409, 410, 422].contains(status)
         }
-        let newUser = User(
-            accessToken: authenticatedUser.accessToken,
-            accessTokenExpiresAt: authenticatedUser.accessTokenExpiresAt,
-            refreshToken: refreshToken,
-            userId: userInfo.response.pid,
-            nickname: userInfo.response.nickname,
-            preferenceR18Enabled: userInfo.response.r18 == 1 ? true : false
-        )
-        AppData.userState.user = newUser
+        return false
+    }
+
+    private func isGoogleCancellation(_ error: Error) -> Bool {
+        let value = error as NSError
+        return value.domain == kGIDSignInErrorDomain
+            && value.code == GIDSignInError.canceled.rawValue
+    }
+
+    private func isAppleCancellation(_ error: Error) -> Bool {
+        let value = error as NSError
+        return value.domain == ASAuthorizationError.errorDomain
+            && value.code == ASAuthorizationError.canceled.rawValue
+    }
+
+    private func isTerminalGoogleAuthentication(
+        _ error: Error,
+        flow: GoogleAuthenticationFlow
+    ) -> Bool {
+        // Once bytes may have reached the service, an expired replay response
+        // is committed-or-unknown until the backend can reconcile the durable
+        // request. Never silently mint a second refresh-token family.
+        if flow.submissionAttemptedAt != nil { return false }
+        if let flowError = error as? GoogleAuthenticationFlowError {
+            return flowError != .persistenceFailed
+                && flowError != .committedOrUnknown
+        }
+        if case CominaviServiceError.server(_, _, let status) = error {
+            return [400, 401, 403, 404, 409, 410, 422].contains(status)
+        }
+        return false
+    }
+
+    private func isTerminalAppleAuthentication(
+        _ error: Error,
+        flow: AppleAuthenticationFlow
+    ) -> Bool {
+        if flow.submissionAttemptedAt != nil { return false }
+        if let flowError = error as? AppleAuthenticationFlowError {
+            return flowError != .persistenceFailed
+                && flowError != .committedOrUnknown
+        }
+        if case CominaviServiceError.server(_, _, let status) = error {
+            return [400, 401, 403, 404, 409, 410, 422].contains(status)
+        }
+        return false
     }
 }
 
@@ -312,9 +545,17 @@ struct SignInView: View {
         @State private var selectedCirclemsEnvironment = AppEnvironment.current.circlems
     #endif
     private let onUseDemoData: (() -> Void)?
+    private let googleInvitation: SharedPlanInvitationInbox.Pending?
+    private let googleSpecialEntry: Bool
 
-    init(onUseDemoData: (() -> Void)? = nil) {
+    init(
+        onUseDemoData: (() -> Void)? = nil,
+        googleInvitation: SharedPlanInvitationInbox.Pending? = nil,
+        googleSpecialEntry: Bool = false
+    ) {
         self.onUseDemoData = onUseDemoData
+        self.googleInvitation = googleInvitation
+        self.googleSpecialEntry = googleSpecialEntry
     }
 
     var body: some View {
@@ -334,6 +575,22 @@ struct SignInView: View {
 
                     loginButton
                         .padding(.top, loginButtonTopPadding)
+
+                    if let googleInvitation {
+                        appleLoginButton(invitation: googleInvitation)
+                            .padding(.top, 12)
+                        if GoogleSignInConfiguration.load() != nil {
+                            googleLoginButton(invitation: googleInvitation)
+                                .padding(.top, 12)
+                        }
+                    } else if googleSpecialEntry {
+                        appleLoginButton(invitation: nil)
+                            .padding(.top, 12)
+                        if GoogleSignInConfiguration.load() != nil {
+                            googleLoginButton(invitation: nil)
+                                .padding(.top, 12)
+                        }
+                    }
 
                     if let authenticationError = vm.authenticationError {
                         HStack(alignment: .top, spacing: 10) {
@@ -384,6 +641,22 @@ struct SignInView: View {
                     .ignoresSafeArea()
 
                 ConventionFloorBackdrop()
+            }
+        }
+        .task {
+            vm.resumePendingSignInIfNeeded()
+            if let googleInvitation {
+                vm.resumePendingAppleAuthenticationIfNeeded(
+                    entryContext: .invitation,
+                    invitationToken: googleInvitation.token
+                )
+                vm.resumePendingGoogleAuthenticationIfNeeded(
+                    entryContext: .invitation,
+                    invitationToken: googleInvitation.token
+                )
+            } else if googleSpecialEntry {
+                vm.resumePendingAppleAuthenticationIfNeeded(entryContext: .special)
+                vm.resumePendingGoogleAuthenticationIfNeeded(entryContext: .special)
             }
         }
     }
@@ -500,6 +773,62 @@ struct SignInView: View {
         .disabled(vm.state == .authenticating)
         .accessibilityHint("Tap to log in")
         .animation(.easeInOut(duration: 0.2), value: vm.state == .authenticating)
+    }
+
+    private func googleLoginButton(
+        invitation: SharedPlanInvitationInbox.Pending?
+    ) -> some View {
+        Button {
+            vm.signInWithGoogle(
+                entryContext: invitation == nil ? .special : .invitation,
+                invitationToken: invitation?.token
+            )
+        } label: {
+            HStack(spacing: 10) {
+                Text("Sign in with Google")
+                Spacer(minLength: 12)
+                Text(verbatim: "G")
+                    .font(.headline.weight(.bold))
+                    .accessibilityHidden(true)
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .padding(.horizontal, 8)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.roundedRectangle(radius: 16))
+        .disabled(vm.state == .authenticating)
+        .accessibilityHint(
+            invitation == nil
+                ? "Sign in with Google from the special entry"
+                : "Use the invitation to sign in with Google"
+        )
+        .accessibilityIdentifier(
+            invitation == nil ? "sign-in-google-special-entry" : "sign-in-google-invitation"
+        )
+    }
+
+    private func appleLoginButton(
+        invitation: SharedPlanInvitationInbox.Pending?
+    ) -> some View {
+        AppleSignInControl {
+            vm.signInWithApple(
+                entryContext: invitation == nil ? .special : .invitation,
+                invitationToken: invitation?.token
+            )
+        }
+        .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56)
+        .clipShape(.rect(cornerRadius: 16))
+        .allowsHitTesting(vm.state != .authenticating)
+        .opacity(vm.state == .authenticating ? 0.55 : 1)
+        .accessibilityHint(
+            invitation == nil
+                ? "Sign in with Apple from the special entry"
+                : "Use the invitation to sign in with Apple"
+        )
+        .accessibilityIdentifier(
+            invitation == nil ? "sign-in-apple-special-entry" : "sign-in-apple-invitation"
+        )
     }
 
 }

@@ -274,6 +274,7 @@ protocol MapCatalog: Sendable {
     func search(day: Int, mapID: Int, query: String) async throws -> [CatalogMapSearchMatch]
     func genrePlacements(day: Int, mapID: Int) async throws -> [CatalogMapGenrePlacement]
     func bookmarkLocations(updateIDs: [Int]) async throws -> [CatalogBookmarkLocation]
+    func bookmarkLocations(publicCircleIDs: [Int]) async throws -> [CatalogBookmarkLocation]
 }
 
 struct SQLiteMapCatalog: MapCatalog {
@@ -680,6 +681,56 @@ struct SQLiteMapCatalog: MapCatalog {
         }
     }
 
+    func bookmarkLocations(publicCircleIDs: [Int]) async throws -> [CatalogBookmarkLocation] {
+        let uniqueIDs = Array(Set(publicCircleIDs))
+        guard !uniqueIDs.isEmpty else { return [] }
+        let placeholders = Array(repeating: "?", count: uniqueIDs.count).joined(separator: ",")
+        let arguments = StatementArguments(uniqueIDs)
+
+        return try await mainDatabase.read { database in
+            try Row.fetchAll(
+                database,
+                sql: """
+                    SELECT circleExtension.WCId AS publicCircleId,
+                           circle.id AS catalogCircleId,
+                           circle.updateId,
+                           circle.day,
+                           circle.blockId,
+                           circle.spaceNo,
+                           circle.spaceNoSub,
+                           layout.mapId
+                    FROM ComiketCircleWC circle
+                    JOIN ComiketCircleExtend circleExtension ON circleExtension.id = circle.id
+                    JOIN ComiketLayoutWC layout
+                      ON layout.blockId = circle.blockId
+                     AND layout.spaceNo = circle.spaceNo
+                    WHERE circleExtension.WCId IN (\(placeholders))
+                    """,
+                arguments: arguments
+            ).compactMap(Self.bookmarkLocation)
+        }
+    }
+
+    private static func bookmarkLocation(_ row: Row) -> CatalogBookmarkLocation? {
+        guard let publicCircleID: Int = row["publicCircleId"],
+              let catalogCircleID: Int = row["catalogCircleId"],
+              let updateID: Int = row["updateId"],
+              let day: Int = row["day"],
+              let mapID: Int = row["mapId"],
+              let blockID: Int = row["blockId"],
+              let spaceNumber: Int = row["spaceNo"]
+        else { return nil }
+        return CatalogBookmarkLocation(
+            publicCircleID: publicCircleID,
+            catalogCircleID: catalogCircleID,
+            updateID: updateID,
+            day: day,
+            mapID: mapID,
+            tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
+            subspace: row["spaceNoSub"] ?? 0
+        )
+    }
+
 }
 
 enum MapCatalogError: LocalizedError {
@@ -861,6 +912,23 @@ struct FixtureMapCatalog: MapCatalog {
                 )
             }
         }.filter { updateIDs.contains($0.updateID) }
+    }
+
+    func bookmarkLocations(publicCircleIDs: [Int]) async throws -> [CatalogBookmarkLocation] {
+        fixtureScene.tables.flatMap { table in
+            [0, 1].map { subspace in
+                let circleID = table.id.blockID * 100 + table.id.spaceNumber * 2 + subspace
+                return CatalogBookmarkLocation(
+                    publicCircleID: circleID,
+                    catalogCircleID: circleID,
+                    updateID: circleID,
+                    day: 1,
+                    mapID: 1,
+                    tableID: table.id,
+                    subspace: subspace
+                )
+            }
+        }.filter { publicCircleIDs.contains($0.publicCircleID) }
     }
 }
 #endif

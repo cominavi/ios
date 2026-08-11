@@ -80,40 +80,10 @@ final class AppEnvironmentTests: XCTestCase {
             AppEnvironment.storageNamespace(build: .debug, circlems: .testing),
             AppEnvironment.storageNamespace(build: .debug, circlems: .production)
         )
+        XCTAssertEqual(
+            AppEnvironment.storageNamespace(build: .testFlight, circlems: .production),
+            "pre-release-v2/testflight/production"
+        )
     }
 
-    func testAuthorizationURLUsesSelectedServiceAndRequiredParameters() throws {
-        let redirectURL = try XCTUnwrap(URL(string: "https://example.com/oauth/circlems"))
-        let cases: [(environment: CirclemsServiceEnvironment, host: String)] = [
-            (.testing, "auth1-sandbox.circle.ms"),
-            (.production, "auth1.circle.ms"),
-        ]
-
-        for testCase in cases {
-            let url = try XCTUnwrap(
-                CirclemsAuthorizationURLBuilder.makeURL(
-                    serviceEnvironment: testCase.environment,
-                    clientID: "client-id",
-                    redirectURL: redirectURL,
-                    state: "oauth-state"
-                )
-            )
-            let components = try XCTUnwrap(
-                URLComponents(url: url, resolvingAgainstBaseURL: false)
-            )
-            let query = Dictionary(
-                uniqueKeysWithValues: (components.queryItems ?? []).compactMap { item in
-                    item.value.map { (item.name, $0) }
-                }
-            )
-
-            XCTAssertEqual(components.host, testCase.host)
-            XCTAssertEqual(components.path, "/OAuth2/")
-            XCTAssertEqual(query["response_type"], "code")
-            XCTAssertEqual(query["client_id"], "client-id")
-            XCTAssertEqual(query["redirect_uri"], redirectURL.absoluteString)
-            XCTAssertEqual(query["scope"], "circle_read favorite_read favorite_write user_info")
-            XCTAssertEqual(query["state"], "oauth-state")
-        }
-    }
 }

@@ -3,65 +3,66 @@ import XCTest
 @testable import ComiNavi
 
 final class FollowingImportAPITests: XCTestCase {
-    func testClientExchangesCirclemsTokenThenImportsBasicFollowingMetadata() async throws {
-        let transport = FollowingImportTransportStub()
-        let client = FollowingImportAPIClient(
-            baseURL: URL(string: "https://cominavi.net")!,
-            transport: { request in
-                try await transport.response(for: request)
-            }
-        )
-
-        let payload = try await client.importFollowings(
+    func testClientDelegatesOnlyTheNormalizedUserNameToServiceSessionAuthority() async throws {
+        let payload = FollowingImportPayload(
             twitterUserName: "owner",
-            circlemsAccessToken: "circlems-token",
-            circlemsEnvironment: .production
+            importedAt: Date(timeIntervalSince1970: 1_754_697_600),
+            nextAllowedAt: Date(timeIntervalSince1970: 1_754_719_200),
+            followings: [FollowingAccount(
+                id: "x-1",
+                userName: "circle_a",
+                name: "Circle A",
+                url: URL(string: "https://x.com/circle_a")!,
+                profilePicture: URL(string: "https://pbs.twimg.com/a.jpg")
+            )],
+            source: .twitterAPI
         )
+        let service = FollowingImportServiceStub(result: .success(payload))
+        let client = FollowingImportAPIClient(service: service)
 
-        XCTAssertEqual(payload.twitterUserName, "owner")
-        XCTAssertEqual(payload.source, .twitterAPI)
-        XCTAssertEqual(payload.followings.map(\.userName), ["circle_a"])
-        let requests = await transport.requests()
-        XCTAssertEqual(requests.map { $0.url?.path }, [
-            "/api/v1/auth/circlems",
-            "/api/v1/imports/x-followings",
-        ])
-        XCTAssertEqual(
-            requests.map { $0.value(forHTTPHeaderField: "Authorization") },
-            ["Bearer circlems-token", "Bearer cominavi-jwt"]
-        )
-        XCTAssertEqual(
-            try JSONDecoder().decode([String: String].self, from: XCTUnwrap(requests[0].httpBody)),
-            ["environment": "production"]
-        )
-        XCTAssertEqual(
-            try JSONDecoder().decode([String: String].self, from: XCTUnwrap(requests[1].httpBody)),
-            ["userName": "owner"]
-        )
+        let result = try await client.importFollowings(twitterUserName: "owner")
+        let requestedUserNames = await service.requestedUserNames()
+
+        XCTAssertEqual(result, payload)
+        XCTAssertEqual(requestedUserNames, ["owner"])
+    }
+
+    func testClientPreservesTypedServiceError() async throws {
+        let nextAllowedAt = Date(timeIntervalSince1970: 1_754_719_200)
+        let service = FollowingImportServiceStub(result: .failure(
+            FollowingImportAPIError.server(
+                code: "following_import_rate_limited",
+                message: "Try later.",
+                nextAllowedAt: nextAllowedAt
+            )
+        ))
+        let client = FollowingImportAPIClient(service: service)
+
+        do {
+            _ = try await client.importFollowings(twitterUserName: "owner")
+            XCTFail("Expected the typed service error")
+        } catch FollowingImportAPIError.server(let code, let message, let retryAt) {
+            XCTAssertEqual(code, "following_import_rate_limited")
+            XCTAssertEqual(message, "Try later.")
+            XCTAssertEqual(retryAt, nextAllowedAt)
+        }
     }
 }
 
-private actor FollowingImportTransportStub {
-    private var storedRequests: [URLRequest] = []
+private actor FollowingImportServiceStub: FollowingImportServicing {
+    private let result: Result<FollowingImportPayload, Error>
+    private var userNames: [String] = []
 
-    func response(for request: URLRequest) throws -> (Data, URLResponse) {
-        storedRequests.append(request)
-        let body: String
-        if storedRequests.count == 1 {
-            body = #"{"accessToken":"cominavi-jwt"}"#
-        } else {
-            body = #"{"twitterUserName":"owner","importedAt":"2026-08-09T00:00:00Z","nextAllowedAt":"2026-08-09T06:00:00Z","followings":[{"id":"x-1","userName":"circle_a","name":"Circle A","url":"https://x.com/circle_a","profilePicture":"https://pbs.twimg.com/a.jpg"}],"source":"twitterapi.io"}"#
-        }
-        let response = try XCTUnwrap(HTTPURLResponse(
-            url: try XCTUnwrap(request.url),
-            statusCode: 200,
-            httpVersion: "HTTP/1.1",
-            headerFields: ["Content-Type": "application/json"]
-        ))
-        return (Data(body.utf8), response)
+    init(result: Result<FollowingImportPayload, Error>) {
+        self.result = result
     }
 
-    func requests() -> [URLRequest] {
-        storedRequests
+    func importXFollowings(userName: String) async throws -> FollowingImportPayload {
+        userNames.append(userName)
+        return try result.get()
+    }
+
+    func requestedUserNames() -> [String] {
+        userNames
     }
 }

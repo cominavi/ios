@@ -9,18 +9,45 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
+enum EntryContentRoute: Equatable {
+    case accountDeletion
+    case signIn
+    case catalog
+    case catalogIndependent
+
+    static func resolve(
+        accountDeletionPending: Bool,
+        shouldShowSignIn: Bool,
+        hasCatalog: Bool
+    ) -> Self {
+        if accountDeletionPending { return .accountDeletion }
+        if shouldShowSignIn { return .signIn }
+        return hasCatalog ? .catalog : .catalogIndependent
+    }
+}
+
 struct EntryView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(SharedLocationClipboardImporter.enabledDefaultsKey)
     private var automaticallyReadsSharedLocations = false
-    @State private var userState = AppData.userState
     @State private var catalogLibrary = AppData.catalogLibrary
     @State private var sharedLocationInbox = AppData.sharedLocationInbox
+    @State private var invitationInbox = AppData.sharedPlanInvitationInbox
+    @State private var profileStore = AppData.profileStore
+    @State private var showsInvitationConfirmation = false
+    @State private var googleSpecialEntryActive = false
+    @State private var accountDeletionPending = AppData.isAccountDeletionPending
+    @State private var accountDeletionIssue: String?
     #if DEBUG
         @State private var isForcingSignInForTesting = ProcessInfo.processInfo.arguments.contains(
             "-cominavi-ui-testing-show-sign-in"
         )
     #endif
+
+    private var verifiedProfileID: String? {
+        guard profileStore.isIdentityVerified else { return nil }
+        return profileStore.profile?.id
+    }
 
     private var shouldShowSignIn: Bool {
         #if DEBUG
@@ -33,26 +60,106 @@ struct EntryView: View {
                 return false
             }
         #endif
-        return userState.user?.userId == nil
+        if googleSpecialEntryActive {
+            return true
+        }
+        if profileStore.requiresReauthentication {
+            return true
+        }
+        return verifiedProfileID == nil
     }
 
     var body: some View {
         appContent
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onOpenURL { url in
-                sharedLocationInbox.receive(url: url)
+                if GoogleSignInIDTokenProvider.handle(url) {
+                    return
+                } else if receiveAppleSpecialEntry(url) {
+                    return
+                } else if receiveGoogleSpecialEntry(url) {
+                    return
+                } else if AppData.receiveCirclemsAuthorizationCallback(url) {
+                    return
+                } else if invitationInbox.receive(url: url) {
+                    showsInvitationConfirmation = true
+                } else {
+                    sharedLocationInbox.receive(url: url)
+                }
+            }
+            .task {
+                let deletionPending = await retryPendingAccountDeletionIfNeeded()
+                guard !deletionPending else { return }
+                let logoutPending = await retryPendingLogoutIfNeeded()
+                guard !logoutPending else { return }
+                await recoverCompletedCirclemsFlowIfPossible()
+                await recoverCompletedGoogleFlowIfPossible()
+                await recoverCompletedAppleFlowIfPossible()
+                await profileStore.load()
+                if profileStore.isIdentityVerified,
+                   let userID = profileStore.profile?.id
+                {
+                    await AppData.sharedPlanStore(for: userID).load()
+                }
+                showsInvitationConfirmation = invitationInbox.pending != nil
+                if let flow = try? AppData.pendingGoogleAuthenticationFlow(),
+                   flow.entryContext == .special
+                {
+                    googleSpecialEntryActive = true
+                }
+                if let flow = try? AppData.pendingAppleAuthenticationFlow(),
+                   flow.entryContext == .special
+                {
+                    googleSpecialEntryActive = true
+                }
+            }
+            .task {
+                var wasReachable = false
+                for await isReachable in SharedPlanNetworkReachability.updates() {
+                    defer { wasReachable = isReachable }
+                    guard isReachable, !wasReachable else { continue }
+                    let deletionPending = await retryPendingAccountDeletionIfNeeded()
+                    guard !deletionPending else { continue }
+                    let logoutPending = await retryPendingLogoutIfNeeded()
+                    guard !logoutPending else { continue }
+                    await recoverCompletedCirclemsFlowIfPossible()
+                    await recoverCompletedGoogleFlowIfPossible()
+                    await recoverCompletedAppleFlowIfPossible()
+                    try? await profileStore.drainPendingMutation()
+                    guard profileStore.isIdentityVerified,
+                          let userID = profileStore.profile?.id else { continue }
+                    await AppData.sharedPlanStore(for: userID).networkBecameReachable()
+                }
             }
             .onChange(of: scenePhase, initial: true) { _, phase in
                 guard phase == .active else { return }
                 importSharedLocationFromClipboardIfEnabled()
+                Task {
+                    let deletionPending = await retryPendingAccountDeletionIfNeeded()
+                    guard !deletionPending else { return }
+                    let logoutPending = await retryPendingLogoutIfNeeded()
+                    guard !logoutPending else { return }
+                    await recoverCompletedCirclemsFlowIfPossible()
+                    await recoverCompletedGoogleFlowIfPossible()
+                    await recoverCompletedAppleFlowIfPossible()
+                    try? await profileStore.drainPendingMutation()
+                    guard profileStore.isIdentityVerified,
+                          let userID = profileStore.profile?.id else { return }
+                    await AppData.sharedPlanStore(for: userID).drainRESTOutbox()
+                }
             }
             .onChange(of: automaticallyReadsSharedLocations) { _, enabled in
                 guard enabled else { return }
                 importSharedLocationFromClipboardIfEnabled()
             }
-            .onChange(of: userState.user?.userId, initial: true) { _, userID in
-                guard userID != nil else { return }
+            .onChange(of: verifiedProfileID, initial: true) { _, userID in
+                guard let userID else { return }
+                googleSpecialEntryActive = false
+                if invitationInbox.pending != nil {
+                    showsInvitationConfirmation = true
+                }
                 Task {
+                    await AppData.sharedPlanStore(for: userID).refresh()
                     let settings = await UNUserNotificationCenter.current()
                         .notificationSettings()
                     if [.authorized, .provisional, .ephemeral].contains(
@@ -61,6 +168,10 @@ struct EntryView: View {
                         UIApplication.shared.registerForRemoteNotifications()
                     }
                 }
+            }
+            .onChange(of: profileStore.requiresReauthentication) { _, required in
+                guard required, AppData.isAccountDeletionPending else { return }
+                accountDeletionPending = true
             }
             .alert(
                 sharedLocationIssueTitle,
@@ -75,6 +186,109 @@ struct EntryView: View {
             } message: {
                 Text(sharedLocationIssueMessage)
             }
+            .sheet(isPresented: $showsInvitationConfirmation) {
+                if let pending = invitationInbox.pending {
+                    SharedPlanInvitationSheet(
+                        pending: pending,
+                        profileStore: profileStore,
+                        invitationInbox: invitationInbox,
+                        onDismiss: { showsInvitationConfirmation = false }
+                    )
+                }
+            }
+    }
+
+    @MainActor
+    private func retryPendingLogoutIfNeeded() async -> Bool {
+        try? await CominaviServiceClient.shared.resumePendingLogout()
+        return await CominaviServiceClient.shared.hasPendingLogout()
+    }
+
+    @MainActor
+    private func retryPendingAccountDeletionIfNeeded() async -> Bool {
+        let wasPending = await CominaviServiceClient.shared.hasPendingAccountDeletion()
+        guard wasPending else {
+            accountDeletionPending = false
+            return false
+        }
+        accountDeletionPending = true
+        do {
+            _ = try await CominaviServiceClient.shared.resumePendingAccountDeletion()
+            _ = try await AppData.finishAccountDeletionLocalCleanupIfNeeded()
+            let remainsPending = await CominaviServiceClient.shared
+                .hasPendingAccountDeletion()
+            accountDeletionPending = remainsPending
+            if !remainsPending { accountDeletionIssue = nil }
+            return remainsPending
+        } catch {
+            accountDeletionIssue = error.localizedDescription
+        }
+        return true
+    }
+
+    @MainActor
+    private func recoverCompletedCirclemsFlowIfPossible() async {
+        guard let persisted = await CominaviServiceClient.shared
+            .storedCirclemsAuthorizationCompletion()
+        else { return }
+        do {
+            if try AppData.recoverCompletedCirclemsAuthorizationFlow(persisted) {
+                try await CominaviServiceClient.shared.clearCirclemsAuthorizationCompletion(
+                    flowRequestID: persisted.marker.flowRequestID
+                )
+            } else if try AppData.pendingCirclemsAuthorizationFlow() == nil {
+                // The flow was already scrubbed and only the final marker-clear
+                // write was interrupted.
+                try await CominaviServiceClient.shared.clearCirclemsAuthorizationCompletion(
+                    flowRequestID: persisted.marker.flowRequestID
+                )
+            }
+        } catch {
+            // Leave both protected records intact for the next lifecycle or
+            // reachability retry. No legacy credential rotation is re-enabled.
+        }
+    }
+
+    @MainActor
+    private func recoverCompletedGoogleFlowIfPossible() async {
+        guard let marker = await CominaviServiceClient.shared
+            .storedGoogleAuthenticationCompletion()
+        else { return }
+        do {
+            if let flow = try AppData.pendingGoogleAuthenticationFlow() {
+                guard flow.requestID == marker.flowRequestID else {
+                    throw CominaviServiceError.invalidResponse
+                }
+                try AppData.clearGoogleAuthenticationFlow()
+            }
+            try await CominaviServiceClient.shared.clearGoogleAuthenticationCompletion(
+                flowRequestID: marker.flowRequestID
+            )
+        } catch {
+            // Retain both protected records. A later lifecycle/reachability
+            // pass finishes local cleanup without submitting the ID token again.
+        }
+    }
+
+    @MainActor
+    private func recoverCompletedAppleFlowIfPossible() async {
+        guard let marker = await CominaviServiceClient.shared
+            .storedAppleAuthenticationCompletion()
+        else { return }
+        do {
+            if let flow = try AppData.pendingAppleAuthenticationFlow() {
+                guard flow.requestID == marker.flowRequestID else {
+                    throw CominaviServiceError.invalidResponse
+                }
+                try AppData.clearAppleAuthenticationFlow()
+            }
+            try await CominaviServiceClient.shared.clearAppleAuthenticationCompletion(
+                flowRequestID: marker.flowRequestID
+            )
+        } catch {
+            // Retain the protected code/token and completion marker until local
+            // cleanup can finish without repeating Apple authorization.
+        }
     }
 
     @ViewBuilder
@@ -137,6 +351,17 @@ struct EntryView: View {
                     image: Self.shinagakiTestImage,
                     accessibilityLabel: "Test Shinagaki"
                 )
+            } else if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-no-catalog-shell"
+            ) {
+                CatalogIndependentContentView(
+                    catalogLibrary: catalogLibrary,
+                    sharedLocationInbox: sharedLocationInbox
+                )
+            } else if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-shared-plan-list"
+            ) {
+                SharedPlanListUITestSurface()
             } else {
                 regularAppContent
             }
@@ -147,26 +372,41 @@ struct EntryView: View {
 
     @ViewBuilder
     private var regularAppContent: some View {
-        // TODO: this is to make sure we request the user info and catalog base API data sequentially, but it really shouldn't be done this way.
-        if shouldShowSignIn {
+        switch EntryContentRoute.resolve(
+            accountDeletionPending: accountDeletionPending,
+            shouldShowSignIn: shouldShowSignIn,
+            hasCatalog: catalogLibrary.dataSource != nil
+        ) {
+        case .accountDeletion:
+            AccountDeletionPendingView(
+                issue: accountDeletionIssue,
+                retry: {
+                    Task { _ = await retryPendingAccountDeletionIfNeeded() }
+                }
+            )
+        case .signIn:
             SignInView(
                 onUseDemoData: {
                     leaveForcedSignIn()
                     #if DEBUG || COMINAVI_STAGING
                         catalogLibrary.selectMode(.demo)
                     #endif
-                }
+                },
+                googleInvitation: invitationInbox.isGoogleEntryEligible
+                    ? invitationInbox.pending
+                    : nil,
+                googleSpecialEntry: googleSpecialEntryActive
             )
-        } else if catalogLibrary.dataSource != nil {
+        case .catalog:
             ContentView(
                 catalogLibrary: catalogLibrary,
                 sharedLocationInbox: sharedLocationInbox
             )
-        } else {
-            catalogLoadingView
-                .task {
-                    catalogLibrary.start()
-                }
+        case .catalogIndependent:
+            CatalogIndependentContentView(
+                catalogLibrary: catalogLibrary,
+                sharedLocationInbox: sharedLocationInbox
+            )
         }
     }
 
@@ -196,6 +436,48 @@ struct EntryView: View {
         #if DEBUG
             isForcingSignInForTesting = false
         #endif
+    }
+
+    @MainActor
+    private func receiveGoogleSpecialEntry(_ url: URL) -> Bool {
+        if GoogleSpecialEntryLink.isTrigger(url) {
+            do {
+                _ = try AppData.prepareGoogleAuthenticationFlow(entryContext: .special)
+                googleSpecialEntryActive = true
+            } catch {
+                googleSpecialEntryActive = true
+            }
+            return true
+        }
+        guard GoogleEntryGrantCallbackParser.isCallbackURL(url) else { return false }
+        googleSpecialEntryActive = true
+        Task {
+            // Publication stays inside the service actor. A logout ordered
+            // before this task clears the stored flow and rejects the callback.
+            try? await CominaviServiceClient.shared
+                .recordPendingGoogleEntryGrantCallback(url)
+        }
+        return true
+    }
+
+    @MainActor
+    private func receiveAppleSpecialEntry(_ url: URL) -> Bool {
+        if AppleSpecialEntryLink.isTrigger(url) {
+            do {
+                _ = try AppData.prepareAppleAuthenticationFlow(entryContext: .special)
+                googleSpecialEntryActive = true
+            } catch {
+                googleSpecialEntryActive = true
+            }
+            return true
+        }
+        guard AppleEntryGrantCallbackParser.isCallbackURL(url) else { return false }
+        googleSpecialEntryActive = true
+        Task {
+            try? await CominaviServiceClient.shared
+                .recordPendingAppleEntryGrantCallback(url)
+        }
+        return true
     }
 
     private func importSharedLocationFromClipboardIfEnabled() {
@@ -270,6 +552,15 @@ struct EntryView: View {
                     .frame(width: 32, height: 32)
                     .accessibilityLabel(Text(String(localized: "Opening catalog…")))
             }
+        case .downloading(let event, let progress):
+            CatalogStatusSurface(
+                symbolName: "arrow.down.circle.fill",
+                eyebrow: event.shortName,
+                title: String(localized: "Downloading catalog…"),
+                subtitle: String(localized: "The previous catalog remains available until verification finishes.")
+            ) {
+                DownloadProgressView(progresses: [progress])
+            }
         case .idle, .discovering, .ready:
             CatalogStatusSurface(
                 symbolName: "sparkles",
@@ -283,6 +574,24 @@ struct EntryView: View {
                     .frame(width: 32, height: 32)
                     .accessibilityLabel(Text(String(localized: "Finding available catalogs…")))
             }
+        }
+    }
+}
+
+private struct AccountDeletionPendingView: View {
+    let issue: String?
+    let retry: () -> Void
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("Deleting your account", systemImage: "person.crop.circle.badge.xmark")
+        } description: {
+            Text("Your deletion request is stored securely on this device and will finish automatically when the network is available.")
+            if let issue { Text(issue) }
+        } actions: {
+            Button("Try again", action: retry)
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("account-deletion-retry")
         }
     }
 }

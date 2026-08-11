@@ -1,5 +1,5 @@
 {
-  "originHash" : "1b0c236a36c2839dbc4349d6e8dd64d0dd0a2e247d386227586217e44613191f",
+  "originHash" : "e04d860d81d499c8b0eb7fc6b9298e8694cc3e139c88a8e34dc28e8abe8b93e3",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -8,6 +8,33 @@
       "state" : {
         "revision" : "7595cbcf59809f9977c5f6378500de2ad73b7ddb",
         "version" : "5.12.0"
+      }
+    },
+    {
+      "identity" : "app-check",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/app-check.git",
+      "state" : {
+        "revision" : "3e33dd27dd4c69bd81c7c81fe61d8ccf58846902",
+        "version" : "11.3.1"
+      }
+    },
+    {
+      "identity" : "appauth-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/openid/AppAuth-iOS.git",
+      "state" : {
+        "revision" : "a7caeda164dc5108bf4649472b28a5af65dc6f33",
+        "version" : "2.1.0"
+      }
+    },
+    {
+      "identity" : "automerge-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/automerge/automerge-swift.git",
+      "state" : {
+        "revision" : "aa45d17ac92cef2b8ded63b47e65a28dc85e3418",
+        "version" : "0.7.2"
       }
     },
     {
@@ -20,12 +47,48 @@
       }
     },
     {
+      "identity" : "googlesignin-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/GoogleSignIn-iOS.git",
+      "state" : {
+        "revision" : "913b4005ea26aebe1c97d54e35ad82a515924c71",
+        "version" : "9.1.0"
+      }
+    },
+    {
+      "identity" : "googleutilities",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/GoogleUtilities.git",
+      "state" : {
+        "revision" : "9f183ae842be978784f2963a343682e0c46d8fb3",
+        "version" : "8.1.2"
+      }
+    },
+    {
       "identity" : "grdb.swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/groue/GRDB.swift.git",
       "state" : {
         "revision" : "2cf6c756e1e5ef6901ebae16576a7e4e4b834622",
         "version" : "6.29.3"
+      }
+    },
+    {
+      "identity" : "gtm-session-fetcher",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/gtm-session-fetcher.git",
+      "state" : {
+        "revision" : "a2ab612cb980066ee56d90d60d8462992c07f24b",
+        "version" : "3.5.0"
+      }
+    },
+    {
+      "identity" : "gtmappauth",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/GTMAppAuth.git",
+      "state" : {
+        "revision" : "56e0ccf09a6dd29dc7e68bdf729598240ca8aa16",
+        "version" : "5.0.0"
       }
     },
     {
@@ -38,12 +101,30 @@
       }
     },
     {
+      "identity" : "interop-ios-for-google-sdks",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/interop-ios-for-google-sdks.git",
+      "state" : {
+        "revision" : "040d087ac2267d2ddd4cca36c757d1c6a05fdbfe",
+        "version" : "101.0.0"
+      }
+    },
+    {
       "identity" : "maplibre-gl-native-distribution",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/maplibre/maplibre-gl-native-distribution.git",
       "state" : {
         "revision" : "84a79bc375a301169390ac110c868f06c857b83f",
         "version" : "6.27.0"
+      }
+    },
+    {
+      "identity" : "openapikit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mattpolzin/OpenAPIKit",
+      "state" : {
+        "revision" : "57b6318128e3f901c93f4fbf98d1c1464ec168d3",
+        "version" : "6.2.0"
       }
     },
     {
@@ -56,12 +137,93 @@
       }
     },
     {
+      "identity" : "promises",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/promises.git",
+      "state" : {
+        "revision" : "f4a19a3c313dc2616c70bb49d29a799fb16be837",
+        "version" : "2.4.1"
+      }
+    },
+    {
       "identity" : "sentry-cocoa",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/getsentry/sentry-cocoa/",
       "state" : {
         "revision" : "f196cbb98e0388381d57908f2f5a9bdc385cde68",
         "version" : "8.58.4"
+      }
+    },
+    {
+      "identity" : "swift-algorithms",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-algorithms",
+      "state" : {
+        "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
+        "version" : "1.2.1"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser",
+      "state" : {
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
+      }
+    },
+    {
+      "identity" : "swift-collections",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-collections",
+      "state" : {
+        "revision" : "a0cb0954ecb21e4e31b0070e6ed5674e8556685a",
+        "version" : "1.6.0"
+      }
+    },
+    {
+      "identity" : "swift-http-types",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-http-types",
+      "state" : {
+        "revision" : "db774a277f60063a32d854f2980299caf06da041",
+        "version" : "1.6.0"
+      }
+    },
+    {
+      "identity" : "swift-numerics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-numerics.git",
+      "state" : {
+        "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+        "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "swift-openapi-generator",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-openapi-generator",
+      "state" : {
+        "revision" : "af9a2a1f5dcfb00a278d4bb29c6d75080932e99e",
+        "version" : "1.13.0"
+      }
+    },
+    {
+      "identity" : "swift-openapi-runtime",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-openapi-runtime",
+      "state" : {
+        "revision" : "3d3a8457661daf7fb260ceeb9f0e24e5204ba5fb",
+        "version" : "1.12.0"
+      }
+    },
+    {
+      "identity" : "swift-openapi-urlsession",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-openapi-urlsession",
+      "state" : {
+        "revision" : "08796d36c99ad2318929bfa1d1e40f82194b65cc",
+        "version" : "1.3.1"
       }
     },
     {
@@ -80,6 +242,15 @@
       "state" : {
         "revision" : "b8f0de845abca47eee747b6e671f1141ec4dcf3e",
         "version" : "2.1.3"
+      }
+    },
+    {
+      "identity" : "yams",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jpsim/Yams",
+      "state" : {
+        "revision" : "a27b21e0c81c5bf42049b897a62aaf387e80f279",
+        "version" : "6.2.2"
       }
     }
   ],

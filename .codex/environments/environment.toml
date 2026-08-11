@@ -10,7 +10,7 @@ name = "ComiNavi iOS"
 [setup]
 script = '''
 #!/usr/bin/env bash
-exec bash .codex/worktree-setup.sh
+exec bash "$CODEX_SOURCE_TREE_PATH/.codex/worktree-setup.sh"
 '''
 
 [[actions]]

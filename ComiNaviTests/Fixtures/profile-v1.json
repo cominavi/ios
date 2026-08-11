@@ -1,0 +1,17 @@
+{
+  "id": "0123456789abcdef0123456789abcdef",
+  "displayName": "Galvin",
+  "avatarURL": "/api/v2/users/0123456789abcdef0123456789abcdef/avatar",
+  "revision": 3,
+  "identities": [
+    {
+      "provider": "google",
+      "email": "fixture@example.com"
+    },
+    {
+      "provider": "circlems",
+      "environment": "production",
+      "providerUserID": 42
+    }
+  ]
+}

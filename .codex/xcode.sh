@@ -8,7 +8,7 @@ fail() {
 }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo="$(cd "$script_dir/.." && pwd)"
+repo="${CODEX_WORKTREE_PATH:-$(cd "$script_dir/.." && pwd)}"
 derived_data="${COMINAVI_DERIVED_DATA_PATH:-$repo/DerivedData}"
 source_packages="$derived_data/SourcePackages"
 action="${1:-}"

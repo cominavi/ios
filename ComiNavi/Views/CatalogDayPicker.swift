@@ -308,11 +308,15 @@ struct CatalogEventDaySheet: View {
         if case .loading(let event) = catalogLibrary.phase {
             return event
         }
+        if case .downloading(let event, _) = catalogLibrary.phase {
+            return event
+        }
         return catalogLibrary.selectedEvent
     }
 
     private var isOpeningCatalog: Bool {
         if case .loading = catalogLibrary.phase { return true }
+        if case .downloading = catalogLibrary.phase { return true }
         guard let dataSource = catalogLibrary.dataSource else { return true }
         return dataSource.readiness != .ready
     }
@@ -385,11 +389,15 @@ private struct CatalogEventSelectionView: View {
         if case .loading(let event) = catalogLibrary.phase {
             return event
         }
+        if case .downloading(let event, _) = catalogLibrary.phase {
+            return event
+        }
         return catalogLibrary.selectedEvent
     }
 
     private var isOpeningCatalog: Bool {
         if case .loading = catalogLibrary.phase { return true }
+        if case .downloading = catalogLibrary.phase { return true }
         return catalogLibrary.isSwitching
     }
 

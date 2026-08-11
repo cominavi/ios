@@ -24,6 +24,7 @@ enum BookmarkSyncState: String, Codable, Sendable {
     case synced
     case pendingUpsert
     case pendingDelete
+    case quarantined
 }
 
 struct MapBookmark: Identifiable, Equatable, Sendable {
@@ -72,6 +73,34 @@ protocol UserPlanStoring: Sendable {
     func upsert(_ bookmark: MapBookmark) async throws
     func upsert(_ bookmarks: [MapBookmark]) async throws
     func remove(eventNumber: Int, publicCircleID: Int) async throws
+    func pendingCanonicalFavoriteMutation(
+        eventNumber: Int
+    ) async throws -> PendingCanonicalFavoriteMutation?
+    func savePendingCanonicalFavoriteMutation(
+        _ mutation: PendingCanonicalFavoriteMutation
+    ) async throws
+    func acknowledgeCanonicalFavoriteMutation(
+        _ mutation: PendingCanonicalFavoriteMutation
+    ) async throws
+    func discardCanonicalFavoriteMutation(
+        eventNumber: Int,
+        mutationID: UUID
+    ) async throws
+    func quarantinedCanonicalFavoriteMutations(
+        eventNumber: Int
+    ) async throws -> [QuarantinedCanonicalFavoriteMutation]
+    @discardableResult
+    func quarantineCanonicalFavoriteMutation(
+        _ mutation: PendingCanonicalFavoriteMutation,
+        code: String,
+        message: String,
+        affectedPublicCircleIDs: [Int],
+        rejectedAt: Date
+    ) async throws -> QuarantinedCanonicalFavoriteMutation
+    func discardQuarantinedCanonicalFavoriteMutation(
+        eventNumber: Int,
+        mutationID: UUID
+    ) async throws
     func followingImportState(eventNumber: Int) async throws -> FollowingImportState?
     func importedCircleSources(eventNumber: Int) async throws -> [ImportedCircleSource]
     func mergeFollowingImport(
@@ -146,6 +175,28 @@ actor SQLiteUserPlanStore: UserPlanStoring {
             try database.execute(sql: "DROP INDEX IF EXISTS bookmark_route")
             try database.execute(sql: "ALTER TABLE bookmark DROP COLUMN routeOrder")
         }
+        migrator.registerMigration("create-canonical-favorite-outbox") { database in
+            try database.create(table: CanonicalFavoriteMutationRecord.databaseTableName) { table in
+                table.column("eventNumber", .integer).primaryKey()
+                table.column("mutationID", .text).notNull()
+                table.column("baseRevision", .integer).notNull()
+                table.column("favorites", .blob).notNull()
+            }
+        }
+        migrator.registerMigration("create-canonical-favorite-quarantine") { database in
+            try database.create(table: CanonicalFavoriteQuarantineRecord.databaseTableName) {
+                table in
+                table.column("eventNumber", .integer).notNull()
+                table.column("mutationID", .text).notNull()
+                table.column("baseRevision", .integer).notNull()
+                table.column("favorites", .blob).notNull()
+                table.column("code", .text).notNull()
+                table.column("message", .text).notNull()
+                table.column("affectedPublicCircleIDs", .blob).notNull()
+                table.column("rejectedAt", .datetime).notNull()
+                table.primaryKey(["eventNumber", "mutationID"])
+            }
+        }
         try migrator.migrate(database)
     }
 
@@ -190,7 +241,10 @@ actor SQLiteUserPlanStore: UserPlanStoring {
         try await database.read { database in
             try BookmarkRecord
                 .filter(Column("eventNumber") == eventNumber)
-                .filter(Column("syncState") != BookmarkSyncState.synced.rawValue)
+                .filter([
+                    BookmarkSyncState.pendingUpsert.rawValue,
+                    BookmarkSyncState.pendingDelete.rawValue,
+                ].contains(Column("syncState")))
                 .order(Column("modifiedAt"))
                 .fetchAll(database)
                 .compactMap(\.bookmark)
@@ -213,6 +267,191 @@ actor SQLiteUserPlanStore: UserPlanStoring {
                 .filter(Column("eventNumber") == eventNumber)
                 .filter(Column("publicCircleID") == publicCircleID)
                 .deleteAll(database)
+        }
+    }
+
+    func pendingCanonicalFavoriteMutation(
+        eventNumber: Int
+    ) async throws -> PendingCanonicalFavoriteMutation? {
+        try await database.read { database in
+            guard let record = try CanonicalFavoriteMutationRecord.fetchOne(
+                database,
+                key: eventNumber
+            ) else { return nil }
+            guard let mutation = record.mutation else {
+                throw UserPlanStoreError.invalidPendingFavoriteMutation
+            }
+            return mutation
+        }
+    }
+
+    func savePendingCanonicalFavoriteMutation(
+        _ mutation: PendingCanonicalFavoriteMutation
+    ) async throws {
+        try await database.write { database in
+            if let record = try CanonicalFavoriteMutationRecord.fetchOne(
+                database,
+                key: mutation.eventNumber
+            ) {
+                guard let existing = record.mutation else {
+                    throw UserPlanStoreError.invalidPendingFavoriteMutation
+                }
+                guard existing == mutation else {
+                    throw UserPlanStoreError.pendingFavoriteMutationConflict
+                }
+            }
+            try CanonicalFavoriteMutationRecord(mutation).save(database)
+        }
+    }
+
+    func acknowledgeCanonicalFavoriteMutation(
+        _ mutation: PendingCanonicalFavoriteMutation
+    ) async throws {
+        try await database.write { database in
+            guard let record = try CanonicalFavoriteMutationRecord.fetchOne(
+                database,
+                key: mutation.eventNumber
+            ) else { throw UserPlanStoreError.pendingFavoriteMutationConflict }
+            guard let stored = record.mutation else {
+                throw UserPlanStoreError.invalidPendingFavoriteMutation
+            }
+            guard stored == mutation else {
+                throw UserPlanStoreError.pendingFavoriteMutationConflict
+            }
+
+            _ = try CanonicalFavoriteMutationRecord
+                .filter(Column("eventNumber") == mutation.eventNumber)
+                .deleteAll(database)
+            let acknowledged = Dictionary(
+                uniqueKeysWithValues: mutation.favorites.map { ($0.publicCircleID, $0) }
+            )
+            let pending = try BookmarkRecord
+                .filter(Column("eventNumber") == mutation.eventNumber)
+                .filter(Column("syncState") != BookmarkSyncState.synced.rawValue)
+                .fetchAll(database)
+            for record in pending {
+                guard var bookmark = record.bookmark else { continue }
+                switch bookmark.syncState {
+                case .pendingDelete where acknowledged[bookmark.publicCircleID] == nil:
+                    _ = try BookmarkRecord
+                        .filter(Column("eventNumber") == mutation.eventNumber)
+                        .filter(Column("publicCircleID") == bookmark.publicCircleID)
+                        .deleteAll(database)
+                case .pendingUpsert:
+                    guard let favorite = acknowledged[bookmark.publicCircleID],
+                          favorite.color == bookmark.color
+                    else { continue }
+                    bookmark.syncState = .synced
+                    bookmark.modifiedAt = Date()
+                    try BookmarkRecord(bookmark).save(database)
+                case .synced, .pendingDelete, .quarantined:
+                    continue
+                }
+            }
+        }
+    }
+
+    func discardCanonicalFavoriteMutation(
+        eventNumber: Int,
+        mutationID: UUID
+    ) async throws {
+        try await database.write { database in
+            guard let record = try CanonicalFavoriteMutationRecord.fetchOne(
+                database,
+                key: eventNumber
+            ) else { return }
+            guard record.mutationID == mutationID.uuidString.lowercased() else {
+                throw UserPlanStoreError.pendingFavoriteMutationConflict
+            }
+            try record.delete(database)
+        }
+    }
+
+    func quarantinedCanonicalFavoriteMutations(
+        eventNumber: Int
+    ) async throws -> [QuarantinedCanonicalFavoriteMutation] {
+        try await database.read { database in
+            try CanonicalFavoriteQuarantineRecord
+                .filter(Column("eventNumber") == eventNumber)
+                .order(Column("rejectedAt").desc)
+                .fetchAll(database)
+                .map { record in
+                    guard let quarantine = record.quarantine else {
+                        throw UserPlanStoreError.invalidPendingFavoriteMutation
+                    }
+                    return quarantine
+                }
+        }
+    }
+
+    @discardableResult
+    func quarantineCanonicalFavoriteMutation(
+        _ mutation: PendingCanonicalFavoriteMutation,
+        code: String,
+        message: String,
+        affectedPublicCircleIDs: [Int],
+        rejectedAt: Date
+    ) async throws -> QuarantinedCanonicalFavoriteMutation {
+        try await database.write { database in
+            guard let pending = try CanonicalFavoriteMutationRecord.fetchOne(
+                database,
+                key: mutation.eventNumber
+            ), pending.mutation == mutation
+            else { throw UserPlanStoreError.pendingFavoriteMutationConflict }
+
+            let localPending = try BookmarkRecord
+                .filter(Column("eventNumber") == mutation.eventNumber)
+                .filter([
+                    BookmarkSyncState.pendingUpsert.rawValue,
+                    BookmarkSyncState.pendingDelete.rawValue,
+                ].contains(Column("syncState")))
+                .fetchAll(database)
+            let pendingIDs = Set(localPending.map(\.publicCircleID))
+            let requestedIDs = Set(affectedPublicCircleIDs.filter { $0 > 0 })
+            let affected = (requestedIDs.isEmpty ? pendingIDs : requestedIDs.intersection(pendingIDs))
+                .sorted()
+            let quarantine = QuarantinedCanonicalFavoriteMutation(
+                mutation: mutation,
+                code: code,
+                message: message,
+                affectedPublicCircleIDs: affected,
+                rejectedAt: rejectedAt
+            )
+            try CanonicalFavoriteQuarantineRecord(quarantine).save(database)
+            try pending.delete(database)
+            for record in localPending where affected.contains(record.publicCircleID) {
+                guard var bookmark = record.bookmark else { continue }
+                bookmark.syncState = .quarantined
+                try BookmarkRecord(bookmark).save(database)
+            }
+            return quarantine
+        }
+    }
+
+    func discardQuarantinedCanonicalFavoriteMutation(
+        eventNumber: Int,
+        mutationID: UUID
+    ) async throws {
+        try await database.write { database in
+            let key: [String: DatabaseValueConvertible] = [
+                "eventNumber": eventNumber,
+                "mutationID": mutationID.uuidString.lowercased(),
+            ]
+            guard let record = try CanonicalFavoriteQuarantineRecord.fetchOne(
+                database,
+                key: key
+            ) else { return }
+            guard let quarantine = record.quarantine else {
+                throw UserPlanStoreError.invalidPendingFavoriteMutation
+            }
+            for publicCircleID in quarantine.affectedPublicCircleIDs {
+                _ = try BookmarkRecord
+                    .filter(Column("eventNumber") == eventNumber)
+                    .filter(Column("publicCircleID") == publicCircleID)
+                    .filter(Column("syncState") == BookmarkSyncState.quarantined.rawValue)
+                    .deleteAll(database)
+            }
+            try record.delete(database)
         }
     }
 
@@ -254,6 +493,104 @@ actor SQLiteUserPlanStore: UserPlanStoring {
                 ).save(database)
             }
         }
+    }
+}
+
+enum UserPlanStoreError: Error, Equatable, Sendable {
+    case pendingFavoriteMutationConflict
+    case invalidPendingFavoriteMutation
+}
+
+private struct CanonicalFavoriteMutationRecord: Codable, FetchableRecord, PersistableRecord {
+    static let databaseTableName = "canonicalFavoriteMutation"
+
+    let eventNumber: Int
+    let mutationID: String
+    let baseRevision: Int
+    let favorites: Data
+
+    init(_ mutation: PendingCanonicalFavoriteMutation) throws {
+        eventNumber = mutation.eventNumber
+        mutationID = mutation.mutationID.uuidString.lowercased()
+        baseRevision = mutation.baseRevision
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        favorites = try encoder.encode(mutation.favorites)
+    }
+
+    var mutation: PendingCanonicalFavoriteMutation? {
+        guard let id = UUID(uuidString: mutationID),
+              mutationID == id.uuidString.lowercased(),
+              eventNumber > 0,
+              baseRevision >= 0,
+              let decoded = try? JSONDecoder().decode([CominaviFavorite].self, from: favorites),
+              decoded.allSatisfy({ $0.publicCircleID > 0 })
+        else { return nil }
+        return PendingCanonicalFavoriteMutation(
+            eventNumber: eventNumber,
+            mutationID: id,
+            baseRevision: baseRevision,
+            favorites: decoded
+        )
+    }
+}
+
+private struct CanonicalFavoriteQuarantineRecord: Codable, FetchableRecord,
+    PersistableRecord
+{
+    static let databaseTableName = "canonicalFavoriteMutationQuarantine"
+
+    let eventNumber: Int
+    let mutationID: String
+    let baseRevision: Int
+    let favorites: Data
+    let code: String
+    let message: String
+    let affectedPublicCircleIDs: Data
+    let rejectedAt: Date
+
+    init(_ quarantine: QuarantinedCanonicalFavoriteMutation) throws {
+        eventNumber = quarantine.mutation.eventNumber
+        mutationID = quarantine.mutation.mutationID.uuidString.lowercased()
+        baseRevision = quarantine.mutation.baseRevision
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        favorites = try encoder.encode(quarantine.mutation.favorites)
+        code = quarantine.code
+        message = quarantine.message
+        affectedPublicCircleIDs = try encoder.encode(quarantine.affectedPublicCircleIDs)
+        rejectedAt = quarantine.rejectedAt
+    }
+
+    var quarantine: QuarantinedCanonicalFavoriteMutation? {
+        guard let id = UUID(uuidString: mutationID),
+              mutationID == id.uuidString.lowercased(),
+              eventNumber > 0,
+              baseRevision >= 0,
+              !code.isEmpty,
+              let decodedFavorites = try? JSONDecoder().decode(
+                  [CominaviFavorite].self,
+                  from: favorites
+              ),
+              decodedFavorites.allSatisfy({ $0.publicCircleID > 0 }),
+              let affected = try? JSONDecoder().decode(
+                  [Int].self,
+                  from: affectedPublicCircleIDs
+              ),
+              affected.allSatisfy({ $0 > 0 })
+        else { return nil }
+        return QuarantinedCanonicalFavoriteMutation(
+            mutation: PendingCanonicalFavoriteMutation(
+                eventNumber: eventNumber,
+                mutationID: id,
+                baseRevision: baseRevision,
+                favorites: decodedFavorites
+            ),
+            code: code,
+            message: message,
+            affectedPublicCircleIDs: affected,
+            rejectedAt: rejectedAt
+        )
     }
 }
 
@@ -385,6 +722,9 @@ private struct ImportedCircleSourceRecord: Codable, FetchableRecord, Persistable
 
 actor InMemoryUserPlanStore: UserPlanStoring {
     private var storedBookmarks: [Int: MapBookmark] = [:]
+    private var canonicalFavoriteMutations: [Int: PendingCanonicalFavoriteMutation] = [:]
+    private var canonicalFavoriteQuarantines:
+        [Int: [UUID: QuarantinedCanonicalFavoriteMutation]] = [:]
     private var followingStates: [Int: FollowingImportState] = [:]
     private var importedSources: [ImportedSourceKey: ImportedCircleSource] = [:]
 
@@ -417,12 +757,132 @@ actor InMemoryUserPlanStore: UserPlanStoring {
 
     func pendingChanges(eventNumber: Int) async throws -> [MapBookmark] {
         storedBookmarks.values
-            .filter { $0.eventNumber == eventNumber && $0.syncState != .synced }
+            .filter {
+                $0.eventNumber == eventNumber
+                    && ($0.syncState == .pendingUpsert || $0.syncState == .pendingDelete)
+            }
             .sorted { $0.modifiedAt < $1.modifiedAt }
     }
 
     func remove(eventNumber: Int, publicCircleID: Int) async throws {
         storedBookmarks[publicCircleID] = nil
+    }
+
+    func pendingCanonicalFavoriteMutation(
+        eventNumber: Int
+    ) async throws -> PendingCanonicalFavoriteMutation? {
+        canonicalFavoriteMutations[eventNumber]
+    }
+
+    func savePendingCanonicalFavoriteMutation(
+        _ mutation: PendingCanonicalFavoriteMutation
+    ) async throws {
+        if let existing = canonicalFavoriteMutations[mutation.eventNumber],
+           existing != mutation
+        {
+            throw UserPlanStoreError.pendingFavoriteMutationConflict
+        }
+        canonicalFavoriteMutations[mutation.eventNumber] = mutation
+    }
+
+    func acknowledgeCanonicalFavoriteMutation(
+        _ mutation: PendingCanonicalFavoriteMutation
+    ) async throws {
+        guard canonicalFavoriteMutations[mutation.eventNumber] == mutation else {
+            throw UserPlanStoreError.pendingFavoriteMutationConflict
+        }
+        canonicalFavoriteMutations[mutation.eventNumber] = nil
+        let acknowledged = Dictionary(
+            uniqueKeysWithValues: mutation.favorites.map { ($0.publicCircleID, $0) }
+        )
+        for (publicCircleID, var bookmark) in storedBookmarks
+        where bookmark.eventNumber == mutation.eventNumber && bookmark.syncState != .synced {
+            switch bookmark.syncState {
+            case .pendingDelete where acknowledged[publicCircleID] == nil:
+                storedBookmarks[publicCircleID] = nil
+            case .pendingUpsert:
+                guard acknowledged[publicCircleID]?.color == bookmark.color else { continue }
+                bookmark.syncState = .synced
+                bookmark.modifiedAt = Date()
+                storedBookmarks[publicCircleID] = bookmark
+            case .synced, .pendingDelete, .quarantined:
+                continue
+            }
+        }
+    }
+
+    func discardCanonicalFavoriteMutation(
+        eventNumber: Int,
+        mutationID: UUID
+    ) async throws {
+        guard let existing = canonicalFavoriteMutations[eventNumber] else { return }
+        guard existing.mutationID == mutationID else {
+            throw UserPlanStoreError.pendingFavoriteMutationConflict
+        }
+        canonicalFavoriteMutations[eventNumber] = nil
+    }
+
+    func quarantinedCanonicalFavoriteMutations(
+        eventNumber: Int
+    ) async throws -> [QuarantinedCanonicalFavoriteMutation] {
+        (canonicalFavoriteQuarantines[eventNumber] ?? [:]).values.sorted {
+            $0.rejectedAt > $1.rejectedAt
+        }
+    }
+
+    @discardableResult
+    func quarantineCanonicalFavoriteMutation(
+        _ mutation: PendingCanonicalFavoriteMutation,
+        code: String,
+        message: String,
+        affectedPublicCircleIDs: [Int],
+        rejectedAt: Date
+    ) async throws -> QuarantinedCanonicalFavoriteMutation {
+        guard canonicalFavoriteMutations[mutation.eventNumber] == mutation else {
+            throw UserPlanStoreError.pendingFavoriteMutationConflict
+        }
+        let pendingIDs: Set<Int> = Set(storedBookmarks.values.compactMap {
+            bookmark -> Int? in
+            guard bookmark.eventNumber == mutation.eventNumber,
+                  bookmark.syncState == .pendingUpsert || bookmark.syncState == .pendingDelete
+            else { return nil }
+            return bookmark.publicCircleID
+        })
+        let requestedIDs = Set(affectedPublicCircleIDs.filter { $0 > 0 })
+        let affected = (requestedIDs.isEmpty ? pendingIDs : requestedIDs.intersection(pendingIDs))
+            .sorted()
+        let quarantine = QuarantinedCanonicalFavoriteMutation(
+            mutation: mutation,
+            code: code,
+            message: message,
+            affectedPublicCircleIDs: affected,
+            rejectedAt: rejectedAt
+        )
+        canonicalFavoriteMutations[mutation.eventNumber] = nil
+        canonicalFavoriteQuarantines[mutation.eventNumber, default: [:]][mutation.mutationID] =
+            quarantine
+        for publicCircleID in affected {
+            guard var bookmark = storedBookmarks[publicCircleID],
+                  bookmark.eventNumber == mutation.eventNumber
+            else { continue }
+            bookmark.syncState = .quarantined
+            storedBookmarks[publicCircleID] = bookmark
+        }
+        return quarantine
+    }
+
+    func discardQuarantinedCanonicalFavoriteMutation(
+        eventNumber: Int,
+        mutationID: UUID
+    ) async throws {
+        guard let quarantine = canonicalFavoriteQuarantines[eventNumber]?[mutationID] else {
+            return
+        }
+        for publicCircleID in quarantine.affectedPublicCircleIDs
+        where storedBookmarks[publicCircleID]?.syncState == .quarantined {
+            storedBookmarks[publicCircleID] = nil
+        }
+        canonicalFavoriteQuarantines[eventNumber]?[mutationID] = nil
     }
 
     func followingImportState(eventNumber: Int) async throws -> FollowingImportState? {

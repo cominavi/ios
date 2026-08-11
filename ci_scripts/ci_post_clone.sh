@@ -10,6 +10,9 @@ if [ "${CI_XCODE_CLOUD:-}" != "TRUE" ]; then
     exit 0
 fi
 
+# Trust the checked-in Swift OpenAPI build plugin on fresh Xcode Cloud workers.
+defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidatation -bool YES
+
 # Deployment preparation can prepend Homebrew after this script finishes, so
 # check the installed formula rather than trusting the current PATH alone.
 if command -v brew >/dev/null 2>&1 && brew list --versions rsync >/dev/null 2>&1; then

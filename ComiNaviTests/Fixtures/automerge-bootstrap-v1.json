@@ -1,0 +1,10 @@
+{
+  "fixtureVersion": 1,
+  "automergeJS": "3.2.6",
+  "automergeSwift": "0.7.2",
+  "actorID": "0123456789abcdef0123456789abcdef",
+  "planID": "11111111-1111-4111-8111-111111111111",
+  "comiketNo": 108,
+  "document": "hW9KgzOqAtMA0QEBEAEjRWeJq83vASNFZ4mrze8B-QGNRn-8rIRvag5F7asslPwbQq13c1T3PPfZsGKjHhYGAQIDAhMCIwZAAlYCCBUzIQIjAjQBQgZWB1cngAECfwB_AX8Ff-fR4dMGfwB_B3sHY2lyY2xlcwljb21pa2V0Tm8Kb3BlcmF0aW9ucwZwbGFuSUQNc2NoZW1hVmVyc2lvbgUABQEFfQABAAIBewAkAMYEFOwAMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExAQUAAA",
+  "heads": ["f9018d467fbcac846f6a0e45edab2c94fc1b42ad777354f73cf7d9b062a31e16"]
+}

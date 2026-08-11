@@ -46,6 +46,14 @@ final class LocalizationTests: XCTestCase {
             "Circle.msからログアウトしますか？"
         )
         XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Circle.ms authorization is required for the direct catalog source.",
+                value: nil,
+                table: nil
+            ),
+            "Circle.msの直接カタログを利用するには、Circle.msでの認証が必要です。"
+        )
+        XCTAssertEqual(
             japaneseBundle.localizedString(forKey: "Cancel", value: nil, table: nil),
             "キャンセル"
         )
@@ -56,6 +64,124 @@ final class LocalizationTests: XCTestCase {
                 table: nil
             ),
             "ひらがな・カタカナ・ローマ字"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Members and invitations",
+                value: nil,
+                table: nil
+            ),
+            "メンバーと招待"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Shared Plan notifications",
+                value: nil,
+                table: nil
+            ),
+            "共有プランの通知"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Circle added to Shared Plan",
+                value: nil,
+                table: nil
+            ),
+            "共有プランにサークルを追加しました"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Shared Plans are read-only",
+                value: nil,
+                table: nil
+            ),
+            "共有プランは現在読み取り専用です"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "No Shared Plans are available.",
+                value: nil,
+                table: nil
+            ),
+            "現在表示できる共有プランはありません。"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "This Shared Plan has no circles.",
+                value: nil,
+                table: nil
+            ),
+            "この共有プランにはサークルがありません。"
+        )
+        XCTAssertFalse(
+            japaneseBundle.localizedString(
+                forKey: "No Shared Plans are available.",
+                value: nil,
+                table: nil
+            ).contains("作成")
+        )
+        XCTAssertFalse(
+            japaneseBundle.localizedString(
+                forKey: "This Shared Plan has no circles.",
+                value: nil,
+                table: nil
+            ).contains("追加")
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Shared Plan editing is not available yet",
+                value: nil,
+                table: nil
+            ),
+            "共有プランの編集はまだ利用できません"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Choose removal or the later edit",
+                value: nil,
+                table: nil
+            ),
+            "削除するか、後から加えた変更を残すか選択"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Retained operation data reached the 512 KiB safety limit. Export it, then rebase or discard the local branch.",
+                value: nil,
+                table: nil
+            ),
+            "保持している変更データが512 KiBの安全上限に達しました。書き出した後、端末の履歴をリベースするか破棄してください。"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Plain text only. Unicode characters are edited by scalar position and saved after a short idle pause or when you leave this screen.",
+                value: nil,
+                table: nil
+            ),
+            "メモはプレーンテキストです。Unicode文字を正しい位置で扱い、入力が少し止まったとき、またはこの画面を離れるときにまとめて保存します。"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Some favorites could not be imported. You can retry them.",
+                value: nil,
+                table: nil
+            ),
+            "一部のお気に入りを追加できませんでした。失敗したサークルだけを再試行できます。"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Member-entered outcome",
+                value: nil,
+                table: nil
+            ),
+            "メンバーが記録した結果"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Live external reports",
+                value: nil,
+                table: nil
+            ),
+            "外部からの最新情報"
         )
     }
 

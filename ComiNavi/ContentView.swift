@@ -7,6 +7,59 @@
 
 import SwiftUI
 
+struct CatalogIndependentContentView: View {
+    private enum TabSelection: Hashable {
+        case catalog
+        case plans
+        case profile
+    }
+
+    let catalogLibrary: CatalogLibrary
+    let sharedLocationInbox: SharedLocationInbox
+    @State private var selection: TabSelection = .plans
+
+    var body: some View {
+        TabView(selection: $selection) {
+            Tab(
+                "Catalog",
+                image: LucideIcon.assetName(for: "map"),
+                value: .catalog
+            ) {
+                CatalogLibraryLoadingSurface(catalogLibrary: catalogLibrary)
+            }
+
+            Tab(
+                "共有プラン",
+                image: LucideIcon.assetName(for: "list-checks"),
+                value: .plans
+            ) {
+                SharedPlansScreen(
+                    store: AppData.sharedPlanStore,
+                    comiketNo: nil,
+                    currentUserID: AppData.profileStore.profile?.id
+                )
+            }
+
+            Tab(
+                "Profile",
+                image: LucideIcon.assetName(for: "person.circle"),
+                value: .profile
+            ) {
+                NavigationStack {
+                    ProfileScreen(
+                        catalogLibrary: catalogLibrary,
+                        sharedLocationInbox: sharedLocationInbox
+                    )
+                }
+            }
+        }
+        .accessibilityIdentifier("catalog-independent-shell")
+        .task {
+            catalogLibrary.start()
+        }
+    }
+}
+
 struct ContentView: View {
     @State private var catalogLibrary: CatalogLibrary
     @State private var sharedLocationInbox: SharedLocationInbox
@@ -39,7 +92,7 @@ struct ContentView: View {
         }
         .overlay(alignment: .top) {
             if catalogLibrary.isSwitching,
-                case .loading(let event) = catalogLibrary.phase
+               let event = catalogLibrary.phase.eventBeingLoaded
             {
                 LucideLabel("Opening \(event.shortName)…", icon: "arrow.triangle.2.circlepath")
                     .font(.caption.weight(.semibold))
@@ -114,6 +167,16 @@ private struct CatalogLibraryLoadingSurface: View {
                     .accessibilityLabel(Text(String(localized: "Opening catalog…")))
             }
 
+        case .downloading(let event, let progress):
+            CatalogStatusSurface(
+                symbolName: "arrow.down.circle.fill",
+                eyebrow: event.shortName,
+                title: String(localized: "Downloading catalog…"),
+                subtitle: String(localized: "The previous catalog remains available until verification finishes.")
+            ) {
+                DownloadProgressView(progresses: [progress])
+            }
+
         case .discovering:
             CatalogStatusSurface(
                 symbolName: "sparkles",
@@ -145,11 +208,20 @@ private struct CatalogLibraryLoadingSurface: View {
     }
 }
 
+private extension CatalogLibrary.Phase {
+    var eventBeingLoaded: CatalogEvent? {
+        switch self {
+        case .loading(let event), .downloading(let event, _): event
+        default: nil
+        }
+    }
+}
+
 private struct CatalogContentView: View {
     private enum TabSelection: Hashable {
         case map
         case explore
-        case toolbox
+        case plans
         case profile
     }
 
@@ -249,11 +321,15 @@ private struct CatalogContentView: View {
                     }
 
                     Tab(
-                        "Toolbox",
-                        image: LucideIcon.assetName(for: "grid-2x2"),
-                        value: .toolbox
+                        "共有プラン",
+                        image: LucideIcon.assetName(for: "list-checks"),
+                        value: .plans
                     ) {
-                        ComiketToolboxView()
+                        SharedPlansScreen(
+                            store: AppData.sharedPlanStore,
+                            comiketNo: circle.comiket.number,
+                            currentUserID: AppData.profileStore.profile?.id
+                        )
                     }
 
                     Tab(

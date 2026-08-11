@@ -1,0 +1,104 @@
+{
+  "fixtureVersion": 1,
+  "list": {
+    "request": {
+      "method": "GET",
+      "path": "/api/v2/me/notifications?limit=2"
+    },
+    "response": {
+      "items": [
+        {
+          "id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "kind": "sharedPlanEvent",
+          "planID": "11111111-1111-4111-8111-111111111111",
+          "eventType": "shared_plan.circle.memo.splice.v1",
+          "i18nKey": "shared_plan.circle.memo.splice",
+          "payloadVersion": 1,
+          "payload": {
+            "v": 1,
+            "planID": "11111111-1111-4111-8111-111111111111",
+            "operationID": "22222222-2222-4222-8222-222222222222",
+            "operationType": "shared_plan.circle.memo.splice.v1",
+            "actorUserID": "11111111111111111111111111111111",
+            "payload": {
+              "v": 1,
+              "wcID": 9001,
+              "index": 0,
+              "deleteCount": 0,
+              "insertedTextUTF8Bytes": 6,
+              "insertedTextPreview": "メモ"
+            },
+            "heads": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ],
+            "membershipEpoch": 7
+          },
+          "createdAt": "2026-08-10T00:00:00.000Z",
+          "readAt": null
+        },
+        {
+          "id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "kind": "sharedPlanEvent",
+          "planID": "11111111-1111-4111-8111-111111111111",
+          "eventType": "shared_plan.conflict.v1",
+          "i18nKey": "shared_plan.conflict",
+          "payloadVersion": 1,
+          "payload": {
+            "v": 1,
+            "planID": "11111111-1111-4111-8111-111111111111",
+            "conflictID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "path": [
+              "circles",
+              "9001",
+              "needs",
+              "33333333-3333-4333-8333-333333333333",
+              "wantedQuantity"
+            ],
+            "changeHashes": [
+              "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            ],
+            "heads": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ],
+            "membershipEpoch": 7
+          },
+          "createdAt": "2026-08-10T00:00:00.000Z",
+          "readAt": null
+        }
+      ],
+      "nextCursor": "eyJ2IjoxLCJraW5kIjoibm90aWZpY2F0aW9ucyIsImV2ZW50Q3JlYXRlZEF0IjoxNzg2MzIwMDAwLCJldmVudElEIjoiZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZSJ9"
+    }
+  },
+  "read": {
+    "request": {
+      "method": "PUT",
+      "path": "/api/v2/me/notifications/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff/read",
+      "body": null
+    },
+    "response": {
+      "id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "readAt": "2026-08-10T00:01:00.000Z"
+    },
+    "exactReplayResponse": {
+      "id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "readAt": "2026-08-10T00:01:00.000Z"
+    }
+  },
+  "errors": {
+    "malformedEventID": {
+      "status": 400,
+      "body": {
+        "error": "invalid_notification_event",
+        "message": "The notification event ID is invalid."
+      }
+    },
+    "notFound": {
+      "status": 404,
+      "body": {
+        "error": "notification_not_found",
+        "message": "The notification was not found."
+      }
+    }
+  }
+}

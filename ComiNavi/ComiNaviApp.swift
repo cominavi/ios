@@ -13,6 +13,14 @@ import Sentry
 import SwiftUI
 import UserNotifications
 
+private var isCominaviE2ESessionBridgeActive: Bool {
+    #if DEBUG
+        ProcessInfo.processInfo.environment["COMINAVI_E2E_SESSION_BRIDGE_ACTIVE"] == "1"
+    #else
+        false
+    #endif
+}
+
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool
@@ -42,12 +50,14 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         }
         #endif
 
-        AppTrack.user(AppData.userState.user)
-        UNUserNotificationCenter.current().delegate = self
-        Task { @MainActor in
-            let settings = await UNUserNotificationCenter.current().notificationSettings()
-            if [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus) {
-                application.registerForRemoteNotifications()
+        if !isCominaviE2ESessionBridgeActive {
+            AppTrack.user(AppData.userState.user)
+            UNUserNotificationCenter.current().delegate = self
+            Task { @MainActor in
+                let settings = await UNUserNotificationCenter.current().notificationSettings()
+                if [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus) {
+                    application.registerForRemoteNotifications()
+                }
             }
         }
 
@@ -100,7 +110,11 @@ struct ComiNaviApp: App {
 
     var body: some Scene {
         WindowGroup {
-            EntryView()
+            if isCominaviE2ESessionBridgeActive {
+                Color.clear
+            } else {
+                EntryView()
+            }
         }
     }
 }

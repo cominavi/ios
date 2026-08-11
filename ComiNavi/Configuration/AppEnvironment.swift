@@ -11,11 +11,15 @@ enum AppBuildEnvironment: String, Sendable {
     case testFlight = "testflight"
 }
 
-enum CirclemsServiceEnvironment: String, CaseIterable, Identifiable, Sendable {
+enum CirclemsServiceEnvironment: String, CaseIterable, Identifiable, Codable, Sendable {
     case testing
     case production
 
     var id: Self { self }
+
+    var apiValue: String {
+        self == .production ? "production" : "sandbox"
+    }
 
     var displayName: LocalizedStringResource {
         switch self {
@@ -55,6 +59,11 @@ enum CirclemsServiceEnvironment: String, CaseIterable, Identifiable, Sendable {
 }
 
 struct AppEnvironment: Sendable {
+    // The app has not shipped yet. Keep pre-release persisted credentials and
+    // databases behind an explicit epoch so an incompatible authentication
+    // contract can start cleanly without deleting unrelated Keychain items.
+    private static let storageEpoch = "pre-release-v2"
+
     static let current = load()
 
     #if DEBUG
@@ -63,10 +72,7 @@ struct AppEnvironment: Sendable {
 
     let build: AppBuildEnvironment
     private let configuredCirclems: CirclemsServiceEnvironment
-    let circlemsClientID: String
-    let oauthRedirectURL: URL
     let oauthCallbackScheme: String
-    let circlemsTokenRefreshURL: URL
 
     var circlems: CirclemsServiceEnvironment {
         #if DEBUG
@@ -91,7 +97,7 @@ struct AppEnvironment: Sendable {
         build: AppBuildEnvironment,
         circlems: CirclemsServiceEnvironment
     ) -> String {
-        "\(build.rawValue)/\(circlems.rawValue)"
+        "\(storageEpoch)/\(build.rawValue)/\(circlems.rawValue)"
     }
 
     static func resolveCirclemsEnvironment(
@@ -151,21 +157,11 @@ struct AppEnvironment: Sendable {
             "Circle.ms environment \(circlems.rawValue) is invalid for the \(build.rawValue) build."
         )
 
-        let clientID = requiredString(key: "ComiNaviCirclemsClientID", bundle: bundle)
-        let redirectURL = requiredURL(key: "ComiNaviOAuthRedirectURL", bundle: bundle)
         let callbackScheme = requiredString(key: "ComiNaviOAuthCallbackScheme", bundle: bundle)
-        let refreshURL = requiredURL(key: "ComiNaviCirclemsTokenRefreshURL", bundle: bundle)
-
-        precondition(redirectURL.scheme == "https", "The OAuth redirect URL must use HTTPS.")
-        precondition(refreshURL.scheme == "https", "The token refresh URL must use HTTPS.")
-
         return AppEnvironment(
             build: build,
             configuredCirclems: circlems,
-            circlemsClientID: clientID,
-            oauthRedirectURL: redirectURL,
-            oauthCallbackScheme: callbackScheme,
-            circlemsTokenRefreshURL: refreshURL
+            oauthCallbackScheme: callbackScheme
         )
     }
 
@@ -177,14 +173,6 @@ struct AppEnvironment: Sendable {
             preconditionFailure("Missing build setting-backed Info.plist value for \(key).")
         }
         return value
-    }
-
-    private static func requiredURL(key: String, bundle: Bundle) -> URL {
-        let value = requiredString(key: key, bundle: bundle)
-        guard let url = URL(string: value), url.host != nil else {
-            preconditionFailure("Invalid URL configured for \(key): \(value)")
-        }
-        return url
     }
 
     private static func requiredEnum<T: RawRepresentable>(

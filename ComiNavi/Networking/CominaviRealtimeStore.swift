@@ -1,5 +1,30 @@
 import Foundation
 
+struct SharedPlanExternalCircleState: Equatable, Identifiable, Sendable {
+    let kind: String
+    let value: String
+    let occurredAt: Date
+    let sourceName: String
+    let sourceHandle: String
+    let sourceURL: URL?
+
+    var id: String { "\(kind):\(value):\(occurredAt.timeIntervalSince1970)" }
+
+    var title: String {
+        switch (kind, value) {
+        case ("inventory", "available"): String(localized: "Available")
+        case ("inventory", "low_stock"): String(localized: "Low stock")
+        case ("inventory", "sold_out"): String(localized: "Sold out")
+        case ("presence", "present"): String(localized: "Circle present")
+        case ("presence", "temporarily_away"): String(localized: "Temporarily away")
+        case ("presence", "closed"): String(localized: "Circle closed")
+        case ("attendance", "absent"): String(localized: "Withdrawn")
+        case ("attendance", "attending"): String(localized: "Attending")
+        default: String(localized: "External update")
+        }
+    }
+}
+
 actor CominaviRealtimeStore {
     static let shared = CominaviRealtimeStore()
 
@@ -62,6 +87,36 @@ actor CominaviRealtimeStore {
         (headsByEvent[eventNumber] ?? [:]).compactMapValues { heads in
             Self.enrichment(from: Array(heads.values))
         }
+    }
+
+    func sharedPlanExternalStates(
+        eventNumber: Int,
+        publicCircleID: Int,
+        minimumRefreshInterval: TimeInterval = 60
+    ) async throws -> [SharedPlanExternalCircleState] {
+        try await refresh(
+            eventNumber: eventNumber,
+            minimumInterval: minimumRefreshInterval
+        )
+        let supportedKinds = Set(["inventory", "presence", "attendance"])
+        return (headsByEvent[eventNumber]?[publicCircleID] ?? [:]).values
+            .filter { supportedKinds.contains($0.stateKind) }
+            .map { update in
+                SharedPlanExternalCircleState(
+                    kind: update.stateKind,
+                    value: update.stateValue,
+                    occurredAt: update.occurredAt,
+                    sourceName: update.post.author.name ?? update.post.author.handle,
+                    sourceHandle: update.post.author.handle,
+                    sourceURL: update.post.url
+                )
+            }
+            .sorted {
+                if $0.occurredAt != $1.occurredAt {
+                    return $0.occurredAt > $1.occurredAt
+                }
+                return $0.kind < $1.kind
+            }
     }
 
     private static func isNewer(

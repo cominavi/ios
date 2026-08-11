@@ -113,6 +113,8 @@ struct CatalogDataSourceConfiguration: Equatable, Sendable {
     let enrichment: CatalogEnrichmentConfiguration?
     let allowsBookmarkSync: Bool
     let allowsRemoteMetadata: Bool
+    let allowsCirclemsFavoriteMirror: Bool
+    let accountPublicUserID: String?
 
     init(
         eventID: Int,
@@ -121,7 +123,9 @@ struct CatalogDataSourceConfiguration: Equatable, Sendable {
         image: CatalogDatabaseConfiguration,
         enrichment: CatalogEnrichmentConfiguration? = nil,
         allowsBookmarkSync: Bool,
-        allowsRemoteMetadata: Bool = true
+        allowsRemoteMetadata: Bool = true,
+        allowsCirclemsFavoriteMirror: Bool = false,
+        accountPublicUserID: String? = nil
     ) {
         self.eventID = eventID
         self.eventNumber = eventNumber
@@ -130,6 +134,8 @@ struct CatalogDataSourceConfiguration: Equatable, Sendable {
         self.enrichment = enrichment
         self.allowsBookmarkSync = allowsBookmarkSync
         self.allowsRemoteMetadata = allowsRemoteMetadata
+        self.allowsCirclemsFavoriteMirror = allowsCirclemsFavoriteMirror
+        self.accountPublicUserID = accountPublicUserID
     }
 }
 
@@ -197,6 +203,7 @@ final class CirclemsDataSource {
     private let databases: CirclemsDataSourceDatabases
     private let databaseDownloader: ResumableCatalogDownload
     private let allowsBookmarkSync: Bool
+    private let allowsCirclemsFavoriteMirror: Bool
     private let enrichmentIsRequired: Bool
     private let enrichmentStore: CatalogEnrichmentStore?
     private let realtimeStore: CominaviRealtimeStore?
@@ -248,6 +255,7 @@ final class CirclemsDataSource {
         )
         self.databaseDownloader = databaseDownloader
         self.allowsBookmarkSync = configuration.allowsBookmarkSync
+        self.allowsCirclemsFavoriteMirror = configuration.allowsCirclemsFavoriteMirror
         self.allowsRemoteMetadata = configuration.allowsRemoteMetadata
         enrichmentIsRequired = configuration.enrichment?.isRequired == true
         enrichmentStore = configuration.enrichment.map {
@@ -256,13 +264,22 @@ final class CirclemsDataSource {
         realtimeStore = configuration.allowsBookmarkSync ? .shared : nil
         self.comiketId = comiketId
 
-        let userID = AppData.userState.user?.userId ?? 0
-        let userPlanURL = DirectoryManager.shared
-            .userDataFor(eventID: configuration.eventID, comiketId: comiketId, userID: userID)
-            .appendingPathComponent("user-plan.sqlite")
-        if let userPlanStore = try? SQLiteUserPlanStore(path: userPlanURL.path) {
+        let verifiedPublicUserID = configuration.accountPublicUserID
+            ?? (AppData.profileStore.isIdentityVerified ? AppData.profileStore.profile?.id : nil)
+        if let verifiedPublicUserID,
+           let userPlanURL = try? DirectoryManager.shared
+            .userDataFor(
+                eventID: configuration.eventID,
+                comiketId: comiketId,
+                publicUserID: verifiedPublicUserID
+            )
+            .appendingPathComponent("user-plan.sqlite"),
+           let userPlanStore = try? SQLiteUserPlanStore(path: userPlanURL.path)
+        {
             self.userPlanStore = userPlanStore
         } else {
+            // Never substitute a Circle.ms numeric ID (or zero) before the
+            // provider-neutral ComiNavi identity has been verified.
             self.userPlanStore = InMemoryUserPlanStore()
         }
 
@@ -400,6 +417,17 @@ final class CirclemsDataSource {
     private func prepareDatabases() async throws {
         let allDatabases = [self.databases.main, self.databases.image]
         var databasesToDownload: [CirclemsDataSourceDatabaseMetadata] = []
+
+        if databases.main.isLocalResource,
+           databases.image.isLocalResource,
+           databases.main.localPath == databases.image.localPath
+        {
+            try await Self.validateCombinedDatabaseOffMainActor(
+                at: URL(fileURLWithPath: databases.main.localPath)
+            )
+            NSLog("Combined catalog database is ready; no duplicate validation is required")
+            return
+        }
 
         for database in allDatabases {
             if database.isLocalResource {
@@ -581,6 +609,14 @@ final class CirclemsDataSource {
         }
     }
 
+    nonisolated private static func validateCombinedDatabaseOffMainActor(
+        at url: URL
+    ) async throws {
+        try await runDatabaseWorker {
+            try validateDatabase(at: url, types: [.main, .image])
+        }
+    }
+
     nonisolated private static func runDatabaseWorker<Result: Sendable>(
         _ operation: @escaping @Sendable () throws -> Result
     ) async throws -> Result {
@@ -724,10 +760,18 @@ final class CirclemsDataSource {
         )
     }
 
-    nonisolated private static func validateDatabase(
+    nonisolated static func validateDatabase(
         at url: URL,
         type: CirclemsDataSourceDatabaseType
     ) throws {
+        try validateDatabase(at: url, types: [type])
+    }
+
+    nonisolated private static func validateDatabase(
+        at url: URL,
+        types: [CirclemsDataSourceDatabaseType]
+    ) throws {
+        let type = types.first ?? .main
         guard Self.hasSQLiteHeader(at: url) else {
             throw NSError(
                 domain: "CirclemsDataSource",
@@ -757,11 +801,14 @@ final class CirclemsDataSource {
                 )
             }
 
-            let tables = Set(try String.fetchAll(
+            let schemaObjects = Set(try String.fetchAll(
                 db,
-                sql: "SELECT name FROM sqlite_master WHERE type = 'table'"
+                sql: "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
             ))
-            let missingTables = type.requiredTables.subtracting(tables)
+            let requiredTables = types.reduce(into: Set<String>()) {
+                $0.formUnion($1.requiredTables)
+            }
+            let missingTables = requiredTables.subtracting(schemaObjects)
             guard missingTables.isEmpty else {
                 throw NSError(
                     domain: "CirclemsDataSource",
@@ -772,6 +819,32 @@ final class CirclemsDataSource {
                         ),
                     ]
                 )
+            }
+
+            if Set(types) == Set([.main, .image]) {
+                let smokeCount = try Int.fetchOne(
+                    db,
+                    sql: """
+                    SELECT COUNT(*)
+                    FROM ComiketCircleWC AS circle
+                    JOIN ComiketCircleExtend AS extension ON extension.id = circle.id
+                    JOIN ComiketLayoutWC AS layout
+                      ON layout.blockId = circle.blockId AND layout.spaceNo = circle.spaceNo
+                    JOIN ComiketCircleImage AS image ON image.WCId = extension.WCId
+                    WHERE circle.id = extension.WCId
+                    """
+                ) ?? 0
+                guard smokeCount > 0 else {
+                    throw NSError(
+                        domain: "CirclemsDataSource",
+                        code: 8,
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "The downloaded catalog database has invalid circle relationships."
+                            ),
+                        ]
+                    )
+                }
             }
         }
     }
@@ -876,7 +949,10 @@ final class CirclemsDataSource {
                 eventNumber: Int(comiketId) ?? 0,
                 catalog: mapCatalog,
                 localStore: userPlanStore,
-                serviceFavoriteSync: CominaviServiceClient.shared
+                serviceFavoriteSync: CominaviServiceClient.shared,
+                circlemsMirror: allowsCirclemsFavoriteMirror
+                    ? CirclemsFavoriteRemoteStore()
+                    : nil
             )
         }
     }

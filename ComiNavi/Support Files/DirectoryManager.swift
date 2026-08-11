@@ -5,6 +5,7 @@
 //  Created by Galvin Gao on 9/15/24.
 //
 
+import CryptoKit
 import Foundation
 
 struct EventStorageShard: Hashable, Sendable {
@@ -178,6 +179,84 @@ final class DirectoryManager: Sendable {
         .appendingPathComponent("user-\(userID)", isDirectory: true)
         createDirectoryIfNeeded(at: url)
         return url
+    }
+
+    func userDataFor(
+        eventID: Int,
+        comiketId: String,
+        publicUserID: String
+    ) throws -> URL {
+        let accountDirectoryName = try Self.accountDirectoryName(
+            publicUserID: publicUserID
+        )
+        let url = eventDirectory(
+            in: environmentApplicationSupportDirectory,
+            eventID: eventID,
+            comiketId: comiketId
+        )
+        .appendingPathComponent("users", isDirectory: true)
+        .appendingPathComponent(accountDirectoryName, isDirectory: true)
+        createDirectoryIfNeeded(at: url)
+        return url
+    }
+
+    static func accountDirectoryName(publicUserID: String) throws -> String {
+        "cominavi-\(try accountScope(publicUserID: publicUserID))"
+    }
+
+    /// Removes only durable data derived from one stable ComiNavi public user
+    /// ID. Sanitized catalogs are deliberately environment-scoped and remain
+    /// available to another authenticated account, so their global directory
+    /// is never part of this cleanup.
+    func removeApplicationSupportData(
+        publicUserID: String,
+        in rootDirectory: URL? = nil,
+        fileManager: FileManager = .default
+    ) throws {
+        let rootDirectory = rootDirectory ?? environmentApplicationSupportDirectory
+        let accountScope = try Self.accountScope(publicUserID: publicUserID)
+        let accountDirectoryName = "cominavi-\(accountScope)"
+        let eventsDirectory = rootDirectory.appendingPathComponent("events", isDirectory: true)
+
+        if let enumerator = fileManager.enumerator(
+            at: eventsDirectory,
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            while let candidate = enumerator.nextObject() as? URL {
+                guard candidate.lastPathComponent == accountDirectoryName,
+                      candidate.deletingLastPathComponent().lastPathComponent == "users"
+                else { continue }
+                enumerator.skipDescendants()
+                if fileManager.fileExists(atPath: candidate.path) {
+                    try fileManager.removeItem(at: candidate)
+                }
+            }
+        }
+
+        let exactFiles = [
+            rootDirectory.appendingPathComponent("shared-plans-\(accountScope).sqlite"),
+            rootDirectory.appendingPathComponent("shared-plans-\(accountScope).sqlite-wal"),
+            rootDirectory.appendingPathComponent("shared-plans-\(accountScope).sqlite-shm"),
+            rootDirectory.appendingPathComponent("shared-plans-\(accountScope).sqlite-journal"),
+            rootDirectory
+                .appendingPathComponent("ProfileMutations", isDirectory: true)
+                .appendingPathComponent("profile-mutation-\(accountScope).json"),
+        ]
+        for file in exactFiles where fileManager.fileExists(atPath: file.path) {
+            try fileManager.removeItem(at: file)
+        }
+    }
+
+    private static func accountScope(publicUserID: String) throws -> String {
+        guard !publicUserID.isEmpty,
+              publicUserID.utf8.count <= 256
+        else {
+            throw CocoaError(.fileWriteInvalidFileName)
+        }
+        return SHA256.hash(data: Data(publicUserID.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 
     /// Event IDs are Circle.ms's stable API identifiers. The nested Comiket number

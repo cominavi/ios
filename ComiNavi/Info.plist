@@ -8,14 +8,14 @@
 	<string>$(COMINAVI_CIRCLEMS_CLIENT_ID)</string>
 	<key>ComiNaviCirclemsEnvironment</key>
 	<string>$(COMINAVI_CIRCLEMS_ENVIRONMENT)</string>
-	<key>ComiNaviCirclemsTokenRefreshURL</key>
-	<string>$(COMINAVI_CIRCLEMS_TOKEN_REFRESH_URL)</string>
 	<key>ComiNaviOAuthCallbackScheme</key>
 	<string>$(COMINAVI_OAUTH_CALLBACK_SCHEME)</string>
 	<key>ComiNaviOAuthRedirectURL</key>
 	<string>$(COMINAVI_OAUTH_REDIRECT_URL)</string>
 	<key>ComiNaviServiceBaseURL</key>
 	<string>https://cominavi.net</string>
+	<key>GIDClientID</key>
+	<string>$(COMINAVI_GOOGLE_CLIENT_ID)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -26,6 +26,16 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>$(COMINAVI_OAUTH_CALLBACK_SCHEME)</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>Google Sign-In</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(COMINAVI_GOOGLE_CALLBACK_SCHEME)</string>
 			</array>
 		</dict>
 	</array>

@@ -39,6 +39,17 @@ extension DataRequest {
     }
 }
 
+enum CirclemsAPIAuthorizationError: LocalizedError, Equatable {
+    case accessTokenRequired
+
+    var errorDescription: String? {
+        switch self {
+        case .accessTokenRequired:
+            String(localized: "Circle.ms authorization is required for the direct catalog source.")
+        }
+    }
+}
+
 enum CirclemsAPI {
     public static var baseURL: String {
         AppEnvironment.current.circlems.apiBaseURL.absoluteString
@@ -58,8 +69,16 @@ enum CirclemsAPI {
         return decoder
     }
     
-    private static func headers() async -> HTTPHeaders {
-        ["Authorization": "Bearer \(await AppData.getUserToken())"]
+    static func authenticatedHeaders(accessToken: String) throws -> HTTPHeaders {
+        let accessToken = accessToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !accessToken.isEmpty else {
+            throw CirclemsAPIAuthorizationError.accessTokenRequired
+        }
+        return ["Authorization": "Bearer \(accessToken)"]
+    }
+
+    private static func headers() async throws -> HTTPHeaders {
+        try authenticatedHeaders(accessToken: await AppData.getUserToken())
     }
     
     // MARK: - Response Types
@@ -377,7 +396,7 @@ enum CirclemsAPI {
     
     static func getEventList() async throws -> EventListResponse {
         let url = "\(baseURL)/WebCatalog/GetEventList"
-        return try await AF.request(url, headers: await headers())
+        return try await AF.request(url, headers: try await headers())
             .debugValidate()
             .serializingDecodable(EventListResponse.self, decoder: makeDecoder())
             .value
@@ -389,7 +408,7 @@ enum CirclemsAPI {
             url,
             parameters: EventParameters(eventID: eventId),
             encoder: URLEncodedFormParameterEncoder.default,
-            headers: await headers()
+            headers: try await headers()
         )
             .debugValidate()
             .serializingDecodable(CatalogBaseResponse.self, decoder: makeDecoder())
@@ -412,7 +431,7 @@ enum CirclemsAPI {
                 lastUpdate: lastUpdate
             ),
             encoder: URLEncodedFormParameterEncoder.default,
-            headers: await headers()
+            headers: try await headers()
         )
             .debugValidate()
             .serializingDecodable(FavoriteCirclesResponse.self, decoder: makeDecoder())
@@ -425,7 +444,7 @@ enum CirclemsAPI {
             url,
             parameters: CircleParameters(wcid: wcid),
             encoder: URLEncodedFormParameterEncoder.default,
-            headers: await headers()
+            headers: try await headers()
         )
             .debugValidate()
             .serializingDecodable(CircleResponse.self, decoder: makeDecoder())
@@ -454,7 +473,7 @@ enum CirclemsAPI {
                 lastUpdate: lastUpdate
             ),
             encoder: URLEncodedFormParameterEncoder.default,
-            headers: await headers()
+            headers: try await headers()
         )
             .debugValidate()
             .serializingDecodable(CircleQueryResponse.self, decoder: makeDecoder())
@@ -468,7 +487,7 @@ enum CirclemsAPI {
             method: .post,
             parameters: FavoriteMutationParameters(wcid: wcid, color: color, memo: memo, free: free),
             encoder: URLEncodedFormParameterEncoder.default,
-            headers: await headers()
+            headers: try await headers()
         )
             .debugValidate()
             .serializingDecodable(FavoriteMutationResponse.self, decoder: makeDecoder())
@@ -482,7 +501,7 @@ enum CirclemsAPI {
             method: .put,
             parameters: FavoriteMutationParameters(wcid: wcid, color: color, memo: memo, free: free),
             encoder: URLEncodedFormParameterEncoder.default,
-            headers: await headers()
+            headers: try await headers()
         )
             .debugValidate()
             .serializingDecodable(FavoriteMutationResponse.self, decoder: makeDecoder())
@@ -496,7 +515,7 @@ enum CirclemsAPI {
             method: .delete,
             parameters: FavoriteDeleteParameters(wcid: wcid),
             encoder: URLEncodedFormParameterEncoder.default,
-            headers: await headers()
+            headers: try await headers()
         )
             .debugValidate()
             .serializingDecodable(Response<EmptyResponse>.self, decoder: makeDecoder())
@@ -505,7 +524,7 @@ enum CirclemsAPI {
     
     static func getUserInfo() async throws -> UserInfoResponse {
         let url = "\(baseURL)/User/Info"
-        return try await AF.request(url, method: .post, headers: await headers())
+        return try await AF.request(url, method: .post, headers: try await headers())
             .debugValidate()
             .serializingDecodable(UserInfoResponse.self, decoder: makeDecoder())
             .value
@@ -527,7 +546,7 @@ enum CirclemsAPI {
                 lastUpdate: lastUpdate
             ),
             encoder: URLEncodedFormParameterEncoder.default,
-            headers: await headers()
+            headers: try await headers()
         )
             .debugValidate()
             .serializingDecodable(BookQueryResponse.self, decoder: makeDecoder())

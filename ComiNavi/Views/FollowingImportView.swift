@@ -14,7 +14,7 @@ struct FollowingImportView: View {
         List {
             Section("X account") {
                 HStack(spacing: 8) {
-                    Text("@")
+                    Text(verbatim: "@")
                         .foregroundStyle(.secondary)
                     TextField("username", text: $model.twitterUserName)
                         .textInputAutocapitalization(.never)

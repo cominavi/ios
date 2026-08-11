@@ -1,0 +1,62 @@
+{
+  "catalogList": {
+    "items": [
+      {
+        "schemaVersion": 1,
+        "versionID": "c108-v1-aaaaaaaaaaaaaaaaaaaaaaaa",
+        "comiketNo": 108,
+        "name": "Comic Market 108",
+        "publishedAt": 103,
+        "sourceUpdatedAt": 90,
+        "artifact": {
+          "url": "/api/v2/catalogs/108/versions/c108-v1-aaaaaaaaaaaaaaaaaaaaaaaa/artifact",
+          "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "bytes": 1234,
+          "contentType": "application/vnd.cominavi.catalog-v1+sqlite"
+        },
+        "counts": { "circles": 1, "layouts": 1, "images": 2 },
+        "capabilities": {
+          "stableCircleIdentity": "comiketNo+wcID",
+          "circleImages": true,
+          "commonImages": true
+        }
+      }
+    ]
+  },
+  "catalogVersion": {
+    "schemaVersion": 1,
+    "versionID": "c108-v1-aaaaaaaaaaaaaaaaaaaaaaaa",
+    "comiketNo": 108,
+    "name": "Comic Market 108",
+    "publishedAt": 103,
+    "sourceUpdatedAt": 90,
+    "artifact": {
+      "url": "/api/v2/catalogs/108/versions/c108-v1-aaaaaaaaaaaaaaaaaaaaaaaa/artifact",
+      "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "bytes": 1234,
+      "contentType": "application/vnd.cominavi.catalog-v1+sqlite"
+    },
+    "counts": { "circles": 1, "layouts": 1, "images": 2 },
+    "capabilities": {
+      "stableCircleIdentity": "comiketNo+wcID",
+      "circleImages": true,
+      "commonImages": true
+    }
+  },
+  "compatibilitySmoke": {
+    "query": "SELECT circle.comiketNo, circle.id, extension.WCId, circle.circleName, circle.blockId, circle.spaceNo, layout.xpos2, layout.ypos2, image.size, circle.circlems, extension.CirclemsPortalURL FROM ComiketCircleWC AS circle JOIN ComiketCircleExtend AS extension ON extension.id = circle.id JOIN ComiketLayoutWC AS layout ON layout.blockId = circle.blockId AND layout.spaceNo = circle.spaceNo JOIN ComiketCircleImage AS image ON image.WCId = extension.WCId",
+    "row": {
+      "comiketNo": 108,
+      "id": 9001,
+      "WCId": 9001,
+      "circleName": "Fixture Circle",
+      "blockId": 1,
+      "spaceNo": 1,
+      "xpos2": 100,
+      "ypos2": 200,
+      "size": 12,
+      "circlems": null,
+      "CirclemsPortalURL": null
+    }
+  }
+}

@@ -21,16 +21,13 @@ final class FollowingImportModel {
 
     @ObservationIgnored private let dataSource: CirclemsDataSource
     @ObservationIgnored private let client: FollowingImportAPIClient
-    @ObservationIgnored private let accessToken: () async -> String
 
     init(
         dataSource: CirclemsDataSource,
-        client: FollowingImportAPIClient = FollowingImportAPIClient(),
-        accessToken: @escaping () async -> String = { await AppData.getUserToken() }
+        client: FollowingImportAPIClient = FollowingImportAPIClient()
     ) {
         self.dataSource = dataSource
         self.client = client
-        self.accessToken = accessToken
     }
 
     var canImport: Bool {
@@ -70,11 +67,8 @@ final class FollowingImportModel {
         defer { activity = .idle }
 
         do {
-            let token = await accessToken()
             let payload = try await client.importFollowings(
-                twitterUserName: userName,
-                circlemsAccessToken: token,
-                circlemsEnvironment: AppEnvironment.current.circlems
+                twitterUserName: userName
             )
             async let circles = dataSource.getCircles()
             async let extensions = dataSource.getCircleExtensions()

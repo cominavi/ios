@@ -6,6 +6,84 @@ import XCTest
 
 @MainActor
 final class CatalogLibraryTests: XCTestCase {
+    func testDirectCirclemsHeadersRejectMissingAccessTokenBeforeNetworking() throws {
+        for accessToken in ["", " ", "\n\t"] {
+            XCTAssertThrowsError(
+                try CirclemsAPI.authenticatedHeaders(accessToken: accessToken)
+            ) { error in
+                XCTAssertEqual(
+                    error as? CirclemsAPIAuthorizationError,
+                    .accessTokenRequired
+                )
+            }
+        }
+
+        let headers = try CirclemsAPI.authenticatedHeaders(accessToken: "  provider-token  ")
+        XCTAssertEqual(headers["Authorization"], "Bearer provider-token")
+    }
+
+    func testMissingDirectCirclemsTokenFallsBackToBackendCatalog() async throws {
+        let circlemsRecorder = CatalogSourceInvocationRecorder()
+        let cominaviRecorder = CatalogSourceInvocationRecorder()
+        let sources: [CatalogDataMode: any CatalogSource] = [
+            .circlems: CatalogSourceStub(
+                mode: .circlems,
+                behavior: .missingAccessToken,
+                recorder: circlemsRecorder
+            ),
+            .cominavi: CatalogSourceStub(
+                mode: .cominavi,
+                behavior: .events([.init(id: 230, number: 108)]),
+                recorder: cominaviRecorder
+            ),
+        ]
+        let (defaults, suiteName) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(
+            CatalogDataMode.circlems.rawValue,
+            forKey: "CatalogLibrary.mode.\(AppEnvironment.current.storageNamespace)"
+        )
+        let library = CatalogLibrary(
+            sources: sources,
+            defaults: defaults,
+            initialMode: .circlems
+        )
+
+        library.start()
+        try await waitForFailure(in: library)
+
+        XCTAssertEqual(library.mode, .cominavi)
+        XCTAssertEqual(
+            defaults.string(forKey: "CatalogLibrary.mode.\(AppEnvironment.current.storageNamespace)"),
+            CatalogDataMode.cominavi.rawValue
+        )
+        let circlemsAvailableEventsCallCount = await circlemsRecorder.availableEventsCallCount
+        let cominaviAvailableEventsCallCount = await cominaviRecorder.availableEventsCallCount
+        let cominaviConfigurationEventIDs = await cominaviRecorder.configurationEventIDs
+        XCTAssertEqual(circlemsAvailableEventsCallCount, 1)
+        XCTAssertEqual(cominaviAvailableEventsCallCount, 1)
+        XCTAssertEqual(cominaviConfigurationEventIDs, [230])
+    }
+
+    func testAuthenticatedUserWithoutCatalogKeepsIndependentAppDestinationsAvailable() {
+        XCTAssertEqual(
+            EntryContentRoute.resolve(
+                accountDeletionPending: false,
+                shouldShowSignIn: false,
+                hasCatalog: false
+            ),
+            .catalogIndependent
+        )
+        XCTAssertEqual(
+            EntryContentRoute.resolve(
+                accountDeletionPending: false,
+                shouldShowSignIn: false,
+                hasCatalog: true
+            ),
+            .catalog
+        )
+    }
+
     func testReadinessProgressesClampInvalidTotalsAndOverflow() {
         let empty = Readiness.Progress(
             type: .main,
@@ -53,7 +131,11 @@ final class CatalogLibraryTests: XCTestCase {
             190,
             forKey: "CatalogLibrary.selectedEventID.\(AppEnvironment.current.storageNamespace).circlems"
         )
-        let library = CatalogLibrary(service: service, defaults: defaults)
+        let library = CatalogLibrary(
+            service: service,
+            defaults: defaults,
+            initialMode: .circlems
+        )
 
         library.start()
         try await waitForFailure(in: library)
@@ -73,7 +155,11 @@ final class CatalogLibraryTests: XCTestCase {
         let service = CatalogServiceStub(eventListResponse: response)
         let (defaults, suiteName) = isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let library = CatalogLibrary(service: service, defaults: defaults)
+        let library = CatalogLibrary(
+            service: service,
+            defaults: defaults,
+            initialMode: .circlems
+        )
 
         library.start()
         try await waitForFailure(in: library)
@@ -260,12 +346,12 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertNil(dataSource.bookmarkSyncCoordinator)
     }
 
-    func testNonProductionBuildExposesCirclemsAndDemoCatalogModes() {
+    func testNonProductionBuildIncludesCominaviWithDebugCatalogModes() {
         let library = CatalogLibrary(initialMode: .circlems)
 
         XCTAssertEqual(
             Set(library.availableModes),
-            [.circlems, .demo]
+            [.cominavi, .circlems, .demo]
         )
     }
 
@@ -369,7 +455,10 @@ private struct MultiEventDemoCatalogSource: CatalogSource {
         events
     }
 
-    func configuration(for event: CatalogEvent) async throws -> CatalogDataSourceConfiguration {
+    func configuration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration {
         CatalogDataSourceConfiguration(
             eventID: event.id,
             eventNumber: event.number,
@@ -411,4 +500,46 @@ private enum CatalogServiceStubError: LocalizedError {
     case metadataUnavailable
 
     var errorDescription: String? { "Fixture metadata is intentionally unavailable." }
+}
+
+private actor CatalogSourceInvocationRecorder {
+    private(set) var availableEventsCallCount = 0
+    private(set) var configurationEventIDs: [Int] = []
+
+    func recordAvailableEventsCall() {
+        availableEventsCallCount += 1
+    }
+
+    func recordConfiguration(eventID: Int) {
+        configurationEventIDs.append(eventID)
+    }
+}
+
+private struct CatalogSourceStub: CatalogSource {
+    enum Behavior: Sendable {
+        case missingAccessToken
+        case events([CatalogEvent])
+    }
+
+    let mode: CatalogDataMode
+    let behavior: Behavior
+    let recorder: CatalogSourceInvocationRecorder
+
+    func availableEvents() async throws -> [CatalogEvent] {
+        await recorder.recordAvailableEventsCall()
+        switch behavior {
+        case .missingAccessToken:
+            throw CirclemsAPIAuthorizationError.accessTokenRequired
+        case .events(let events):
+            return events
+        }
+    }
+
+    func configuration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration {
+        await recorder.recordConfiguration(eventID: event.id)
+        throw CatalogServiceStubError.metadataUnavailable
+    }
 }

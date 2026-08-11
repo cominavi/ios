@@ -33,6 +33,147 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testSharedPlanRowHasIconAndReopensReliably() throws {
+        let planID = "11111111-1111-4111-8111-111111111111"
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-ui-testing-hide-debugger",
+            "-cominavi-ui-testing-shared-plan-list",
+        ]
+        app.launch()
+
+        for _ in 0 ..< 5 {
+            let row = app.buttons["shared-plan-row-\(planID)"]
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+            XCTAssertTrue(
+                app.images["shared-plan-row-icon-\(planID)"].exists,
+                "Every Shared Plan row needs a visible plan icon"
+            )
+            row.tap()
+            XCTAssertTrue(
+                app.staticTexts["shared-plan-test-detail"].waitForExistence(timeout: 5),
+                "Tapping the same plan after returning must always reopen it"
+            )
+
+            let backButton = app.navigationBars.buttons.element(boundBy: 0)
+            XCTAssertTrue(backButton.waitForExistence(timeout: 5))
+            backButton.tap()
+        }
+    }
+
+    @MainActor
+    func testProductionInvitationSurfaceWhenExplicitlyRequired() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["COMINAVI_E2E_INVITATION_UI_REQUIRED"] == "1" else {
+            return
+        }
+
+        let app = XCUIApplication()
+        guard let rawInvitationURL = environment["COMINAVI_E2E_INVITATION_URL"],
+              let invitationURL = URL(string: rawInvitationURL)
+        else {
+            return XCTFail("A valid invitation URL is required")
+        }
+
+        switch environment["COMINAVI_E2E_INVITATION_OPEN_MODE"] {
+        case "cold":
+            if app.state != .notRunning {
+                app.terminate()
+            }
+            XCUIDevice.shared.system.open(invitationURL)
+        case "warm":
+            app.launch()
+            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+            app.open(invitationURL)
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            for label in ["Open", "開く"] {
+                let button = springboard.buttons[label]
+                if button.waitForExistence(timeout: 2) {
+                    button.tap()
+                    break
+                }
+            }
+        default:
+            return XCTFail("A supported invitation open mode is required")
+        }
+
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+
+        let invitationTitle = app.navigationBars["共有プランへの招待"]
+        XCTAssertTrue(invitationTitle.waitForExistence(timeout: 20))
+        XCTAssertEqual(app.navigationBars.matching(
+            NSPredicate(format: "identifier == %@", "共有プランへの招待")
+        ).count, 1)
+
+        let action = environment["COMINAVI_E2E_INVITATION_UI_ACTION"]
+        if action == "expect-unavailable" {
+            let error = app.staticTexts["shared-plan-invitation-error"]
+            XCTAssertTrue(error.waitForExistence(timeout: 20))
+            XCTAssertFalse(app.buttons["このプランに参加"].exists)
+            let cancel = app.buttons["キャンセル"]
+            XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+            cancel.tap()
+            XCTAssertTrue(invitationTitle.waitForNonExistence(timeout: 10))
+            return
+        }
+
+        if let expectedPlanName = environment["COMINAVI_E2E_INVITATION_PLAN_NAME"] {
+            let planName = app.staticTexts["shared-plan-invitation-plan-name"]
+            XCTAssertTrue(planName.waitForExistence(timeout: 20))
+            XCTAssertTrue(planName.label.contains(expectedPlanName))
+        }
+        let comiket = app.staticTexts["shared-plan-invitation-comiket"]
+        XCTAssertTrue(comiket.waitForExistence(timeout: 5))
+        XCTAssertTrue(comiket.label.contains("C108"))
+
+        switch action {
+        case "authenticate-google-accept":
+            let login = app.buttons["ログインして続ける"]
+            XCTAssertTrue(login.waitForExistence(timeout: 10))
+            login.tap()
+
+            let google = app.buttons.matching(
+                NSPredicate(
+                    format: "label IN %@",
+                    ["Googleでログイン", "Sign in with Google"]
+                )
+            ).firstMatch
+            XCTAssertTrue(google.waitForExistence(timeout: 15))
+            google.tap()
+
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            let continueLabels = ["続ける", "Continue"]
+            for label in continueLabels {
+                let button = springboard.buttons[label]
+                if button.waitForExistence(timeout: 2) {
+                    button.tap()
+                    break
+                }
+            }
+
+            let accept = app.buttons["このプランに参加"]
+            XCTAssertTrue(
+                accept.waitForExistence(timeout: 90),
+                "The preserved Google provider session did not return to invitation confirmation"
+            )
+            accept.tap()
+            XCTAssertTrue(invitationTitle.waitForNonExistence(timeout: 30))
+        case "accept":
+            let accept = app.buttons["このプランに参加"]
+            XCTAssertTrue(accept.waitForExistence(timeout: 10))
+            accept.tap()
+            XCTAssertTrue(invitationTitle.waitForNonExistence(timeout: 20))
+        case "dismiss":
+            let cancel = app.buttons["キャンセル"]
+            XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+            cancel.tap()
+            XCTAssertTrue(invitationTitle.waitForNonExistence(timeout: 10))
+        default:
+            XCTFail("A supported invitation UI action is required")
+        }
+    }
+
+    @MainActor
     func testShinagakiLightboxDoubleTapZoomsAndResets() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-ui-testing-shinagaki-lightbox")
@@ -64,6 +205,15 @@ final class ComiNaviUITests: XCTestCase {
     func testCatalogTabsExploreLayoutsAndGlobalDay() throws {
         let app = XCUIApplication()
         app.launch()
+
+        let catalogTab = app.buttons["Catalog"]
+        XCTAssertTrue(catalogTab.waitForExistence(timeout: 10))
+        catalogTab.tap()
+
+        let retryButton = app.buttons["Try Again"]
+        if retryButton.waitForExistence(timeout: 2) {
+            retryButton.tap()
+        }
 
         let eventDayBanner = app.buttons["global-event-day-banner"]
         guard eventDayBanner.waitForExistence(timeout: 20) else {
@@ -126,6 +276,137 @@ final class ComiNaviUITests: XCTestCase {
         mapTab.tap()
         XCTAssertTrue(eventDayBanner.waitForExistence(timeout: 5))
         XCTAssertTrue(eventDayBanner.label.contains("Day 2"))
+    }
+
+    @MainActor
+    func testNoCatalogKeepsSharedPlansAndProfileAvailable() {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-ui-testing-no-catalog-shell")
+        app.launch()
+
+        let shell = app.otherElements["catalog-independent-shell"]
+        XCTAssertTrue(shell.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["共有プラン"].exists)
+        XCTAssertTrue(app.buttons["Profile"].exists)
+        XCTAssertTrue(app.navigationBars["共有プラン"].exists)
+
+        app.buttons["Catalog"].tap()
+        XCTAssertTrue(app.buttons["Try Again"].waitForExistence(timeout: 5))
+
+        app.buttons["共有プラン"].tap()
+        XCTAssertTrue(app.navigationBars["共有プラン"].waitForExistence(timeout: 5))
+    }
+
+    /// Opt-in production acceptance for a preserved signed-in device or
+    /// simulator. This exercises discovery, authenticated artifact download,
+    /// verification, installation, and the real C108 catalog shell.
+    @MainActor
+    func testLiveProductionC108CatalogDownloadsAndOpens() {
+        let app = XCUIApplication()
+        app.launch()
+
+        let eventDayBanner = app.buttons["global-event-day-banner"]
+        if !eventDayBanner.waitForExistence(timeout: 5) {
+            let mapTab = app.buttons["Map"].firstMatch
+            if mapTab.waitForExistence(timeout: 10), mapTab.isHittable {
+                mapTab.tap()
+            } else {
+                let catalogTab = app.buttons["Catalog"].firstMatch
+                XCTAssertTrue(catalogTab.waitForExistence(timeout: 10))
+                XCTAssertTrue(catalogTab.isHittable)
+                catalogTab.tap()
+            }
+        }
+
+        let retryButton = app.buttons["Try Again"]
+        if retryButton.waitForExistence(timeout: 2) {
+            retryButton.tap()
+        }
+
+        XCTAssertTrue(
+            eventDayBanner.waitForExistence(timeout: 180),
+            "The authenticated production C108 catalog did not finish installing"
+        )
+        XCTAssertTrue(
+            eventDayBanner.label.contains("108"),
+            "The installed production catalog is not C108: \(eventDayBanner.label)"
+        )
+
+        eventDayBanner.tap()
+        XCTAssertTrue(
+            app.otherElements["catalog-event-day-sheet"].waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(app.buttons["global-day-1"].exists)
+        XCTAssertTrue(app.buttons["global-day-2"].exists)
+        takeScreenshot(named: "Live-C108-Catalog-Ready")
+    }
+
+    /// Opt-in production acceptance for a preserved signed-in physical device.
+    /// The stable prefix names only agent-created test data; no account or
+    /// invitation capability is embedded in source. Devices without it skip.
+    @MainActor
+    func testLiveSharedPlanRebootstrapReachesSynchronizedState() throws {
+        #if targetEnvironment(simulator)
+            throw XCTSkip("The live Shared Plan acceptance runs only on a physical device")
+        #else
+            let planNamePrefix = "[E2E] Shared Plans Acceptance"
+
+            let app = XCUIApplication()
+            app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+            app.launch()
+
+            let plansTab = app.buttons["Shared Plans"].exists
+                ? app.buttons["Shared Plans"]
+                : app.buttons["共有プラン"]
+            XCTAssertTrue(plansTab.waitForExistence(timeout: 15))
+            plansTab.tap()
+
+            let plan = app.buttons.matching(
+                NSPredicate(format: "label CONTAINS %@", planNamePrefix)
+            ).firstMatch
+            guard plan.waitForExistence(timeout: 15) else {
+                throw XCTSkip("No preserved live Shared Plan test fixture is installed")
+            }
+            plan.tap()
+
+            let openEditor = app.buttons["shared-plan-open-editor"]
+            XCTAssertTrue(openEditor.waitForExistence(timeout: 10))
+            openEditor.tap()
+
+            let recovery = app.descendants(matching: .any)[
+                "shared-plan-editor-recovery"
+            ]
+            let discard = app.buttons["shared-plan-editor-recovery-discard"]
+            if discard.waitForExistence(timeout: 3) {
+                discard.tap()
+                let confirm = app.buttons[
+                    "shared-plan-editor-recovery-discard-confirmation"
+                ]
+                XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+                confirm.tap()
+            }
+
+            let syncStatus = app.descendants(matching: .any)[
+                "shared-plan-editor-sync-status"
+            ]
+            XCTAssertTrue(syncStatus.waitForExistence(timeout: 10))
+            expectation(
+                for: NSPredicate(format: "label CONTAINS[c] %@", "up to date"),
+                evaluatedWith: syncStatus
+            )
+            waitForExpectations(timeout: 30)
+            XCTAssertFalse(recovery.exists)
+
+            // A framing regression can briefly clear recovery while reconnecting
+            // and then quarantine again. Keep the editor alive for another cycle.
+            expectation(
+                for: NSPredicate(format: "exists == false"),
+                evaluatedWith: recovery
+            )
+            waitForExpectations(timeout: 5)
+            XCTAssertFalse(recovery.exists)
+            takeScreenshot(named: "Live-Shared-Plan-Synchronized")
+        #endif
     }
 
     @MainActor
@@ -1129,6 +1410,7 @@ final class ComiNaviUITests: XCTestCase {
         add(attachment)
     }
 
+    @MainActor
     private func expectedInitialGalleryColumns(for app: XCUIApplication) -> String {
         expectedInitialGalleryColumns(forWidth: app.frame.width)
     }

@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 enum CatalogDataMode: String, CaseIterable, Hashable, Sendable {
+    case cominavi
     case circlems
 
     #if DEBUG || COMINAVI_STAGING
@@ -10,6 +11,8 @@ enum CatalogDataMode: String, CaseIterable, Hashable, Sendable {
 
     var displayName: String {
         switch self {
+        case .cominavi:
+            "ComiNavi"
         case .circlems:
             "Circle.ms"
         #if DEBUG || COMINAVI_STAGING
@@ -21,6 +24,8 @@ enum CatalogDataMode: String, CaseIterable, Hashable, Sendable {
 
     var detail: String {
         switch self {
+        case .cominavi:
+            String(localized: "Downloads the verified ComiNavi catalog for every signed-in account.")
         case .circlems:
             String(localized: "Downloads catalogs supported by Circle.ms.")
         #if DEBUG || COMINAVI_STAGING
@@ -111,7 +116,16 @@ struct CirclemsCatalogEventService: CatalogEventServicing {
 protocol CatalogSource: Sendable {
     var mode: CatalogDataMode { get }
     func availableEvents() async throws -> [CatalogEvent]
-    func configuration(for event: CatalogEvent) async throws -> CatalogDataSourceConfiguration
+    func configuration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration
+}
+
+extension CatalogSource {
+    func configuration(for event: CatalogEvent) async throws -> CatalogDataSourceConfiguration {
+        try await configuration(for: event, progress: nil)
+    }
 }
 
 struct CirclemsCatalogSource: CatalogSource {
@@ -141,7 +155,10 @@ struct CirclemsCatalogSource: CatalogSource {
         return events
     }
 
-    func configuration(for event: CatalogEvent) async throws -> CatalogDataSourceConfiguration {
+    func configuration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration {
         let response = try await service.catalogBase(eventID: event.id)
         guard let mainURL = URL(string: response.response.url.textdbSqlite3UrlSsl),
               let imageURL = URL(string: response.response.url.imagedb1UrlSsl)
@@ -170,7 +187,10 @@ struct CirclemsCatalogSource: CatalogSource {
                 )
             },
             allowsBookmarkSync: true,
-            allowsRemoteMetadata: true
+            allowsRemoteMetadata: true,
+            // Provider mirroring remains opt-in after an explicit import/link
+            // confirmation; merely selecting the debug source is not consent.
+            allowsCirclemsFavoriteMirror: false
         )
     }
 }
@@ -190,7 +210,10 @@ struct DemoCatalogSource: CatalogSource {
         [Self.c104]
     }
 
-    func configuration(for event: CatalogEvent) async throws -> CatalogDataSourceConfiguration {
+    func configuration(
+        for event: CatalogEvent,
+        progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
+    ) async throws -> CatalogDataSourceConfiguration {
         guard event == Self.c104 else {
             throw CatalogLibraryError.demoEventUnavailable
         }
@@ -227,7 +250,7 @@ struct DemoCatalogSource: CatalogSource {
 
 #endif
 
-private enum CatalogResourceLocator {
+enum CatalogResourceLocator {
     static func url(
         named name: String,
         resourceDirectory: URL? = nil
@@ -259,6 +282,7 @@ final class CatalogLibrary {
         case idle
         case discovering
         case loading(CatalogEvent)
+        case downloading(CatalogEvent, Readiness.Progress)
         case ready
         case failed(String)
     }
@@ -281,9 +305,10 @@ final class CatalogLibrary {
         initialMode: CatalogDataMode? = nil
     ) {
         var sources: [CatalogDataMode: any CatalogSource] = [
-            .circlems: CirclemsCatalogSource(service: service),
+            .cominavi: CominaviCatalogSource(),
         ]
         #if DEBUG || COMINAVI_STAGING
+        sources[.circlems] = CirclemsCatalogSource(service: service)
         sources[.demo] = DemoCatalogSource()
         #endif
         self.sources = sources
@@ -311,7 +336,12 @@ final class CatalogLibrary {
     }
 
     var isSwitching: Bool {
-        if case .loading = phase { return dataSource?.readiness == .ready }
+        switch phase {
+        case .loading, .downloading:
+            return dataSource?.readiness == .ready
+        default:
+            break
+        }
         return false
     }
 
@@ -346,6 +376,9 @@ final class CatalogLibrary {
                 return
             } catch {
                 guard let self else { return }
+                if self.fallbackToCominaviCatalogIfNeeded(for: error) {
+                    return
+                }
                 self.phase = .failed(error.localizedDescription)
                 self.errorMessage = error.localizedDescription
             }
@@ -416,9 +449,17 @@ final class CatalogLibrary {
         operationTask = Task { [weak self, source] in
             var candidate: CirclemsDataSource?
             do {
-                let configuration = try await source.configuration(for: event)
+                let configuration = try await source.configuration(
+                    for: event,
+                    progress: { [weak self] progress in
+                        guard let self, self.phase != .ready else { return }
+                        self.phase = .downloading(event, progress)
+                    }
+                )
                 try Task.checkCancellation()
                 guard let self else { return }
+
+                self.phase = .loading(event)
 
                 let nextDataSource = CirclemsDataSource(configuration: configuration)
                 candidate = nextDataSource
@@ -457,6 +498,9 @@ final class CatalogLibrary {
                 if self.pendingDataSource === candidate {
                     self.pendingDataSource = nil
                 }
+                if self.fallbackToCominaviCatalogIfNeeded(for: error) {
+                    return
+                }
                 self.errorMessage = String(
                     localized: "Could not load \(event.shortName): \(error.localizedDescription)"
                 )
@@ -465,6 +509,28 @@ final class CatalogLibrary {
                     : .ready
             }
         }
+    }
+
+    @discardableResult
+    private func fallbackToCominaviCatalogIfNeeded(for error: Error) -> Bool {
+        guard mode == .circlems,
+              error as? CirclemsAPIAuthorizationError == .accessTokenRequired,
+              sources[.cominavi] != nil
+        else { return false }
+
+        pendingDataSource?.cancelPreparation()
+        pendingDataSource = nil
+        dataSource?.cancelPreparation()
+        dataSource = nil
+        events = []
+        selectedEvent = nil
+        phase = .idle
+        errorMessage = nil
+        mode = .cominavi
+        defaults.set(CatalogDataMode.cominavi.rawValue, forKey: modeDefaultsKey)
+        operationTask = nil
+        start()
+        return true
     }
 
     private var modeDefaultsKey: String {
@@ -484,9 +550,13 @@ final class CatalogLibrary {
             return explicit
         }
 
-        if ProcessInfo.processInfo.arguments.contains("-cominavi-circlems-data") {
+        #if DEBUG || COMINAVI_STAGING
+        if ProcessInfo.processInfo.arguments.contains("-cominavi-circlems-data"),
+           availableModes.contains(.circlems)
+        {
             return .circlems
         }
+        #endif
 
         #if DEBUG || COMINAVI_STAGING
         if ProcessInfo.processInfo.arguments.contains("-cominavi-demo-data"),
@@ -503,7 +573,7 @@ final class CatalogLibrary {
         {
             return persisted
         }
-        return .circlems
+        return availableModes.contains(.cominavi) ? .cominavi : .circlems
     }
 }
 

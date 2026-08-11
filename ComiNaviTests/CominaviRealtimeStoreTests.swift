@@ -48,6 +48,41 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
     }
 
+    func testSharedPlanExternalStatesRemainSourceAttributedAndSeparate() async throws {
+        let client = RealtimeFetchingStub(pages: [(
+            updates: [
+                try update(
+                    cursor: 1,
+                    stateKind: "inventory",
+                    stateValue: "sold_out",
+                    occurredAt: "2026-08-15T03:00:00Z"
+                ),
+                try update(
+                    cursor: 2,
+                    stateKind: "presence",
+                    stateValue: "temporarily_away",
+                    occurredAt: "2026-08-15T03:05:00Z"
+                ),
+            ],
+            nextCursor: 2,
+            hasMore: false
+        )])
+        let store = CominaviRealtimeStore(client: client)
+
+        let states = try await store.sharedPlanExternalStates(
+            eventNumber: 108,
+            publicCircleID: 23_000_001,
+            minimumRefreshInterval: 60
+        )
+
+        XCTAssertEqual(states.map(\.kind), ["presence", "inventory"])
+        XCTAssertEqual(states.map(\.value), ["temporarily_away", "sold_out"])
+        XCTAssertEqual(states.map(\.sourceHandle), ["circle", "circle"])
+        XCTAssertEqual(states.compactMap(\.sourceURL).count, 2)
+        let requestCount = await client.requestCount()
+        XCTAssertEqual(requestCount, 1)
+    }
+
     private func update(
         cursor: Int,
         stateKind: String,

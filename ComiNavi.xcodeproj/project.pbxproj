@@ -16,6 +16,9 @@
 		B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AECE2C9357DA00742CE8 /* SwifterSwift */; };
 		B5E9AEDF2C942CC900742CE8 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B5E9AEDE2C942CC900742CE8 /* GRDB */; };
 		C0D200000000000000000003 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = C0D200000000000000000002 /* MapLibre */; };
+		C0D400000000000000000003 /* Automerge in Frameworks */ = {isa = PBXBuildFile; productRef = C0D400000000000000000002 /* Automerge */; };
+		C0D500000000000000000003 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = C0D500000000000000000002 /* GoogleSignIn */; };
+		C0D600000000000000000003 /* CominaviAPIClient in Frameworks */ = {isa = PBXBuildFile; productRef = C0D600000000000000000002 /* CominaviAPIClient */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -106,6 +109,9 @@
 				B5E9AECF2C9357DA00742CE8 /* SwifterSwift in Frameworks */,
 				5625CF33AB7F4CF89953B2B5 /* Sentry in Frameworks */,
 				C0D200000000000000000003 /* MapLibre in Frameworks */,
+				C0D400000000000000000003 /* Automerge in Frameworks */,
+				C0D500000000000000000003 /* GoogleSignIn in Frameworks */,
+				C0D600000000000000000003 /* CominaviAPIClient in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -201,6 +207,8 @@
 				B59B24DD2CAD4D78009FDFAE /* PostHog */,
 				B5600A3C2CB775E200AD1074 /* DebugSwift */,
 				C0D200000000000000000002 /* MapLibre */,
+				C0D400000000000000000002 /* Automerge */,
+				C0D600000000000000000002 /* CominaviAPIClient */,
 			);
 			productName = ComiNavi;
 			productReference = B5E9AEB32C9333CD00742CE8 /* ComiNavi.app */;
@@ -272,6 +280,9 @@
 				B59B24DC2CAD4D78009FDFAE /* XCRemoteSwiftPackageReference "posthog-ios" */,
 				B5600A3B2CB775E200AD1074 /* XCRemoteSwiftPackageReference "DebugSwift" */,
 				C0D200000000000000000001 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */,
+				C0D400000000000000000001 /* XCRemoteSwiftPackageReference "automerge-swift" */,
+				C0D500000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				C0D600000000000000000001 /* XCLocalSwiftPackageReference "Packages/CominaviAPIClient" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B5E9AEB42C9333CD00742CE8 /* Products */;
@@ -542,7 +553,8 @@
 				COMINAVI_BUILD_ENVIRONMENT = debug;
 				COMINAVI_CIRCLEMS_CLIENT_ID = cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C;
 				COMINAVI_CIRCLEMS_ENVIRONMENT = testing;
-				COMINAVI_CIRCLEMS_TOKEN_REFRESH_URL = "https://cominavi.net/api/v1/oauth/circlems/refresh_token";
+				COMINAVI_GOOGLE_CALLBACK_SCHEME = "com.googleusercontent.apps.90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2";
+				COMINAVI_GOOGLE_CLIENT_ID = "90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2.apps.googleusercontent.com";
 				COMINAVI_OAUTH_CALLBACK_SCHEME = cominavi;
 				COMINAVI_OAUTH_REDIRECT_URL = "https://cominavi.net/oauth/circlems/landing";
 				CURRENT_PROJECT_VERSION = 1;
@@ -589,7 +601,8 @@
 				COMINAVI_BUILD_ENVIRONMENT = staging;
 				COMINAVI_CIRCLEMS_CLIENT_ID = cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C;
 				COMINAVI_CIRCLEMS_ENVIRONMENT = testing;
-				COMINAVI_CIRCLEMS_TOKEN_REFRESH_URL = "https://cominavi.net/api/v1/oauth/circlems/refresh_token";
+				COMINAVI_GOOGLE_CALLBACK_SCHEME = "com.googleusercontent.apps.90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2";
+				COMINAVI_GOOGLE_CLIENT_ID = "90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2.apps.googleusercontent.com";
 				COMINAVI_OAUTH_CALLBACK_SCHEME = cominavi;
 				COMINAVI_OAUTH_REDIRECT_URL = "https://cominavi.net/oauth/circlems/landing";
 				CURRENT_PROJECT_VERSION = 1;
@@ -739,7 +752,8 @@
 				COMINAVI_BUILD_ENVIRONMENT = testflight;
 				COMINAVI_CIRCLEMS_CLIENT_ID = cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C;
 				COMINAVI_CIRCLEMS_ENVIRONMENT = production;
-				COMINAVI_CIRCLEMS_TOKEN_REFRESH_URL = "https://cominavi.net/api/v1/oauth/circlems/refresh_token";
+				COMINAVI_GOOGLE_CALLBACK_SCHEME = "com.googleusercontent.apps.90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2";
+				COMINAVI_GOOGLE_CLIENT_ID = "90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2.apps.googleusercontent.com";
 				COMINAVI_OAUTH_CALLBACK_SCHEME = cominavi;
 				COMINAVI_OAUTH_REDIRECT_URL = "https://cominavi.net/oauth/circlems/landing";
 				CURRENT_PROJECT_VERSION = 2026080901;
@@ -864,6 +878,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		C0D600000000000000000001 /* XCLocalSwiftPackageReference "Packages/CominaviAPIClient" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CominaviAPIClient;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		A4022B3FC5F444AF831FA16C /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -937,6 +958,22 @@
 				minimumVersion = 6.26.0;
 			};
 		};
+		C0D400000000000000000001 /* XCRemoteSwiftPackageReference "automerge-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/automerge/automerge-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.7.2;
+			};
+		};
+		C0D500000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 9.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -979,6 +1016,20 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C0D200000000000000000001 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */;
 			productName = MapLibre;
+		};
+		C0D400000000000000000002 /* Automerge */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0D400000000000000000001 /* XCRemoteSwiftPackageReference "automerge-swift" */;
+			productName = Automerge;
+		};
+		C0D500000000000000000002 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0D500000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		C0D600000000000000000002 /* CominaviAPIClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CominaviAPIClient;
 		};
 		CC3C71F91CD14381A99FD361 /* Sentry */ = {
 			isa = XCSwiftPackageProductDependency;

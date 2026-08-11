@@ -1,5 +1,37 @@
 import Foundation
 
+struct CominaviFavorite: Codable, Equatable, Sendable {
+    let publicCircleID: Int
+    let color: BookmarkColor
+    let notificationsEnabled: Bool
+}
+
+struct PendingCanonicalFavoriteMutation: Codable, Equatable, Sendable {
+    let eventNumber: Int
+    let mutationID: UUID
+    let baseRevision: Int
+    let favorites: [CominaviFavorite]
+}
+
+/// An immutable canonical write the service definitively rejected. Keeping the
+/// exact request makes the failure inspectable/exportable without allowing it
+/// to remain at the head of the active outbox.
+struct QuarantinedCanonicalFavoriteMutation: Codable, Equatable, Identifiable, Sendable {
+    var id: UUID { mutation.mutationID }
+
+    let mutation: PendingCanonicalFavoriteMutation
+    let code: String
+    let message: String
+    let affectedPublicCircleIDs: [Int]
+    let rejectedAt: Date
+}
+
+struct CominaviFavoriteSnapshot: Equatable, Sendable {
+    let eventNumber: Int
+    let revision: Int
+    let favorites: [CominaviFavorite]
+}
+
 struct RemoteFavorite: Equatable, Sendable {
     let publicCircleID: Int
     let updateID: Int
@@ -64,8 +96,8 @@ actor BookmarkSyncCoordinator {
     private let eventNumber: Int
     private let catalog: any MapCatalog
     private let localStore: any UserPlanStoring
-    private let remoteStore: any FavoriteRemoteStoring
-    private let serviceFavoriteSync: (any CominaviFavoriteSyncing)?
+    private let serviceFavoriteSync: any CominaviFavoriteSyncing
+    private let circlemsMirror: (any FavoriteRemoteStoring)?
     private var requestedRevision: UInt64 = 0
     private var completedRevision: UInt64 = 0
     private var worker: Task<Void, Error>?
@@ -75,15 +107,15 @@ actor BookmarkSyncCoordinator {
         eventNumber: Int,
         catalog: any MapCatalog,
         localStore: any UserPlanStoring,
-        remoteStore: any FavoriteRemoteStoring = CirclemsFavoriteRemoteStore(),
-        serviceFavoriteSync: (any CominaviFavoriteSyncing)? = nil
+        serviceFavoriteSync: any CominaviFavoriteSyncing,
+        circlemsMirror: (any FavoriteRemoteStoring)? = nil
     ) {
         self.eventID = eventID
         self.eventNumber = eventNumber
         self.catalog = catalog
         self.localStore = localStore
-        self.remoteStore = remoteStore
         self.serviceFavoriteSync = serviceFavoriteSync
+        self.circlemsMirror = circlemsMirror
     }
 
     func sync() async throws {
@@ -118,24 +150,65 @@ actor BookmarkSyncCoordinator {
     }
 
     private func performSync() async throws {
-        let remoteFavorites = try await remoteStore.favorites(eventID: eventID)
-        let remoteIDs = Set(remoteFavorites.map(\.publicCircleID))
+        if let pending = try await localStore.pendingCanonicalFavoriteMutation(
+            eventNumber: eventNumber
+        ) {
+            do {
+                try await sendAndAcknowledge(pending)
+            } catch CominaviServiceError.revisionConflict {
+                // Idempotency replay is evaluated before revision CAS. A 409
+                // therefore proves this immutable request did not commit.
+                try await localStore.discardCanonicalFavoriteMutation(
+                    eventNumber: eventNumber,
+                    mutationID: pending.mutationID
+                )
+            } catch {
+                guard let rejection = terminalRejection(error) else { throw error }
+                try await quarantine(pending, rejection: rejection)
+            }
+        }
+
+        try await reconcileCanonicalFavorites(allowConflictRebase: true)
+
+        if let circlemsMirror {
+            do {
+                try await mirrorToCirclems(
+                    Array((try await localStore.allBookmarks(eventNumber: eventNumber))
+                        .filter { $0.syncState == .synced }),
+                    remoteStore: circlemsMirror
+                )
+            } catch {
+                // Circle.ms is optional compatibility. It cannot roll back or
+                // poison the canonical ComiNavi result.
+                NSLog("Circle.ms favorite mirror failed: \(error)")
+            }
+        }
+    }
+
+    private func reconcileCanonicalFavorites(allowConflictRebase: Bool) async throws {
+        let canonical = try await serviceFavoriteSync.favoriteSnapshot(eventNumber: eventNumber)
+        guard canonical.eventNumber == eventNumber else {
+            throw CominaviServiceError.invalidResponse
+        }
+        let remoteIDs = Set(canonical.favorites.map(\.publicCircleID))
         let existingLocal = try await localStore.allBookmarks(eventNumber: eventNumber)
         let pendingIDs = Set(existingLocal.filter { $0.syncState != .synced }.map(\.publicCircleID))
 
         let locations = try await catalog.bookmarkLocations(
-            updateIDs: remoteFavorites.map(\.updateID))
-        let locationByUpdateID = Dictionary(
-            uniqueKeysWithValues: locations.map { ($0.updateID, $0) })
+            publicCircleIDs: canonical.favorites.map(\.publicCircleID)
+        )
+        let locationByPublicID = Dictionary(
+            uniqueKeysWithValues: locations.map { ($0.publicCircleID, $0) }
+        )
+        let existingByPublicID = Dictionary(
+            uniqueKeysWithValues: existingLocal.map { ($0.publicCircleID, $0) }
+        )
 
-        for remoteFavorite in remoteFavorites {
+        for remoteFavorite in canonical.favorites {
             guard !pendingIDs.contains(remoteFavorite.publicCircleID),
-                let location = locationByUpdateID[remoteFavorite.updateID]
-            else {
-                continue
-            }
-
-            let bookmark = MapBookmark(
+                  let location = locationByPublicID[remoteFavorite.publicCircleID]
+            else { continue }
+            try await localStore.upsert(MapBookmark(
                 eventNumber: eventNumber,
                 publicCircleID: remoteFavorite.publicCircleID,
                 catalogCircleID: location.catalogCircleID,
@@ -145,47 +218,139 @@ actor BookmarkSyncCoordinator {
                 tableID: location.tableID,
                 subspace: location.subspace,
                 color: remoteFavorite.color,
-                memo: remoteFavorite.memo,
+                memo: existingByPublicID[remoteFavorite.publicCircleID]?.memo ?? "",
                 modifiedAt: Date(),
                 syncState: .synced
-            )
-            try await localStore.upsert(bookmark)
+            ))
         }
 
         for local in existingLocal
         where local.syncState == .synced && !remoteIDs.contains(local.publicCircleID) {
             try await localStore.remove(
-                eventNumber: eventNumber, publicCircleID: local.publicCircleID)
+                eventNumber: eventNumber,
+                publicCircleID: local.publicCircleID
+            )
         }
 
         let pendingChanges = try await localStore.pendingChanges(eventNumber: eventNumber)
-        for var bookmark in pendingChanges {
+        guard !pendingChanges.isEmpty else { return }
+        var desired = Dictionary(
+            uniqueKeysWithValues: canonical.favorites.map { ($0.publicCircleID, $0) }
+        )
+        for bookmark in pendingChanges {
             switch bookmark.syncState {
             case .pendingDelete:
-                try await remoteStore.delete(publicCircleID: bookmark.publicCircleID)
-                try await localStore.remove(
-                    eventNumber: eventNumber, publicCircleID: bookmark.publicCircleID)
+                desired[bookmark.publicCircleID] = nil
             case .pendingUpsert:
-                if remoteIDs.contains(bookmark.publicCircleID) {
-                    try await remoteStore.update(bookmark)
-                } else {
-                    try await remoteStore.add(bookmark)
-                }
-                bookmark.syncState = .synced
-                bookmark.modifiedAt = Date()
-                try await localStore.upsert(bookmark)
-            case .synced:
+                desired[bookmark.publicCircleID] = CominaviFavorite(
+                    publicCircleID: bookmark.publicCircleID,
+                    color: bookmark.color,
+                    notificationsEnabled: true
+                )
+            case .synced, .quarantined:
                 break
             }
         }
-
-        if let serviceFavoriteSync {
-            let synchronized = try await localStore.allBookmarks(eventNumber: eventNumber)
-            try await serviceFavoriteSync.synchronizeFavorites(
-                eventNumber: eventNumber,
-                bookmarks: synchronized
-            )
+        let mutation = PendingCanonicalFavoriteMutation(
+            eventNumber: eventNumber,
+            mutationID: UUID(),
+            baseRevision: canonical.revision,
+            favorites: desired.values.sorted { $0.publicCircleID < $1.publicCircleID }
+        )
+        // Persist the immutable ID/base/payload before its first network send.
+        try await localStore.savePendingCanonicalFavoriteMutation(mutation)
+        do {
+            try await sendAndAcknowledge(mutation)
+        } catch let error as CominaviServiceError {
+            switch error {
+            case .revisionConflict:
+                try await localStore.discardCanonicalFavoriteMutation(
+                    eventNumber: eventNumber,
+                    mutationID: mutation.mutationID
+                )
+                guard allowConflictRebase else { throw error }
+                try await reconcileCanonicalFavorites(allowConflictRebase: false)
+            default:
+                guard let rejection = terminalRejection(error) else { throw error }
+                try await quarantine(mutation, rejection: rejection)
+                // The rejected bookmark rows are no longer active pending
+                // changes. Reconcile again so unrelated local edits are not
+                // stranded behind this terminal request.
+                try await reconcileCanonicalFavorites(allowConflictRebase: allowConflictRebase)
+            }
         }
+    }
+
+    private struct TerminalRejection: Sendable {
+        let code: String
+        let message: String
+        let affectedPublicCircleIDs: [Int]
+    }
+
+    private func terminalRejection(_ error: Error) -> TerminalRejection? {
+        guard let error = error as? CominaviServiceError else { return nil }
+        switch error {
+        case .favoriteMutationRejected(let code, let message, let invalidPublicCircleIDs):
+            return TerminalRejection(
+                code: code,
+                message: message,
+                affectedPublicCircleIDs: invalidPublicCircleIDs
+            )
+        case .server(let code, let message, let status)
+        where status == 400 || status == 404 || status == 422:
+            return TerminalRejection(
+                code: code,
+                message: message,
+                affectedPublicCircleIDs: []
+            )
+        default:
+            return nil
+        }
+    }
+
+    private func quarantine(
+        _ mutation: PendingCanonicalFavoriteMutation,
+        rejection: TerminalRejection
+    ) async throws {
+        _ = try await localStore.quarantineCanonicalFavoriteMutation(
+            mutation,
+            code: rejection.code,
+            message: rejection.message,
+            affectedPublicCircleIDs: rejection.affectedPublicCircleIDs,
+            rejectedAt: Date()
+        )
+    }
+
+    private func sendAndAcknowledge(
+        _ mutation: PendingCanonicalFavoriteMutation
+    ) async throws {
+        let result = try await serviceFavoriteSync.replaceFavorites(
+            eventNumber: mutation.eventNumber,
+            baseRevision: mutation.baseRevision,
+            mutationID: mutation.mutationID,
+            favorites: mutation.favorites
+        )
+        guard result.eventNumber == mutation.eventNumber,
+              result.revision > mutation.baseRevision
+        else { throw CominaviServiceError.invalidResponse }
+        try await localStore.acknowledgeCanonicalFavoriteMutation(mutation)
+    }
+
+    private func mirrorToCirclems(
+        _ bookmarks: [MapBookmark],
+        remoteStore: any FavoriteRemoteStoring
+    ) async throws {
+        let remote = try await remoteStore.favorites(eventID: eventID)
+        let remoteIDs = Set(remote.map(\.publicCircleID))
+        for bookmark in bookmarks {
+            if remoteIDs.contains(bookmark.publicCircleID) {
+                try await remoteStore.update(bookmark)
+            } else {
+                try await remoteStore.add(bookmark)
+            }
+        }
+        // Never delete provider favorites without provider-origin ownership
+        // provenance. An unrelated Circle.ms row is not a mirror tombstone.
     }
 
     #if DEBUG
