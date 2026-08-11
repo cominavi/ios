@@ -197,7 +197,68 @@ final class LocalizationTests: XCTestCase {
         )
     }
 
-    func testEveryCatalogEntryHasReviewedJapaneseCopy() throws {
+    func testNewLocalizationsResolveRepresentativeInterfaceCopy() throws {
+        let expectations: [String: [String: String]] = [
+            "zh-Hans": [
+                "Map": "地图",
+                "Explore": "探索",
+                "Where Am I": "设置当前位置",
+                "Welcome to ComiNavi!": "欢迎来到 ComiNavi！",
+                "Find circles. Know where they are.": "找到社团，确认位置。",
+                "Login via circle.ms": "使用 Circle.ms 登录",
+                "East 1–3": "东1–3馆",
+                "Shinagaki": "商品一览",
+                "Members and invitations": "成员与邀请",
+                "Shared Plans": "共享计划",
+                "Circle": "社团",
+                "Catalog": "目录",
+                "No Shared Plans are available.": "目前没有可显示的共享计划。",
+            ],
+            "zh-Hant": [
+                "Map": "地圖",
+                "Explore": "探索",
+                "Where Am I": "設定目前位置",
+                "Welcome to ComiNavi!": "歡迎來到 ComiNavi！",
+                "Find circles. Know where they are.": "尋找社團，確認位置。",
+                "Login via circle.ms": "使用 Circle.ms 登入",
+                "East 1–3": "東1–3館",
+                "Shinagaki": "商品一覽",
+                "Members and invitations": "成員與邀請",
+                "Shared Plans": "共享計畫",
+                "Circle": "社團",
+                "Catalog": "目錄",
+                "No Shared Plans are available.": "目前沒有可顯示的共享計畫。",
+            ],
+            "ko": [
+                "Map": "지도",
+                "Explore": "탐색",
+                "Where Am I": "현재 위치 설정",
+                "Welcome to ComiNavi!": "ComiNavi에 오신 것을 환영합니다!",
+                "Find circles. Know where they are.": "서클을 찾고 위치를 확인하세요.",
+                "Login via circle.ms": "Circle.ms로 로그인",
+                "East 1–3": "동 1–3홀",
+                "Shinagaki": "판매 목록",
+                "Members and invitations": "멤버 및 초대",
+                "Shared Plans": "공유 플랜",
+                "Circle": "서클",
+                "Catalog": "카탈로그",
+                "No Shared Plans are available.": "현재 표시할 수 있는 공유 플랜이 없습니다.",
+            ],
+        ]
+
+        for (language, strings) in expectations {
+            let bundle = try localizedBundle(for: language)
+            for (key, expected) in strings {
+                XCTAssertEqual(
+                    bundle.localizedString(forKey: key, value: nil, table: nil),
+                    expected,
+                    "Unexpected \(language) translation for \(key)"
+                )
+            }
+        }
+    }
+
+    func testEveryCatalogEntryHasReviewedCopyInEverySupportedLanguage() throws {
         let data = try Data(contentsOf: sourceCatalogURL)
         let root = try XCTUnwrap(
             JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -206,22 +267,24 @@ final class LocalizationTests: XCTestCase {
         let strings = try XCTUnwrap(root["strings"] as? [String: Any])
         XCTAssertGreaterThan(strings.count, 250)
 
-        let missingJapanese = strings.compactMap { key, rawEntry -> String? in
-            guard let entry = rawEntry as? [String: Any] else { return key }
-            if entry["shouldTranslate"] as? Bool == false {
+        for language in supportedLanguages {
+            let missing = strings.compactMap { key, rawEntry -> String? in
+                guard let entry = rawEntry as? [String: Any] else { return key }
+                if entry["shouldTranslate"] as? Bool == false {
+                    return nil
+                }
+                guard let localizations = entry["localizations"] as? [String: Any],
+                      let localization = localizations[language] as? [String: Any],
+                      let unit = localization["stringUnit"] as? [String: Any],
+                      unit["state"] as? String == "translated",
+                      let value = unit["value"] as? String,
+                      !value.isEmpty
+                else { return key }
                 return nil
             }
-            guard let localizations = entry["localizations"] as? [String: Any],
-                  let japanese = localizations["ja"] as? [String: Any],
-                  let unit = japanese["stringUnit"] as? [String: Any],
-                  unit["state"] as? String == "translated",
-                  let value = unit["value"] as? String,
-                  !value.isEmpty
-            else { return key }
-            return nil
-        }
 
-        XCTAssertEqual(missingJapanese, [], "Missing Japanese translations: \(missingJapanese)")
+            XCTAssertEqual(missing, [], "Missing \(language) translations: \(missing)")
+        }
     }
 
     func testJapaneseIsTheProjectDevelopmentLanguage() throws {
@@ -233,39 +296,68 @@ final class LocalizationTests: XCTestCase {
 
         XCTAssertTrue(project.contains("developmentRegion = ja;"))
         XCTAssertFalse(project.contains("developmentRegion = en;"))
+        XCTAssertTrue(project.contains("\n\t\t\t\tko,"))
+        XCTAssertTrue(project.contains("\n\t\t\t\t\"zh-Hans\","))
+        XCTAssertTrue(project.contains("\n\t\t\t\t\"zh-Hant\","))
     }
 
-    func testJapaneseFormatPlaceholdersMatchSourceKeys() throws {
+    func testFormatPlaceholdersMatchSourceKeysInEverySupportedLanguage() throws {
         let data = try Data(contentsOf: sourceCatalogURL)
         let root = try XCTUnwrap(
             JSONSerialization.jsonObject(with: data) as? [String: Any]
         )
         let strings = try XCTUnwrap(root["strings"] as? [String: Any])
-        var mismatches: [String] = []
-
-        for (key, rawEntry) in strings {
-            guard let entry = rawEntry as? [String: Any],
-                  let localizations = entry["localizations"] as? [String: Any],
-                  let japanese = localizations["ja"] as? [String: Any],
-                  let unit = japanese["stringUnit"] as? [String: Any],
-                  let value = unit["value"] as? String
-            else { continue }
-            if placeholders(in: key) != placeholders(in: value) {
-                mismatches.append(key)
+        for language in supportedLanguages {
+            var mismatches: [String] = []
+            for (key, rawEntry) in strings {
+                guard let entry = rawEntry as? [String: Any],
+                      let localizations = entry["localizations"] as? [String: Any],
+                      let localization = localizations[language] as? [String: Any],
+                      let unit = localization["stringUnit"] as? [String: Any],
+                      let value = unit["value"] as? String
+                else { continue }
+                if placeholders(in: key) != placeholders(in: value) {
+                    mismatches.append(key)
+                }
             }
-        }
 
-        XCTAssertEqual(mismatches, [], "Format placeholders differ for: \(mismatches)")
+            XCTAssertEqual(
+                mismatches,
+                [],
+                "Format placeholders differ in \(language) for: \(mismatches)"
+            )
+        }
     }
 
-    func testJapaneseLocationPermissionCopyIsPresent() throws {
-        let url = sourceCatalogURL
-            .deletingLastPathComponent()
-            .appending(path: "ja.lproj/InfoPlist.strings")
-        let contents = try String(contentsOf: url, encoding: .utf8)
+    func testLocalizedLocationPermissionCopyIsPresent() throws {
+        let expectedCopy = [
+            "ja": "会場候補を表示するために位置情報を使用します",
+            "zh-Hans": "东京国际展览中心展馆",
+            "zh-Hant": "東京國際展示場展館",
+            "ko": "도쿄 빅사이트",
+        ]
 
-        XCTAssertTrue(contents.contains("NSLocationWhenInUseUsageDescription"))
-        XCTAssertTrue(contents.contains("会場候補を表示するために位置情報を使用します"))
+        for (language, expected) in expectedCopy {
+            let url = sourceCatalogURL
+                .deletingLastPathComponent()
+                .appending(path: "\(language).lproj/InfoPlist.strings")
+            let contents = try String(contentsOf: url, encoding: .utf8)
+            XCTAssertTrue(contents.contains("NSLocationWhenInUseUsageDescription"))
+            XCTAssertTrue(contents.contains(expected), "Missing \(language) permission copy")
+        }
+    }
+
+    private let supportedLanguages = ["ja", "zh-Hans", "zh-Hant", "ko"]
+
+    private func localizedBundle(for language: String) throws -> Bundle {
+        let bundles = [Bundle.main] + Bundle.allBundles
+        let appBundle = try XCTUnwrap(bundles.first { bundle in
+            bundle.bundleURL.pathExtension == "app"
+                && bundle.url(forResource: language, withExtension: "lproj") != nil
+        })
+        return try XCTUnwrap(
+            appBundle.url(forResource: language, withExtension: "lproj").flatMap(Bundle.init(url:))
+        )
     }
 
     private var sourceCatalogURL: URL {
