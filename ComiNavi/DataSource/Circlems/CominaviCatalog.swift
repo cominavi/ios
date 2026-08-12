@@ -631,18 +631,19 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         switch response.statusCode {
         case 200:
             try validateIdentityHeaders(response, catalog: catalog)
-            guard response.expectedContentLength == catalog.artifact.bytes else {
-                throw CominaviCatalogError.invalidResponse
-            }
+            try validateAdvertisedLength(response, expected: catalog.artifact.bytes)
             return .replace(etag: try etag(from: response, catalog: catalog))
         case 206:
             try validateIdentityHeaders(response, catalog: catalog)
             let range = try contentRange(from: response)
             guard range.start == requestedStart,
                   range.end <= requestedEnd,
-                  range.total == catalog.artifact.bytes,
-                  response.expectedContentLength == range.end - range.start + 1
+                  range.total == catalog.artifact.bytes
             else { throw CominaviCatalogError.invalidResponse }
+            try validateAdvertisedLength(
+                response,
+                expected: range.end - range.start + 1
+            )
             return .append(
                 etag: try etag(from: response, catalog: catalog),
                 start: range.start,
@@ -658,6 +659,16 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
             return .transient(status: response.statusCode)
         default:
             throw CominaviCatalogError.httpStatus(response.statusCode)
+        }
+    }
+
+    private func validateAdvertisedLength(
+        _ response: HTTPURLResponse,
+        expected: Int64
+    ) throws {
+        let advertised = response.expectedContentLength
+        guard advertised == NSURLSessionTransferSizeUnknown || advertised == expected else {
+            throw CominaviCatalogError.invalidResponse
         }
     }
 
@@ -688,9 +699,7 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
             throw CominaviCatalogError.httpStatus(response.statusCode)
         }
         try validateIdentityHeaders(response, catalog: catalog)
-        guard response.expectedContentLength == catalog.artifact.bytes else {
-            throw CominaviCatalogError.invalidResponse
-        }
+        try validateAdvertisedLength(response, expected: catalog.artifact.bytes)
         let length = try fileSizeIfPresent(at: partialURL)
         if length == catalog.artifact.bytes {
             checkpoint.currentLength = length
