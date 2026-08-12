@@ -180,6 +180,23 @@ struct SharedPlanEditorReadOnlyPresentation: Equatable, Sendable {
     }
 }
 
+struct SharedPlanEditorSyncFailurePresentation: Equatable, Sendable {
+    let detail: String
+
+    init?(status: SharedPlanSyncConnectionStatus) {
+        switch status {
+        case .reconnecting(let message):
+            detail = message
+        case .quarantined(let issue):
+            detail = SharedPlanEditorReadOnlyPresentation(
+                reason: .quarantine(issue)
+            ).detail
+        case .idle, .connecting, .connected, .synchronized:
+            return nil
+        }
+    }
+}
+
 struct SharedPlanConflictPresentation: Equatable, Sendable {
     let title: String
     let detail: String
@@ -474,10 +491,11 @@ struct SharedPlanEditorScreen: View {
             model.dismissIssue()
         }
         .onChange(of: model.syncStatus) { _, status in
-            guard case .reconnecting(let message) = status else { return }
+            guard let failure = SharedPlanEditorSyncFailurePresentation(status: status)
+            else { return }
             AppToast.showError(
                 String(localized: "Shared Plan could not be updated"),
-                subtitle: message
+                subtitle: failure.detail
             )
         }
     }

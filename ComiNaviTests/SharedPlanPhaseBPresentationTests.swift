@@ -616,6 +616,30 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(model.readOnlyReason, .waitingForWritableSync)
     }
 
+    func testOnlyFailedSyncStatesProduceToastCopy() {
+        let silentStates: [SharedPlanSyncConnectionStatus] = [
+            .idle,
+            .connecting,
+            .connected(mutationsEnabled: true, pendingOperationCount: 1),
+            .synchronized(mutationsEnabled: true, pendingOperationCount: 0),
+        ]
+
+        XCTAssertTrue(silentStates.allSatisfy {
+            SharedPlanEditorSyncFailurePresentation(status: $0) == nil
+        })
+        XCTAssertEqual(
+            SharedPlanEditorSyncFailurePresentation(
+                status: .reconnecting("offline")
+            )?.detail,
+            "offline"
+        )
+        XCTAssertNotNil(
+            SharedPlanEditorSyncFailurePresentation(
+                status: .quarantined(.membershipRevoked)
+            )
+        )
+    }
+
     func testEveryReadOnlyAuthorityHasDistinctActionablePresentation() {
         let reasons: [SharedPlanEditorReadOnlyReason] = [
             .featureDisabled,
