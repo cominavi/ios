@@ -13,7 +13,6 @@ struct CircleDetailView: View {
     @State private var isOpeningMap = false
     @State private var planModel: CircleUserPlanModel
     @State private var isShowingSharedPlanRequest = false
-    @State private var sharedPlanConfirmation: String?
 
     init(
         circle: CirclemsDataSchema.ComiketCircleWC,
@@ -198,20 +197,12 @@ struct CircleDetailView: View {
                     circleName: circle.circleName.nonBlank ?? String(localized: "Unnamed circle"),
                     penName: circle.penName.nonBlank
                 ) { planName in
-                    sharedPlanConfirmation = String(localized: "Added to \(planName)")
+                    AppToast.showSuccess(
+                        String(localized: "Purchase request added"),
+                        subtitle: String(localized: "Added to \(planName)")
+                    )
                 }
             }
-        }
-        .alert(
-            "Purchase request added",
-            isPresented: Binding(
-                get: { sharedPlanConfirmation != nil },
-                set: { if !$0 { sharedPlanConfirmation = nil } }
-            )
-        ) {
-            Button("OK") { sharedPlanConfirmation = nil }
-        } message: {
-            Text(sharedPlanConfirmation ?? "")
         }
         .task(id: circle.id) {
             circleAddress = nil

@@ -54,7 +54,14 @@ struct SharedPlanCircleQuickAddSheet: View {
         .task {
             await store.load()
             await store.refresh()
-            selectedPlanID = eligiblePlans.first?.id
+            let storedPrimaryPlanID = SharedPlanPrimaryPlanPreference().planID(
+                userID: currentUserID,
+                comiketNo: circle.comiketNo
+            )
+            selectedPlanID = SharedPlanPrimaryPlanPreference.validPlanID(
+                storedPrimaryPlanID,
+                among: eligiblePlans
+            ) ?? eligiblePlans.first?.id
             isLoadingPlans = false
             focusedField = .itemName
         }
