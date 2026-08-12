@@ -145,7 +145,7 @@ final class LocalizationTests: XCTestCase {
             "ja": "サークルと買い物を追加しました",
             "ko": "서클과 구매 항목을 추가했습니다",
             "zh-Hans": "已添加社团和购物项",
-            "zh-Hant": "已新增社團和購物項目",
+            "zh-Hant": "已新增社團和購買項目",
         ]
         let entry = try XCTUnwrap(strings["Circle and purchase added"] as? [String: Any])
         let localizations = try XCTUnwrap(entry["localizations"] as? [String: Any])
@@ -167,7 +167,7 @@ final class LocalizationTests: XCTestCase {
                 "Explore": "探索",
                 "Where Am I": "设置当前位置",
                 "Welcome to ComiNavi!": "欢迎来到 ComiNavi！",
-                "Find circles. Know where they are.": "找到社团，确认位置。",
+                "Find circles. Know where they are.": "找到社团，确认位置",
                 "Login via circle.ms": "使用 Circle.ms 登录",
                 "East 1–3": "东1–3馆",
                 "Shinagaki": "商品一览",
@@ -186,7 +186,7 @@ final class LocalizationTests: XCTestCase {
                 "Explore": "探索",
                 "Where Am I": "設定目前位置",
                 "Welcome to ComiNavi!": "歡迎來到 ComiNavi！",
-                "Find circles. Know where they are.": "尋找社團，確認位置。",
+                "Find circles. Know where they are.": "尋找社團，確認位置",
                 "Login via circle.ms": "使用 Circle.ms 登入",
                 "East 1–3": "東1–3館",
                 "Shinagaki": "商品一覽",
@@ -304,11 +304,93 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    func testChineseInterfaceStyleAndTerminologyRules() throws {
+        let data = try Data(contentsOf: sourceCatalogURL)
+        let root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let strings = try XCTUnwrap(root["strings"] as? [String: Any])
+        let protectedNames = [
+            "Tokyo Big Sight",
+            "Comic Market",
+            "Comiket",
+            "Comike Web Catalog",
+            "Cosplay",
+            "FamilyMart",
+            "Lawson",
+            "7-Eleven",
+            "Daily Yamazaki",
+            "Ministop",
+            "Seven Bank",
+            "Pixiv",
+            "Google",
+        ]
+        let expectedTerms = [
+            "AM Entry": ["zh-Hans": "上午入场", "zh-Hant": "上午入場"],
+            "PM Entry": ["zh-Hans": "下午入场", "zh-Hant": "下午入場"],
+            "Empty text": ["zh-Hans": "空文本", "zh-Hant": "空文本"],
+            "Galleria": ["zh-Hans": "连廊", "zh-Hant": "連廊"],
+            "Owner": ["zh-Hans": "所有者", "zh-Hant": "所有者"],
+            "Match all": ["zh-Hans": "匹配全部", "zh-Hant": "匹配全部"],
+            "Match any": ["zh-Hans": "匹配任一项", "zh-Hant": "匹配任一項"],
+            "Match tags": ["zh-Hans": "匹配标签", "zh-Hant": "匹配標籤"],
+            "Possible match": ["zh-Hans": "可能匹配", "zh-Hant": "可能匹配"],
+            "Tag matching": ["zh-Hans": "标签匹配", "zh-Hant": "標籤匹配"],
+            "Unmatched": ["zh-Hans": "未匹配", "zh-Hant": "未匹配"],
+        ]
+
+        for language in ["zh-Hans", "zh-Hant"] {
+            var trailingFullStops: [String] = []
+            var alteredNames: [String] = []
+            var bannedTerms: [String] = []
+
+            for (key, rawEntry) in strings {
+                guard let entry = rawEntry as? [String: Any],
+                      let localizations = entry["localizations"] as? [String: Any],
+                      let localization = localizations[language] as? [String: Any],
+                      let unit = localization["stringUnit"] as? [String: Any],
+                      let value = unit["value"] as? String
+                else { continue }
+
+                if value.hasSuffix("。") { trailingFullStops.append(key) }
+                if value.contains("先生")
+                    || value.contains("老板")
+                    || value.contains("老闆")
+                    || value.contains("业主")
+                    || value.contains("業主")
+                    || value.contains("擁有者")
+                    || value.contains("课文")
+                    || value.contains("課文")
+                {
+                    bannedTerms.append(key)
+                }
+                for name in protectedNames
+                where key.localizedCaseInsensitiveContains(name)
+                    && !value.contains(name)
+                {
+                    alteredNames.append(key)
+                }
+            }
+
+            XCTAssertEqual(trailingFullStops, [], "Trailing Chinese full stops in \(language)")
+            XCTAssertEqual(alteredNames, [], "Altered protected names in \(language)")
+            XCTAssertEqual(bannedTerms, [], "Disallowed Chinese terminology in \(language)")
+
+            for (key, localizedValues) in expectedTerms {
+                let entry = try XCTUnwrap(strings[key] as? [String: Any])
+                let localizations = try XCTUnwrap(entry["localizations"] as? [String: Any])
+                let localization = try XCTUnwrap(localizations[language] as? [String: Any])
+                let unit = try XCTUnwrap(localization["stringUnit"] as? [String: Any])
+                XCTAssertEqual(unit["value"] as? String, localizedValues[language])
+            }
+        }
+    }
+
     func testLocalizedLocationPermissionCopyIsPresent() throws {
         let expectedCopy = [
             "ja": "会場候補を表示するために位置情報を使用します",
-            "zh-Hans": "东京国际展览中心展馆",
-            "zh-Hant": "東京國際展示場展館",
+            "zh-Hans": "Tokyo Big Sight 展馆",
+            "zh-Hant": "Tokyo Big Sight 展館",
             "ko": "도쿄 빅사이트",
         ]
 
