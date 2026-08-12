@@ -103,16 +103,8 @@ protocol CominaviCatalogDownloadTransporting: Sendable {
 struct URLSessionCominaviCatalogDownloadTransport: CominaviCatalogDownloadTransporting {
     private let session: URLSession
 
-    init(session: URLSession? = nil) {
-        if let session {
-            self.session = session
-        } else {
-            self.session = URLSession(
-                configuration: .ephemeral,
-                delegate: CatalogDownloadRedirectDelegate(),
-                delegateQueue: nil
-            )
-        }
+    init(session: URLSession = .shared) {
+        self.session = session
     }
 
     func download(for request: URLRequest) async throws -> (URL, HTTPURLResponse) {
@@ -129,101 +121,6 @@ struct URLSessionCominaviCatalogDownloadTransport: CominaviCatalogDownloadTransp
             throw CominaviCatalogError.invalidResponse
         }
         return response
-    }
-}
-
-private final class CatalogDownloadRedirectDelegate: NSObject, URLSessionTaskDelegate,
-    @unchecked Sendable
-{
-    func urlSession(
-        _ session: URLSession,
-        task: URLSessionTask,
-        willPerformHTTPRedirection response: HTTPURLResponse,
-        newRequest request: URLRequest,
-        completionHandler: @escaping (URLRequest?) -> Void
-    ) {
-        completionHandler(CatalogDownloadRedirectPolicy.redirectedRequest(
-            original: task.originalRequest,
-            response: response,
-            proposed: request
-        ))
-    }
-}
-
-enum CatalogDownloadRedirectPolicy {
-    private static let r2Host =
-        "bee683f3b5473a422feaa41e040ac176.r2.cloudflarestorage.com"
-
-    static func redirectedRequest(
-        original: URLRequest?,
-        response: HTTPURLResponse,
-        proposed: URLRequest
-    ) -> URLRequest? {
-        guard response.statusCode == 307,
-              original?.url?.scheme == "https",
-              original?.url?.host == "cominavi.net",
-              let url = proposed.url,
-              isAllowedCapabilityURL(url)
-        else { return nil }
-        var redirected = proposed
-        redirected.setValue(nil, forHTTPHeaderField: "Authorization")
-        return redirected
-    }
-
-    static func isAllowedCapabilityURL(_ url: URL) -> Bool {
-        guard url.scheme == "https",
-              url.port == nil,
-              url.user == nil,
-              url.password == nil
-        else { return false }
-        if url.host == "catalogs.cominavi.net" {
-            return isAllowedCustomDomainCapability(url)
-        }
-        if url.host == r2Host {
-            return isAllowedR2PresignedCapability(url)
-        }
-        return false
-    }
-
-    private static func isAllowedCustomDomainCapability(_ url: URL) -> Bool {
-        guard url.path.hasPrefix("/derived/catalogs/"),
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.queryItems?.count == 1,
-              components.queryItems?.first?.name == "verify",
-              let token = components.queryItems?.first?.value,
-              token.range(
-                of: "^[0-9]{10}-[A-Za-z0-9+/]{43}=$",
-                options: .regularExpression
-              ) != nil
-        else { return false }
-        return true
-    }
-
-    private static func isAllowedR2PresignedCapability(_ url: URL) -> Bool {
-        guard url.path.hasPrefix("/cominavi-catalog-downloads/derived/catalogs/"),
-              let items = URLComponents(
-                url: url,
-                resolvingAgainstBaseURL: false
-              )?.queryItems,
-              !items.isEmpty,
-              Set(items.map(\.name)).count == items.count,
-              Set(items.map(\.name)).isSubset(of: [
-                "X-Amz-Algorithm", "X-Amz-Content-Sha256", "X-Amz-Credential",
-                "X-Amz-Date", "X-Amz-Expires", "X-Amz-SignedHeaders", "X-Amz-Signature",
-                "X-Amz-Security-Token",
-              ]),
-              items.first(where: { $0.name == "X-Amz-Algorithm" })?.value
-                == "AWS4-HMAC-SHA256",
-              items.first(where: { $0.name == "X-Amz-Credential" })?.value?
-                .hasSuffix("/auto/s3/aws4_request") == true,
-              items.first(where: { $0.name == "X-Amz-Date" })?.value?
-                .range(of: "^[0-9]{8}T[0-9]{6}Z$", options: .regularExpression) != nil,
-              items.first(where: { $0.name == "X-Amz-Expires" })?.value == "300",
-              items.first(where: { $0.name == "X-Amz-SignedHeaders" })?.value == "host",
-              items.first(where: { $0.name == "X-Amz-Signature" })?.value?
-                .range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil
-        else { return false }
-        return true
     }
 }
 
@@ -828,21 +725,12 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         catalog: CominaviCatalog
     ) throws {
         guard response.value(forHTTPHeaderField: "Content-Type") == catalog.artifact.contentType,
-              response.url?.scheme == "https",
-              [
-                "cominavi.net",
-                "catalogs.cominavi.net",
-                "bee683f3b5473a422feaa41e040ac176.r2.cloudflarestorage.com",
-              ].contains(response.url?.host)
+              response.value(forHTTPHeaderField: "X-Content-Type-Options")?.lowercased()
+                == "nosniff",
+              response.value(forHTTPHeaderField: "Digest") == Self.digestHeader(
+                forHexSHA256: catalog.artifact.sha256
+              )
         else { throw CominaviCatalogError.invalidResponse }
-        if response.url?.host == "cominavi.net" {
-            guard response.value(forHTTPHeaderField: "X-Content-Type-Options")?.lowercased()
-                    == "nosniff",
-                  response.value(forHTTPHeaderField: "Digest") == Self.digestHeader(
-                    forHexSHA256: catalog.artifact.sha256
-                  )
-            else { throw CominaviCatalogError.invalidResponse }
-        }
     }
 
     private func etag(
@@ -850,13 +738,8 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         catalog: CominaviCatalog
     ) throws -> String {
         guard let value = response.value(forHTTPHeaderField: "ETag"),
-              !value.isEmpty,
-              value.utf8.count <= 256,
-              value.range(of: "^[!-~]+$", options: .regularExpression) != nil
+              value == catalog.expectedETag
         else { throw CominaviCatalogError.invalidResponse }
-        if response.url?.host == "cominavi.net", value != catalog.expectedETag {
-            throw CominaviCatalogError.invalidResponse
-        }
         return value
     }
 
