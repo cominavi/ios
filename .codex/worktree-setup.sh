@@ -24,6 +24,7 @@ xcrun --sdk iphonesimulator --show-sdk-path >/dev/null 2>&1 || fail 'the iOS Sim
 
 [[ -f "$worktree/ComiNavi.xcodeproj/project.pbxproj" ]] || fail 'ComiNavi.xcodeproj is missing from the worktree.'
 [[ -f "$worktree/ComiNavi.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" ]] || fail 'the committed Package.resolved file is missing.'
+[ -e "$worktree/.codegraph/codegraph.db" ] || codegraph init "$worktree"
 
 printf 'ComiNavi worktree setup: Xcode %s; resolving locked Swift packages...\n' "$xcode_version"
 (
