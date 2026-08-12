@@ -152,5 +152,18 @@ into the App Store upload. Xcode 26.6 can otherwise fail its packaging step with
 `rsync` from its ephemeral worker before the archive starts. Keep the archive so
 the matching dSYM remains available for crash symbolication.
 
+The TestFlight archive uploads its dSYM and source context to Sentry before the
+archive is accepted. Install and authenticate the current CLI locally:
+
+```sh
+brew install getsentry/tools/sentry
+sentry auth login
+```
+
+Xcode Cloud installs the pinned CLI version automatically. Configure
+`SENTRY_AUTH_TOKEN` as a secret Xcode Cloud environment variable; a TestFlight
+archive fails with an actionable build error if the CLI is missing,
+unauthenticated, or cannot finish processing the debug symbols.
+
 Build `1.0 (2026081301)` is the current prepared TestFlight build. Increase
 `CURRENT_PROJECT_VERSION` for every subsequent upload.

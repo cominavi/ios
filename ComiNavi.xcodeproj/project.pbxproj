@@ -338,7 +338,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Upload distribution debug symbols and source context to Sentry.\ncase \"$CONFIGURATION\" in\n    Staging|TestFlight) ;;\n    *) exit 0 ;;\nesac\n\nif [ \"$PLATFORM_NAME\" != \"iphoneos\" ]; then\n    exit 0\nfi\n\nif [ \"$(uname -m)\" = \"arm64\" ]; then\n    export PATH=\"/opt/homebrew/bin:$PATH\"\nfi\n\nif which sentry-cli >/dev/null; then\n    export SENTRY_ORG=cominavi\n    export SENTRY_PROJECT=cominavi\n    ERROR=$(sentry-cli debug-files upload --include-sources \"$DWARF_DSYM_FOLDER_PATH\" 2>&1 >/dev/null)\n    if [ ! $? -eq 0 ]; then\n        echo \"warning: sentry-cli - $ERROR\"\n    fi\nelse\n    echo \"warning: sentry-cli not installed, download from https://github.com/getsentry/sentry-cli/releases\"\nfi\n";
+			shellScript = "\"$SRCROOT/Scripts/upload-sentry-debug-symbols.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

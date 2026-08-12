@@ -150,10 +150,17 @@ xcodebuild \
 
 - The app and UI-test targets use automatic signing.
 - Debug builds disable Sentry and PostHog event delivery.
-- `.sentryclirc` is local-only and must not be committed.
+- Install the current Sentry CLI with `brew install getsentry/tools/sentry`,
+  then authenticate once with `sentry auth login`. The CLI stores its local
+  authentication outside the repository; never commit Sentry credentials.
 - The Staging and TestFlight Sentry symbol-upload phase intentionally disables Xcode user-script sandboxing.
-  `sentry-cli --include-sources` reads the generated dSYM directory and source context,
+  `sentry debug-files upload --include-sources` reads the generated dSYM directory and source context,
   which are not completely modeled as build-phase inputs.
+- TestFlight archives fail if symbol upload fails instead of silently shipping
+  unsymbolicated builds. Xcode Cloud installs the pinned CLI version from
+  `ci_scripts/install_sentry_cli.sh` and requires `SENTRY_AUTH_TOKEN` to be set
+  as a secret environment variable. Staging builds report upload failures as
+  warnings so local development is not blocked.
 - Use the shared `ComiNavi-TestFlight` scheme for App Store Connect archives.
   It is release-optimized, uses the production bundle identifier and Circle.ms
   production service, and excludes non-production SQLite fixtures. The OAuth

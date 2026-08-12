@@ -29,3 +29,7 @@ if [ "$resolved_rsync" != "/usr/bin/rsync" ] || \
 fi
 
 echo "Using Apple-compatible rsync at $resolved_rsync"
+
+# Xcode Cloud workers are ephemeral. Install the exact CLI version used by the
+# symbol-upload build phase instead of relying on a preinstalled tool.
+"$CI_PRIMARY_REPOSITORY_PATH/ci_scripts/install_sentry_cli.sh"
