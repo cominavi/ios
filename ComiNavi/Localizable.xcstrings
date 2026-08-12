@@ -3248,13 +3248,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "有ATM机"
+            "value" : "有ATM"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "有ATM機"
+            "value" : "有ATM"
           }
         }
       }

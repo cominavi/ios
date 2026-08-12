@@ -326,6 +326,7 @@ final class LocalizationTests: XCTestCase {
             "Google",
         ]
         let expectedTerms = [
+            "ATM available": ["zh-Hans": "有ATM", "zh-Hant": "有ATM"],
             "AM Entry": ["zh-Hans": "上午入场", "zh-Hant": "上午入場"],
             "PM Entry": ["zh-Hans": "下午入场", "zh-Hant": "下午入場"],
             "Empty text": ["zh-Hans": "空文本", "zh-Hant": "空文本"],
