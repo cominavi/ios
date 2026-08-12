@@ -8583,7 +8583,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "第 %lld 天"
+            "value" : "第%lld天"
           }
         }
       }

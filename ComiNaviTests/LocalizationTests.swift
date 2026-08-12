@@ -262,6 +262,27 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    func testLocalizedDayLabelDoesNotDuplicateDayNumber() throws {
+        let day = 1
+        let expectations = [
+            "ja": "1日目",
+            "ko": "1일차",
+            "zh-Hans": "第1天",
+            "zh-Hant": "第1天",
+        ]
+
+        for (language, expected) in expectations {
+            let bundle = try localizedBundle(for: language)
+            let localized = String(
+                localized: "Day \(day)",
+                bundle: bundle,
+                locale: Locale(identifier: language)
+            )
+
+            XCTAssertEqual(localized, expected, "Unexpected day label in \(language)")
+        }
+    }
+
     func testJapaneseIsTheProjectDevelopmentLanguage() throws {
         let projectURL = sourceCatalogURL
             .deletingLastPathComponent()
