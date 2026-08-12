@@ -1286,18 +1286,6 @@ private enum SharedPlanCircleEditorSheet: Identifiable {
     }
 }
 
-private enum SharedPlanCircleEditorConfirmation: Identifiable {
-    case removeCircle
-    case deleteNeed(UUID)
-
-    var id: String {
-        switch self {
-        case .removeCircle: "remove-circle"
-        case .deleteNeed(let id): "delete-need:\(id.uuidString.lowercased())"
-        }
-    }
-}
-
 private struct SharedPlanCircleEditorScreen: View {
     @Bindable var model: SharedPlanEditorModel
     let store: SharedPlanStore
@@ -1305,7 +1293,8 @@ private struct SharedPlanCircleEditorScreen: View {
     let currentUserID: String?
     let identity: SharedPlanCircleIdentityPresentation
     @State private var presentedSheet: SharedPlanCircleEditorSheet?
-    @State private var confirmation: SharedPlanCircleEditorConfirmation?
+    @State private var confirmsCircleRemoval = false
+    @State private var purchaseNeedPendingRemoval: UUID?
 
     var body: some View {
         ScrollView {
@@ -1362,36 +1351,21 @@ private struct SharedPlanCircleEditorScreen: View {
             }
         }
         .confirmationDialog(
-            confirmationTitle,
+            "Remove this purchase need?",
             isPresented: Binding(
-                get: { confirmation != nil },
-                set: { if !$0 { confirmation = nil } }
+                get: { purchaseNeedPendingRemoval != nil },
+                set: { if !$0 { purchaseNeedPendingRemoval = nil } }
             ),
             titleVisibility: .visible,
-            presenting: confirmation
-        ) { item in
-            switch item {
-            case .removeCircle:
-                Button("Remove circle", role: .destructive) {
-                    confirmation = nil
-                    Task {
-                        await model.setCirclePresence(.removed, circle: circle, using: store)
-                    }
-                }
-            case .deleteNeed(let needID):
-                Button("Remove purchase need", role: .destructive) {
-                    confirmation = nil
-                    Task { await model.deleteNeed(needID, circle: circle, using: store) }
-                }
+            presenting: purchaseNeedPendingRemoval
+        ) { needID in
+            Button("Remove purchase need", role: .destructive) {
+                purchaseNeedPendingRemoval = nil
+                Task { await model.deleteNeed(needID, circle: circle, using: store) }
             }
-            Button("Cancel", role: .cancel) { confirmation = nil }
-        } message: { item in
-            switch item {
-            case .removeCircle:
-                Text("This circle will be removed from the plan. Its notes and purchases remain available if another recent change restores it.")
-            case .deleteNeed:
-                Text("This purchase request will be removed. If someone changed it at the same time, you can choose which version to keep.")
-            }
+            Button("Cancel", role: .cancel) { purchaseNeedPendingRemoval = nil }
+        } message: { _ in
+            Text("This purchase request will be removed. If someone changed it at the same time, you can choose which version to keep.")
         }
         .task(id: circle.id) {
             do {
@@ -1414,10 +1388,35 @@ private struct SharedPlanCircleEditorScreen: View {
                 switch content.presence {
                 case .present:
                     if model.canEdit {
-                        Button("Remove circle from plan", role: .destructive) {
-                            confirmation = .removeCircle
+                        Button(role: .destructive) {
+                            confirmsCircleRemoval = true
+                        } label: {
+                            Text("Remove circle from plan")
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
                         }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.roundedRectangle(radius: 14))
                         .disabled(model.isPerformingMutation)
+                        .confirmationDialog(
+                            "Remove this circle from the plan?",
+                            isPresented: $confirmsCircleRemoval,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Remove circle", role: .destructive) {
+                                confirmsCircleRemoval = false
+                                Task {
+                                    await model.setCirclePresence(
+                                        .removed,
+                                        circle: circle,
+                                        using: store
+                                    )
+                                }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("This circle will be removed from the plan. Its notes and purchases remain available if another recent change restores it.")
+                        }
                     }
                 case .removed:
                     LucideLabel("Removed", icon: "minus")
@@ -1448,7 +1447,6 @@ private struct SharedPlanCircleEditorScreen: View {
             TextEditor(text: memoBinding)
                 .frame(minHeight: 96)
                 .scrollContentBackground(.hidden)
-                .padding(8)
                 .background(.background, in: .rect(cornerRadius: 12))
                 .disabled(!model.canEdit)
                 .accessibilityLabel("Memo")
@@ -1519,7 +1517,7 @@ private struct SharedPlanCircleEditorScreen: View {
                                 buyerUserID: buyer.userID
                             ))
                         },
-                        onDelete: { confirmation = .deleteNeed(need.id) }
+                        onDelete: { purchaseNeedPendingRemoval = need.id }
                     )
                 }
             }
@@ -1534,7 +1532,6 @@ private struct SharedPlanCircleEditorScreen: View {
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
                 }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.roundedRectangle(radius: 14))
@@ -1557,13 +1554,6 @@ private struct SharedPlanCircleEditorScreen: View {
         )
     }
 
-    private var confirmationTitle: String {
-        switch confirmation {
-        case .removeCircle: String(localized: "Remove this circle from the plan?")
-        case .deleteNeed: String(localized: "Remove this purchase need?")
-        case nil: String(localized: "Confirm change")
-        }
-    }
 }
 
 private struct SharedPlanCircleIdentityText: View {
