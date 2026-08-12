@@ -136,13 +136,14 @@ struct CircleDetailView: View {
                     planModel.toggleFavorite()
                 } label: {
                     LucideIcon(planModel.isFavorite ? "star.fill" : "star", size: 21)
-                        .foregroundStyle(
-                            planModel.selectedColor?.swiftUIColor ?? Color.accentColor
-                        )
+                        .foregroundStyle(planModel.isFavorite ? Color.accentColor : .secondary)
                 }
-                .accessibilityLabel(planModel.isFavorite ? "Saved circle" : "Save circle")
-                .accessibilityValue(planModel.isFavorite ? "Saved" : "Not saved")
-                .accessibilityHint("Adds or removes this circle from your saved circles")
+                .accessibilityLabel(
+                    planModel.isFavorite ? "Remove from favorites" : "Add to favorites"
+                )
+                .accessibilityValue(planModel.isFavorite ? "In favorites" : "Not in favorites")
+                .accessibilityHint("Adds or removes this circle from your favorites")
+                .accessibilityAddTraits(planModel.isFavorite ? .isSelected : [])
                 .accessibilityIdentifier("circle-favorite-button")
             }
         }
@@ -626,8 +627,38 @@ private struct CircleUserPlanSection: View {
     var body: some View {
         @Bindable var model = model
 
-        CircleDetailSection("Your plan") {
+        CircleDetailSection("Favorite settings") {
             VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    LucideIcon("star.fill", size: 20)
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 42, height: 42)
+                        .background(Color.accentColor.opacity(0.12), in: .circle)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Saved to favorites")
+                            .font(.body.weight(.semibold))
+                        Text("Choose a label color for this favorite.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    if let selectedColor = model.selectedColor {
+                        Circle()
+                            .fill(selectedColor.swiftUIColor)
+                            .frame(width: 18, height: 18)
+                            .overlay {
+                                Circle()
+                                    .stroke(Color(uiColor: .separator), lineWidth: 0.5)
+                            }
+                            .accessibilityLabel(Text(selectedColor.displayName))
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("circle-favorite-status")
+
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Label color")
                         .font(.subheadline.weight(.semibold))

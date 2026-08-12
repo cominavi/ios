@@ -194,6 +194,11 @@ struct FollowingImportView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel(color.displayName)
+                                .accessibilityValue(
+                                    model.selectedColor == color
+                                        ? "Selected"
+                                        : "Not selected"
+                                )
                                 .accessibilityAddTraits(
                                     model.selectedColor == color ? .isSelected : []
                                 )
@@ -204,17 +209,48 @@ struct FollowingImportView: View {
                     .scrollIndicators(.hidden)
 
                     Button(action: model.favoriteAll) {
-                        Label("Favorite all imported circles", systemImage: "star.fill")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .foregroundStyle(model.selectedColor.swiftUIColor)
+                        HStack(spacing: 12) {
+                            Image(systemName: "star.fill")
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 30, height: 30)
+                                .background(Color.accentColor.opacity(0.12), in: .circle)
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Favorite all imported circles")
+                                    .font(.body.weight(.semibold))
+                                Text("Use the selected label color for each circle.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Circle()
+                                .fill(model.selectedColor.swiftUIColor)
+                                .frame(width: 18, height: 18)
+                                .overlay {
+                                    Circle()
+                                        .stroke(Color(uiColor: .separator), lineWidth: 0.5)
+                                }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 4)
                     }
                     .disabled(model.activity != .idle)
+                    .accessibilityLabel("Favorite all imported circles")
+                    .accessibilityValue(
+                        Text(
+                            "Label color \(String(localized: model.selectedColor.displayName))"
+                        )
+                    )
                     .accessibilityIdentifier("following-import-favorite-all")
                 }
             }
 
             Section("Imported circles (\(model.importedPublicCircleCount))") {
                 ForEach(model.importedCircles) { importedCircle in
+                    let favoriteColor = model.favoriteColor(for: importedCircle)
+
                     HStack(alignment: .top, spacing: 10) {
                         NavigationLink {
                             CircleDetailView(
@@ -233,24 +269,46 @@ struct FollowingImportView: View {
                         Button {
                             model.favorite(importedCircle)
                         } label: {
-                            Image(systemName: model.favoriteColor(for: importedCircle) == nil
-                                ? "star"
-                                : "star.fill")
+                            Image(systemName: favoriteColor == nil ? "star" : "star.fill")
                                 .font(.title3)
-                                .foregroundStyle(
-                                    model.favoriteColor(for: importedCircle)?.swiftUIColor
-                                        ?? model.selectedColor.swiftUIColor
-                                )
+                                .foregroundStyle(Color.accentColor)
                                 .frame(width: 36, height: 44)
+                                .overlay(alignment: .bottomTrailing) {
+                                    if let favoriteColor {
+                                        Circle()
+                                            .fill(favoriteColor.swiftUIColor)
+                                            .frame(width: 9, height: 9)
+                                            .overlay {
+                                                Circle()
+                                                    .stroke(Color(uiColor: .systemBackground), lineWidth: 1)
+                                            }
+                                    }
+                                }
                                 .contentShape(.rect)
                         }
                         .buttonStyle(.plain)
                         .disabled(model.activity != .idle)
-                        .accessibilityLabel("Favorite this circle")
+                        .accessibilityLabel(
+                            favoriteColor == nil
+                                ? "Add to favorites"
+                                : "Remove from favorites"
+                        )
+                        .accessibilityValue(
+                            favoriteAccessibilityValue(for: favoriteColor)
+                        )
+                        .accessibilityHint("Adds or removes this circle from your favorites")
+                        .accessibilityAddTraits(favoriteColor == nil ? [] : .isSelected)
                     }
                 }
             }
         }
+    }
+
+    private func favoriteAccessibilityValue(for color: BookmarkColor?) -> String {
+        guard let color else { return String(localized: "Not in favorites") }
+        return String(
+            localized: "In favorites, label color \(String(localized: color.displayName))"
+        )
     }
 
     @ToolbarContentBuilder
