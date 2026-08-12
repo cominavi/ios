@@ -1442,12 +1442,12 @@ private struct SharedPlanCircleEditorScreen: View {
                         Button(role: .destructive) {
                             confirmsCircleRemoval = true
                         } label: {
-                            Text("Remove circle from plan")
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
+                            SharedPlanActionRowLabel(
+                                title: "Remove circle from plan",
+                                tint: .red
+                            )
                         }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.roundedRectangle(radius: 14))
+                        .buttonStyle(.plain)
                         .disabled(model.isPerformingMutation)
                         .confirmationDialog(
                             "Remove this circle from the plan?",
@@ -1577,15 +1577,14 @@ private struct SharedPlanCircleEditorScreen: View {
                 Button {
                     presentedSheet = .createNeed
                 } label: {
-                    HStack(spacing: 8) {
-                        LucideIcon("plus")
-                        Text("Add purchase request")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: .infinity)
+            SharedPlanActionRowLabel(
+                title: "Add purchase request",
+                icon: "plus",
+                tint: .accentColor,
+                titleColor: .primary
+            )
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 14))
+                .buttonStyle(.plain)
                 .disabled(currentUserID == nil || model.isPerformingMutation)
                 .accessibilityIdentifier(SharedPlanEditorAccessibilityID.addNeed(circle))
             }
@@ -1677,6 +1676,57 @@ private struct SharedPlanCirclePanel<Content: View>: View {
             RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
         }
+    }
+}
+
+private struct SharedPlanActionRowLabel: View {
+    let title: LocalizedStringKey
+    let icon: String?
+    let tint: Color
+    let titleColor: Color
+
+    @ScaledMetric(relativeTo: .body) private var iconContainerSize = 42.0
+    @ScaledMetric(relativeTo: .body) private var iconSize = 22.0
+    @ScaledMetric(relativeTo: .body) private var rowHeight = 60.0
+
+    init(
+        title: LocalizedStringKey,
+        icon: String? = nil,
+        tint: Color,
+        titleColor: Color? = nil
+    ) {
+        self.title = title
+        self.icon = icon
+        self.tint = tint
+        self.titleColor = titleColor ?? (icon == nil ? tint : .primary)
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            if let icon {
+                Circle()
+                    .fill(tint)
+                    .frame(width: iconContainerSize, height: iconContainerSize)
+                    .overlay {
+                        LucideIcon(icon, size: iconSize)
+                            .foregroundStyle(.white)
+                    }
+                    .accessibilityHidden(true)
+            }
+
+            Text(title)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(titleColor)
+                .multilineTextAlignment(.leading)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, icon == nil ? 22 : 16)
+        .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
+        .background(
+            Color(uiColor: .secondarySystemBackground),
+            in: .capsule
+        )
     }
 }
 
