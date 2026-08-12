@@ -616,10 +616,11 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(model.readOnlyReason, .waitingForWritableSync)
     }
 
-    func testOnlyFailedSyncStatesProduceToastCopy() {
+    func testOnlyTerminalSyncFailuresProduceToastCopy() {
         let silentStates: [SharedPlanSyncConnectionStatus] = [
             .idle,
             .connecting,
+            .reconnecting("Software caused connection abort"),
             .connected(mutationsEnabled: true, pendingOperationCount: 1),
             .synchronized(mutationsEnabled: true, pendingOperationCount: 0),
         ]
@@ -627,12 +628,6 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertTrue(silentStates.allSatisfy {
             SharedPlanEditorSyncFailurePresentation(status: $0) == nil
         })
-        XCTAssertEqual(
-            SharedPlanEditorSyncFailurePresentation(
-                status: .reconnecting("offline")
-            )?.detail,
-            "offline"
-        )
         XCTAssertNotNil(
             SharedPlanEditorSyncFailurePresentation(
                 status: .quarantined(.membershipRevoked)

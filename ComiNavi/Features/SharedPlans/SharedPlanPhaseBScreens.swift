@@ -191,8 +191,13 @@ struct SharedPlanEditorSyncFailurePresentation: Equatable, Sendable {
 
     init?(status: SharedPlanSyncConnectionStatus) {
         switch status {
-        case .reconnecting(let message):
-            detail = message
+        case .reconnecting:
+            // Reconnecting is an expected intermediate state. In particular,
+            // Network.framework can report a connection abort when iOS
+            // suspends the app while the user briefly switches to another
+            // app. Keep this state in the editor UI, but do not interrupt the
+            // user with an error toast.
+            return nil
         case .quarantined(let issue):
             detail = SharedPlanEditorReadOnlyPresentation(
                 reason: .quarantine(issue)
