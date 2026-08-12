@@ -31,6 +31,7 @@ const iconNames = [
   "circle-arrow-down",
   "info",
   "circle-user",
+  "clock",
   "compass",
   "copy",
   "database",
