@@ -705,9 +705,7 @@ struct SharedPlanEditorScreen: View {
                                 store: store,
                                 circle: circle.key,
                                 currentUserID: currentUserID,
-                                identity: identity,
-                                catalogCircle: catalogCircles[circle.key],
-                                catalogDataSource: catalogDataSource
+                                identity: identity
                             )
                         } label: {
                             SharedPlanEmptyPurchaseSummaryRow(identity: identity)
@@ -723,14 +721,12 @@ struct SharedPlanEditorScreen: View {
                                     store: store,
                                     circle: circle.key,
                                     currentUserID: currentUserID,
-                                    identity: identity,
-                                    catalogCircle: catalogCircles[circle.key],
-                                    catalogDataSource: catalogDataSource
+                                    identity: identity
                                 )
                             } label: {
                                 SharedPlanPurchaseSummaryRow(
                                     need: need,
-                                    circleName: identity.circleName,
+                                    circleDisplayName: identity.displayName,
                                     hasConflict: model.conflicts.contains { conflict in
                                         conflict.path.contains(need.id.uuidString.lowercased())
                                     }
@@ -789,7 +785,6 @@ struct SharedPlanEditorScreen: View {
             })?.name
         }
         return SharedPlanCircleIdentityPresentation(
-            publicCircleID: key.wcID,
             circleName: catalogCircle?.circleName,
             penName: catalogCircle?.penName,
             day: catalogCircle?.day,
@@ -979,7 +974,7 @@ private struct SharedPlanCircleGroupHeader: View {
 
 private struct SharedPlanPurchaseSummaryRow: View {
     let need: SharedPlanPurchaseNeed
-    let circleName: String
+    let circleDisplayName: String
     let hasConflict: Bool
 
     var body: some View {
@@ -997,7 +992,7 @@ private struct SharedPlanPurchaseSummaryRow: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            Text(circleName)
+            Text(circleDisplayName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -1026,7 +1021,7 @@ private struct SharedPlanEmptyPurchaseSummaryRow: View {
         VStack(alignment: .leading, spacing: 3) {
             Text("No purchase requests yet")
                 .font(.headline)
-            Text(identity.circleName)
+            Text(identity.displayName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -1309,8 +1304,6 @@ private struct SharedPlanCircleEditorScreen: View {
     let circle: SharedPlanCircleKey
     let currentUserID: String?
     let identity: SharedPlanCircleIdentityPresentation
-    let catalogCircle: CirclemsDataSchema.ComiketCircleWC?
-    let catalogDataSource: CirclemsDataSource?
     @State private var presentedSheet: SharedPlanCircleEditorSheet?
     @State private var confirmation: SharedPlanCircleEditorConfirmation?
 
@@ -1318,7 +1311,6 @@ private struct SharedPlanCircleEditorScreen: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
                 if let content {
-                    circleOverview
                     needsSection(content)
                     memoSection
                     presenceSection(content)
@@ -1411,29 +1403,6 @@ private struct SharedPlanCircleEditorScreen: View {
         }
     }
 
-    @ViewBuilder
-    private var circleOverview: some View {
-        if let catalogCircle, let catalogDataSource {
-            NavigationLink {
-                CircleDetailView(circle: catalogCircle, dataSource: catalogDataSource)
-            } label: {
-                SharedPlanCircleIdentityOverview(
-                    identity: identity,
-                    showsDisclosureIndicator: true
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint("Opens the full circle detail page")
-            .accessibilityIdentifier("shared-plan-circle-overview")
-        } else {
-            SharedPlanCircleIdentityOverview(
-                identity: identity,
-                showsDisclosureIndicator: false
-            )
-                .accessibilityIdentifier("shared-plan-circle-overview")
-        }
-    }
-
     private var content: SharedPlanCircleContent? {
         model.circleContent(for: circle)
     }
@@ -1520,7 +1489,7 @@ private struct SharedPlanCircleEditorScreen: View {
                 ForEach(content.needs) { need in
                     SharedPlanNeedEditorRow(
                         need: need,
-                        circleName: identity.circleName,
+                        circleDisplayName: identity.displayName,
                         currentUserID: currentUserID,
                         members: model.members,
                         hasConflict: model.conflicts.contains { conflict in
@@ -1594,35 +1563,6 @@ private struct SharedPlanCircleEditorScreen: View {
         case .deleteNeed: String(localized: "Remove this purchase need?")
         case nil: String(localized: "Confirm change")
         }
-    }
-}
-
-private struct SharedPlanCircleIdentityOverview: View {
-    let identity: SharedPlanCircleIdentityPresentation
-    let showsDisclosureIndicator: Bool
-
-    var body: some View {
-        HStack(spacing: 12) {
-            LucideIcon("building-2", size: 22)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 32)
-                .accessibilityHidden(true)
-            SharedPlanCircleIdentityText(identity: identity)
-            Spacer(minLength: 8)
-            if showsDisclosureIndicator {
-                LucideIcon("chevron-right", size: 16)
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
-        }
-        .padding(16)
-        .background(.background, in: .rect(cornerRadius: 18))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
-        }
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -1772,7 +1712,7 @@ private struct SharedPlanPurchaseStageBar: View {
 
 private struct SharedPlanNeedEditorRow: View {
     let need: SharedPlanPurchaseNeed
-    let circleName: String
+    let circleDisplayName: String
     let currentUserID: String?
     let members: [SharedPlanMember]
     let hasConflict: Bool
@@ -1799,7 +1739,7 @@ private struct SharedPlanNeedEditorRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text(circleName)
+                Text(circleDisplayName)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -2450,7 +2390,6 @@ struct SharedPlanPurchaseUITestSurface: View {
     @State private var presentedProgress: SharedPlanPurchaseProgressEdit?
 
     private let identity = SharedPlanCircleIdentityPresentation(
-        publicCircleID: 101,
         circleName: "うどん道場",
         penName: "青井",
         day: 1,
@@ -2527,19 +2466,6 @@ struct SharedPlanPurchaseUITestSurface: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
-                    NavigationLink {
-                        Text("Circle detail")
-                            .navigationTitle(identity.circleName)
-                            .accessibilityIdentifier("shared-plan-circle-detail-test-surface")
-                    } label: {
-                        SharedPlanCircleIdentityOverview(
-                            identity: identity,
-                            showsDisclosureIndicator: true
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("shared-plan-circle-overview")
-
                     HStack {
                         Text("Purchases")
                             .font(.title3.weight(.bold))
@@ -2549,7 +2475,7 @@ struct SharedPlanPurchaseUITestSurface: View {
                     ForEach(needs) { need in
                         SharedPlanNeedEditorRow(
                             need: need,
-                            circleName: identity.circleName,
+                            circleDisplayName: identity.displayName,
                             currentUserID: Self.requesterID,
                             members: members,
                             hasConflict: false,

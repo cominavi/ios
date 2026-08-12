@@ -714,7 +714,6 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
 
     func testCircleIdentityCombinesNamePenNameDayAndCatalogLocation() {
         let identity = SharedPlanCircleIdentityPresentation(
-            publicCircleID: 101,
             circleName: " うどん道場 ",
             penName: " 青井 ",
             day: 1,
@@ -726,10 +725,10 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(identity.circleName, "うどん道場")
         XCTAssertEqual(identity.penName, "青井")
         XCTAssertEqual(identity.dayAndLocation, String(localized: "Day 1 · 東A12b"))
+        XCTAssertEqual(identity.displayName, "うどん道場 · 青井")
         XCTAssertEqual(identity.navigationSubtitle, "うどん道場 · 青井")
 
         let fallback = SharedPlanCircleIdentityPresentation(
-            publicCircleID: 202,
             circleName: " ",
             penName: nil,
             day: nil,
@@ -737,8 +736,10 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
             spaceNumber: nil,
             spaceNumberSub: nil
         )
-        XCTAssertEqual(fallback.circleName, String(localized: "Circle WCID \(202.formatted())"))
+        XCTAssertEqual(fallback.circleName, String(localized: "Unnamed circle"))
         XCTAssertNil(fallback.penName)
+        XCTAssertEqual(fallback.displayName, String(localized: "Unnamed circle"))
+        XCTAssertFalse(fallback.displayName.contains("WCID"))
         XCTAssertEqual(fallback.dayAndLocation, String(localized: "Location unavailable"))
     }
 

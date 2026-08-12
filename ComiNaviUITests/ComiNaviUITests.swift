@@ -174,23 +174,16 @@ final class ComiNaviUITests: XCTestCase {
                 .waitForExistence(timeout: 8)
         )
 
-        XCTAssertTrue(app.staticTexts["うどん道場"].firstMatch.exists)
-        XCTAssertTrue(app.staticTexts["青井"].firstMatch.exists)
-        XCTAssertTrue(app.staticTexts["Day 1 · 東A12a"].exists)
+        XCTAssertGreaterThanOrEqual(
+            app.staticTexts.matching(
+                NSPredicate(format: "label == %@", "うどん道場 · 青井")
+            ).count,
+            5,
+            "Every compact purchase row must show the circle and pen name"
+        )
+        XCTAssertFalse(app.staticTexts["Day 1 · 東A12a"].exists)
         XCTAssertFalse(app.staticTexts["Active"].exists)
-
-        let circleOverview = app.buttons["shared-plan-circle-overview"]
-        XCTAssertTrue(circleOverview.waitForExistence(timeout: 3))
-        circleOverview.tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["shared-plan-circle-detail-test-surface"]
-                .waitForExistence(timeout: 3)
-        )
-        app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(
-            app.descendants(matching: .any)["shared-plan-purchase-test-surface"]
-                .waitForExistence(timeout: 3)
-        )
+        XCTAssertFalse(app.buttons["shared-plan-circle-overview"].exists)
 
         var rowHeights: [CGFloat] = []
         for index in 1 ... 5 {

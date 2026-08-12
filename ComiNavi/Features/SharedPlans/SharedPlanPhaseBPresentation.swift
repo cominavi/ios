@@ -194,7 +194,6 @@ struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
     let dayAndLocation: String
 
     init(
-        publicCircleID: Int,
         circleName: String?,
         penName: String?,
         day: Int?,
@@ -209,7 +208,7 @@ struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
         self.circleName = if let normalizedCircleName, !normalizedCircleName.isEmpty {
             normalizedCircleName
         } else {
-            String(localized: "Circle WCID \(publicCircleID.formatted())")
+            String(localized: "Unnamed circle")
         }
         self.penName = if let normalizedPenName, !normalizedPenName.isEmpty {
             normalizedPenName
@@ -238,10 +237,12 @@ struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
         }
     }
 
-    var navigationSubtitle: String {
+    var displayName: String {
         guard let penName else { return circleName }
         return "\(circleName) · \(penName)"
     }
+
+    var navigationSubtitle: String { displayName }
 }
 
 enum SharedPlanParentTarget: Equatable, Sendable {
