@@ -2037,9 +2037,16 @@ private struct SharedPlanQuantityControl: View {
 
     var body: some View {
         Stepper(value: $quantity, in: range) {
-            Text(title)
-                .font(.body.weight(.medium))
+            HStack {
+                Text(title)
+                    .font(.body.weight(.medium))
+                Spacer(minLength: 8)
+                Text(quantity, format: .number)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
         }
+        .accessibilityValue(quantity.formatted())
     }
 }
 
@@ -2078,6 +2085,15 @@ private struct SharedPlanCreateNeedSheet: View {
                         focusedField = .itemName
                     }
 
+                    TextField(
+                        "Price per item (optional)",
+                        text: $rawUnitPrice,
+                        prompt: Text("Yen")
+                    )
+                    .focused($focusedField, equals: .price)
+                    .keyboardType(.numberPad)
+                    .accessibilityIdentifier("shared-plan-need-unit-price")
+
                     SharedPlanQuantityControl(
                         title: String(localized: "Requested"),
                         quantity: $wantedQuantity,
@@ -2089,15 +2105,6 @@ private struct SharedPlanCreateNeedSheet: View {
                             ? String(localized: "Verified profile required")
                             : String(localized: "自分")
                     )
-
-                    TextField(
-                        "Price per item (optional)",
-                        text: $rawUnitPrice,
-                        prompt: Text("Yen")
-                    )
-                    .focused($focusedField, equals: .price)
-                    .keyboardType(.numberPad)
-                    .accessibilityIdentifier("shared-plan-need-unit-price")
                 }
             }
             .navigationTitle("Add purchase request")
