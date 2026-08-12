@@ -608,7 +608,7 @@ private struct SharedPlanJoinGuideSheet: View {
                     guideStep(
                         number: 1,
                         title: "Get an invitation link",
-                        detail: "Ask the plan owner to create and share an invitation from Plan information, then Members and invitations."
+                        detail: "Ask the plan owner to create and share an invitation from Plan information, then Add member."
                     )
                     guideStep(
                         number: 2,
@@ -738,10 +738,10 @@ struct SharedPlanListUITestSurface: View {
                     planDetail(plans.first { $0.id == planID } ?? primaryPlan)
                 case .information:
                     List {
-                        NavigationLink(value: Route.invitations) {
-                            Label("Members and invitations", systemImage: "person.2")
+                        Section("Members") {
+                            Text("Member list")
+                            Label("Add member", systemImage: "link.badge.plus")
                         }
-                        .accessibilityIdentifier("shared-plan-open-management")
                     }
                     .navigationTitle("Plan information")
                     .accessibilityIdentifier("shared-plan-test-information")
@@ -1053,13 +1053,44 @@ struct SharedPlanDetailScreen: View {
 }
 
 private struct SharedPlanInformationScreen: View {
+    private enum Confirmation: Identifiable {
+        case archive
+        case administrative(SharedPlanAdministrativeAction)
+
+        var id: String {
+            switch self {
+            case .archive: "archive-plan"
+            case .administrative(let action): action.id
+            }
+        }
+    }
+
     let store: SharedPlanStore
     @State private var editedName = ""
     @State private var issue: String?
     @State private var showsFavoriteImport = false
+    @State private var managementModel: SharedPlanManagementModel
+    @State private var presentedManagementSheet: SharedPlanManagementSheet?
+    @State private var confirmation: Confirmation?
     let planID: String
     let features: SharedPlanPresentationFeatures
     let favoriteImportService: any CirclemsFavoriteImportServicing
+
+    init(
+        store: SharedPlanStore,
+        planID: String,
+        features: SharedPlanPresentationFeatures,
+        favoriteImportService: any CirclemsFavoriteImportServicing
+    ) {
+        self.store = store
+        self.planID = planID
+        self.features = features
+        self.favoriteImportService = favoriteImportService
+        _managementModel = State(initialValue: SharedPlanManagementModel(
+            planID: planID,
+            features: features
+        ))
+    }
 
     var body: some View {
         Group {
@@ -1115,18 +1146,8 @@ private struct SharedPlanInformationScreen: View {
                         }
                     }
 
-                    Section("Collaboration") {
-                        NavigationLink {
-                            SharedPlanManagementScreen(
-                                store: store,
-                                planID: plan.id,
-                                features: features
-                            )
-                        } label: {
-                            Label("Members and invitations", systemImage: "person.2")
-                        }
-                        .accessibilityIdentifier("shared-plan-open-management")
-                    }
+                    membersSection
+                    invitationLinksSection
 
                     Section("Circle import") {
                         Button {
@@ -1147,12 +1168,22 @@ private struct SharedPlanInformationScreen: View {
 
                     if features.writesEnabled, plan.role == .owner {
                         Section {
-                            Button(archiveButtonTitle(for: plan)) {
-                                toggleArchive(plan)
+                            Button(role: plan.lifecycle == .active ? .destructive : nil) {
+                                if plan.lifecycle == .active {
+                                    confirmation = .archive
+                                } else {
+                                    toggleArchive(plan)
+                                }
+                            } label: {
+                                HStack {
+                                    Text(archiveButtonTitle(for: plan))
+                                    Spacer(minLength: 0)
+                                }
                             }
+                            .buttonStyle(.borderedProminent)
+                            .tint(plan.lifecycle == .active ? .red : .accentColor)
+                            .frame(maxWidth: .infinity)
                             .disabled(!quarantinedChanges.isEmpty)
-                        } header: {
-                            Text("Plan status")
                         } footer: {
                             Text(plan.lifecycle == .active
                                 ? String(localized: "Archived plans remain available but cannot be edited.")
@@ -1172,6 +1203,8 @@ private struct SharedPlanInformationScreen: View {
                 .accessibilityIdentifier("shared-plan-information-screen")
                 .onAppear { editedName = plan.name }
                 .onChange(of: plan.name) { _, value in editedName = value }
+                .refreshable { await managementModel.refresh(using: store) }
+                .task(id: planID) { await managementModel.load(using: store) }
                 .sheet(isPresented: $showsFavoriteImport) {
                     SharedPlanFavoriteImportScreen(
                         store: store,
@@ -1180,6 +1213,45 @@ private struct SharedPlanInformationScreen: View {
                         eventNumber: plan.comiketNo,
                         features: features
                     )
+                }
+                .sheet(item: $presentedManagementSheet) { sheet in
+                    switch sheet {
+                    case .createInvitation:
+                        SharedPlanCreateInvitationSheet(
+                            model: managementModel,
+                            store: store,
+                            presentedSheet: $presentedManagementSheet
+                        )
+                    case .createdInvitation(let invitation):
+                        SharedPlanCreatedInvitationSheet(
+                            invitation: invitation,
+                            model: managementModel
+                        )
+                    }
+                }
+                .confirmationDialog(
+                    "Confirm Shared Plan change",
+                    isPresented: Binding(
+                        get: { confirmation != nil },
+                        set: { if !$0 { confirmation = nil } }
+                    ),
+                    titleVisibility: .visible,
+                    presenting: confirmation
+                ) { item in
+                    confirmationActions(item)
+                } message: { item in
+                    Text(confirmationMessage(item))
+                }
+                .alert(
+                    "Shared Plan could not be updated",
+                    isPresented: Binding(
+                        get: { managementModel.actionIssue != nil },
+                        set: { if !$0 { managementModel.dismissActionIssue() } }
+                    )
+                ) {
+                    Button("OK") { managementModel.dismissActionIssue() }
+                } message: {
+                    Text(managementModel.actionIssue ?? String(localized: "Please try again."))
                 }
             } else {
                 FocusedActionSurface(
@@ -1204,8 +1276,144 @@ private struct SharedPlanInformationScreen: View {
         store.quarantinedChanges(planID: planID)
     }
 
-    private func archiveButtonTitle(for plan: SharedPlan) -> String {
-        plan.lifecycle == .active ? "アーカイブ" : "再開"
+    @ViewBuilder
+    private var membersSection: some View {
+        Section {
+            if managementModel.members.isEmpty,
+               managementModel.memberIssue == nil,
+               managementModel.isRefreshing
+            {
+                SharedPlanLoadingRow(label: "Loading members")
+            } else if managementModel.members.isEmpty {
+                ContentUnavailableView(
+                    "No members available",
+                    systemImage: "person.2.slash",
+                    description: Text(
+                        managementModel.memberIssue
+                            ?? String(localized: "Pull to refresh and try again.")
+                    )
+                )
+            } else {
+                ForEach(managementModel.members) { member in
+                    SharedPlanMemberRow(
+                        member: member,
+                        canManage: managementModel.permitsMembershipAdministration
+                    ) { action in
+                        confirmation = .administrative(action)
+                    }
+                }
+                if managementModel.canLoadMoreMembers {
+                    SharedPlanLoadMoreRow(
+                        label: "Load more members",
+                        isLoading: managementModel.isLoadingMoreMembers
+                    ) {
+                        Task { await managementModel.loadMoreMembers(using: store) }
+                    }
+                }
+            }
+
+            if managementModel.permitsInvitationCreation {
+                Button {
+                    presentedManagementSheet = .createInvitation
+                } label: {
+                    Label("Add member", systemImage: "link.badge.plus")
+                }
+                .disabled(managementModel.isPerformingAction)
+                .accessibilityIdentifier("shared-plan-add-member")
+            }
+
+            if let issue = managementModel.memberIssue,
+               !managementModel.members.isEmpty
+            {
+                SharedPlanInlineIssue(message: issue) {
+                    Task { await managementModel.refresh(using: store) }
+                }
+            }
+        } header: {
+            Text("Members")
+        } footer: {
+            if managementModel.isOwner {
+                Text("Removed members remain listed so the owner can explicitly reinstate them.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var invitationLinksSection: some View {
+        if !managementModel.visibleInvitations.isEmpty
+            || managementModel.isRefreshing
+            || managementModel.invitationIssue != nil
+        {
+            Section("Invitation links") {
+                if managementModel.visibleInvitations.isEmpty,
+                   managementModel.invitationIssue == nil,
+                   managementModel.isRefreshing
+                {
+                    SharedPlanLoadingRow(label: "Loading invitation links")
+                }
+
+                ForEach(managementModel.visibleInvitations) { invitation in
+                    SharedPlanInvitationRow(
+                        invitation: invitation,
+                        canManage: managementModel.permitsInvitationRevocation(
+                            invitationID: invitation.invitationID
+                        )
+                    ) {
+                        confirmation = .administrative(.revokeInvitation(
+                            invitationID: invitation.invitationID
+                        ))
+                    }
+                }
+
+                if managementModel.canLoadMoreInvitations {
+                    SharedPlanLoadMoreRow(
+                        label: "Load more invitation links",
+                        isLoading: managementModel.isLoadingMoreInvitations
+                    ) {
+                        Task { await managementModel.loadMoreInvitations(using: store) }
+                    }
+                }
+
+                if let issue = managementModel.invitationIssue {
+                    SharedPlanInlineIssue(message: issue) {
+                        Task { await managementModel.refresh(using: store) }
+                    }
+                }
+            }
+        }
+    }
+
+    private func archiveButtonTitle(for plan: SharedPlan) -> LocalizedStringResource {
+        plan.lifecycle == .active ? "Archive..." : "Reopen"
+    }
+
+    @ViewBuilder
+    private func confirmationActions(_ item: Confirmation) -> some View {
+        switch item {
+        case .archive:
+            Button("Archive", role: .destructive) {
+                confirmation = nil
+                guard let plan else { return }
+                toggleArchive(plan)
+            }
+        case .administrative(let action):
+            Button(role: action.isDestructive ? .destructive : nil) {
+                confirmation = nil
+                Task { await managementModel.perform(action, using: store) }
+            } label: {
+                Text(action.confirmationButtonTitle)
+            }
+        }
+        Button("Cancel", role: .cancel) { confirmation = nil }
+    }
+
+    private func confirmationMessage(_ item: Confirmation) -> String {
+        switch item {
+        case .archive:
+            String(localized: "This plan will become read-only. You can reopen it later.")
+        case .administrative(let action):
+            action.confirmationMessage
+        }
     }
 
     private func quarantinedTitle(_ write: SharedPlanRESTWrite) -> String {

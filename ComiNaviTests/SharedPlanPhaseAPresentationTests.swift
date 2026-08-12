@@ -74,6 +74,23 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
         XCTAssertNotNil(model.invitationIssue)
     }
 
+    func testVisibleInvitationsExcludeRevokedRows() {
+        let store = PhaseAStoreStub(plan: makePlan())
+        store.invitationsByPlanID[planID] = [
+            makeInvitation(id: invitationA),
+            makeInvitation(
+                id: invitationB,
+                currentUserCanRevoke: false,
+                revokedAt: Date(timeIntervalSince1970: 1_786_280_000)
+            ),
+        ]
+        let model = SharedPlanManagementModel(planID: planID)
+
+        model.synchronize(from: store)
+
+        XCTAssertEqual(model.visibleInvitations.map(\.invitationID), [invitationA])
+    }
+
     func testExplicitReadOnlyGateRejectsAdministrativeMutation() async {
         let store = PhaseAStoreStub(plan: makePlan())
         let model = SharedPlanManagementModel(
