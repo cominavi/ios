@@ -399,33 +399,29 @@ private struct CircleXProfile {
 
 private struct CircleXProfileRow: View {
     let profile: CircleXProfile
-    var avatarSize: CGFloat = 48
+    var avatarSize: CGFloat = 40
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            IconifyBrandIcon("x", size: 18)
-                .foregroundStyle(.primary)
-                .frame(width: 20, height: avatarSize, alignment: .center)
-
+        HStack(alignment: .center, spacing: 8) {
             CircleXProfileAvatar(url: profile.avatarURL, size: avatarSize)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 1) {
                 DimmedCircleDisplayName(displayName: profile.displayName)
-                    .font(.headline.weight(.semibold))
-                    .lineLimit(2)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
                     .truncationMode(.tail)
 
                 Text(verbatim: "@\(profile.handle)")
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
 
-            LucideIcon("chevron.forward", size: 16)
+            LucideIcon("chevron.forward", size: 14)
                 .foregroundStyle(.tertiary)
-                .padding(.top, 3)
                 .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
@@ -467,7 +463,7 @@ private struct CircleXProfileAvatar: View {
     let size: CGFloat
 
     var body: some View {
-        AsyncImage(url: url) { phase in
+        AsyncImage(url: url?.highResolutionXProfileImageURL) { phase in
             switch phase {
             case .success(let image):
                 image
@@ -486,7 +482,44 @@ private struct CircleXProfileAvatar: View {
             Circle()
                 .stroke(Color(uiColor: .separator).opacity(0.24), lineWidth: 0.5)
         }
+        .overlay(alignment: .bottomTrailing) {
+            IconifyBrandIcon("x", size: 9)
+                .foregroundStyle(.primary)
+                .frame(width: 16, height: 16)
+                .background(.background, in: .circle)
+                .overlay {
+                    Circle()
+                        .stroke(
+                            Color(uiColor: .separator).opacity(0.32),
+                            lineWidth: 0.5
+                        )
+                }
+                .offset(x: 2, y: 2)
+        }
         .accessibilityHidden(true)
+    }
+}
+
+private extension URL {
+    var highResolutionXProfileImageURL: URL {
+        guard host?.lowercased() == "pbs.twimg.com",
+              path.contains("/profile_images/")
+        else { return self }
+
+        let thumbnailMarkers = ["_normal.", "_bigger.", "_mini."]
+        guard let marker = thumbnailMarkers.first(where: path.contains) else {
+            return self
+        }
+
+        var components = URLComponents(
+            url: self,
+            resolvingAgainstBaseURL: false
+        )
+        components?.path = path.replacingOccurrences(
+            of: marker,
+            with: "_400x400."
+        )
+        return components?.url ?? self
     }
 }
 
@@ -607,13 +640,14 @@ private struct CircleDetailHeader: View {
             if let xProfile {
                 Link(destination: xProfile.url) {
                     CircleXProfileRow(profile: xProfile)
-                        .padding(12)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
                         .background(
                             Color(uiColor: .secondarySystemGroupedBackground),
-                            in: .rect(cornerRadius: 16)
+                            in: .rect(cornerRadius: 13)
                         )
                         .overlay {
-                            RoundedRectangle(cornerRadius: 16)
+                            RoundedRectangle(cornerRadius: 13)
                                 .stroke(
                                     Color(uiColor: .separator).opacity(0.24),
                                     lineWidth: 0.5
@@ -1270,8 +1304,7 @@ private struct ShinagakiPostCard: View {
                                 ?? "@\(post.authorHandle)",
                             handle: post.authorHandle,
                             avatarURL: post.authorProfileImageURL
-                        ),
-                        avatarSize: 44
+                        )
                     )
                 }
                 .buttonStyle(.plain)
