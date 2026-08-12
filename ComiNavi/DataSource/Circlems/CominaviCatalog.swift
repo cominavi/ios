@@ -288,6 +288,8 @@ extension CominaviCatalogInstalling {
 }
 
 actor CominaviCatalogInstaller: CominaviCatalogInstalling {
+    static let defaultChunkBytes: Int64 = 16 * 1_024 * 1_024
+
     nonisolated static func removeAllDownloadedData(
         rootDirectory: URL = DirectoryManager.shared.environmentApplicationSupportDirectory
             .appendingPathComponent("CominaviCatalogs", isDirectory: true)
@@ -353,7 +355,7 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
             URLSessionCominaviCatalogDownloadTransport(),
         rootDirectory: URL = DirectoryManager.shared.environmentApplicationSupportDirectory
             .appendingPathComponent("CominaviCatalogs", isDirectory: true),
-        chunkBytes: Int64 = 4 * 1_024 * 1_024,
+        chunkBytes: Int64 = CominaviCatalogInstaller.defaultChunkBytes,
         retryDelay: Duration = .seconds(2),
         fileManager: FileManager = .default
     ) {

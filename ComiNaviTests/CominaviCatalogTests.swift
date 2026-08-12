@@ -6,6 +6,10 @@ import XCTest
 @testable import ComiNavi
 
 final class CominaviCatalogTests: XCTestCase {
+    func testDefaultChunkSizeBalancesRequestOverheadAndResumeGranularity() {
+        XCTAssertEqual(CominaviCatalogInstaller.defaultChunkBytes, 16 * 1_024 * 1_024)
+    }
+
     func testRemovingDownloadedDataDeletesOnlyTheCatalogRoot() async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
