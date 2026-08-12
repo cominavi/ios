@@ -4419,6 +4419,34 @@
         }
       }
     },
+    "Available in %lld seconds": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld秒後に実行できます"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld초 후에 사용할 수 있습니다"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld秒后可用"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld秒後可用"
+          }
+        }
+      }
+    },
     "B": {
       "localizations": {
         "ja": {
@@ -10956,6 +10984,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "刪除賬號"
+          }
+        }
+      }
+    },
+    "Delete available in %lld seconds": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "あと%lld秒で削除できます"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld초 후 계정을 삭제할 수 있습니다"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还需等待%lld秒才能删除"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "還需等待%lld秒才能刪除"
           }
         }
       }
@@ -23828,6 +23884,62 @@
         }
       }
     },
+    "Permanently deletes your account": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントを完全に削除します"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "계정을 영구적으로 삭제합니다"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "永久删除账户"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "永久刪除帳號"
+          }
+        }
+      }
+    },
+    "Please wait before deleting your account.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントを削除する前にお待ちください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "계정을 삭제하기 전에 잠시 기다려 주세요."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在删除账户前稍候。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在刪除帳號前稍候。"
+          }
+        }
+      }
+    },
     "Please sign in again before opening the catalog.": {
       "localizations": {
         "ja": {
@@ -36487,6 +36599,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "更新中也可以選擇會場。"
+          }
+        }
+      }
+    },
+    "You can delete your account now.": {
+      "localizations": {
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アカウントを削除できるようになりました。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이제 계정을 삭제할 수 있습니다."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现在可以删除账户了。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在可以刪除帳號了。"
           }
         }
       }
