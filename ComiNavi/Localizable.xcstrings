@@ -2251,6 +2251,34 @@
         }
       }
     },
+    "Add to favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りに追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에 추가"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到收藏夹"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入收藏"
+          }
+        }
+      }
+    },
     "Added to %@" : {
       "localizations" : {
         "ja" : {
@@ -2275,6 +2303,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新增了%@"
+          }
+        }
+      }
+    },
+    "Adds or removes this circle from your favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサークルをお気に入りに追加または削除します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 서클을 즐겨찾기에 추가하거나 제거합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将此社团添加到收藏或从收藏中移除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將此社團新增至收藏或從收藏夾移除"
           }
         }
       }
@@ -4842,6 +4898,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選擇社團並在地圖上標記"
+          }
+        }
+      }
+    },
+    "Choose a label color for this favorite." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このお気に入りのラベル色を選択します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 즐겨찾기의 라벨 색상을 선택하세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择此收藏的标签颜色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇此收藏的標籤顏色"
           }
         }
       }
@@ -11864,6 +11948,34 @@
         }
       }
     },
+    "Favorite settings" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入り設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기 설정"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收藏设置"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收藏設定"
+          }
+        }
+      }
+    },
     "Fills the item name field." : {
       "localizations" : {
         "ja" : {
@@ -13591,6 +13703,63 @@
         }
       }
     },
+    "In favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入り登録済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기 등록 완료"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已收藏"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加入收藏"
+          }
+        }
+      }
+    },
+    "In favorites, label color %@" : {
+      "comment" : "VoiceOver value for a favorited circle and its selected label color.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入り登録済み、お気に入りの色：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기 등록 완료, 좋아하는 색: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已收藏，标签颜色：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加入收藏，標籤顏色：%@"
+          }
+        }
+      }
+    },
     "Information · East Hall 1" : {
       "localizations" : {
         "ja" : {
@@ -14427,6 +14596,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "標籤顏色"
+          }
+        }
+      }
+    },
+    "Label color %@" : {
+      "comment" : "VoiceOver value for the selected favorite label color.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りの色：%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "좋아하는 색: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签颜色：%@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標籤顏色：%@"
           }
         }
       }
@@ -16965,6 +17163,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未登入"
+          }
+        }
+      }
+    },
+    "Not in favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入り未登録"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에 등록되지 않음"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未收藏"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未加入收藏"
           }
         }
       }
@@ -20784,6 +21010,34 @@
         }
       }
     },
+    "Remove from favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りから削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에서 제거"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从收藏中移除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從收藏夾移除"
+          }
+        }
+      }
+    },
     "Remove circle from plan" : {
       "localizations" : {
         "ja" : {
@@ -21990,6 +22244,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已收藏社团"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加入收藏"
+          }
+        }
+      }
+    },
+    "Saved to favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入り登録済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기 등록 완료"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已收藏"
           }
         },
         "zh-Hant" : {
@@ -27495,6 +27777,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用邀請透過 Google 登入"
+          }
+        }
+      }
+    },
+    "Use the selected label color for each circle." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したラベル色を各サークルに使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 라벨 색상을 각 서클에 사용합니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为每个社团使用所选标签颜色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "為每個社團使用所選標籤顏色"
           }
         }
       }
