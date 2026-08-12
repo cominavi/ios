@@ -32,8 +32,15 @@ enum FollowingImportAPIError: LocalizedError {
       String(localized: "Log in to ComiNavi before importing X followings.")
     case .invalidResponse:
       String(localized: "The import service returned an invalid response.")
-    case .server(_, let message, _):
-      message
+    case .server(let code, let message, _):
+      if code == "twitter_following_limit_exceeded" {
+        String(
+          localized:
+          "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts."
+        )
+      } else {
+        message
+      }
     }
   }
 }

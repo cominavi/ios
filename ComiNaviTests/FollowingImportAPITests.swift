@@ -47,6 +47,19 @@ final class FollowingImportAPITests: XCTestCase {
             XCTAssertEqual(retryAt, nextAllowedAt)
         }
     }
+
+    func testFollowingLimitErrorUsesLocalizedUserMessage() {
+        let error = FollowingImportAPIError.server(
+            code: "twitter_following_limit_exceeded",
+            message: "backend fallback",
+            nextAllowedAt: nil
+        )
+
+        XCTAssertEqual(
+            error.localizedDescription,
+            "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts."
+        )
+    }
 }
 
 private actor FollowingImportServiceStub: FollowingImportServicing {

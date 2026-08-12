@@ -870,6 +870,28 @@ final class CominaviServiceClientTests: XCTestCase {
         }
     }
 
+    func testGeneratedXFollowingImportPreservesFollowingLimitError() async throws {
+        let response = Data(
+            #"{"error":"twitter_following_limit_exceeded","message":"This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts."}"#.utf8
+        )
+        let transport = StaticCominaviTransport(responses: [
+            "POST /api/v2/imports/x-followings": (422, response),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        do {
+            _ = try await client.importXFollowings(userName: "cominavi")
+            XCTFail("A following-limit response must remain typed")
+        } catch FollowingImportAPIError.server(let code, let message, let date) {
+            XCTAssertEqual(code, "twitter_following_limit_exceeded")
+            XCTAssertEqual(
+                message,
+                "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts."
+            )
+            XCTAssertNil(date)
+        }
+    }
+
     func testTypedRevisionConflictDecodesCurrentRevisionAndCurrentPlan() async throws {
         let fixture = try fixtureObject(named: "shared-plan-rest-v1")
         var plan = try XCTUnwrap(fixture["create"] as? [String: Any])["plan"] as? [String: Any]
