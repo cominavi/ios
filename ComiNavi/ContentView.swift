@@ -144,7 +144,7 @@ private struct CatalogLibraryLoadingSurface: View {
                 symbolName: "arrow.down.circle.fill",
                 eyebrow: event.shortName,
                 title: String(localized: "Downloading catalog…"),
-                subtitle: String(localized: "Downloading databases, this may take a while...")
+                subtitle: String(localized: "Downloading the catalog, this may take a while…")
             ) {
                 DownloadProgressView(progresses: [progress])
             }
@@ -225,8 +225,8 @@ private struct CatalogContentView: View {
                 CatalogStatusSurface(
                     symbolName: "arrow.down.circle.fill",
                     eyebrow: eventName,
-                    title: String(localized: "Downloading\ndatabases"),
-                    subtitle: String(localized: "Downloading databases, this may take a while...")
+                    title: String(localized: "Downloading\ncatalog"),
+                    subtitle: String(localized: "Downloading the catalog, this may take a while…")
                 ) {
                     DownloadProgressView(progresses: progresses)
                     CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)

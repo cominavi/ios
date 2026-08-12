@@ -129,7 +129,6 @@ struct CircleDetailView: View {
         }
         .sheet(isPresented: $isShowingDataSources) {
             CircleDetailDataSourcesSheet(
-                circle: circle,
                 details: details,
                 officialCatalogLinks: officialCatalogLinks
             )
@@ -823,7 +822,6 @@ private struct CircleWithdrawalNotice: View {
 private struct CircleDetailDataSourcesSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    let circle: CirclemsDataSchema.ComiketCircleWC
     let details: CatalogCircleDetails?
     let officialCatalogLinks: [CircleExternalLink]
 
@@ -836,14 +834,6 @@ private struct CircleDetailDataSourcesSheet: View {
                     publicXEvidenceSection
                 }
 
-                if let enrichment = details?.enrichment,
-                   !enrichment.posts.isEmpty || !enrichment.attendanceClaims.isEmpty {
-                    automatedMatchingSection(enrichment: enrichment)
-                }
-
-                if let tags = details?.enrichment?.tags, !tags.isEmpty {
-                    tagProvenanceSection(tags: tags)
-                }
             }
             .navigationTitle("Data sources")
             .navigationBarTitleDisplayMode(.inline)
@@ -864,11 +854,6 @@ private struct CircleDetailDataSourcesSheet: View {
                 Text("Circle.ms Web Catalog")
             }
 
-            LabeledContent("Catalog record") {
-                Text(verbatim: "C\(circle.comiketNo) · \(circle.id)")
-                    .monospacedDigit()
-            }
-
             ForEach(officialCatalogLinks) { link in
                 Link(destination: link.url) {
                     LucideLabel("Open official Circle.ms record", icon: "arrow.up.right")
@@ -876,9 +861,6 @@ private struct CircleDetailDataSourcesSheet: View {
                 .accessibilityHint("Opens the official catalog record")
             }
 
-            Text("The official catalog allocation is preserved even when later public attendance evidence says the circle withdrew.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
     }
 
@@ -895,30 +877,6 @@ private struct CircleDetailDataSourcesSheet: View {
                     }
                 }
                 .accessibilityHint("Opens the original public post")
-            }
-        }
-    }
-
-    private func automatedMatchingSection(
-        enrichment: CatalogCircleEnrichment
-    ) -> some View {
-        Section("Automated matching") {
-            ForEach(enrichment.posts) { post in
-                CatalogPostDecisionSourceRow(post: post)
-            }
-
-            ForEach(enrichment.attendanceClaims) { claim in
-                CatalogAttendanceDecisionSourceRow(claim: claim)
-            }
-        }
-    }
-
-    private func tagProvenanceSection(
-        tags: [CatalogEnrichmentTag]
-    ) -> some View {
-        Section("Tag provenance") {
-            ForEach(tags) { tag in
-                CatalogTagSourceRow(tag: tag)
             }
         }
     }
@@ -953,219 +911,6 @@ private struct CatalogXEvidence: Identifiable {
     let title: LocalizedStringResource
     let url: URL
     let authorHandle: String
-}
-
-private struct CatalogPostDecisionSourceRow: View {
-    let post: CatalogShinagakiPost
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Shinagaki match")
-                .font(.headline)
-
-            if let policyID = post.matchingPolicyID {
-                LabeledContent("Matching policy", value: policyID)
-            }
-
-            LabeledContent("Post confidence") {
-                Text(post.postConfidence.title)
-            }
-            LabeledContent("Placement confidence") {
-                Text(post.placementConfidence.title)
-            }
-
-            CatalogReasonList(reasons: post.postReasons + post.matchReasons)
-            CatalogProvenanceList(
-                provenance: post.provenance + post.matchedCircleProvenance
-            )
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-private struct CatalogAttendanceDecisionSourceRow: View {
-    let claim: CatalogAttendanceClaim
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-
-            if let policyID = claim.matchingPolicyID {
-                LabeledContent("Matching policy", value: policyID)
-            }
-            if let policyID = claim.policyID {
-                LabeledContent("Attendance policy", value: policyID)
-            }
-
-            LabeledContent("Attendance confidence") {
-                Text(claim.confidence.title)
-            }
-
-            CatalogReasonList(reasons: claim.reasons + claim.matchReasons)
-            CatalogProvenanceList(
-                provenance: claim.provenance + claim.matchedCircleProvenance
-            )
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var title: LocalizedStringResource {
-        claim.status == .withdrawn ? "Withdrawal match" : "Attendance match"
-    }
-}
-
-private struct CatalogReasonList: View {
-    let reasons: [String]
-
-    var body: some View {
-        if !uniqueReasons.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Match reasons")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                ForEach(uniqueReasons, id: \.self) { reason in
-                    Text(reason)
-                        .font(.caption.monospaced())
-                        .textSelection(.enabled)
-                }
-            }
-        }
-    }
-
-    private var uniqueReasons: [String] {
-        var seen: Set<String> = []
-        return reasons.filter { seen.insert($0).inserted }
-    }
-}
-
-private struct CatalogProvenanceList: View {
-    let provenance: [CatalogRecordProvenance]
-
-    var body: some View {
-        if !uniqueProvenance.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Source records")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                ForEach(uniqueProvenance) { record in
-                    CatalogProvenanceRecordRow(record: record)
-                }
-            }
-        }
-    }
-
-    private var uniqueProvenance: [CatalogRecordProvenance] {
-        var seen: Set<CatalogRecordProvenance> = []
-        return provenance.filter { seen.insert($0).inserted }
-    }
-}
-
-private struct CatalogProvenanceRecordRow: View {
-    let record: CatalogRecordProvenance
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            if let url = record.url {
-                Link(destination: url) {
-                    LucideLabel(verbatim: sourceName, icon: "arrow.up.right")
-                        .font(.subheadline)
-                }
-            } else {
-                Text(sourceName)
-                    .font(.subheadline)
-            }
-
-            if let recordID = record.recordID {
-                Text(recordID)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-
-            if let retrievedAt = record.retrievedAt {
-                Text("Retrieved: \(retrievedAt)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var sourceName: String {
-        record.sourceID ?? record.sourceKind ?? String(localized: "Source record")
-    }
-}
-
-private struct CatalogTagSourceRow: View {
-    let tag: CatalogEnrichmentTag
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(tag.canonicalLabel)
-                .font(.headline)
-
-            if let evidenceLine = tag.evidenceLine {
-                LabeledContent("OCR evidence", value: evidenceLine)
-            }
-
-            if tag.provenance.isEmpty {
-                Text("Detected from shinagaki text or OCR by the collector's tag matcher.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(uniqueProvenance, id: \.id) { provenance in
-                    if let url = provenance.url {
-                        Link(destination: url) {
-                            LucideLabel(verbatim: provenance.title, icon: "arrow.up.right")
-                        }
-                    } else {
-                        Text(provenance.title)
-                            .font(.subheadline)
-                    }
-                }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var uniqueProvenance: [CatalogTagSource] {
-        var seen: Set<CatalogTagSource> = []
-        return tag.provenance.compactMap(CatalogTagSource.init).filter {
-            seen.insert($0).inserted
-        }
-    }
-}
-
-private struct CatalogTagSource: Identifiable, Hashable {
-    let sourceID: String?
-    let recordID: String?
-    let url: URL?
-
-    init?(_ provenance: CatalogTagProvenance) {
-        sourceID = provenance.sourceID.nonBlank
-        recordID = provenance.recordID.nonBlank
-        if let rawURL = provenance.url.nonBlank,
-           let candidate = URL(string: rawURL),
-           ["http", "https"].contains(candidate.scheme?.lowercased()) {
-            url = candidate
-        } else {
-            url = nil
-        }
-
-        guard sourceID != nil || recordID != nil || url != nil else { return nil }
-    }
-
-    var id: String {
-        [sourceID ?? "", recordID ?? "", url?.absoluteString ?? ""]
-            .joined(separator: "\u{1f}")
-    }
-
-    var title: String {
-        let value = [sourceID, recordID].compactMap { $0 }.joined(separator: " · ")
-        return value.isEmpty ? String(localized: "Tag source") : value
-    }
 }
 
 private struct CircleDetailSection<Content: View>: View {

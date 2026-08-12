@@ -113,8 +113,8 @@ struct SharedPlanEditorStatusPresentation: Equatable, Sendable {
     init(status: SharedPlanSyncConnectionStatus, pendingOperationCount: Int) {
         switch status {
         case .idle:
-            title = String(localized: "Sync is stopped")
-            detail = String(localized: "Open this screen while online to check for plan updates.")
+            title = String(localized: "Updates are paused")
+            detail = String(localized: "Open this screen to check for plan updates.")
             systemImage = "circle"
             tone = .neutral
         case .connecting:
@@ -142,8 +142,8 @@ struct SharedPlanEditorStatusPresentation: Equatable, Sendable {
             systemImage = "refresh-cw"
             tone = .warning
         case .quarantined:
-            title = String(localized: "Sync is paused for review")
-            detail = String(localized: "Saved content remains on this device until you choose a recovery action.")
+            title = String(localized: "Updates are paused for review")
+            detail = String(localized: "Saved content remains until you choose a recovery action.")
             systemImage = "triangle-alert"
             tone = .warning
         }
@@ -151,8 +151,8 @@ struct SharedPlanEditorStatusPresentation: Equatable, Sendable {
 
     private static func pendingDetail(_ count: Int) -> String {
         count == 0
-            ? String(localized: "No changes are waiting to sync.")
-            : String(localized: "\(count) changes are waiting to sync.")
+            ? String(localized: "No changes are waiting to send.")
+            : String(localized: "\(count) changes are waiting to send.")
     }
 }
 
@@ -176,18 +176,18 @@ struct SharedPlanEditorReadOnlyPresentation: Equatable, Sendable {
             detail = String(localized: "An owner or editor can change this plan.")
             systemImage = "eye"
         case .waitingForWritableSync:
-            title = String(localized: "Waiting for writable sync")
-            detail = String(localized: "Keep this screen open while ComiNavi reconnects. No local edit will be accepted until authority is confirmed.")
+            title = String(localized: "Waiting for editing access")
+            detail = String(localized: "ComiNavi is reconnecting. Editing will be available when it is ready.")
             systemImage = "calendar-clock"
         case .localLimit(let limit):
             switch limit {
-            case .syncBacklog(let maximum, let pending):
-                title = String(localized: "Sync before editing again")
-                detail = String(localized: "\(pending) changes are waiting to upload. Let them finish before editing again. The limit is \(maximum).")
+            case .syncBacklog:
+                title = String(localized: "Send changes before editing again")
+                detail = String(localized: "Some changes are waiting to be saved. Let them finish before editing again.")
                 systemImage = "refresh-cw"
             case .compactionRequired:
-                title = String(localized: "This plan needs compact recovery")
-                detail = String(localized: "This plan has too many saved changes. Download a copy, then repair or reset the plan.")
+                title = String(localized: "This plan needs recovery")
+                detail = String(localized: "There are too many changes to continue. Download a copy, then repair or reset the plan.")
                 systemImage = "triangle-alert"
             }
         case .quarantine(let issue):
@@ -210,9 +210,9 @@ struct SharedPlanEditorReadOnlyPresentation: Equatable, Sendable {
         case .rejectedLocalChanges:
             String(localized: "Some saved changes need recovery")
         case .compactionRequired, .serverCompactionRequired:
-            String(localized: "The server requires plan recovery")
+            String(localized: "This plan needs recovery")
         case .backlogLimit:
-            String(localized: "The server rejected an oversized sync backlog")
+            String(localized: "This plan has too many pending changes")
         }
     }
 
@@ -228,14 +228,14 @@ struct SharedPlanEditorReadOnlyPresentation: Equatable, Sendable {
             String(localized: "This saved plan cannot be opened. Download a copy or reset it.")
         case .rejectedLocalChanges(let supportCode):
             if let supportCode {
-                String(localized: "Some changes could not be saved online. Download a copy, then reset from the latest plan. Support code: \(supportCode)")
+                String(localized: "Some changes could not be saved. Download a copy, then reset from the latest plan. Support code: \(supportCode)")
             } else {
-                String(localized: "Some changes could not be saved online. Download a copy, then reset from the latest plan.")
+                String(localized: "Some changes could not be saved. Download a copy, then reset from the latest plan.")
             }
         case .compactionRequired, .serverCompactionRequired:
             String(localized: "Download a copy, then choose how to repair or reset this plan.")
-        case .backlogLimit(let maximum, let received):
-            String(localized: "There are \(received) unsent changes, above the \(maximum)-change upload limit. Download a copy, then repair or reset the plan.")
+        case .backlogLimit:
+            String(localized: "There are too many pending changes. Download a copy, then repair or reset the plan.")
         }
     }
 }
@@ -527,7 +527,7 @@ struct SharedPlanEditorScreen: View {
             status: model.syncStatus,
             pendingOperationCount: model.pendingOperationCount
         )
-        return Section("Sync") {
+        return Section("Updates") {
             Label {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(presentation.title)
@@ -544,7 +544,7 @@ struct SharedPlanEditorScreen: View {
             .accessibilityIdentifier(SharedPlanEditorAccessibilityID.syncStatus)
 
             if case .reconnecting = model.syncStatus {
-                Button("Retry sync") {
+                Button("Reconnect") {
                     Task { await model.retrySync(using: store) }
                 }
                 .disabled(model.isStartingSync)
@@ -580,9 +580,9 @@ struct SharedPlanEditorScreen: View {
         if let recovery = model.recoveryDocument {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    LucideLabel("Saved recovery copy", icon: "database")
+                    LucideLabel("Recovery copy", icon: "database")
                         .font(.headline)
-                    Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are saved on this device.")
+                    Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are available in this recovery copy.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -613,9 +613,9 @@ struct SharedPlanEditorScreen: View {
                 if case .some(.unavailable) = model.syncIssue {
                     Text("This saved plan cannot be opened. Download a copy before resetting it.")
                 } else if model.recoveryRebaseAvailable {
-                    Text("Repair keeps the changes that can be recovered and starts from the latest shared plan.")
+                    Text("Repair keeps recoverable changes and starts from the latest plan.")
                 } else {
-                    Text("This plan cannot be repaired automatically. Download a copy before resetting it.")
+                    Text("This plan needs to be reset. Download a copy before resetting it.")
                 }
             }
             .accessibilityIdentifier(SharedPlanEditorAccessibilityID.recovery)
@@ -640,8 +640,6 @@ struct SharedPlanEditorScreen: View {
                 }
             } header: {
                 Text("Unsaved memo drafts")
-            } footer: {
-                Text("A memo draft is never presented as saved when editing authority was lost.")
             }
         }
     }
@@ -1354,7 +1352,7 @@ private struct SharedPlanCircleEditorScreen: View {
                     LucideContentUnavailableView(
                         "Circle content is unavailable",
                         icon: "building-2",
-                        description: Text("This circle may have been removed. Any saved memo can still be downloaded from plan recovery.")
+                        description: Text("This circle may have been removed. Any saved memo can still be downloaded from recovery.")
                     )
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 64)
@@ -1416,7 +1414,7 @@ private struct SharedPlanCircleEditorScreen: View {
             }
             Button("Cancel", role: .cancel) { purchaseNeedPendingRemoval = nil }
         } message: { _ in
-            Text("This purchase request will be removed. If someone changed it at the same time, you can choose which version to keep.")
+            Text("This purchase request will be removed.")
         }
         .task(id: circle.id) {
             do {
@@ -1466,7 +1464,7 @@ private struct SharedPlanCircleEditorScreen: View {
                             }
                             Button("Cancel", role: .cancel) {}
                         } message: {
-                            Text("This circle will be removed from the plan. Its notes and purchases remain available if another recent change restores it.")
+                            Text("This circle will be removed from the plan. Its notes and purchases will remain available.")
                         }
                     }
                 case .removed:
@@ -1507,7 +1505,7 @@ private struct SharedPlanCircleEditorScreen: View {
             if model.hasMemoDraft(for: circle) {
                 LucideLabel(
                     verbatim: model.isMemoDraftDurablyRetained(for: circle)
-                        ? String(localized: "Saved on this device")
+                        ? String(localized: "Saved")
                         : String(localized: "Saving…"),
                     icon: model.isMemoDraftDurablyRetained(for: circle)
                         ? "circle-check-big"

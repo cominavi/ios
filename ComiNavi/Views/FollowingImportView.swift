@@ -132,11 +132,11 @@ struct FollowingImportView: View {
             Group {
                 if let availableAt = model.manualImportAvailableAt {
                     Text(
-                        "Manual import is available after \(availableAt.formatted(date: .abbreviated, time: .shortened)). Nothing will start automatically."
+                        "You can import again after \(availableAt.formatted(date: .abbreviated, time: .shortened))."
                     )
                 } else {
                     Text(
-                        "Imports start only when you tap the button. They are limited to once every six hours."
+                        "You can import once every six hours."
                     )
                 }
             }

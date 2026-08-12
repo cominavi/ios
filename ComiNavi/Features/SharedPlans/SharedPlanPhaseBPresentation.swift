@@ -528,7 +528,7 @@ final class SharedPlanEditorModel {
                 ?? (draft.replicaID != replicaID
                     || readOnlyReason != nil
                     || circleContent(for: draft.circle) == nil
-                    ? String(localized: "未保存のメモを同期できないため、端末に保持しています。")
+                    ? String(localized: "未保存のメモを保管しています。")
                     : nil)
             guard let reason,
                   let exportText = Self.memoDraftExport(
@@ -1228,7 +1228,7 @@ final class SharedPlanEditorModel {
             await preserveMemoDraftForRecovery(
                 draft,
                 reason: draft.replicaID == replicaID ? .circleUnavailable : .authorityLost,
-                message: String(localized: "編集権限が変わったため、未保存のメモを端末に保持しています。"),
+                message: String(localized: "編集権限が変わったため、メモを保管しています。"),
                 using: service
             )
             return
@@ -1237,7 +1237,7 @@ final class SharedPlanEditorModel {
             await preserveMemoDraftForRecovery(
                 draft,
                 reason: .authorityLost,
-                message: String(localized: "編集権限がないため、未保存のメモを端末に保持しています。"),
+                message: String(localized: "編集権限がないため、メモを保管しています。"),
                 using: service
             )
             return

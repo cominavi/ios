@@ -1024,7 +1024,7 @@ private struct ExploreFilterSheet: View {
                     case .idle, .loading:
                         Text("Loading Circle.ms tags…")
                     case .unavailable:
-                        Text("Some Circle.ms tags are unavailable. Bundled tags still work offline.")
+                        Text("Some tags are unavailable right now.")
                     case .ready:
                         EmptyView()
                     }

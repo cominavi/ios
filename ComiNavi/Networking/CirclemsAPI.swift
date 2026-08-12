@@ -45,7 +45,7 @@ enum CirclemsAPIAuthorizationError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .accessTokenRequired:
-            String(localized: "Circle.ms authorization is required for the direct catalog source.")
+            String(localized: "Sign in to Circle.ms to open this catalog.")
         }
     }
 }

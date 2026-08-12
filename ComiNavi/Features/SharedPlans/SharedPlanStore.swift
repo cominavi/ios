@@ -549,7 +549,7 @@ final class SharedPlanStore {
                         let quarantined = write.quarantined(
                             for: .terminalFailure,
                             code: "invite_capability_missing",
-                            message: "保護された招待情報が見つからないため、自動送信を停止しました。招待リンクをもう一度開いてください。"
+                            message: "招待リンクをもう一度開いてください。"
                         )
                         try await persistence.saveQuarantinedRESTWrites(
                             [quarantined],
@@ -748,7 +748,7 @@ final class SharedPlanStore {
         }
         guard let syncRequestAuthorizer else {
             syncStatuses[planID] = .quarantined(.unavailable(
-                String(localized: "共同編集サーバーに接続できません。")
+                String(localized: "共有プランに接続できません。")
             ))
             return
         }
@@ -2900,7 +2900,7 @@ final class SharedPlanStore {
                 throw SharedPlanError.planCompactionRequired
             } catch {
                 let issue = SharedPlanSyncIssue.unavailable(
-                    String(localized: "端末に保存された共同編集データを安全に読み込めません。")
+                    String(localized: "共有プランのデータを読み込めません。")
                 )
                 let quarantined = SharedPlanDocumentSnapshot(
                     planID: snapshot.planID,
@@ -2918,7 +2918,7 @@ final class SharedPlanStore {
             }
             guard document.planID == plan.id, document.comiketNo == plan.comiketNo else {
                 let issue = SharedPlanSyncIssue.unavailable(
-                    String(localized: "保存されたプランが現在のプランと一致しません。")
+                    String(localized: "保存されたプランを開けません。")
                 )
                 let quarantined = SharedPlanDocumentSnapshot(
                     planID: snapshot.planID,
@@ -3487,8 +3487,8 @@ final class SharedPlanStore {
         case .rejectedLocalChanges(let supportCode):
             .documentLimit(
                 supportCode.map {
-                    String(localized: "The server could not verify one or more saved changes. They remain on this device. Support code: \($0)")
-                } ?? String(localized: "The server could not verify one or more saved changes. They remain on this device.")
+                    String(localized: "One or more changes could not be saved. Support code: \($0)")
+                } ?? String(localized: "One or more changes could not be saved.")
             )
         }
     }

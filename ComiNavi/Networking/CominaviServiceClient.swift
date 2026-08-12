@@ -31,11 +31,11 @@ enum CominaviServiceError: LocalizedError, Sendable {
         case .authenticationStorageUnavailable:
             String(localized: "ログイン情報を安全に保存できませんでした。もう一度ログインしてください。")
         case .logoutPending:
-            String(localized: "Logout is still being completed. Please try again when the network is available.")
+            String(localized: "Sign out is still being completed. Please try again shortly.")
         case .accountDeletionPending:
-            String(localized: "Account deletion is still being completed and will retry automatically when the network is available.")
+            String(localized: "Account deletion is still being completed. Please try again shortly.")
         case .circlemsCredentialTransferPending:
-            String(localized: "Circle.ms credentials are being transferred securely. Please try again shortly.")
+            String(localized: "Circle.ms sign-in is still being completed. Please try again shortly.")
         case .invalidResponse:
             String(localized: "The ComiNavi service returned an invalid response.")
         case .server(_, let message, _):

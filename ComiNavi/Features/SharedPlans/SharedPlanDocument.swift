@@ -280,7 +280,7 @@ actor SharedPlanAutomergeDocument {
     ) throws {
         guard data.count <= Self.maximumSavedDocumentBytes else {
             throw SharedPlanError.documentLimit(
-                String(localized: "プランの保存データが上限を超えています。")
+                String(localized: "プランのデータが大きすぎます。")
             )
         }
         let document = try Document(data)
@@ -3799,7 +3799,7 @@ actor SharedPlanAutomergeDocument {
               document.save().count <= Self.maximumSavedDocumentBytes
         else {
             throw SharedPlanError.documentLimit(
-                String(localized: "プランの保存データが上限を超えています。")
+                String(localized: "プランのデータが大きすぎます。")
             )
         }
     }
@@ -3826,7 +3826,7 @@ actor SharedPlanAutomergeDocument {
               document.save().count <= maximumSavedDocumentBytes
         else {
             throw SharedPlanError.documentLimit(
-                String(localized: "プランの保存データが上限を超えています。")
+                String(localized: "プランのデータが大きすぎます。")
             )
         }
         return retainedPayloadBytes

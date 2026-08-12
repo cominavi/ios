@@ -1265,15 +1265,15 @@ enum CominaviCatalogError: LocalizedError, Equatable, Sendable {
         case .invalidAccount:
             String(localized: "Please sign in again before opening the catalog.")
         case .invalidResponse, .httpStatus:
-            String(localized: "The catalog download could not be verified.")
+            String(localized: "The catalog could not be verified.")
         case .checkpointMismatch:
-            String(localized: "The saved catalog download could not be resumed safely.")
+            String(localized: "The catalog download could not be resumed. Please try again.")
         case .sizeMismatch, .digestMismatch:
-            String(localized: "The catalog download did not match its published version.")
+            String(localized: "The catalog download was incomplete. Please try again.")
         case .invalidDatabase, .identityMismatch, .countMismatch:
-            String(localized: "The downloaded catalog database is invalid.")
+            String(localized: "The catalog could not be opened. Please try downloading it again.")
         case .invalidInstalledReceipt:
-            String(localized: "The previously installed catalog could not be verified.")
+            String(localized: "The installed catalog could not be verified. Please try downloading it again.")
         }
     }
 
