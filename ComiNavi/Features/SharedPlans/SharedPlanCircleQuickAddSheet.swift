@@ -111,7 +111,7 @@ struct SharedPlanCircleQuickAddSheet: View {
                 TextField(
                     "Item name",
                     text: $itemName,
-                    prompt: Text("For example: Shinkansen tickets or shikishi")
+                    prompt: Text("For example: new-release set, new release only, or acrylic keychain")
                 )
                 .focused($focusedField, equals: .itemName)
                 .textInputAutocapitalization(.sentences)

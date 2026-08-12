@@ -141,8 +141,8 @@ final class SharedPlanFoundationTests: XCTestCase {
             SharedPlanPurchaseNeed(
                 id: needID,
                 requesterUserID: userID,
-                itemName: "新幹線のきっぷ",
-                unitPrice: 14_720,
+                itemName: "新刊のみ",
+                unitPrice: 1_000,
                 wantedQuantity: 2
             ),
             circle: circle,
@@ -158,8 +158,8 @@ final class SharedPlanFoundationTests: XCTestCase {
         await relaunched.load()
         let need = try await relaunched.circleContent(circle: circle, planID: plan.id)?
             .needs.first(where: { $0.id == needID })
-        XCTAssertEqual(need?.itemName, "新幹線のきっぷ")
-        XCTAssertEqual(need?.unitPrice, 14_720)
+        XCTAssertEqual(need?.itemName, "新刊のみ")
+        XCTAssertEqual(need?.unitPrice, 1_000)
         XCTAssertEqual(need?.wantedQuantity, 2)
     }
 

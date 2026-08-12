@@ -64,7 +64,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         model.dismissIssue()
         await model.createNeed(
             requesterUserID: Self.userID,
-            itemName: "  色紙  ",
+            itemName: "  アクキー  ",
             unitPrice: 2_500,
             wantedQuantity: 1,
             circle: Self.circle,
@@ -78,7 +78,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
                 SharedPlanPurchaseNeed(
                     id: Self.needID,
                     requesterUserID: Self.userID,
-                    itemName: "色紙",
+                    itemName: "アクキー",
                     unitPrice: 2_500,
                     wantedQuantity: 1
                 ),
@@ -145,8 +145,8 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         await model.flushMemo(circle: Self.circle, using: service, now: Self.now)
         await model.createNeed(
             requesterUserID: Self.userID,
-            itemName: "新幹線のきっぷ",
-            unitPrice: 14_720,
+            itemName: "新刊のみ",
+            unitPrice: 1_000,
             wantedQuantity: 3,
             circle: Self.circle,
             id: Self.needID,
@@ -210,8 +210,8 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
                 SharedPlanPurchaseNeed(
                     id: Self.needID,
                     requesterUserID: Self.userID,
-                    itemName: "新幹線のきっぷ",
-                    unitPrice: 14_720,
+                    itemName: "新刊のみ",
+                    unitPrice: 1_000,
                     wantedQuantity: 3
                 ),
                 Self.circle
@@ -683,7 +683,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
                 need: SharedPlanPurchaseNeed(
                     id: Self.needID,
                     requesterUserID: Self.userID,
-                    itemName: "新幹線チケット",
+                    itemName: "新刊セット",
                     unitPrice: 2_000,
                     wantedQuantity: requested,
                     buyerAllocations: assigned == 0 ? [:] : [Self.userID: assigned],

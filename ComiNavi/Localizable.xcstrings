@@ -15128,30 +15128,30 @@
         }
       }
     },
-    "For example: Shinkansen tickets or shikishi": {
+    "For example: new-release set, new release only, or acrylic keychain": {
       "localizations": {
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "例：新幹線のきっぷ、色紙など"
+            "value": "例：新刊セット、新刊のみ、アクキーなど"
           }
         },
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "예: 신칸센 승차권, 색지 등"
+            "value": "예: 신간 세트, 신간 단품, 아크릴 키링 등"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "例：新干线的车票、彩纸等"
+            "value": "例：新刊套装、仅新刊、亚克力钥匙扣等"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "例：新幹線的車票、彩紙等"
+            "value": "例：新刊套組、僅新刊、壓克力鑰匙圈等"
           }
         }
       }

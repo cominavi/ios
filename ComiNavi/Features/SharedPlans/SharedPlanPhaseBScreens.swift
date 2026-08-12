@@ -2086,7 +2086,7 @@ private struct SharedPlanCreateNeedSheet: View {
                     TextField(
                         "What should be purchased?",
                         text: $itemName,
-                        prompt: Text("For example: Shinkansen tickets or shikishi")
+                        prompt: Text("For example: new-release set, new release only, or acrylic keychain")
                     )
                     .focused($focusedField, equals: .itemName)
                     .textInputAutocapitalization(.sentences)
@@ -2484,22 +2484,22 @@ struct SharedPlanPurchaseUITestSurface: View {
         SharedPlanPurchaseNeed(
             id: UUID(uuidString: "10000000-0000-4000-8000-000000000001")!,
             requesterUserID: Self.requesterID,
-            itemName: "新幹線チケット",
-            unitPrice: 13_870,
+            itemName: "新刊セット",
+            unitPrice: 2_000,
             wantedQuantity: 2
         ),
         SharedPlanPurchaseNeed(
             id: UUID(uuidString: "10000000-0000-4000-8000-000000000002")!,
             requesterUserID: Self.requesterID,
-            itemName: "新刊セット",
-            unitPrice: 2_000,
+            itemName: "新刊のみ",
+            unitPrice: 1_000,
             wantedQuantity: 2,
             buyerAllocations: [Self.buyerID: 1]
         ),
         SharedPlanPurchaseNeed(
             id: UUID(uuidString: "10000000-0000-4000-8000-000000000003")!,
             requesterUserID: Self.requesterID,
-            itemName: "色紙",
+            itemName: "アクキー",
             wantedQuantity: 1,
             buyerAllocations: [Self.buyerID: 1]
         ),

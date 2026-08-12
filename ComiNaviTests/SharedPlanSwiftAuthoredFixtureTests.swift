@@ -36,8 +36,8 @@ final class SharedPlanSwiftAuthoredFixtureTests: XCTestCase {
                 SharedPlanPurchaseNeed(
                     id: UUID(uuidString: "93939393-9393-4393-8393-939393939393")!,
                     requesterUserID: actorUserID,
-                    itemName: "新幹線のきっぷ",
-                    unitPrice: 14_720,
+                    itemName: "新刊セット",
+                    unitPrice: 2_000,
                     wantedQuantity: 2
                 ),
                 circle: circle

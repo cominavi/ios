@@ -237,7 +237,7 @@ final class ComiNaviUITests: XCTestCase {
         app.buttons["Done"].tap()
         XCTAssertFalse(app.navigationBars["Purchase progress"].waitForExistence(timeout: 2))
 
-        let firstRowMenu = app.buttons["More actions for 新幹線チケット"]
+        let firstRowMenu = app.buttons["More actions for 新刊セット"]
         XCTAssertTrue(firstRowMenu.waitForExistence(timeout: 3))
         firstRowMenu.tap()
         let purchaseProgressAction = app.buttons["Purchase progress"].firstMatch
