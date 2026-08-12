@@ -566,15 +566,11 @@ struct SignInView: View {
                         .padding(.top, loginButtonTopPadding)
 
                     if let googleInvitation {
-                        appleLoginButton(invitation: googleInvitation)
-                            .padding(.top, 12)
                         if GoogleSignInConfiguration.load() != nil {
                             googleLoginButton(invitation: googleInvitation)
                                 .padding(.top, 12)
                         }
                     } else if googleSpecialEntry {
-                        appleLoginButton(invitation: nil)
-                            .padding(.top, 12)
                         if GoogleSignInConfiguration.load() != nil {
                             googleLoginButton(invitation: nil)
                                 .padding(.top, 12)
@@ -720,9 +716,10 @@ struct SignInView: View {
             HStack(spacing: 10) {
                 Text("Sign in with Google")
                 Spacer(minLength: 12)
-                Text(verbatim: "G")
-                    .font(.headline.weight(.bold))
-                    .accessibilityHidden(true)
+                Image(decorative: "simple-icons-google")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20, height: 20)
             }
             .font(.headline)
             .frame(maxWidth: .infinity, minHeight: 56)
@@ -738,29 +735,6 @@ struct SignInView: View {
         )
         .accessibilityIdentifier(
             invitation == nil ? "sign-in-google-special-entry" : "sign-in-google-invitation"
-        )
-    }
-
-    private func appleLoginButton(
-        invitation: SharedPlanInvitationInbox.Pending?
-    ) -> some View {
-        AppleSignInControl {
-            vm.signInWithApple(
-                entryContext: invitation == nil ? .special : .invitation,
-                invitationToken: invitation?.token
-            )
-        }
-        .frame(maxWidth: .infinity, minHeight: 56, maxHeight: 56)
-        .clipShape(.rect(cornerRadius: 16))
-        .allowsHitTesting(vm.state != .authenticating)
-        .opacity(vm.state == .authenticating ? 0.55 : 1)
-        .accessibilityHint(
-            invitation == nil
-                ? "Sign in with Apple from the special entry"
-                : "Use the invitation to sign in with Apple"
-        )
-        .accessibilityIdentifier(
-            invitation == nil ? "sign-in-apple-special-entry" : "sign-in-apple-invitation"
         )
     }
 
