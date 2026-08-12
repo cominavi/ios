@@ -407,35 +407,33 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         let checkpointURL = partialURL.appendingPathExtension("json")
 
         do {
-            if fileManager.fileExists(atPath: destinationURL.path) {
-                do {
-                    try await validateDatabase(at: destinationURL, catalog: catalog)
-                    try saveInstalledReceipt(catalog: catalog, url: destinationURL, in: directory)
-                    if !startsFreshDownload {
-                        try? garbageCollect(in: directory, keeping: destinationURL)
-                        return CominaviInstalledCatalog(
-                            catalog: catalog,
-                            url: destinationURL,
-                            isCurrentVersion: true
-                        )
-                    }
-                } catch is CancellationError {
-                    throw CancellationError()
-                } catch {
-                    // An immutable digest path that no longer validates must not
-                    // short-circuit every later repair attempt.
-                    try quarantineInvalidInstalledFile(destinationURL, in: directory)
-                }
-            }
-
             if startsFreshDownload {
-                try discardPartial(partialURL, checkpointURL: checkpointURL)
+                try removeCatalogDirectory(directory)
                 if let progress {
                     await progress(Readiness.Progress(
                         type: .main,
                         totalBytes: catalog.artifact.bytes,
                         completedBytes: 0
                     ))
+                }
+            }
+
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                do {
+                    try await validateDatabase(at: destinationURL, catalog: catalog)
+                    try saveInstalledReceipt(catalog: catalog, url: destinationURL, in: directory)
+                    try? garbageCollect(in: directory, keeping: destinationURL)
+                    return CominaviInstalledCatalog(
+                        catalog: catalog,
+                        url: destinationURL,
+                        isCurrentVersion: true
+                    )
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    // An immutable digest path that no longer validates must not
+                    // short-circuit every later repair attempt.
+                    try quarantineInvalidInstalledFile(destinationURL, in: directory)
                 }
             }
 
@@ -479,6 +477,7 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
+            guard !startsFreshDownload else { throw error }
             if let fallback = try? await validatedFallback(in: directory) {
                 return CominaviInstalledCatalog(
                     catalog: fallback.catalog,
@@ -488,6 +487,13 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
             }
             throw error
         }
+    }
+
+    private func removeCatalogDirectory(_ directory: URL) throws {
+        guard fileManager.fileExists(atPath: directory.path) else { return }
+        let eventsDirectory = directory.deletingLastPathComponent()
+        try fileManager.removeItem(at: directory)
+        try Self.synchronizeDirectory(eventsDirectory)
     }
 
     func installedCatalogs(publicUserID: String) async throws -> [CominaviInstalledCatalog] {

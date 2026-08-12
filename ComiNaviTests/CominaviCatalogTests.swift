@@ -302,6 +302,74 @@ final class CominaviCatalogTests: XCTestCase {
         XCTAssertNil(firstRecoveryRequest.value(forHTTPHeaderField: "If-Range"))
     }
 
+    func testExplicitRedownloadRemovesInstalledCatalogAndDoesNotFallBack() async throws {
+        let root = try temporaryDirectory(named: "clean-redownload")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fixture = try makeCatalogDatabase(in: root, versionID: "c108-clean-redownload-v1")
+        let installRoot = root.appendingPathComponent("installed")
+        let installer = CominaviCatalogInstaller(
+            authorizer: CatalogAuthorizerStub(),
+            transport: CatalogTransportStub(
+                artifact: try Data(contentsOf: fixture.databaseURL),
+                catalog: fixture.catalog
+            ),
+            rootDirectory: installRoot,
+            chunkBytes: 64 * 1_024,
+            retryDelay: .zero
+        )
+        let original = try await installer.install(
+            fixture.catalog,
+            publicUserID: "account-a",
+            progress: nil
+        )
+        let eventDirectory = original.url.deletingLastPathComponent()
+        let staleDirectory = eventDirectory.appendingPathComponent("Corrupt", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: staleDirectory,
+            withIntermediateDirectories: true
+        )
+        try Data("stale".utf8).write(
+            to: staleDirectory.appendingPathComponent("stale.sqlite")
+        )
+
+        let failingTransport = CatalogTransportStub(
+            artifact: try Data(contentsOf: fixture.databaseURL),
+            catalog: fixture.catalog,
+            steps: [.cancel]
+        )
+        let recoveryInstaller = CominaviCatalogInstaller(
+            authorizer: CatalogAuthorizerStub(),
+            transport: failingTransport,
+            rootDirectory: installRoot,
+            chunkBytes: 64 * 1_024,
+            retryDelay: .zero
+        )
+
+        do {
+            _ = try await recoveryInstaller.redownload(
+                fixture.catalog,
+                publicUserID: "account-a",
+                progress: nil
+            )
+            XCTFail("Expected the clean redownload to be cancelled")
+        } catch is CancellationError {
+            // The old shard must already be gone before the first request begins.
+        }
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: original.url.path))
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: eventDirectory.appendingPathComponent("current.json").path
+            )
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staleDirectory.path))
+        let installed = try await recoveryInstaller.installedCatalogs(publicUserID: "account-a")
+        XCTAssertTrue(installed.isEmpty)
+        let requests = await failingTransport.requests()
+        XCTAssertEqual(requests.first?.value(forHTTPHeaderField: "Range"), "bytes=0-65535")
+        XCTAssertNil(requests.first?.value(forHTTPHeaderField: "If-Range"))
+    }
+
     func test200And416AreHandledWithoutBlessingTheWrongRepresentation() async throws {
         let root = try temporaryDirectory(named: "statuses")
         defer { try? FileManager.default.removeItem(at: root) }
