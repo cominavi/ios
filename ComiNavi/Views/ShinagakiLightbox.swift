@@ -6,6 +6,13 @@ enum ShinagakiArtworkLayout {
     static let maximumZoomMultiplier = CGFloat(6)
     static let doubleTapZoomMultiplier = CGFloat(2.5)
 
+    static func previewAspectRatio(for imageSize: CGSize) -> CGFloat {
+        guard imageSize.width > 0, imageSize.height > 0 else {
+            return a4PortraitAspectRatio
+        }
+        return imageSize.width / imageSize.height
+    }
+
     static func minimumZoomScale(
         imageSize: CGSize,
         viewportSize: CGSize

@@ -1410,6 +1410,10 @@ private struct ShinagakiRemoteImage: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(uiColor: .separator).opacity(0.25), lineWidth: 0.5)
         }
+        .aspectRatio(
+            ShinagakiArtworkLayout.previewAspectRatio(for: image?.size ?? .zero),
+            contentMode: .fit
+        )
         .task(id: media.displayURL) {
             await loadImage()
         }
@@ -1468,10 +1472,6 @@ private struct ShinagakiMediaGallery: View {
                 ShinagakiRemoteImage(
                     media: item,
                     accessibilityLabel: accessibilityLabel
-                )
-                .aspectRatio(
-                    ShinagakiArtworkLayout.a4PortraitAspectRatio,
-                    contentMode: .fit
                 )
                 .frame(maxWidth: .infinity)
             }

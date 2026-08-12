@@ -11,6 +11,31 @@ final class ShinagakiArtworkLayoutTests: XCTestCase {
         )
     }
 
+    func testPreviewAspectRatioUsesDecodedImageDimensions() {
+        XCTAssertEqual(
+            ShinagakiArtworkLayout.previewAspectRatio(
+                for: CGSize(width: 1_920, height: 1_080)
+            ),
+            16.0 / 9.0,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            ShinagakiArtworkLayout.previewAspectRatio(
+                for: CGSize(width: 1_600, height: 1_200)
+            ),
+            4.0 / 3.0,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testPreviewAspectRatioFallsBackWhileImageSizeIsUnavailable() {
+        XCTAssertEqual(
+            ShinagakiArtworkLayout.previewAspectRatio(for: .zero),
+            ShinagakiArtworkLayout.a4PortraitAspectRatio,
+            accuracy: 0.000_001
+        )
+    }
+
     func testMinimumZoomScaleFitsWholeImageInsideViewport() {
         XCTAssertEqual(
             ShinagakiArtworkLayout.minimumZoomScale(
