@@ -68,39 +68,43 @@ struct MapView: View {
                 model: model,
                 eventDaySelector: eventDaySelector,
                 visibleMapLayers: $visibleMapLayers,
-                onWhereAmI: {
-                    if model.locatedUser != nil {
-                        showsCurrentLocation = true
-                    } else {
-                        showsWhereAmI = true
-                    }
-                },
-                onUpdateLocation: {
-                    showsWhereAmI = true
-                },
-                onFindTable: {
-                    showsDestinationPicker = true
-                },
                 onFindCircle: {
                     showsCircleSearch = true
-                },
-                onClearDestination: {
-                    model.clearDestination()
                 }
             )
-            .frame(maxWidth: 760)
             .padding(.horizontal, 14)
             .safeAreaPadding(.top, 8)
 
-            if model.phase == .ready, model.scope == .venue, model.showsGenreOverlay {
-                MapLegendView(
-                    genrePlacements: model.genrePlacements,
-                    isExpanded: $isMapLegendExpanded
+            VStack(alignment: .trailing, spacing: 8) {
+                if model.phase == .ready, model.scope == .venue, model.showsGenreOverlay {
+                    MapLegendView(
+                        genrePlacements: model.genrePlacements,
+                        isExpanded: $isMapLegendExpanded
+                    )
+                }
+
+                MapLocationControls(
+                    location: model.locatedUser,
+                    destination: model.destination,
+                    eventNumber: model.eventNumber,
+                    onWhereAmI: {
+                        if model.locatedUser != nil {
+                            showsCurrentLocation = true
+                        } else {
+                            showsWhereAmI = true
+                        }
+                    },
+                    onFindTable: {
+                        showsDestinationPicker = true
+                    },
+                    onClearDestination: {
+                        model.clearDestination()
+                    }
                 )
-                .padding(.trailing, MapChromeLayout.trailingInset)
-                .safeAreaPadding(.bottom, 78)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
+            .padding(.trailing, MapChromeLayout.trailingInset)
+            .safeAreaPadding(.bottom, 78)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(uiColor: .secondarySystemBackground))
@@ -369,151 +373,136 @@ private struct MapControlPanel: View {
     let model: MapScreenModel
     let eventDaySelector: CatalogEventDayBanner?
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
-    let onWhereAmI: () -> Void
-    let onUpdateLocation: () -> Void
-    let onFindTable: () -> Void
     let onFindCircle: () -> Void
-    let onClearDestination: () -> Void
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let eventDaySelector {
-                eventDaySelector
-            }
-            MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
-            primaryActions
+            selectors
             if model.isSearchPresented {
                 MapSearchField(model: model, onFindByLocation: onFindCircle)
             }
         }
-    }
-
-    private var primaryActions: some View {
-        Group {
-            if horizontalSizeClass == .regular {
-                HStack(alignment: .top, spacing: 8) {
-                    actionButtons
-                }
-            } else {
-                VStack(spacing: 8) {
-                    actionButtons
-                }
-            }
-        }
+        .frame(maxWidth: 760)
     }
 
     @ViewBuilder
-    private var actionButtons: some View {
-        WhereAmIEntryButton(
-            location: model.locatedUser,
-            action: onWhereAmI,
-            updateAction: onUpdateLocation
-        )
-        .frame(maxWidth: .infinity)
-
-        DestinationEntryButton(
-            destination: model.destination,
-            eventNumber: model.eventNumber,
-            action: onFindTable,
-            clearAction: onClearDestination
-        )
-        .frame(maxWidth: .infinity)
+    private var selectors: some View {
+        if verticalSizeClass == .compact {
+            HStack(spacing: 8) {
+                if let eventDaySelector {
+                    eventDaySelector
+                }
+                MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
+            }
+        } else {
+            if let eventDaySelector {
+                eventDaySelector
+            }
+            MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
+        }
     }
 }
 
-private struct DestinationEntryButton: View {
+private struct MapLocationControls: View {
+    let location: LocatedMapUser?
     let destination: MapDestination?
     let eventNumber: Int
-    let action: () -> Void
-    let clearAction: () -> Void
+    let onWhereAmI: () -> Void
+    let onFindTable: () -> Void
+    let onClearDestination: () -> Void
 
-    @State private var copied = false
-    @ScaledMetric(relativeTo: .headline) private var minimumHeight = 58.0
+    @State private var copiedDestination = false
+    @State private var showsDestinationActions = false
     @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
-        HStack(spacing: 0) {
-            Button(action: action) {
-                HStack(spacing: 12) {
-                    LucideIcon("mappin.and.ellipse")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(
-                            destination.map { String(localized: "Table \($0.spaceCode)") }
-                                ?? String(localized: "Find a Circle")
-                        )
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    LucideIcon("chevron.forward")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
-                .padding(.leading, 18)
-                .padding(.trailing, destination == nil ? 18 : 12)
-                .frame(maxWidth: .infinity, minHeight: minimumHeight)
-                .contentShape(.rect)
+        HStack(spacing: 8) {
+            Button(action: onWhereAmI) {
+                MapLocationControlIcon(
+                    icon: "location.viewfinder",
+                    isActive: location != nil
+                )
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Choose a circle and pin it on the map")
+            .accessibilityLabel(whereAmILabel)
+            .accessibilityHint(
+                location == nil
+                    ? "Open the venue locator. You can also press and hold the map."
+                    : "View, copy, or update your current location"
+            )
+            .accessibilityIdentifier(
+                location == nil ? "where-am-i-button" : "current-location-button"
+            )
+
+            Button {
+                if destination == nil {
+                    onFindTable()
+                } else {
+                    showsDestinationActions = true
+                }
+            } label: {
+                destinationIcon
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(destinationLabel)
+            .accessibilityHint(destinationHint)
             .accessibilityIdentifier("find-table-button")
+            .confirmationDialog(
+                destinationLabel,
+                isPresented: $showsDestinationActions,
+                titleVisibility: .visible
+            ) {
+                if let destination {
+                    Button {
+                        onFindTable()
+                    } label: {
+                        LucideLabel("Find a Circle", icon: "mappin.and.ellipse")
+                    }
 
-            if let destination {
-                Divider()
-                    .frame(height: 34)
+                    Divider()
 
-                Button {
-                    copy(destination)
-                } label: {
-                    LucideIcon(copied ? "checkmark" : "doc.on.doc")
-                        .font(.headline.weight(.semibold))
-                        .frame(width: 52, height: minimumHeight)
-                        .contentShape(.rect)
+                    Button {
+                        copy(destination)
+                    } label: {
+                        LucideLabel("Copy circle location", icon: "doc.on.doc")
+                    }
+                    .accessibilityIdentifier("copy-destination-button")
+
+                    Button(role: .destructive) {
+                        onClearDestination()
+                    } label: {
+                        LucideLabel("Clear destination", icon: "xmark")
+                    }
+                    .accessibilityIdentifier("clear-destination-button")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(copied ? "Copied" : "Copy circle location")
-                .accessibilityHint("Copies the venue-aware location and a ComiNavi link")
-                .accessibilityIdentifier("copy-destination-button")
-
-                Divider()
-                    .frame(height: 34)
-
-                Button(action: clearAction) {
-                    LucideIcon("xmark")
-                        .font(.headline.weight(.semibold))
-                        .frame(width: 56, height: minimumHeight)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear destination")
-                .accessibilityIdentifier("clear-destination-button")
             }
         }
-        .background(Color(uiColor: .systemBackground).opacity(0.94))
-        .clipShape(.rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
-        }
         .onChange(of: destination?.selectedAt) {
-            copied = false
+            copiedDestination = false
         }
     }
 
-    private var subtitle: String {
-        guard destination != nil else {
-            return String(localized: "Pin a circle using its Comiket address")
-        }
-        return String(localized: "Pinned on the map · follow current signs and staff")
+    private var whereAmILabel: String {
+        location.map { String(localized: "You are near \($0.spaceCode)") }
+            ?? String(localized: "Where am I?")
+    }
+
+    private var destinationLabel: String {
+        destination.map { String(localized: "Table \($0.spaceCode)") }
+            ?? String(localized: "Find a Circle")
+    }
+
+    private var destinationIcon: some View {
+        MapLocationControlIcon(
+            icon: copiedDestination ? "checkmark" : "mappin.and.ellipse",
+            isActive: destination != nil
+        )
+    }
+
+    private var destinationHint: String {
+        String(localized: "Choose a circle and pin it on the map")
     }
 
     private func copy(_ destination: MapDestination) {
@@ -527,94 +516,33 @@ private struct DestinationEntryButton: View {
             shared?.clipboardText(
                 locationText: destination.canonicalLocationText
             ) ?? destination.canonicalLocationText
-        copied = true
+        copiedDestination = true
         hapticFeedback?.play(.copyConfirmation)
     }
 }
 
-private struct WhereAmIEntryButton: View {
-    let location: LocatedMapUser?
-    let action: () -> Void
-    let updateAction: () -> Void
-
-    @ScaledMetric(relativeTo: .headline) private var minimumHeight = 58.0
+private struct MapLocationControlIcon: View {
+    let icon: String
+    let isActive: Bool
 
     var body: some View {
-        HStack(spacing: 0) {
-            Button(action: action) {
-                HStack(spacing: 12) {
-                    LucideIcon("location.viewfinder")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(
-                            location.map { String(localized: "You are near \($0.spaceCode)") }
-                                ?? String(localized: "Where am I?")
-                        )
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        Text(
-                            location == nil
-                                ? "Press and hold the map to set your position"
-                                : "View and copy your current location"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 8)
-                    LucideIcon("chevron.forward")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
-                .padding(.leading, 18)
-                .padding(.trailing, location == nil ? 18 : 12)
-                .frame(maxWidth: .infinity, minHeight: minimumHeight)
-                .contentShape(.rect)
+        LucideIcon(icon)
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(isActive ? Color.accentColor : Color.primary)
+            .frame(width: 54, height: 54)
+            .background(.regularMaterial, in: .circle)
+            .overlay {
+                Circle()
+                    .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
             }
-            .buttonStyle(.plain)
-            .accessibilityHint(
-                location == nil
-                    ? "Open the large-button venue locator. You can also press and hold the map."
-                    : "View and copy your current location"
-            )
-            .accessibilityIdentifier(
-                location == nil ? "where-am-i-button" : "current-location-button")
-
-            if location != nil {
-                Divider()
-                    .frame(height: 34)
-
-                Button {
-                    updateAction()
-                } label: {
-                    VStack(spacing: 2) {
-                        LucideIcon("location.viewfinder")
-                            .font(.headline.weight(.semibold))
-                        Text("Update location")
-                            .font(.caption2.weight(.semibold))
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                    }
-                }
-                .frame(width: 72)
-                .frame(minHeight: minimumHeight)
-                .accessibilityIdentifier("banner-update-location")
-            }
-        }
-        .background(Color(uiColor: .systemBackground).opacity(0.94))
-        .clipShape(.rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
-        }
+            .contentShape(.circle)
     }
 }
 
 private struct MapSelectorBar: View {
     let model: MapScreenModel
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         HStack(spacing: 8) {
@@ -650,7 +578,9 @@ private struct MapSelectorBar: View {
             }
             .accessibilityIdentifier("map-venue-selector")
 
-            Spacer(minLength: 0)
+            if verticalSizeClass != .compact {
+                Spacer(minLength: 0)
+            }
 
             Menu {
                 Section("Quick Views") {

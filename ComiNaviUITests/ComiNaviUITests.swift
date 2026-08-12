@@ -617,7 +617,7 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testDemoIPadMapSelectorAndActionsUseLeadingLayout() throws {
+    func testDemoIPadMapSelectorsLeadAndLocationActionsTrail() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")
         app.launch()
@@ -636,7 +636,76 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertLessThan(eventDaySelector.frame.midX, app.frame.midX)
         XCTAssertEqual(whereAmI.frame.midY, findTable.frame.midY, accuracy: 2)
         XCTAssertLessThan(whereAmI.frame.maxX, findTable.frame.minX)
-        takeScreenshot(named: "Map-iPad-Leading-Controls")
+        XCTAssertGreaterThan(whereAmI.frame.midX, app.frame.midX)
+        XCTAssertGreaterThan(whereAmI.frame.midY, app.frame.midY)
+        XCTAssertEqual(whereAmI.frame.width, whereAmI.frame.height, accuracy: 2)
+        XCTAssertEqual(findTable.frame.width, findTable.frame.height, accuracy: 2)
+        takeScreenshot(named: "Map-iPad-Location-Actions-Bottom-Trailing")
+    }
+
+    @MainActor
+    func testDemoIPhoneLandscapeMapSelectorsShareOneRow() throws {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        guard app.frame.width > app.frame.height, app.frame.height < 500 else {
+            throw XCTSkip("This adaptive layout assertion requires an iPhone landscape window.")
+        }
+
+        let eventDaySelector = app.buttons["global-event-day-banner"]
+        let venueSelector = app.buttons["map-venue-selector"]
+        let layerButton = app.buttons["map-layer-button"]
+        let whereAmI = app.buttons["where-am-i-button"]
+        let findTable = app.buttons["find-table-button"]
+        XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 20))
+        XCTAssertTrue(venueSelector.exists)
+        XCTAssertTrue(layerButton.exists)
+        XCTAssertTrue(whereAmI.waitForExistence(timeout: 20))
+        XCTAssertTrue(findTable.waitForExistence(timeout: 20))
+
+        XCTAssertEqual(eventDaySelector.frame.midY, venueSelector.frame.midY, accuracy: 2)
+        XCTAssertEqual(venueSelector.frame.midY, layerButton.frame.midY, accuracy: 2)
+        XCTAssertLessThan(eventDaySelector.frame.maxX, venueSelector.frame.minX)
+        XCTAssertLessThan(venueSelector.frame.maxX, layerButton.frame.minX)
+        XCTAssertLessThan(layerButton.frame.minX - venueSelector.frame.maxX, 12)
+
+        XCTAssertEqual(whereAmI.frame.midY, findTable.frame.midY, accuracy: 2)
+        XCTAssertLessThan(whereAmI.frame.maxX, findTable.frame.minX)
+        XCTAssertGreaterThan(whereAmI.frame.midX, app.frame.midX)
+        XCTAssertGreaterThan(whereAmI.frame.midY, app.frame.midY)
+        XCTAssertEqual(whereAmI.frame.width, whereAmI.frame.height, accuracy: 2)
+        XCTAssertEqual(findTable.frame.width, findTable.frame.height, accuracy: 2)
+        takeScreenshot(named: "Map-iPhone-Landscape-Compact-Chrome")
+    }
+
+    @MainActor
+    func testDemoIPhonePortraitMapLocationActionsUseBottomTrailingIcons() throws {
+        XCUIDevice.shared.orientation = .portrait
+
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        guard app.frame.height > app.frame.width, app.frame.width < 500 else {
+            throw XCTSkip("This adaptive layout assertion requires an iPhone portrait window.")
+        }
+
+        let whereAmI = app.buttons["where-am-i-button"]
+        let findTable = app.buttons["find-table-button"]
+        XCTAssertTrue(whereAmI.waitForExistence(timeout: 20))
+        XCTAssertTrue(findTable.waitForExistence(timeout: 20))
+
+        XCTAssertEqual(whereAmI.frame.midY, findTable.frame.midY, accuracy: 2)
+        XCTAssertLessThan(whereAmI.frame.maxX, findTable.frame.minX)
+        XCTAssertGreaterThan(whereAmI.frame.midX, app.frame.midX)
+        XCTAssertGreaterThan(whereAmI.frame.midY, app.frame.midY)
+        XCTAssertEqual(whereAmI.frame.width, whereAmI.frame.height, accuracy: 2)
+        XCTAssertEqual(findTable.frame.width, findTable.frame.height, accuracy: 2)
+        takeScreenshot(named: "Map-iPhone-Portrait-Location-Actions-Bottom-Trailing")
     }
 
     @MainActor
@@ -1502,8 +1571,14 @@ final class ComiNaviUITests: XCTestCase {
         let userPositioned = NSPredicate(format: "value CONTAINS %@", "user location シ01")
         expectation(for: userPositioned, evaluatedWith: map)
         waitForExpectations(timeout: 5)
-        XCTAssertTrue(app.buttons["current-location-button"].exists)
-        XCTAssertTrue(app.buttons["banner-update-location"].exists)
+        let currentLocationButton = app.buttons["current-location-button"]
+        XCTAssertTrue(currentLocationButton.exists)
+        XCTAssertFalse(app.buttons["banner-update-location"].exists)
+        XCTAssertEqual(
+            currentLocationButton.frame.width,
+            currentLocationButton.frame.height,
+            accuracy: 2
+        )
         takeScreenshot(named: "WhereAmI-Map-Focused")
 
         let destinationEntry = app.buttons["find-table-button"]
@@ -1534,9 +1609,11 @@ final class ComiNaviUITests: XCTestCase {
         let destinationOnMap = NSPredicate(format: "value CONTAINS %@", "destination ア02")
         expectation(for: destinationOnMap, evaluatedWith: map)
         waitForExpectations(timeout: 5)
-        XCTAssertTrue(app.buttons["clear-destination-button"].exists)
-        XCTAssertTrue(app.buttons["copy-destination-button"].exists)
         takeScreenshot(named: "FindTable-Pinned")
+
+        destinationEntry.tap()
+        XCTAssertTrue(app.buttons["clear-destination-button"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["copy-destination-button"].exists)
     }
 
     @MainActor
