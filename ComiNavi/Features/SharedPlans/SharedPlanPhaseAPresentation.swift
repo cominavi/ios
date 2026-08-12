@@ -219,6 +219,9 @@ final class SharedPlanManagementModel {
             try await service.refreshMembers(planID: planID, limit: 50)
             memberIssue = nil
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             memberIssue = error.localizedDescription
         }
 
@@ -226,6 +229,9 @@ final class SharedPlanManagementModel {
             try await service.refreshInvitations(planID: planID, limit: 50)
             invitationIssue = nil
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             invitationIssue = error.localizedDescription
         }
     }
@@ -245,6 +251,9 @@ final class SharedPlanManagementModel {
             try await service.loadMoreMembers(planID: planID, limit: 50)
             memberIssue = nil
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             memberIssue = error.localizedDescription
         }
     }
@@ -264,6 +273,9 @@ final class SharedPlanManagementModel {
             try await service.loadMoreInvitations(planID: planID, limit: 50)
             invitationIssue = nil
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             invitationIssue = error.localizedDescription
         }
     }
@@ -299,6 +311,9 @@ final class SharedPlanManagementModel {
             }
             return .queued
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return nil
+            }
             actionIssue = error.localizedDescription
             return nil
         }
@@ -348,6 +363,9 @@ final class SharedPlanManagementModel {
             await service.drainRESTOutbox()
             actionIssue = nil
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             actionIssue = error.localizedDescription
         }
     }
@@ -370,6 +388,9 @@ final class SharedPlanManagementModel {
             await service.drainRESTOutbox()
             actionIssue = nil
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             actionIssue = error.localizedDescription
         }
     }
@@ -388,6 +409,9 @@ final class SharedPlanManagementModel {
             try await service.discardQuarantinedWrite(id: id)
             actionIssue = nil
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             actionIssue = error.localizedDescription
         }
     }
@@ -402,6 +426,9 @@ final class SharedPlanManagementModel {
             actionIssue = nil
             return true
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return false
+            }
             actionIssue = error.localizedDescription
             return false
         }
@@ -516,7 +543,9 @@ final class SharedPlanNotificationInboxModel {
             try await service.refreshNotifications(limit: 50)
             issueMessage = nil
         } catch {
-            issueMessage = error.localizedDescription
+            if !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled {
+                issueMessage = error.localizedDescription
+            }
         }
     }
 
@@ -531,6 +560,9 @@ final class SharedPlanNotificationInboxModel {
             try await service.loadMoreNotifications(limit: 50)
             issueMessage = nil
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             issueMessage = error.localizedDescription
         }
     }
@@ -556,7 +588,9 @@ final class SharedPlanNotificationInboxModel {
                 try await service.markNotificationRead(id: notification.id, now: now)
             }
         } catch {
-            issueMessage = error.localizedDescription
+            if !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled {
+                issueMessage = error.localizedDescription
+            }
         }
         await service.drainNotificationReadOutbox()
         synchronize(from: service)

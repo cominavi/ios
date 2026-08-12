@@ -557,6 +557,15 @@ struct SharedPlanMutationResult: Equatable, Sendable {
     }
 }
 
+enum SharedPlanErrorHandling {
+    static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        return (error as? URLError)?.code == .cancelled
+    }
+}
+
 protocol SharedPlanRemoteServicing: Sendable {
     func fetchPlans() async throws -> [SharedPlan]
     func fetchSyncBootstrap(planID: String) async throws -> SharedPlanSyncBootstrap

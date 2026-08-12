@@ -581,6 +581,9 @@ final class SharedPlanEditorModel {
                 try await service.refreshAllAllocationMembers(planID: planID)
                 await reload(using: service)
             } catch {
+                guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                    return
+                }
                 issueMessage = error.localizedDescription
             }
         }
@@ -628,7 +631,10 @@ final class SharedPlanEditorModel {
             appliedProjectionGeneration = projection.generation
             issueMessage = nil
         } catch {
-            guard requestID == reloadRequestID else { return }
+            guard requestID == reloadRequestID,
+                  !SharedPlanErrorHandling.isCancellation(error),
+                  !Task.isCancelled
+            else { return }
             issueMessage = error.localizedDescription
         }
     }
@@ -707,6 +713,9 @@ final class SharedPlanEditorModel {
                 self.scheduleMemoFlush(draft, using: service, after: self.memoDebounce)
             } catch {
                 guard self.memoDrafts[draft.id]?.generation == draft.generation else { return }
+                guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                    return
+                }
                 self.memoDrafts[draft.id] = draft.requiringRecovery(
                     .mutationFailed,
                     message: error.localizedDescription
@@ -994,6 +1003,10 @@ final class SharedPlanEditorModel {
             issueMessage = nil
         } catch {
             guard parentResolutionRequest == request else { return }
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                parentResolutionRequest = nil
+                return
+            }
             parentResolutionRequest = nil
             issueMessage = error.localizedDescription
         }
@@ -1088,6 +1101,9 @@ final class SharedPlanEditorModel {
                 parentResolutionDraft = nil
             }
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             issueMessage = error.localizedDescription
         }
     }
@@ -1141,6 +1157,9 @@ final class SharedPlanEditorModel {
             _ = try await operation()
             await reload(using: service)
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             issueMessage = error.localizedDescription
             await reloadPreservingIssue(using: service)
         }
@@ -1156,6 +1175,9 @@ final class SharedPlanEditorModel {
             try await operation()
             await reload(using: service)
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             issueMessage = error.localizedDescription
             await reloadPreservingIssue(using: service)
         }
@@ -1251,6 +1273,9 @@ final class SharedPlanEditorModel {
             }
             await reload(using: service)
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             let failure = error.localizedDescription
             if memoDrafts[draftID]?.generation == draft.generation {
                 await preserveMemoDraftForRecovery(
@@ -1328,6 +1353,9 @@ final class SharedPlanEditorModel {
             memoDrafts[draft.id] = retained
             persistedMemoDraftGenerations[draft.id] = retained.generation
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             issueMessage = error.localizedDescription
             memoDrafts[draft.id] = retained
         }

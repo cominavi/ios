@@ -22,6 +22,30 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(service.actions, [.circlePresence(.active, Self.circle)])
     }
 
+    func testExpectedCancellationDoesNotBecomeAnEditorIssue() async throws {
+        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let model = makeWritableModel()
+        await model.load(using: service)
+
+        service.editorProjectionError = CancellationError()
+        await model.reload(using: service)
+        XCTAssertNil(model.issueMessage)
+
+        service.editorProjectionError = SharedPlanError.persistenceFailed
+        await model.reload(using: service)
+        XCTAssertEqual(
+            model.issueMessage,
+            SharedPlanError.persistenceFailed.localizedDescription
+        )
+
+        model.dismissIssue()
+        service.persistMemoDraftError = URLError(.cancelled)
+        model.stageMemo("離脱しても保つ下書き", circle: Self.circle, using: service)
+        try await waitUntil { service.persistMemoDraftAttempts == 1 }
+        XCTAssertNil(model.issueMessage)
+        XCTAssertTrue(model.hasUnsavedMemoDrafts)
+    }
+
     func testExplicitDisabledGateKeepsEditorReadOnlyAndSendsNoMutation() async {
         let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
         let model = SharedPlanEditorModel(
@@ -1044,6 +1068,9 @@ private final class PhaseBEditorServiceStub: SharedPlanEditorServicing {
     var snapshot: SharedPlanEditorSnapshot
     var projectionGeneration: UInt64 = 1
     var actions: [PhaseBEditorAction] = []
+    var editorProjectionError: Error?
+    var persistMemoDraftError: Error?
+    var persistMemoDraftAttempts = 0
     var circleParentInventory: SharedPlanParentResolutionInventory?
     var circleParentInventories: [UUID: SharedPlanParentResolutionInventory] = [:]
     var needParentInventory: SharedPlanParentResolutionInventory?
@@ -1080,6 +1107,7 @@ private final class PhaseBEditorServiceStub: SharedPlanEditorServicing {
 
     func editorProjection(planID: String) async throws -> SharedPlanEditorProjection {
         guard planID == snapshot.plan.id else { throw SharedPlanError.planNotFound }
+        if let editorProjectionError { throw editorProjectionError }
         let captured = SharedPlanEditorProjection(
             generation: projectionGeneration,
             snapshot: snapshot
@@ -1174,6 +1202,8 @@ private final class PhaseBEditorServiceStub: SharedPlanEditorServicing {
     }
 
     func persistMemoDraft(_ draft: SharedPlanMemoDraft) async throws {
+        persistMemoDraftAttempts += 1
+        if let persistMemoDraftError { throw persistMemoDraftError }
         snapshot = snapshot.replacingMemoDraft(draft)
     }
 

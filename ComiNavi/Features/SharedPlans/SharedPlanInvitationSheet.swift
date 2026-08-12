@@ -157,6 +157,9 @@ struct SharedPlanInvitationSheet: View {
             issue = nil
             canRetryPreview = false
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             let consumesCapability = SharedPlanInvitationFailurePolicy
                 .consumesRouteCapability(after: error)
             if consumesCapability {
@@ -189,6 +192,9 @@ struct SharedPlanInvitationSheet: View {
                 hapticFeedback?.play(.completion)
                 onDismiss()
             } catch {
+                guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                    return
+                }
                 issue = error.localizedDescription
                 hapticFeedback?.play(.error)
             }

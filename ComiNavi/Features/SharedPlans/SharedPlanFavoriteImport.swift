@@ -104,6 +104,9 @@ final class SharedPlanFavoriteImportModel {
             failures = []
             issueMessage = nil
         } catch {
+            guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                return
+            }
             issueMessage = error.localizedDescription
         }
     }
@@ -138,6 +141,9 @@ final class SharedPlanFavoriteImportModel {
                 existingWCIDs.insert(item.wcID)
                 selectedWCIDs.remove(item.wcID)
             } catch {
+                guard !SharedPlanErrorHandling.isCancellation(error), !Task.isCancelled else {
+                    return
+                }
                 nextFailures.append(
                     SharedPlanFavoriteImportFailure(
                         wcID: item.wcID,
