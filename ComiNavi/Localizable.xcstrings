@@ -19008,13 +19008,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "个人资料"
+            "value" : "我"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "個人資料"
+            "value" : "我"
           }
         }
       }

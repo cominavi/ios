@@ -353,6 +353,7 @@ final class LocalizationTests: XCTestCase {
             "Empty text": ["zh-Hans": "空文本", "zh-Hant": "空文本"],
             "Galleria": ["zh-Hans": "连廊", "zh-Hant": "連廊"],
             "Owner": ["zh-Hans": "所有者", "zh-Hant": "所有者"],
+            "Profile": ["zh-Hans": "我", "zh-Hant": "我"],
             "Match all": ["zh-Hans": "匹配全部", "zh-Hant": "匹配全部"],
             "Match any": ["zh-Hans": "匹配任一项", "zh-Hant": "匹配任一項"],
             "Match tags": ["zh-Hans": "匹配标签", "zh-Hant": "匹配標籤"],
