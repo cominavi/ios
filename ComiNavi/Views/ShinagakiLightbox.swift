@@ -77,7 +77,10 @@ struct ShinagakiLightbox: View {
             }
         }
         .background(Color.black)
-        .preferredColorScheme(.dark)
+        // Keep the dark controls local to the lightbox. `preferredColorScheme`
+        // is a presentation-level preference and can change the presenting
+        // app's appearance while this sheet is shown.
+        .environment(\.colorScheme, .dark)
         .accessibilityAction(.escape) {
             dismiss()
         }
