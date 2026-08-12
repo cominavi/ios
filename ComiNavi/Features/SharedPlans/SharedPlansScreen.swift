@@ -1162,7 +1162,7 @@ private struct SharedPlanInformationScreen: View {
                     }
 
                     if features.writesEnabled, plan.role == .owner {
-                        Section {
+                        VStack(alignment: .leading, spacing: 8) {
                             Button(role: plan.lifecycle == .active ? .destructive : nil) {
                                 if plan.lifecycle == .active {
                                     confirmation = .archive
@@ -1179,11 +1179,16 @@ private struct SharedPlanInformationScreen: View {
                             .tint(plan.lifecycle == .active ? .red : .accentColor)
                             .frame(maxWidth: .infinity)
                             .disabled(!quarantinedChanges.isEmpty)
-                        } footer: {
+
                             Text(plan.lifecycle == .active
                                 ? String(localized: "Archived plans remain available but cannot be edited.")
                                 : String(localized: "Reopen this plan to make it editable again."))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     }
 
                     if let issue {

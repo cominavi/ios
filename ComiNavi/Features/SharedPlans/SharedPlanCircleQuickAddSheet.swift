@@ -129,9 +129,6 @@ struct SharedPlanCircleQuickAddSheet: View {
                     focusedField = .itemName
                 }
 
-                Stepper("Quantity: \(wantedQuantity)", value: $wantedQuantity, in: 1...999)
-                    .accessibilityIdentifier("circle-shared-plan-request-quantity")
-
                 TextField(
                     "Price per item (optional)",
                     text: $rawUnitPrice,
@@ -140,6 +137,9 @@ struct SharedPlanCircleQuickAddSheet: View {
                 .focused($focusedField, equals: .price)
                 .keyboardType(.numberPad)
                 .accessibilityIdentifier("circle-shared-plan-request-price")
+
+                Stepper("Quantity: \(wantedQuantity)", value: $wantedQuantity, in: 1...999)
+                    .accessibilityIdentifier("circle-shared-plan-request-quantity")
             } header: {
                 Text("What to buy")
             } footer: {

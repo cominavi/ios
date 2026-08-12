@@ -231,6 +231,13 @@ final class ComiNaviUITests: XCTestCase {
             preview.value as? String,
             "Requested 2, assigned 0, bought 0"
         )
+        XCTAssertEqual(app.steppers.count, 2)
+        let requestedStepper = app.steppers.element(boundBy: 0)
+        let boughtStepper = app.steppers.element(boundBy: 1)
+        XCTAssertEqual(requestedStepper.label, "Requested, 2")
+        XCTAssertEqual(boughtStepper.label, "Bought, 0")
+        XCTAssertEqual(requestedStepper.value as? String, "2")
+        XCTAssertEqual(boughtStepper.value as? String, "0")
         app.buttons["Done"].tap()
         XCTAssertFalse(app.navigationBars["Purchase progress"].waitForExistence(timeout: 2))
 
