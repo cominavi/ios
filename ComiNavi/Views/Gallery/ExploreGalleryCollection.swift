@@ -232,15 +232,16 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             if renderedCardDetail == .artworkOnly {
                 return CGSize(width: width, height: artworkHeight)
             }
-            let headlineHeight = UIFont.preferredFont(forTextStyle: .headline).lineHeight * 2
-            let hasSubtitle = renderedCardDetail == .full
+            let penNameHeight = UIFont.preferredFont(forTextStyle: .caption2).lineHeight
+            let titleHeight = UIFont.preferredFont(forTextStyle: .subheadline).lineHeight
+            let hasLocation = renderedCardDetail == .full
                 && circleIndex(for: indexPath) != nil
-            let subtitleHeight = hasSubtitle
-                ? 8 + UIFont.preferredFont(forTextStyle: .caption1).lineHeight
+            let locationHeight = hasLocation
+                ? 2 + UIFont.preferredFont(forTextStyle: .caption1).lineHeight
                 : 0
             return CGSize(
                 width: width,
-                height: artworkHeight + 8 + headlineHeight + subtitleHeight
+                height: artworkHeight + 8 + penNameHeight + 2 + titleHeight + locationHeight
             )
         }
 

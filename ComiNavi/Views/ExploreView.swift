@@ -730,17 +730,26 @@ struct ExploreGalleryCard: View {
             )
 
             if detail != .artworkOnly {
-                Text(circle.displayName)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-            }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(circle.penName ?? " ")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1, reservesSpace: true)
+                        .opacity(circle.penName == nil ? 0 : 1)
 
-            if detail == .full {
-                Text(circle.spaceLabel)
-                    .font(.caption.monospaced().weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    Text(circle.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    if detail == .full {
+                        Text(circle.spaceLabel)
+                            .font(.caption.monospaced().weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -749,7 +758,7 @@ struct ExploreGalleryCard: View {
     }
 
     private var accessibilityLabel: String {
-        [circle.displayName, circle.penName, circle.spaceLabel]
+        [circle.penName, circle.displayName, circle.spaceLabel]
             .compactMap { $0 }
             .joined(separator: ", ")
     }
@@ -858,23 +867,24 @@ struct ExploreCircleRow: View {
             )
                 .frame(width: artworkWidth)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(circle.displayName)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-
-                Text(circle.spaceLabel)
-                    .font(.subheadline.monospaced().weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
+            VStack(alignment: .leading, spacing: 3) {
                 if let penName = circle.penName {
                     Text(penName)
-                        .font(.subheadline)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+
+                Text(circle.displayName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Text(circle.spaceLabel)
+                    .font(.caption.monospaced().weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
 
                 if !circle.tags.isEmpty {
                     Text(circle.tags.prefix(3).map { "#\($0)" }.joined(separator: "  "))
