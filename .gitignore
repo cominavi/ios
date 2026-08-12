@@ -22,6 +22,8 @@ fastlane/.env.*
 !fastlane/.env.example
 fastlane/AuthKey_*.p8
 fastlane/api_key*.json
+.bundle/
+vendor/bundle/
 
 # Swift Package Manager local state
 .build/

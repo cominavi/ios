@@ -47,6 +47,38 @@ Upload an existing signed IPA to TestFlight
 
 Build and upload the current version to TestFlight
 
+### ios upload_external_ipa
+
+```sh
+[bundle exec] fastlane ios upload_external_ipa
+```
+
+Upload an existing IPA, submit it to External Beta, and verify the result
+
+### ios external_beta
+
+```sh
+[bundle exec] fastlane ios external_beta
+```
+
+Build, upload, submit, and verify an external TestFlight beta
+
+### ios check_external
+
+```sh
+[bundle exec] fastlane ios check_external
+```
+
+Verify an external TestFlight build without changing App Store Connect
+
+### ios submit_external
+
+```sh
+[bundle exec] fastlane ios submit_external
+```
+
+Submit an already-uploaded build to External Beta and verify the result
+
 ### ios upload_metadata
 
 ```sh

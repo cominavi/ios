@@ -1,0 +1,1 @@
+Catalog downloads are now more reliable. Authenticated streaming and resumable chunked downloads improve large data transfers.

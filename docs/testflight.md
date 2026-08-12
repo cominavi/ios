@@ -16,9 +16,19 @@ there is no standalone crawl catalog mode.
 ## Fastlane
 
 Fastlane is configured for App Store Connect API-key authentication, automatic
-signing, local IPA builds, and internal TestFlight uploads. The checked-in
-configuration contains only the key ID and issuer ID. The private `.p8` key is
-ignored by Git and must remain local.
+signing, local IPA builds, and internal or external TestFlight distribution.
+Fastlane and its transitive dependencies are pinned by `Gemfile.lock`. The
+checked-in configuration contains only the key ID and issuer ID. The private
+`.p8` key is ignored by Git and must remain local.
+
+Install the locked Ruby dependencies before running a lane:
+
+```sh
+bundle install
+```
+
+The checked-in lockfile uses Fastlane 2.232.2 and Bundler 2.7.2. The existing
+Home Manager Fastlane package provides the same Fastlane version on this Mac.
 
 The default key location is `fastlane/AuthKey_672X4QRBR9.p8`. Keep it readable
 only by your account:
@@ -31,13 +41,13 @@ Verify that the credentials can access the ComiNavi app without changing App
 Store Connect state:
 
 ```sh
-FASTLANE_SKIP_UPDATE_CHECK=1 fastlane ios asc_check
+FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios asc_check
 ```
 
 Build a signed archive and IPA without uploading it:
 
 ```sh
-FASTLANE_SKIP_UPDATE_CHECK=1 fastlane ios build_testflight
+FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios build_testflight
 ```
 
 This lane uses `Configuration/FastlaneExportOptions.plist`, whose destination is
@@ -49,11 +59,53 @@ existing `Configuration/TestFlightExportOptions.plist` retains Xcode's newer
 Build and upload the current version to internal TestFlight testing:
 
 ```sh
-FASTLANE_SKIP_UPDATE_CHECK=1 fastlane ios beta
+FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios beta
 ```
 
-To upload an existing IPA instead, set `IPA_PATH` and run `fastlane ios
-upload_ipa`. Set `CHANGELOG` to populate TestFlight's **What to Test** text.
+To upload an existing IPA instead, set `IPA_PATH` and run `bundle exec fastlane
+ios upload_ipa`. Set `CHANGELOG` to populate TestFlight's **What to Test** text.
+
+Before external distribution, update both localized release-note files:
+
+- `fastlane/testflight/what_to_test/ja.txt`
+- `fastlane/testflight/what_to_test/en-US.txt`
+
+Build, upload, submit to the `External Beta` group, notify testers, and verify
+the resulting App Store Connect state:
+
+```sh
+FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios external_beta
+```
+
+Submit an existing IPA with the same external workflow:
+
+```sh
+IPA_PATH=/absolute/path/to/ComiNavi.ipa \
+  FASTLANE_SKIP_UPDATE_CHECK=1 \
+  bundle exec fastlane ios upload_external_ipa
+```
+
+If the build is already uploaded, submit it without uploading another binary:
+
+```sh
+FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios submit_external \
+  app_version:1.0 \
+  build_number:2026081202
+```
+
+Check an external build without modifying App Store Connect:
+
+```sh
+FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios check_external \
+  app_version:1.0 \
+  build_number:2026081202
+```
+
+`TESTFLIGHT_EXTERNAL_GROUP`, `CHANGELOG_JA`, and `CHANGELOG_EN_US` can override
+the checked-in defaults. External lanes wait for Apple to finish processing,
+submit the build for Beta App Review, enable automatic tester notification, and
+fail unless the build is assigned to the requested group in an expected review
+or testing state.
 
 The defaults can be overridden with `ASC_KEY_ID`, `ASC_ISSUER_ID`, and
 `ASC_KEY_FILEPATH`; see `fastlane/.env.example`. Increase

@@ -14,6 +14,45 @@ TESTFLIGHT_EXPORT_OPTIONS = File.expand_path(
 )
 FASTLANE_BUILD_DIRECTORY = File.expand_path("../build/fastlane", __dir__)
 DEFAULT_IPA_PATH = File.join(FASTLANE_BUILD_DIRECTORY, "ComiNavi.ipa")
+TESTFLIGHT_EXTERNAL_GROUP = "External Beta"
+TESTFLIGHT_NOTES_DIRECTORY = File.expand_path("testflight/what_to_test", __dir__)
+
+def testflight_release_note(locale, override)
+  note = override.to_s.strip
+  note_path = File.join(TESTFLIGHT_NOTES_DIRECTORY, "#{locale}.txt")
+  note = File.read(note_path).strip if note.empty? && File.file?(note_path)
+
+  if note.empty?
+    UI.user_error!(
+      "Missing #{locale} TestFlight notes. Set the lane option or update #{note_path}"
+    )
+  end
+
+  note
+end
+
+def localized_testflight_build_info(options)
+  {
+    "ja" => {
+      whats_new: testflight_release_note(
+        "ja",
+        options[:changelog_ja] || ENV["CHANGELOG_JA"]
+      )
+    },
+    "en-US" => {
+      whats_new: testflight_release_note(
+        "en-US",
+        options[:changelog_en] || ENV["CHANGELOG_EN_US"]
+      )
+    }
+  }
+end
+
+def external_testflight_group(options)
+  group = (options[:group] || ENV["TESTFLIGHT_EXTERNAL_GROUP"] || TESTFLIGHT_EXTERNAL_GROUP).strip
+  UI.user_error!("External TestFlight group cannot be empty") if group.empty?
+  group
+end
 
 def asc_credentials
   key_id = ENV.fetch("ASC_KEY_ID", ASC_KEY_ID).strip
@@ -58,6 +97,54 @@ private_lane :asc_api_key do
     issuer_id: credentials[:issuer_id],
     key_filepath: credentials[:key_filepath],
     in_house: false
+  )
+end
+
+private_lane :verify_external_testflight_build do |options|
+  asc_api_key
+  app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
+  UI.user_error!("App Store Connect app not found for #{APP_IDENTIFIER}") unless app
+
+  build = Spaceship::ConnectAPI::Build.all(
+    app_id: app.id,
+    version: options.fetch(:app_version),
+    build_number: options.fetch(:build_number),
+    platform: Spaceship::ConnectAPI::Platform::IOS,
+    limit: 1
+  ).first
+  UI.user_error!("Submitted TestFlight build was not found") unless build
+
+  group = app.get_beta_groups.find { |candidate| candidate.name == options.fetch(:group) }
+  UI.user_error!("External TestFlight group was not found") unless group
+
+  assigned_build_ids = group.fetch_builds.map(&:id)
+  unless assigned_build_ids.include?(build.id)
+    UI.user_error!("Build #{build.version} is not assigned to #{group.name}")
+  end
+
+  detail = build.build_beta_detail
+  UI.user_error!("Build #{build.version} is missing its TestFlight status") unless detail
+
+  external_state = Spaceship::ConnectAPI::BuildBetaDetail::ExternalState
+  expected_states = [
+    external_state::WAITING_FOR_BETA_REVIEW,
+    external_state::IN_BETA_REVIEW,
+    external_state::BETA_APPROVED,
+    external_state::IN_BETA_TESTING
+  ]
+  unless expected_states.include?(detail.external_build_state)
+    UI.user_error!(
+      "Unexpected external TestFlight state: #{detail.external_build_state}"
+    )
+  end
+
+  unless detail.auto_notify_enabled
+    UI.user_error!("External tester notifications are not enabled")
+  end
+
+  UI.success(
+    "Verified #{options.fetch(:app_version)} (#{build.version}) in #{group.name}: " \
+    "#{detail.external_build_state}"
   )
 end
 
@@ -106,6 +193,88 @@ platform :ios do
   lane :beta do |options|
     ipa_path = build_testflight
     upload_ipa(ipa: ipa_path, changelog: options[:changelog])
+  end
+
+  desc "Upload an existing IPA, submit it to External Beta, and verify the result"
+  lane :upload_external_ipa do |options|
+    ipa_path = File.expand_path(options[:ipa] || ENV.fetch("IPA_PATH", DEFAULT_IPA_PATH))
+    UI.user_error!("Signed IPA not found at #{ipa_path}") unless File.file?(ipa_path)
+
+    app_version = FastlaneCore::IpaFileAnalyser.fetch_app_version(ipa_path)
+    build_number = FastlaneCore::IpaFileAnalyser.fetch_app_build(ipa_path)
+    group = external_testflight_group(options)
+
+    upload_to_testflight(
+      api_key: asc_api_key,
+      app_identifier: APP_IDENTIFIER,
+      ipa: ipa_path,
+      app_version: app_version,
+      build_number: build_number,
+      localized_build_info: localized_testflight_build_info(options),
+      distribute_external: true,
+      groups: [group],
+      notify_external_testers: true,
+      skip_waiting_for_build_processing: false
+    )
+
+    check_external(
+      app_version: app_version,
+      build_number: build_number,
+      group: group
+    )
+  end
+
+  desc "Build, upload, submit, and verify an external TestFlight beta"
+  lane :external_beta do |options|
+    ipa_path = build_testflight
+    upload_external_ipa(
+      ipa: ipa_path,
+      group: options[:group],
+      changelog_ja: options[:changelog_ja],
+      changelog_en: options[:changelog_en]
+    )
+  end
+
+  desc "Verify an external TestFlight build without changing App Store Connect"
+  lane :check_external do |options|
+    app_version = options[:app_version].to_s.strip
+    build_number = options[:build_number].to_s.strip
+    UI.user_error!("Set app_version, for example app_version:1.0") if app_version.empty?
+    UI.user_error!("Set build_number, for example build_number:2026081202") if build_number.empty?
+
+    verify_external_testflight_build(
+      app_version: app_version,
+      build_number: build_number,
+      group: external_testflight_group(options)
+    )
+  end
+
+  desc "Submit an already-uploaded build to External Beta and verify the result"
+  lane :submit_external do |options|
+    app_version = options[:app_version].to_s.strip
+    build_number = options[:build_number].to_s.strip
+    UI.user_error!("Set app_version, for example app_version:1.0") if app_version.empty?
+    UI.user_error!("Set build_number, for example build_number:2026081202") if build_number.empty?
+
+    group = external_testflight_group(options)
+    upload_to_testflight(
+      api_key: asc_api_key,
+      app_identifier: APP_IDENTIFIER,
+      distribute_only: true,
+      app_version: app_version,
+      build_number: build_number,
+      localized_build_info: localized_testflight_build_info(options),
+      distribute_external: true,
+      groups: [group],
+      notify_external_testers: true,
+      skip_waiting_for_build_processing: false
+    )
+
+    check_external(
+      app_version: app_version,
+      build_number: build_number,
+      group: group
+    )
   end
 
   desc "Upload App Store metadata and screenshots without uploading or submitting a build"
