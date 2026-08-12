@@ -241,6 +241,7 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(root["sourceLanguage"] as? String, "en")
         let strings = try XCTUnwrap(root["strings"] as? [String: Any])
         XCTAssertGreaterThan(strings.count, 250)
+        XCTAssertNil(strings["Check now"], "Removed UI labels must not leave stale i18n keys")
 
         for language in supportedLanguages {
             let missing = strings.compactMap { key, rawEntry -> String? in

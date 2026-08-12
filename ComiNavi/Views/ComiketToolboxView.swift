@@ -417,20 +417,9 @@ private struct ToolboxResourceRow: View {
                 .frame(width: 28, height: 28)
 
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Text(resource.title)
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.primary)
-
-                    if resource.isTimeSensitive {
-                        Text("Check now")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.orange.opacity(0.12), in: .capsule)
-                    }
-                }
+                Text(resource.title)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
 
                 Text(resource.summary)
                     .font(.caption)

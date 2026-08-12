@@ -61,7 +61,6 @@ struct ComiketToolboxResource: Identifiable, Sendable {
     let icon: String
     let url: URL
     let searchTerms: String
-    let isTimeSensitive: Bool
 
     func matches(_ query: String) -> Bool {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -102,8 +101,7 @@ enum ComiketToolboxCatalog {
             .comiket,
             "radio-tower",
             "https://x.com/comiketofficial",
-            "twitter sns 公式 当日 最新 comiketofficial",
-            timeSensitive: true
+            "twitter sns 公式 当日 最新 comiketofficial"
         ),
         resource(
             "international-x",
@@ -113,8 +111,7 @@ enum ComiketToolboxCatalog {
             .comiket,
             "globe",
             "https://x.com/comiket_intl",
-            "twitter english overseas 英語 海外 comiket_intl",
-            timeSensitive: true
+            "twitter english overseas 英語 海外 comiket_intl"
         ),
         resource(
             "cosplay-x",
@@ -124,8 +121,7 @@ enum ComiketToolboxCatalog {
             .comiket,
             "drama",
             "https://x.com/comiket_cosplay",
-            "twitter cosplay コスプレ 撮影 更衣室 comiket_cosplay",
-            timeSensitive: true
+            "twitter cosplay コスプレ 撮影 更衣室 comiket_cosplay"
         ),
         resource(
             "comiket-web",
@@ -135,8 +131,7 @@ enum ComiketToolboxCatalog {
             .comiket,
             "globe",
             "https://www.comiket.co.jp/",
-            "ホームページ web news お知らせ 更新",
-            timeSensitive: true
+            "ホームページ web news お知らせ 更新"
         ),
         resource(
             "circlems-x",
@@ -146,8 +141,7 @@ enum ComiketToolboxCatalog {
             .circlems,
             "at-sign",
             "https://x.com/circlems",
-            "twitter webcatalog web catalog サークルエムエス 障害",
-            timeSensitive: true
+            "twitter webcatalog web catalog サークルエムエス 障害"
         ),
         resource(
             "c108-overview",
@@ -157,8 +151,7 @@ enum ComiketToolboxCatalog {
             .comiket,
             "calendar-days",
             "https://www.comiket.co.jp/info-a/C108/C108Info.html",
-            "開催概要 時間 ホール 日程 交通",
-            timeSensitive: true
+            "開催概要 時間 ホール 日程 交通"
         ),
         resource(
             "c108-entry",
@@ -168,8 +161,7 @@ enum ComiketToolboxCatalog {
             .comiket,
             "door-open",
             "https://www.comiket.co.jp/info-a/C108/C108EntryTicket2.html",
-            "ticket チケット リストバンド 入場 午前 午後 アーリー",
-            timeSensitive: true
+            "ticket チケット リストバンド 入場 午前 午後 アーリー"
         ),
         resource(
             "c108-notes",
@@ -219,8 +211,7 @@ enum ComiketToolboxCatalog {
             .comiket,
             "shopping-cart",
             "https://www.comiket.co.jp/info-a/C108/C108Food.html",
-            "food drink restaurant convenience store フード 飲食 コンビニ 水分",
-            timeSensitive: true
+            "food drink restaurant convenience store フード 飲食 コンビニ 水分"
         ),
         resource(
             "big-sight-floor-maps",
@@ -280,8 +271,7 @@ enum ComiketToolboxCatalog {
             .comiket,
             "search",
             "https://www.comiket.co.jp/info-a/LostsAndFounds.html",
-            "lost found lost property 遺失物 落とし物 忘れ物",
-            timeSensitive: true
+            "lost found lost property 遺失物 落とし物 忘れ物"
         ),
         resource(
             "cosplay-guide",
@@ -311,8 +301,7 @@ enum ComiketToolboxCatalog {
             .transitOperator,
             "calendar-clock",
             "https://www.twr.co.jp/route/tabid/102/Default.aspx",
-            "rinkai twr 国際展示場 りんかい線 時刻表 臨時ダイヤ",
-            timeSensitive: true
+            "rinkai twr 国際展示場 りんかい線 時刻表 臨時ダイヤ"
         ),
         resource(
             "yurikamome-c108",
@@ -322,8 +311,7 @@ enum ComiketToolboxCatalog {
             .transitOperator,
             "calendar-clock",
             "https://www.yurikamome.co.jp/company/news/bbee2796dd59429f6aa22fb274f5ace8_1.pdf",
-            "yurikamome 東京ビッグサイト駅 ゆりかもめ 時刻表 臨時ダイヤ pdf",
-            timeSensitive: true
+            "yurikamome 東京ビッグサイト駅 ゆりかもめ 時刻表 臨時ダイヤ pdf"
         ),
         resource(
             "tokyo-brt-c108",
@@ -333,8 +321,7 @@ enum ComiketToolboxCatalog {
             .transitOperator,
             "calendar-clock",
             "https://tokyo-brt.co.jp/caution/547",
-            "brt 新橋 国際展示場 臨時便 バス",
-            timeSensitive: true
+            "brt 新橋 国際展示場 臨時便 バス"
         ),
         resource(
             "toei-bus",
@@ -354,8 +341,7 @@ enum ComiketToolboxCatalog {
             .comiket,
             "briefcase-medical",
             "https://www.comiket.co.jp/info-a/Heatstroke.html",
-            "heat heatstroke hydration cooling 熱中症 水分 塩分 冷却 休憩",
-            timeSensitive: true
+            "heat heatstroke hydration cooling 熱中症 水分 塩分 冷却 休憩"
         ),
         resource(
             "jma-tokyo-weather",
@@ -365,8 +351,7 @@ enum ComiketToolboxCatalog {
             .publicAgency,
             "sparkles",
             "https://www.data.jma.go.jp/multi/yoho/yoho_detail.html?code=130010&lang=jp",
-            "jma weather rain temperature 気象庁 天気 雨 気温",
-            timeSensitive: true
+            "jma weather rain temperature 気象庁 天気 雨 気温"
         ),
         resource(
             "environment-wbgt",
@@ -376,8 +361,7 @@ enum ComiketToolboxCatalog {
             .publicAgency,
             "triangle-alert",
             "https://www.wbgt.env.go.jp/sp/wbgt_data.php?region=03&tab=td",
-            "wbgt heat alert 暑さ指数 環境省 熱中症警戒アラート",
-            timeSensitive: true
+            "wbgt heat alert 暑さ指数 環境省 熱中症警戒アラート"
         ),
         resource(
             "big-sight-first-aid",
@@ -437,8 +421,7 @@ enum ComiketToolboxCatalog {
         _ authority: ComiketToolboxResource.Authority,
         _ icon: String,
         _ url: String,
-        _ searchTerms: String,
-        timeSensitive: Bool = false
+        _ searchTerms: String
     ) -> ComiketToolboxResource {
         ComiketToolboxResource(
             id: id,
@@ -448,8 +431,7 @@ enum ComiketToolboxCatalog {
             authority: authority,
             icon: icon,
             url: makeURL(url),
-            searchTerms: searchTerms,
-            isTimeSensitive: timeSensitive
+            searchTerms: searchTerms
         )
     }
 

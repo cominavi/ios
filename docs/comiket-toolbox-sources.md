@@ -8,7 +8,7 @@ snapshot as authoritative.
 
 | Need | Extracted feature | Primary source |
 | --- | --- | --- |
-| Live changes | Put the committee's official X and website first; mark event-day sources as “Check now.” | [Comiket official site](https://www.comiket.co.jp/), [@comiketofficial](https://x.com/comiketofficial) |
+| Live changes | Put the committee's official X and website first. | [Comiket official site](https://www.comiket.co.jp/), [@comiketofficial](https://x.com/comiketofficial) |
 | Admission | Keep ticket/wristband and applicable original photo ID in the checklist. Link the current entry schedule instead of copying it into app logic. | [C108 admission](https://www.comiket.co.jp/info-a/C108/C108EntryTicket2.html) |
 | Rules | Link the full catalog notes and distill only high-value reminders: no overnight queuing, no unconsented photography, and follow staff instructions. | [C108 catalog notes](https://www.comiket.co.jp/info-a/C108/C108CtlgNotes.pdf), [official beginner day-of guide](https://harenohi.comiket.co.jp/index.php/beginnersguide/generals/attention/) |
 | Circle planning | Make the Web Catalog and official downloadable circle maps easy to reach; remind people to save priorities offline because the event cannot be covered exhaustively in one day. | [official beginner research guide](https://harenohi.comiket.co.jp/index.php/beginnersguide/generals/guidepre/), [C108 circle maps](https://www.comiket.co.jp/info-a/C108/C108CtlgMap.html) |
@@ -35,7 +35,6 @@ snapshot as authoritative.
 ## Product boundaries
 
 - Resource descriptions summarize why a link is useful, not its full contents.
-- “Check now” identifies time-sensitive pages and accounts.
 - Checklist state is private to the device and is not uploaded.
 - The venue action opens public-transit directions to Tokyo Big Sight only.
 - ComiNavi does not claim that a particular internal walking path is available.
