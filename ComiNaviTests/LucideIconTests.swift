@@ -11,4 +11,14 @@ final class LucideIconTests: XCTestCase {
             )
         }
     }
+
+    @MainActor
+    func testExternalBrandIconsResolveToBundledArtwork() {
+        for icon in ["x", "pixiv"] {
+            XCTAssertNotNil(
+                IconifyBrandIcon.uiImage(for: icon),
+                "External brand icon '\(icon)' is missing from Assets.xcassets"
+            )
+        }
+    }
 }
