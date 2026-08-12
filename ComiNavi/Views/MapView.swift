@@ -145,9 +145,13 @@ struct MapView: View {
                 dataSource: dataSource,
                 eventNumber: model.eventNumber,
                 mapID: model.selectedMapID,
-                onOpenDetail: { circle in
+                onOpenDetail: { circle, shouldExpandSheet in
                     model.select(circle: circle)
-                    circleSheetDetent = .large
+                    if shouldExpandSheet {
+                        circleSheetDetent = .large
+                    } else {
+                        circleSheetDetent = .fraction(0.62)
+                    }
                 }
             )
             .presentationDetents(
@@ -1729,7 +1733,7 @@ private struct CircleMapDetailSheet: View {
     let dataSource: CirclemsDataSource?
     let eventNumber: Int
     let mapID: Int
-    let onOpenDetail: (CatalogMapCircle) -> Void
+    let onOpenDetail: (CatalogMapCircle, Bool) -> Void
 
     var body: some View {
         NavigationStack {
@@ -1841,7 +1845,7 @@ private struct CircleMapDetailSheet: View {
                         member.publicCircleID.flatMap { bookmarks[$0]?.color }
                     }.first,
                     onOpenDetail: {
-                        onOpenDetail(circle)
+                        onOpenDetail(circle, circles.count != 2)
                     }
                 )
                 .frame(maxWidth: .infinity, alignment: .top)
@@ -1871,90 +1875,91 @@ private struct CircleMapSummaryCard: View {
     @State private var catalogCircles: [CirclemsDataSchema.ComiketCircleWC] = []
     @State private var isOpeningDetail = false
     @State private var showsDetail = false
+    @State private var didAutomaticallyOpenCombinedDetail = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if !isCombinedAB {
-                Text(circle.subspace == 0 ? "A" : "B")
-                    .font(.headline.monospaced().weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        Button(action: openDetails) {
+            VStack(alignment: .leading, spacing: 0) {
+                if !isCombinedAB {
+                    Text(circle.subspace == 0 ? "A" : "B")
+                        .font(.headline.monospaced().weight(.bold))
+                        .foregroundStyle(.secondary)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
-            artworkButton
-                .padding(.horizontal, 10)
-                .padding(.top, isCombinedAB ? 10 : 0)
+                artwork
+                    .overlay(alignment: .topTrailing) {
+                        Group {
+                            if isOpeningDetail {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                LucideIcon("arrow.up.right")
+                                    .font(.caption2.weight(.bold))
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                        .frame(width: 28, height: 28)
+                        .background(.regularMaterial, in: .circle)
+                        .padding(6)
+                        .accessibilityHidden(true)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.top, isCombinedAB ? 10 : 0)
 
-            VStack(alignment: .leading, spacing: 7) {
-                Text(displayName)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(displayName)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
 
-                Text(locationLabel)
-                    .font(.caption.monospaced().weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if !circle.penName.isEmpty {
-                    Text(circle.penName)
-                        .font(.caption)
+                    Text(locationLabel)
+                        .font(.caption.monospaced().weight(.semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+
+                    if !circle.penName.isEmpty {
+                        Text(circle.penName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .contentShape(.rect)
+            .background(
+                Color(uiColor: .secondarySystemBackground)
+            )
+            .compositingGroup()
+            .clipShape(.rect(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        Color(uiColor: .separator).opacity(0.3),
+                        lineWidth: 0.5
+                    )
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(
-            Color(uiColor: .secondarySystemBackground)
-        )
-        .compositingGroup()
-        .clipShape(.rect(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    Color(uiColor: .separator).opacity(0.3),
-                    lineWidth: 0.5
-                )
-        }
+        .buttonStyle(.plain)
         .navigationDestination(isPresented: $showsDetail) {
             if !catalogCircles.isEmpty, let dataSource {
                 CircleDetailView(circles: catalogCircles, dataSource: dataSource)
             }
         }
-        .accessibilityElement(children: .contain)
-    }
-
-    private var artworkButton: some View {
-        Button(action: openDetails) {
-            artwork
-                .overlay(alignment: .topTrailing) {
-                    Group {
-                        if isOpeningDetail {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            LucideIcon("arrow.up.right")
-                                .font(.caption2.weight(.bold))
-                        }
-                    }
-                    .foregroundStyle(.primary)
-                    .frame(width: 28, height: 28)
-                    .background(.regularMaterial, in: .circle)
-                    .padding(6)
-                    .accessibilityHidden(true)
-                }
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
         .accessibilityLabel("Open \(displayName) details")
-        .accessibilityHint("Selects this circle, then opens its full detail page")
+        .accessibilityHint("Opens the full circle detail page")
         .accessibilityIdentifier(
             "map-circle-artwork-\(isCombinedAB ? "a+b" : (circle.subspace == 0 ? "a" : "b"))"
         )
+        .task {
+            guard isCombinedAB, !didAutomaticallyOpenCombinedDetail else { return }
+            didAutomaticallyOpenCombinedDetail = true
+            openDetails()
+        }
     }
 
     private func openDetails() {
