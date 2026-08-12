@@ -60,6 +60,10 @@ struct CircleDetailView: View {
                     externalLinks: externalLinks
                 )
 
+                if details?.extensionRecord?.WCId != nil {
+                    sharedPlanSection
+                }
+
                 if !combinedTags.isEmpty {
                     CircleDetailTagsSection(
                         tags: combinedTags,
@@ -68,9 +72,8 @@ struct CircleDetailView: View {
                     )
                 }
 
-                if details?.extensionRecord?.WCId != nil {
+                if details?.extensionRecord?.WCId != nil, planModel.isFavorite {
                     CircleUserPlanSection(model: planModel)
-                    sharedPlanSection
                 }
 
                 if !withdrawalClaims.isEmpty {
@@ -102,6 +105,17 @@ struct CircleDetailView: View {
                     }
                 }
 
+                Button {
+                    isShowingDataSources = true
+                } label: {
+                    LucideLabel("Sources", icon: "info.circle")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows where this circle's information came from")
+                .accessibilityIdentifier("circle-data-sources-button")
             }
             .frame(maxWidth: 720, alignment: .leading)
             .frame(maxWidth: .infinity)
@@ -119,12 +133,17 @@ struct CircleDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    isShowingDataSources = true
+                    planModel.toggleFavorite()
                 } label: {
-                    LucideLabel("Data sources", icon: "info.circle")
+                    LucideIcon(planModel.isFavorite ? "star.fill" : "star", size: 21)
+                        .foregroundStyle(
+                            planModel.selectedColor?.swiftUIColor ?? Color.accentColor
+                        )
                 }
-                .accessibilityHint("Shows where this circle's information came from")
-                .accessibilityIdentifier("circle-data-sources-button")
+                .accessibilityLabel(planModel.isFavorite ? "Saved circle" : "Save circle")
+                .accessibilityValue(planModel.isFavorite ? "Saved" : "Not saved")
+                .accessibilityHint("Adds or removes this circle from your saved circles")
+                .accessibilityIdentifier("circle-favorite-button")
             }
         }
         .sheet(isPresented: $isShowingDataSources) {
@@ -609,28 +628,12 @@ private struct CircleUserPlanSection: View {
 
         CircleDetailSection("Your plan") {
             VStack(alignment: .leading, spacing: 16) {
-                Button(action: model.toggleFavorite) {
-                    LucideLabel(
-                        resource:
-                        model.isFavorite
-                            ? LocalizedStringResource("Saved circle")
-                            : LocalizedStringResource("Save circle"),
-                        icon: model.isFavorite ? "star.fill" : "star"
-                    )
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(model.selectedColor?.swiftUIColor ?? Color.accentColor)
-                .accessibilityIdentifier("circle-favorite-button")
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Label color")
+                        .font(.subheadline.weight(.semibold))
 
-                if model.isFavorite {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Label color")
-                            .font(.subheadline.weight(.semibold))
-
-                        ScrollView(.horizontal) {
-                            HStack(spacing: 10) {
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 10) {
                             ForEach(BookmarkColor.selectableColors) { color in
                                 CirclePlanColorButton(
                                     color: color,
@@ -638,44 +641,42 @@ private struct CircleUserPlanSection: View {
                                     onSelect: { model.selectColor(color) }
                                 )
                             }
+                        }
+                    }
+                    .scrollIndicators(.hidden)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Private note")
+                        .font(.subheadline.weight(.semibold))
+
+                    TextEditor(text: $model.memo)
+                        .focused($isNoteFocused)
+                        .frame(minHeight: 92)
+                        .padding(10)
+                        .scrollContentBackground(.hidden)
+                        .background(
+                            Color(uiColor: .tertiarySystemGroupedBackground),
+                            in: .rect(cornerRadius: 12)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    isNoteFocused
+                                        ? Color.accentColor
+                                        : Color(uiColor: .separator).opacity(0.3),
+                                    lineWidth: isNoteFocused ? 1.5 : 0.5
+                                )
+                        }
+                        .onChange(of: model.memo) {
+                            model.memoDidChange()
+                        }
+                        .onChange(of: isNoteFocused) { _, focused in
+                            if !focused {
+                                model.flushMemo()
                             }
                         }
-                        .scrollIndicators(.hidden)
-                    }
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Private note")
-                            .font(.subheadline.weight(.semibold))
-
-                        TextEditor(text: $model.memo)
-                            .focused($isNoteFocused)
-                            .frame(minHeight: 92)
-                            .padding(10)
-                            .scrollContentBackground(.hidden)
-                            .background(
-                                Color(uiColor: .tertiarySystemGroupedBackground),
-                                in: .rect(cornerRadius: 12)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(
-                                        isNoteFocused
-                                            ? Color.accentColor
-                                            : Color(uiColor: .separator).opacity(0.3),
-                                        lineWidth: isNoteFocused ? 1.5 : 0.5
-                                    )
-                            }
-                            .onChange(of: model.memo) {
-                                model.memoDidChange()
-                            }
-                            .onChange(of: isNoteFocused) { _, focused in
-                                if !focused {
-                                    model.flushMemo()
-                                }
-                            }
-                            .accessibilityIdentifier("circle-private-note")
-
-                    }
+                        .accessibilityIdentifier("circle-private-note")
                 }
             }
         }
