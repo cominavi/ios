@@ -536,9 +536,9 @@ private struct SharedPlanRecoveryPickerRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            LucideLabel("Saved recovery copy", icon: "database")
+            LucideLabel("Recovery copy", icon: "database")
                 .font(.headline)
-            Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are saved on this device.")
+            Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are available in this recovery copy.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack {
@@ -955,11 +955,6 @@ private struct SharedPlanCreateSheet: View {
                             .foregroundStyle(.orange)
                     }
                 }
-                Section {
-                    Text("作成にはネットワーク接続が必要です。送信できない場合は、同じリクエストを端末に保存して自動で再試行します。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
             .navigationTitle("共有プランを作成")
             .navigationBarTitleDisplayMode(.inline)
@@ -1102,7 +1097,7 @@ private struct SharedPlanInformationScreen: View {
 
                     if !quarantinedChanges.isEmpty {
                         Section("確認が必要な変更") {
-                            Text("サーバー上の最新状態を表示しています。端末に残した変更は自動送信されません。")
+                            Text("最新のプランを表示しています。残っている変更を確認してください。")
                                 .font(.callout)
                                 .foregroundStyle(.orange)
                             ForEach(quarantinedChanges) { write in
@@ -1126,7 +1121,7 @@ private struct SharedPlanInformationScreen: View {
                             }) {
                                 Button("最新状態でもう一度試す") { retryConflict() }
                                     .buttonStyle(.borderedProminent)
-                                Button("端末の変更をすべて破棄", role: .destructive) {
+                                Button("残っている変更をすべて破棄", role: .destructive) {
                                     discardAllConflicts()
                                 }
                             }

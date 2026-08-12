@@ -152,7 +152,7 @@ private struct ToolboxReminderSection: View {
         } footer: {
             VStack(alignment: .leading, spacing: 5) {
                 Text(
-                    "Your choices stay on this device. Delivery still follows your iOS notification settings."
+                    "Your choices are saved. Delivery still follows your iOS notification settings."
                 )
                 Link("Official C108 admission schedule", destination: ComiketEventReminderCatalog.officialScheduleURL)
             }
@@ -401,7 +401,7 @@ private struct ToolboxChecklistSection: View {
             }
         } footer: {
             Text(
-                "Your checklist stays on this device. It is a reminder, not a replacement for official instructions."
+                "Your checklist is a reminder, not a replacement for official instructions."
             )
         }
     }

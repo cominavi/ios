@@ -179,7 +179,7 @@ struct ProfileScreen: View {
             }
 
             if !favoriteRecoveries.isEmpty {
-                Section("お気に入り同期の要確認") {
+                Section("お気に入り変更の確認") {
                     ForEach(favoriteRecoveries) { recovery in
                         VStack(alignment: .leading, spacing: 8) {
                             Text("送信できなかったお気に入り変更")
@@ -202,17 +202,13 @@ struct ProfileScreen: View {
 
                                 Spacer()
 
-                                Button("端末から破棄", role: .destructive) {
+                                Button("破棄", role: .destructive) {
                                     favoriteRecoveryPendingDiscard = recovery
                                 }
                             }
                         }
                         .accessibilityElement(children: .contain)
                     }
-
-                    Text("拒否された変更は自動再送せず保存しています。ほかのお気に入り変更は引き続き同期されます。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -237,10 +233,6 @@ struct ProfileScreen: View {
                         }
                     }
                     .accessibilityIdentifier("profile-following-import")
-
-                    Text("Import the public X accounts you follow and match them to this catalog on your device.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 }
             }
 
@@ -250,12 +242,6 @@ struct ProfileScreen: View {
                     isOn: $automaticallyReadsSharedLocations
                 )
                 .accessibilityIdentifier("profile-auto-read-shared-location")
-
-                Text(
-                    "When enabled, ComiNavi checks new clipboard text while the app is active. iOS may ask before allowing access. Clipboard contents are never uploaded or saved."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
 
                 PasteButton(payloadType: String.self) { values in
                     guard let value = values.first else { return }
@@ -339,7 +325,7 @@ struct ProfileScreen: View {
 
             Button("キャンセル", role: .cancel) {}
         } message: {
-            Text("このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログをこの端末から削除します。")
+            Text("このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログを削除します。")
         }
         .confirmationDialog(
             "送信待ちのプロフィール変更を破棄しますか？",

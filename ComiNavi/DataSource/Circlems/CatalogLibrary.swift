@@ -22,18 +22,6 @@ enum CatalogDataMode: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    var detail: String {
-        switch self {
-        case .cominavi:
-            String(localized: "Downloads the verified ComiNavi catalog for every signed-in account.")
-        case .circlems:
-            String(localized: "Downloads catalogs supported by Circle.ms.")
-        #if DEBUG || COMINAVI_STAGING
-        case .demo:
-            String(localized: "Opens the bundled C104 catalog without a network connection.")
-        #endif
-        }
-    }
 }
 
 struct CatalogEvent: Identifiable, Hashable, Sendable {
@@ -639,12 +627,12 @@ enum CatalogLibraryError: LocalizedError {
         case .noAvailableCatalogs:
             String(localized: "Circle.ms did not return any currently viewable Comiket catalogs.")
         case .invalidDatabaseURL:
-            String(localized: "Circle.ms returned an invalid catalog database URL.")
+            String(localized: "Circle.ms returned an invalid catalog link.")
         case .demoEventUnavailable:
             String(localized: "This event is not included in the demo catalog.")
         case .missingDemoDatabase(let name):
             String(
-                localized: "The demo catalog is missing \(name). Run Scripts/prepare-demo-catalog.sh before building."
+                localized: "The demo catalog is unavailable. Please choose another catalog."
             )
         }
     }

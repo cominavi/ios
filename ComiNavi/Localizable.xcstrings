@@ -8416,34 +8416,6 @@
         }
       }
     },
-    "ComiNavi sends your Circle.ms session only to cominavi.net for verification. X accounts are matched to circles on this device. Imports are limited to once every six hours.": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ComiNaviは本人確認のため、Circle.msのセッションをcominavi.netにのみ送信します。Xアカウントとサークルの照合はこの端末上で行われます。インポートは6時間に1回までです。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ComiNavi는 본인 확인을 위해 Circle.ms 세션을 cominavi.net에만 전송합니다. X 계정과 서클의 확인은 이 단말기에서 수행됩니다. 임포트는 6시간에 한 번까지 가능합니다."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ComiNavi为了确认本人身份，只将Circle.ms的会话发送到cominavi.net。 X账户和社团的核对在这个设备上进行。 导入6小时最多1次。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ComiNavi為了確認本人身份，只將Circle.ms的會話傳送到cominavi.net。 X帳號和社團的核對在這個裝置上進行。 匯入6小時最多1次。"
-          }
-        }
-      }
-    },
     "ComiNavi sharing is not configured in this build.": {
       "extractionState": "stale",
       "localizations": {
@@ -16697,63 +16669,6 @@
         }
       }
     },
-    "Import the public X accounts you follow and match them to this catalog on your device.": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "フォロー中の公開Xアカウントを取り込み、この端末上でカタログのサークルと照合します。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "팔로우 중인 공개 X 계정을 가져와 이 기기에서 카탈로그 서클과 대조합니다."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "导入正在关注的公开X账户，在这个设备上与目录的社团进行核对。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "匯入正在關注的公開X帳號，在這個裝置上與目錄的社團進行核對。"
-          }
-        }
-      }
-    },
-    "Imported %lld matching circles.": {
-      "extractionState": "stale",
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "一致したサークルを%lld件インポートしました。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "일치하는 서클을 %lld건으로 가져왔습니다."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "导入了%lld个匹配的社团。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "匯入了%lld個匹配的社團。"
-          }
-        }
-      }
-    },
     "Imported circles (%lld)": {
       "localizations": {
         "ja": {
@@ -17852,34 +17767,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "喜歡的顏色"
-          }
-        }
-      }
-    },
-    "Last successful import: %@. Existing circles stay in this list when later imports add new matches.": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最終インポート：%@。次回のインポートで新しい一致が追加されても、既存のサークルはこの一覧に残ります。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "최종 가져오기: %@. 다음 가져오기에서 새로운 일치가 추가되어도 기존 서클은 이 목록에 남아 있습니다."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最终导入：%@。 即使下次导入时添加了新的匹配，现有的社团也会留在这个列表中。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最終匯入：%@。 即使下次匯入時新增了新的匹配，現有的社團也會保留在這個清單中。"
           }
         }
       }

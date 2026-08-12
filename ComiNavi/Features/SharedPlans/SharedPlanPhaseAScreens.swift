@@ -153,8 +153,6 @@ struct SharedPlanManagementScreen: View {
                 }
             } header: {
                 Text("Changes needing review")
-            } footer: {
-                Text("These changes are not retried automatically. Review them before retrying or discarding them.")
             }
         }
     }
@@ -271,7 +269,7 @@ struct SharedPlanManagementScreen: View {
         switch item {
         case .administrative(let action): action.confirmationMessage
         case .discardQuarantinedWrite:
-            String(localized: "The saved intent will be removed from this device and cannot be recovered.")
+            String(localized: "This saved change will be removed and cannot be recovered.")
         }
     }
 }
@@ -524,8 +522,8 @@ private struct SharedPlanAdministrativeWriteRow: View {
                 Text(write.kind.localizedAdministrativeTitle)
                     .font(.body.weight(.medium))
                 Text(issue ?? (isQuarantined
-                    ? String(localized: "Automatic retry is paused until you review this change.")
-                    : String(localized: "Saved on this device and waiting to send.")))
+                    ? String(localized: "This change needs your review before it can be sent.")
+                    : String(localized: "Waiting to send.")))
                     .font(.caption)
                     .foregroundStyle(issue == nil ? Color.secondary : Color.orange)
             }
@@ -961,12 +959,12 @@ extension SharedPlanAdministrativeAction {
         switch self {
         case .revokeMember(_, let name):
             String.localizedStringWithFormat(
-                String(localized: "%@ will immediately lose access. Unsynced work remains only on their device."),
+                String(localized: "%@ will immediately lose access. Changes they have not sent will not be shared."),
                 name
             )
         case .reinstateMember(_, let name):
             String.localizedStringWithFormat(
-                String(localized: "%@ will regain access with a new synchronization identity."),
+                String(localized: "%@ will regain access."),
                 name
             )
         case .transferOwnership(_, let name):

@@ -423,8 +423,8 @@ private struct DatabaseProgressRow: View {
     CatalogStatusSurface(
         symbolName: "arrow.down.circle.fill",
         eyebrow: "C108",
-        title: String(localized: "Downloading\ndatabases"),
-        subtitle: String(localized: "Downloading databases, this may take a while...")
+        title: String(localized: "Downloading\ncatalog"),
+        subtitle: String(localized: "Downloading the catalog, this may take a while…")
     ) {
         DownloadProgressView(progresses: [
             .init(

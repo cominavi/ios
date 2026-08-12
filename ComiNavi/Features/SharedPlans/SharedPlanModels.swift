@@ -357,31 +357,31 @@ enum SharedPlanError: LocalizedError, Equatable {
         case .insufficientRole:
             String(localized: "このプランを編集する権限がありません。")
         case .membershipRevoked:
-            String(localized: "このプランへの参加権限が取り消されました。未同期の変更は端末に残っています。")
+            String(localized: "このプランへの参加権限が取り消されました。未送信の変更は残っています。")
         case .invalidInvite:
             String(localized: "招待リンクが正しくありません。")
         case .removedMember:
             String(localized: "この招待では再参加できません。オーナーに再招待を依頼してください。")
         case .revisionConflict:
-            String(localized: "別の端末でプランが更新されました。端末に残した変更を確認してください。")
+            String(localized: "別の場所でプランが更新されました。残っている変更を確認してください。")
         case .invitationTokenAlreadyReturned:
             String(localized: "招待は作成済みですが、安全のため招待コードを再表示できません。新しい招待を作成してください。")
         case .documentLimit(let message):
             message
         case .planCompactionRequired:
-            String(localized: "変更履歴が端末の安全な上限に達しました。内容を確認して書き出すか、同期済みの状態からやり直してください。")
+            String(localized: "変更が多いため、このプランを続けて編集できません。内容を書き出してから、最新のプランでやり直してください。")
         case .planSyncBacklogLimit:
-            String(localized: "未同期の変更が1,000件の上限に達しました。内容を確認して書き出すか、同期済みの状態からやり直してください。")
+            String(localized: "変更が多すぎます。内容を書き出してから、最新のプランでやり直してください。")
         case .syncPayloadTooLarge:
-            String(localized: "同期する変更が大きすぎます。内容を減らしてもう一度お試しください。")
+            String(localized: "送信する変更が大きすぎます。内容を減らしてもう一度お試しください。")
         case .syncProtocolViolation:
-            String(localized: "同期セッションを安全に続けられないため、再接続します。")
+            String(localized: "プランを更新できないため、再接続します。")
         case .profileRequired:
             String(localized: "プロフィールを読み込んでからもう一度お試しください。")
         case .profileMutationPending:
             String(localized: "前のプロフィール変更を確認できるまで、新しい変更は保存できません。もう一度同じ操作をお試しください。")
         case .persistenceFailed:
-            String(localized: "変更を端末に保存できませんでした。")
+            String(localized: "変更を保存できませんでした。")
         }
     }
 }

@@ -145,8 +145,8 @@ enum CirclemsDataSourceDatabaseType: String, Equatable, Hashable, Sendable {
 
     var localizedName: String {
         switch self {
-        case .main: String(localized: "catalog data")
-        case .image: String(localized: "image data")
+        case .main: String(localized: "Catalog")
+        case .image: String(localized: "Images")
         }
     }
     
@@ -352,14 +352,14 @@ final class CirclemsDataSource {
         try Task.checkCancellation()
         try await self.prepareDatabases()
         try Task.checkCancellation()
-        self.readiness = .initializing(state: String(localized: "Initializing databases..."))
+        self.readiness = .initializing(state: String(localized: "Preparing catalog…"))
         try await self.initDatabaseConnections()
         try Task.checkCancellation()
-        self.readiness = .initializing(state: String(localized: "Preloading map data..."))
+        self.readiness = .initializing(state: String(localized: "Preparing map…"))
         try self.preloadUFDData()
         try Task.checkCancellation()
         if let enrichmentStore {
-            self.readiness = .initializing(state: String(localized: "Loading social data..."))
+            self.readiness = .initializing(state: String(localized: "Preparing updates…"))
             do {
                 try await enrichmentStore.prepare()
             } catch {
@@ -373,7 +373,7 @@ final class CirclemsDataSource {
         #if DEBUG
         await runMapIndexProbeIfRequested()
         #endif
-        self.readiness = .initializing(state: String(localized: "Finalizing..."))
+        self.readiness = .initializing(state: String(localized: "Almost ready…"))
     }
 
     #if DEBUG
@@ -498,7 +498,7 @@ final class CirclemsDataSource {
                 code: 1,
                 userInfo: [
                     NSLocalizedDescriptionKey: String(
-                        localized: "Circle.ms returned an invalid non-HTTPS database URL."
+                        localized: "Circle.ms returned an invalid catalog link."
                     ),
                 ]
             )
@@ -557,7 +557,7 @@ final class CirclemsDataSource {
                         code: 4,
                         userInfo: [
                             NSLocalizedDescriptionKey: String(
-                                localized: "The downloaded \(metadata.type.localizedName) database failed its integrity check."
+                                localized: "The downloaded catalog could not be verified."
                             ),
                         ]
                     )
@@ -572,7 +572,7 @@ final class CirclemsDataSource {
                 code: 3,
                 userInfo: [
                     NSLocalizedDescriptionKey: String(
-                        localized: "Failed to download the catalog database: \(error.localizedDescription)"
+                        localized: "The catalog could not be downloaded: \(error.localizedDescription)"
                     ),
                 ]
             )
@@ -782,9 +782,9 @@ final class CirclemsDataSource {
             throw NSError(
                 domain: "CirclemsDataSource",
                 code: 5,
-                userInfo: [
-                    NSLocalizedDescriptionKey: String(
-                        localized: "The downloaded \(type.localizedName) file is not a valid catalog database."
+                    userInfo: [
+                        NSLocalizedDescriptionKey: String(
+                            localized: "The downloaded catalog could not be opened."
                     ),
                 ]
             )
@@ -799,9 +799,9 @@ final class CirclemsDataSource {
                 throw NSError(
                     domain: "CirclemsDataSource",
                     code: 6,
-                    userInfo: [
-                        NSLocalizedDescriptionKey: String(
-                            localized: "The \(type.localizedName) database is damaged. Please try downloading it again."
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "The downloaded catalog appears damaged. Please try downloading it again."
                         ),
                     ]
                 )
@@ -819,9 +819,9 @@ final class CirclemsDataSource {
                 throw NSError(
                     domain: "CirclemsDataSource",
                     code: 7,
-                    userInfo: [
-                        NSLocalizedDescriptionKey: String(
-                            localized: "The \(type.localizedName) database is missing required data: \(missingTables.sorted().joined(separator: ", "))."
+                        userInfo: [
+                            NSLocalizedDescriptionKey: String(
+                                localized: "The downloaded catalog is missing required information. Please try downloading it again."
                         ),
                     ]
                 )
@@ -846,7 +846,7 @@ final class CirclemsDataSource {
                         code: 8,
                         userInfo: [
                             NSLocalizedDescriptionKey: String(
-                                localized: "The downloaded catalog database has invalid circle relationships."
+                                localized: "The downloaded catalog has invalid circle data. Please try downloading it again."
                             ),
                         ]
                     )

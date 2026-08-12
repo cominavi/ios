@@ -15,7 +15,7 @@ enum AppleAuthenticationFlowError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unavailable:
-            String(localized: "Sign in with Apple is unavailable on this device.")
+            String(localized: "Sign in with Apple is unavailable right now.")
         case .expired:
             String(localized: "The Sign in with Apple request expired. Please try again.")
         case .invalidCredential:

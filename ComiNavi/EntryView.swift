@@ -220,7 +220,7 @@ struct EntryView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This removes this account's Shared Plans, unsent changes, and downloaded catalog data from this device.")
+                Text("This removes this account's Shared Plans, unsent changes, and downloaded catalog data.")
             }
     }
 
@@ -339,8 +339,8 @@ struct EntryView: View {
                 CatalogStatusSurface(
                     symbolName: "arrow.down.circle.fill",
                     eyebrow: "C108",
-                    title: String(localized: "Downloading\ndatabases"),
-                    subtitle: String(localized: "Downloading databases, this may take a while...")
+                    title: String(localized: "Downloading\ncatalog"),
+                    subtitle: String(localized: "Downloading the catalog, this may take a while…")
                 ) {
                     DownloadProgressView(progresses: [
                         .init(
@@ -566,7 +566,7 @@ struct EntryView: View {
             String(localized: "The clipboard does not contain a ComiNavi location link.")
         case .unsupportedEvent(let eventNumber):
             String.localizedStringWithFormat(
-                String(localized: "The C%d catalog is not available on this device."),
+                String(localized: "The C%d catalog is not available."),
                 eventNumber
             )
         case .locationUnavailable:
@@ -625,7 +625,7 @@ struct EntryView: View {
                 symbolName: "arrow.down.circle.fill",
                 eyebrow: event.shortName,
                 title: String(localized: "Downloading catalog…"),
-                subtitle: String(localized: "Downloading databases, this may take a while...")
+                subtitle: String(localized: "Downloading the catalog, this may take a while…")
             ) {
                 DownloadProgressView(progresses: [progress])
             }
@@ -691,10 +691,6 @@ private struct AccountDeletionPendingView: View {
         ) {
             Text("Deleting your account")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
-
-            Text("Your deletion request is stored securely on this device and will finish automatically when the network is available.")
-                .foregroundStyle(.secondary)
-                .padding(.top, 12)
 
             if let issue {
                 Text(issue)

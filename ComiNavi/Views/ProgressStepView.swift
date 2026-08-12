@@ -26,7 +26,7 @@ struct ProgressStepView: View {
                     .monospacedDigit()
 
                 Group {
-                    Text("Downloading\ndatabases")
+                    Text("Downloading\ncatalog")
                         .font(.largeTitle)
                         .foregroundColor(.accentColor)
                         .fontWeight(.semibold)
