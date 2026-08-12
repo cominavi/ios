@@ -878,7 +878,7 @@ struct SharedPlanEmptyCirclesView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("shared-plan-empty-circles")
-        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 16, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 16, trailing: 0))
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
     }
