@@ -449,6 +449,25 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    func testAccountDeletionCopyKeepsCirclemsAccountSeparate() throws {
+        let key = "This permanently deletes your ComiNavi account and its data. Your Circle.ms account will not be deleted, even if you connected it to ComiNavi."
+        let expectedCopy = [
+            "ja": "ComiNaviアカウントとそのデータは完全に削除されます。ComiNaviに連携している場合も、Circle.msアカウントは削除されません。",
+            "ko": "ComiNavi 계정과 데이터는 영구적으로 삭제됩니다. ComiNavi에 연동한 경우에도 Circle.ms 계정은 삭제되지 않습니다.",
+            "zh-Hans": "这会永久删除你的ComiNavi账户及其数据。即使Circle.ms已连接到ComiNavi，你的Circle.ms账户也不会被删除",
+            "zh-Hant": "這會永久刪除你的ComiNavi帳號及其資料。即使Circle.ms已連結至ComiNavi，你的Circle.ms帳號也不會被刪除",
+        ]
+
+        for language in supportedLanguages {
+            let bundle = try localizedBundle(for: language)
+            XCTAssertEqual(
+                bundle.localizedString(forKey: key, value: nil, table: nil),
+                expectedCopy[language],
+                "Account-separation warning is incorrect for \(language)"
+            )
+        }
+    }
+
     private let supportedLanguages = ["ja", "zh-Hans", "zh-Hant", "ko"]
 
     private func localizedBundle(for language: String) throws -> Bundle {

@@ -625,80 +625,73 @@ extension AvatarImageProcessor {
     }
 }
 
-private struct AccountDeletionConfirmationView: View {
-    private static let countdownDuration = 10
+enum AccountDeletionConfirmationStep: Equatable {
+    case accountSeparation
+    case consequences
+}
 
+enum AccountDeletionConfirmationEvent: Equatable {
+    case showConsequences
+    case showSystemConfirmation
+}
+
+struct AccountDeletionConfirmationFlow: Equatable {
+    static let countdownDuration = 5
+
+    private(set) var step = AccountDeletionConfirmationStep.accountSeparation
+    private(set) var secondsRemaining = Self.countdownDuration
+    private(set) var isFinalConfirmationAvailable = false
+
+    mutating func tick() -> AccountDeletionConfirmationEvent? {
+        guard secondsRemaining > 0 else { return nil }
+        secondsRemaining -= 1
+        guard secondsRemaining == 0 else { return nil }
+
+        switch step {
+        case .accountSeparation:
+            step = .consequences
+            secondsRemaining = Self.countdownDuration
+            return .showConsequences
+        case .consequences:
+            isFinalConfirmationAvailable = true
+            return .showSystemConfirmation
+        }
+    }
+
+    mutating func returnToAccountSeparation() {
+        step = .accountSeparation
+        secondsRemaining = Self.countdownDuration
+        isFinalConfirmationAvailable = false
+    }
+}
+
+private struct AccountDeletionConfirmationView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var secondsRemaining = Self.countdownDuration
+    @State private var flow = AccountDeletionConfirmationFlow()
+    @State private var isShowingFinalConfirmation = false
     let onDelete: () -> Void
 
     var body: some View {
         NavigationStack {
-            FocusedActionSurface(
-                symbolName: "person.crop.circle.badge.xmark",
-                tint: .red
-            ) {
-                Text("Delete your ComiNavi account permanently?")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text("Owned Shared Plans will be deleted, and you will leave joined plans. Your profile, favorites, notifications, and pending changes will also be deleted. This cannot be undone.")
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 12)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(
-                        secondsRemaining > 0
-                            ? "Please wait before deleting your account."
-                            : "You can delete your account now."
-                    )
-                    .font(.headline)
-
-                    if secondsRemaining > 0 {
-                        Text("Delete available in \(secondsRemaining) seconds")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
+            Group {
+                switch flow.step {
+                case .accountSeparation:
+                    accountSeparationPage
+                case .consequences:
+                    consequencesPage
                 }
-                .padding(.top, 28)
-
-                VStack(spacing: 12) {
-                    FocusedActionButton(
-                        role: .destructive,
-                        tint: .red,
-                        action: {
-                            guard secondsRemaining == 0 else { return }
-                            onDelete()
-                            dismiss()
-                        }
-                    ) {
-                        Label("Delete account", systemImage: "trash")
-                    }
-                    .disabled(secondsRemaining > 0)
-                    .accessibilityIdentifier("profile-confirm-delete-account")
-                    .accessibilityHint(
-                        Text(
-                            secondsRemaining > 0
-                                ? "Available in \(secondsRemaining) seconds"
-                                : "Permanently deletes your account"
-                        )
-                    )
-
-                    FocusedActionButton(
-                        role: .cancel,
-                        emphasis: .secondary,
-                        tint: .secondary,
-                        action: dismiss.callAsFunction
-                    ) {
-                        Text("Cancel")
-                    }
-                    .accessibilityIdentifier("profile-cancel-delete-account")
-                }
-                .padding(.top, 28)
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                if flow.step == .consequences {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Back", systemImage: "chevron.backward") {
+                            returnToAccountSeparation()
+                        }
+                        .accessibilityIdentifier("profile-account-deletion-back")
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Cancel", role: .cancel) {
                         dismiss()
                     }
@@ -707,13 +700,176 @@ private struct AccountDeletionConfirmationView: View {
             }
         }
         .interactiveDismissDisabled()
-        .task {
-            await startCountdown()
+        .task(id: flow.step) {
+            await runCountdown(for: flow.step)
+        }
+        .alert("Delete only your ComiNavi account?", isPresented: $isShowingFinalConfirmation) {
+            Button("Delete ComiNavi account", role: .destructive) {
+                onDelete()
+                dismiss()
+            }
+            .accessibilityIdentifier("profile-confirm-delete-account")
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes your ComiNavi account and its data. Your Circle.ms account will not be deleted, even if you connected it to ComiNavi.")
         }
     }
 
-    private func startCountdown() async {
-        while secondsRemaining > 0 {
+    private var accountSeparationPage: some View {
+        FocusedActionSurface(
+            symbolName: "person.crop.circle.badge.questionmark",
+            tint: .orange
+        ) {
+            Text("Step 1 of 2")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.orange)
+
+            Text("ComiNavi and Circle.ms are separate accounts")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+
+            Text("Deleting your ComiNavi account will not delete your Circle.ms account. If you connected Circle.ms, you can continue using that account directly on Circle.ms.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+
+            VStack(spacing: 0) {
+                AccountDeletionScopeRow(
+                    title: "ComiNavi account",
+                    status: "Will be deleted",
+                    systemImage: "trash.fill",
+                    tint: .red
+                )
+
+                Divider()
+
+                AccountDeletionScopeRow(
+                    title: "Circle.ms account",
+                    status: "Will not be deleted",
+                    systemImage: "checkmark.shield.fill",
+                    tint: .green
+                )
+            }
+            .padding(.horizontal, 18)
+            .background(.regularMaterial, in: .rect(cornerRadius: 20))
+            .padding(.top, 28)
+
+            countdownStatus(
+                title: "Reviewing account separation…",
+                countdown: "Consequences shown in \(flow.secondsRemaining) seconds"
+            )
+            .padding(.top, 28)
+
+            FocusedActionButton(
+                role: .cancel,
+                emphasis: .secondary,
+                tint: .secondary,
+                action: dismiss.callAsFunction
+            ) {
+                Text("Cancel")
+            }
+            .accessibilityIdentifier("profile-cancel-delete-account")
+            .padding(.top, 28)
+        }
+        .accessibilityIdentifier("profile-account-deletion-separation")
+    }
+
+    private var consequencesPage: some View {
+        FocusedActionSurface(
+            symbolName: "person.crop.circle.badge.xmark",
+            tint: .red
+        ) {
+            Text("Step 2 of 2")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.red)
+
+            Text("Deleting your ComiNavi account cannot be undone")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+
+            Text("Owned Shared Plans will be deleted, and you will leave joined plans. Your profile, favorites, notifications, and pending changes will also be deleted. This cannot be undone.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+
+            Label {
+                Text("Your Circle.ms account will not be deleted.")
+                    .font(.headline)
+            } icon: {
+                Image(systemName: "checkmark.shield.fill")
+                    .foregroundStyle(.green)
+            }
+            .padding(.top, 22)
+
+            countdownStatus(
+                title: flow.isFinalConfirmationAvailable
+                    ? "Final confirmation is ready."
+                    : "Reviewing deletion consequences…",
+                countdown: "System confirmation shown in \(flow.secondsRemaining) seconds"
+            )
+            .padding(.top, 28)
+
+            VStack(spacing: 12) {
+                if flow.isFinalConfirmationAvailable {
+                    FocusedActionButton(
+                        role: .destructive,
+                        tint: .red,
+                        action: {
+                            isShowingFinalConfirmation = true
+                        }
+                    ) {
+                        Label("Show final confirmation", systemImage: "exclamationmark.triangle")
+                    }
+                    .accessibilityIdentifier("profile-show-final-account-deletion-confirmation")
+                    .accessibilityHint("Opens the system confirmation. Your Circle.ms account will not be deleted.")
+                }
+
+                FocusedActionButton(
+                    role: .cancel,
+                    emphasis: .secondary,
+                    tint: .secondary,
+                    action: dismiss.callAsFunction
+                ) {
+                    Text("Cancel")
+                }
+                .accessibilityIdentifier("profile-cancel-delete-account")
+            }
+            .padding(.top, 28)
+        }
+        .accessibilityIdentifier("profile-account-deletion-consequences")
+    }
+
+    private func countdownStatus(
+        title: LocalizedStringKey,
+        countdown: LocalizedStringKey
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+
+            if flow.secondsRemaining > 0 {
+                ProgressView(
+                    value: Double(
+                        AccountDeletionConfirmationFlow.countdownDuration
+                            - flow.secondsRemaining
+                    ),
+                    total: Double(AccountDeletionConfirmationFlow.countdownDuration)
+                )
+                .tint(flow.step == .accountSeparation ? .orange : .red)
+
+                Text(countdown)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func runCountdown(for expectedStep: AccountDeletionConfirmationStep) async {
+        while flow.secondsRemaining > 0, flow.step == expectedStep {
             do {
                 try await Task.sleep(for: .seconds(1))
             } catch {
@@ -721,8 +877,51 @@ private struct AccountDeletionConfirmationView: View {
             }
 
             guard !Task.isCancelled else { return }
-            secondsRemaining -= 1
+            guard flow.step == expectedStep, let event = flow.tick() else { continue }
+            switch event {
+            case .showConsequences:
+                break
+            case .showSystemConfirmation:
+                isShowingFinalConfirmation = true
+            }
+            return
         }
+    }
+
+    private func returnToAccountSeparation() {
+        isShowingFinalConfirmation = false
+        withAnimation(.snappy) {
+            flow.returnToAccountSeparation()
+        }
+    }
+}
+
+private struct AccountDeletionScopeRow: View {
+    let title: LocalizedStringKey
+    let status: LocalizedStringKey
+    let systemImage: String
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .foregroundStyle(tint)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                Text(status)
+                    .font(.subheadline)
+                    .foregroundStyle(tint)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 15)
+        .accessibilityElement(children: .combine)
     }
 }
 
