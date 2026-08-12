@@ -49,6 +49,10 @@ final class ComiNaviUITests: XCTestCase {
             "The primary plan must open directly"
         )
         XCTAssertTrue(app.navigationBars["買い物リスト"].exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["shared-plan-empty-circles"].exists,
+            "An empty plan should show the designed empty-state card"
+        )
 
         for _ in 0 ..< 3 {
             let switcher = app.buttons["shared-plan-switcher-button"]

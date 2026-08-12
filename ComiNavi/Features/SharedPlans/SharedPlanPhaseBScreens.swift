@@ -686,13 +686,7 @@ struct SharedPlanEditorScreen: View {
     private var circleSections: some View {
         if model.circles.isEmpty {
             Section("Circles and purchases") {
-                LucideContentUnavailableView(
-                    "No circles in this plan",
-                    icon: "building-2",
-                    description: Text(model.canEdit
-                        ? String(localized: "Open a circle from the catalog to add a purchase request to this plan.")
-                        : String(localized: "Circles and purchase requests will appear here."))
-                )
+                SharedPlanEmptyCirclesView(canEdit: model.canEdit)
             }
         } else {
             ForEach(model.circles) { circle in
@@ -840,6 +834,58 @@ struct SharedPlanEditorScreen: View {
         case .success: .green
         case .warning: .orange
         }
+    }
+}
+
+struct SharedPlanEmptyCirclesView: View {
+    let canEdit: Bool
+
+    @ScaledMetric(relativeTo: .title3) private var iconContainerSize = 72.0
+    @ScaledMetric(relativeTo: .title3) private var iconSize = 30.0
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Circle()
+                .fill(Color.accentColor.opacity(0.12))
+                .frame(width: iconContainerSize, height: iconContainerSize)
+                .overlay {
+                    LucideIcon("building-2", size: iconSize)
+                        .foregroundStyle(Color.accentColor)
+                }
+                .accessibilityHidden(true)
+
+            VStack(spacing: 7) {
+                Text("No circles in this plan")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.center)
+
+                if canEdit {
+                    Text("Open a circle from the catalog to add a purchase request to this plan.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Circles and purchase requests will appear here.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 30)
+        .background(.background, in: .rect(cornerRadius: 24))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(Color.accentColor.opacity(0.16), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("shared-plan-empty-circles")
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 16, trailing: 16))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 }
 
@@ -1304,6 +1350,7 @@ private enum SharedPlanCircleEditorConfirmation: Identifiable {
 }
 
 private struct SharedPlanCircleEditorScreen: View {
+    @Environment(\.dismiss) private var dismiss
     @Bindable var model: SharedPlanEditorModel
     let store: SharedPlanStore
     let circle: SharedPlanCircleKey
@@ -1339,6 +1386,10 @@ private struct SharedPlanCircleEditorScreen: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .modifier(SharedPlanCirclePurchasesNavigationTitle(identity: identity))
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: model.circleContent(for: circle)?.presence) { _, presence in
+            guard presence == .removed else { return }
+            dismiss()
+        }
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
             case .createNeed:

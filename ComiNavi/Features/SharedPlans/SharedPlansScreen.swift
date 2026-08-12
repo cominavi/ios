@@ -811,7 +811,7 @@ struct SharedPlanListUITestSurface: View {
                 SharedPlanProgressOverview(progress: progress)
             }
             Section("Circles and purchases") {
-                Text("No circles in this plan")
+                SharedPlanEmptyCirclesView(canEdit: true)
             }
         }
         .navigationTitle(plan.name)
