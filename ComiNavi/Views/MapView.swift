@@ -103,7 +103,7 @@ struct MapView: View {
                 )
             }
             .padding(.trailing, MapChromeLayout.trailingInset)
-            .safeAreaPadding(.bottom, 78)
+            .safeAreaPadding(.bottom, 16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -384,13 +384,13 @@ private struct MapControlPanel: View {
                 MapSearchField(model: model, onFindByLocation: onFindCircle)
             }
         }
-        .frame(maxWidth: 760)
+        .frame(maxWidth: 760, alignment: .leading)
     }
 
     @ViewBuilder
     private var selectors: some View {
         if verticalSizeClass == .compact {
-            HStack(spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 if let eventDaySelector {
                     eventDaySelector
                 }
@@ -526,10 +526,9 @@ private struct MapLocationControlIcon: View {
     let isActive: Bool
 
     var body: some View {
-        LucideIcon(icon)
-            .font(.title3.weight(.semibold))
+        LucideIcon(icon, size: 20)
             .foregroundStyle(isActive ? Color.accentColor : Color.primary)
-            .frame(width: 54, height: 54)
+            .frame(width: 44, height: 44)
             .background(.regularMaterial, in: .circle)
             .overlay {
                 Circle()

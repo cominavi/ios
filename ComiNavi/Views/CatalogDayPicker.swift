@@ -81,7 +81,12 @@ struct CatalogEventDayBanner: View {
     let action: () -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ScaledMetric(relativeTo: .body) private var minimumHeight = 54.0
+
+    private var adaptiveMinimumHeight: CGFloat {
+        verticalSizeClass == .compact ? 44 : minimumHeight
+    }
 
     private var selectedDate: Date? {
         guard let day = days.first(where: { $0.dayIndex == selectedDay }) else { return nil }
@@ -123,7 +128,7 @@ struct CatalogEventDayBanner: View {
                     .accessibilityHidden(true)
             }
             .padding(.horizontal, 13)
-            .frame(maxWidth: .infinity, minHeight: minimumHeight)
+            .frame(maxWidth: .infinity, minHeight: adaptiveMinimumHeight)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)

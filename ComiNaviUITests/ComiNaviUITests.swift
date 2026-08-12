@@ -638,8 +638,10 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertLessThan(whereAmI.frame.maxX, findTable.frame.minX)
         XCTAssertGreaterThan(whereAmI.frame.midX, app.frame.midX)
         XCTAssertGreaterThan(whereAmI.frame.midY, app.frame.midY)
-        XCTAssertEqual(whereAmI.frame.width, whereAmI.frame.height, accuracy: 2)
-        XCTAssertEqual(findTable.frame.width, findTable.frame.height, accuracy: 2)
+        XCTAssertEqual(whereAmI.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(whereAmI.frame.height, 44, accuracy: 1)
+        XCTAssertEqual(findTable.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(findTable.frame.height, 44, accuracy: 1)
         takeScreenshot(named: "Map-iPad-Location-Actions-Bottom-Trailing")
     }
 
@@ -669,6 +671,10 @@ final class ComiNaviUITests: XCTestCase {
 
         XCTAssertEqual(eventDaySelector.frame.midY, venueSelector.frame.midY, accuracy: 2)
         XCTAssertEqual(venueSelector.frame.midY, layerButton.frame.midY, accuracy: 2)
+        XCTAssertEqual(eventDaySelector.frame.minY, venueSelector.frame.minY, accuracy: 2)
+        XCTAssertEqual(eventDaySelector.frame.maxY, venueSelector.frame.maxY, accuracy: 2)
+        XCTAssertEqual(venueSelector.frame.minY, layerButton.frame.minY, accuracy: 2)
+        XCTAssertEqual(venueSelector.frame.maxY, layerButton.frame.maxY, accuracy: 2)
         XCTAssertLessThan(eventDaySelector.frame.maxX, venueSelector.frame.minX)
         XCTAssertLessThan(venueSelector.frame.maxX, layerButton.frame.minX)
         XCTAssertLessThan(layerButton.frame.minX - venueSelector.frame.maxX, 12)
@@ -677,8 +683,11 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertLessThan(whereAmI.frame.maxX, findTable.frame.minX)
         XCTAssertGreaterThan(whereAmI.frame.midX, app.frame.midX)
         XCTAssertGreaterThan(whereAmI.frame.midY, app.frame.midY)
-        XCTAssertEqual(whereAmI.frame.width, whereAmI.frame.height, accuracy: 2)
-        XCTAssertEqual(findTable.frame.width, findTable.frame.height, accuracy: 2)
+        XCTAssertGreaterThan(whereAmI.frame.maxY, app.frame.maxY * 0.75)
+        XCTAssertEqual(whereAmI.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(whereAmI.frame.height, 44, accuracy: 1)
+        XCTAssertEqual(findTable.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(findTable.frame.height, 44, accuracy: 1)
         takeScreenshot(named: "Map-iPhone-Landscape-Compact-Chrome")
     }
 
@@ -703,8 +712,11 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertLessThan(whereAmI.frame.maxX, findTable.frame.minX)
         XCTAssertGreaterThan(whereAmI.frame.midX, app.frame.midX)
         XCTAssertGreaterThan(whereAmI.frame.midY, app.frame.midY)
-        XCTAssertEqual(whereAmI.frame.width, whereAmI.frame.height, accuracy: 2)
-        XCTAssertEqual(findTable.frame.width, findTable.frame.height, accuracy: 2)
+        XCTAssertGreaterThan(whereAmI.frame.maxY, app.frame.maxY * 0.75)
+        XCTAssertEqual(whereAmI.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(whereAmI.frame.height, 44, accuracy: 1)
+        XCTAssertEqual(findTable.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(findTable.frame.height, 44, accuracy: 1)
         takeScreenshot(named: "Map-iPhone-Portrait-Location-Actions-Bottom-Trailing")
     }
 
