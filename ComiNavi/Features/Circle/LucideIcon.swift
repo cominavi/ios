@@ -129,6 +129,34 @@ struct LucideIcon: View {
     ]
 }
 
+/// Brand marks bundled from Iconify's `simple-icons` set.
+struct IconifyBrandIcon: View {
+    private let name: String
+    private let requestedSize: Double?
+    @ScaledMetric(relativeTo: .body) private var size = 19.0
+
+    init(_ name: String, size: Double? = nil) {
+        self.name = name
+        requestedSize = size
+    }
+
+    static func uiImage(for name: String) -> UIImage? {
+        UIImage(named: "simple-icons-\(name)")?.withRenderingMode(.alwaysTemplate)
+    }
+
+    var body: some View {
+        Image("simple-icons-\(name)")
+            .resizable()
+            .renderingMode(.template)
+            .scaledToFit()
+            .frame(
+                width: requestedSize ?? size,
+                height: requestedSize ?? size
+            )
+            .accessibilityHidden(true)
+    }
+}
+
 struct LucideLabel: View {
     private let title: Text
     private let icon: String

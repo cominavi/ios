@@ -56,7 +56,8 @@ struct CircleDetailView: View {
                     favoriteColor: planModel.selectedColor,
                     address: circleAddress,
                     isOpeningMap: isOpeningMap,
-                    onOpenMap: openOnMap
+                    onOpenMap: openOnMap,
+                    externalLinks: externalLinks
                 )
 
                 if !combinedTags.isEmpty {
@@ -101,57 +102,6 @@ struct CircleDetailView: View {
                     }
                 }
 
-                if !externalLinks.isEmpty {
-                    CircleDetailSection(
-                        "Links",
-                        contentInsets: EdgeInsets()
-                    ) {
-                        VStack(spacing: 0) {
-                            ForEach(externalLinks) { item in
-                                Link(destination: item.url) {
-                                    HStack(spacing: 12) {
-                                        LucideIcon(item.systemImage)
-                                            .font(.body.weight(.semibold))
-                                            .foregroundStyle(Color.accentColor)
-                                            .frame(width: 24)
-                                            .accessibilityHidden(true)
-
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            Text(item.title)
-                                                .font(.body.weight(.medium))
-                                                .foregroundStyle(.primary)
-
-                                            Text(item.preview)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .lineLimit(1)
-                                        }
-
-                                        Spacer(minLength: 12)
-
-                                        LucideIcon("arrow.up.right")
-                                            .font(.caption.weight(.bold))
-                                            .foregroundStyle(.tertiary)
-                                            .accessibilityHidden(true)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .frame(minHeight: 56)
-                                    .contentShape(.rect)
-                                }
-                                .buttonStyle(CircleListRowButtonStyle())
-                                .accessibilityHint("Opens in your browser")
-                                .accessibilityIdentifier(item.accessibilityIdentifier)
-
-                                if item.id != externalLinks.last?.id {
-                                    Divider()
-                                        .padding(.leading, 52)
-                                }
-                            }
-                        }
-                        .clipShape(.rect(cornerRadius: 16))
-                    }
-                }
             }
             .frame(maxWidth: 720, alignment: .leading)
             .frame(maxWidth: .infinity)
@@ -407,6 +357,7 @@ private struct CircleDetailHeader: View {
     let address: ComiketSpaceAddress?
     let isOpeningMap: Bool
     let onOpenMap: () -> Void
+    let externalLinks: [CircleExternalLink]
 
     @State private var image: UIImage?
     @State private var didFailLoadingImage = false
@@ -510,8 +461,62 @@ private struct CircleDetailHeader: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }
+
+            if !externalLinks.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(externalLinks) { link in
+                            Link(destination: link.url) {
+                                CircleExternalLinkIcon(kind: link.kind)
+                                    .frame(width: 44, height: 44)
+                                    .background(
+                                        Color(uiColor: .secondarySystemGroupedBackground),
+                                        in: Circle()
+                                    )
+                                    .overlay {
+                                        Circle()
+                                            .stroke(
+                                                Color(uiColor: .separator).opacity(0.24),
+                                                lineWidth: 0.5
+                                            )
+                                    }
+                                    .contentShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(Text(link.title))
+                            .accessibilityValue(Text(verbatim: link.preview))
+                            .accessibilityHint("Opens in your browser")
+                            .accessibilityIdentifier(link.accessibilityIdentifier)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("circle-external-links")
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private struct CircleExternalLinkIcon: View {
+        let kind: CircleExternalLink.Kind
+
+        var body: some View {
+            Group {
+                switch kind {
+                case .xProfile:
+                    IconifyBrandIcon("x", size: 19)
+                case .pixiv:
+                    IconifyBrandIcon("pixiv", size: 21)
+                case .website:
+                    LucideIcon("globe", size: 20)
+                case .circlems:
+                    LucideIcon("person.2.crop.square.stack", size: 20)
+                }
+            }
+            .foregroundStyle(.primary)
+            .accessibilityHidden(true)
+        }
     }
 
     private func locationRow(spaceLabel: String) -> some View {
