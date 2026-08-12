@@ -310,6 +310,11 @@ struct ProfileScreen: View {
                 ProfileEditorScreen(profileStore: profileStore)
             }
         }
+        .fullScreenCover(isPresented: $isShowingAccountDeletionConfirmation) {
+            AccountDeletionConfirmationView {
+                deleteAccount()
+            }
+        }
         .task {
             guard let flow = try? AppData.pendingCirclemsAuthorizationFlow(),
                   flow.purpose == .link,
@@ -335,19 +340,6 @@ struct ProfileScreen: View {
             Button("キャンセル", role: .cancel) {}
         } message: {
             Text("このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログをこの端末から削除します。")
-        }
-        .confirmationDialog(
-            "Delete your ComiNavi account permanently?",
-            isPresented: $isShowingAccountDeletionConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete account", role: .destructive) {
-                deleteAccount()
-            }
-            .accessibilityIdentifier("profile-confirm-delete-account")
-            Button("キャンセル", role: .cancel) {}
-        } message: {
-            Text("Owned Shared Plans will be deleted, and you will leave joined plans. Your profile, favorites, notifications, and pending changes will also be deleted. This cannot be undone.")
         }
         .confirmationDialog(
             "送信待ちのプロフィール変更を破棄しますか？",
@@ -644,6 +636,107 @@ extension AvatarImageProcessor {
             sourceImage.draw(in: drawRect)
         }
         return image.withRenderingMode(.alwaysOriginal)
+    }
+}
+
+private struct AccountDeletionConfirmationView: View {
+    private static let countdownDuration = 10
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var secondsRemaining = Self.countdownDuration
+    let onDelete: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            FocusedActionSurface(
+                symbolName: "person.crop.circle.badge.xmark",
+                tint: .red
+            ) {
+                Text("Delete your ComiNavi account permanently?")
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("Owned Shared Plans will be deleted, and you will leave joined plans. Your profile, favorites, notifications, and pending changes will also be deleted. This cannot be undone.")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(
+                        secondsRemaining > 0
+                            ? "Please wait before deleting your account."
+                            : "You can delete your account now."
+                    )
+                    .font(.headline)
+
+                    if secondsRemaining > 0 {
+                        Text("Delete available in \(secondsRemaining) seconds")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                }
+                .padding(.top, 28)
+
+                VStack(spacing: 12) {
+                    FocusedActionButton(
+                        role: .destructive,
+                        tint: .red,
+                        action: {
+                            guard secondsRemaining == 0 else { return }
+                            onDelete()
+                            dismiss()
+                        }
+                    ) {
+                        Label("Delete account", systemImage: "trash")
+                    }
+                    .disabled(secondsRemaining > 0)
+                    .accessibilityIdentifier("profile-confirm-delete-account")
+                    .accessibilityHint(
+                        Text(
+                            secondsRemaining > 0
+                                ? "Available in \(secondsRemaining) seconds"
+                                : "Permanently deletes your account"
+                        )
+                    )
+
+                    FocusedActionButton(
+                        role: .cancel,
+                        emphasis: .secondary,
+                        tint: .secondary,
+                        action: dismiss.callAsFunction
+                    ) {
+                        Text("Cancel")
+                    }
+                    .accessibilityIdentifier("profile-cancel-delete-account")
+                }
+                .padding(.top, 28)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel", role: .cancel) {
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("profile-cancel-delete-account-top")
+                }
+            }
+        }
+        .interactiveDismissDisabled()
+        .task {
+            await startCountdown()
+        }
+    }
+
+    private func startCountdown() async {
+        while secondsRemaining > 0 {
+            do {
+                try await Task.sleep(for: .seconds(1))
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            secondsRemaining -= 1
+        }
     }
 }
 
