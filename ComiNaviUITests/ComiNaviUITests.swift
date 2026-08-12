@@ -613,6 +613,38 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testDemoExploreFirstVisitExplainsPinchZoom() {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-ui-testing-hide-debugger",
+            "-cominavi-demo-data",
+            "-cominavi-ui-testing-show-explore-onboarding",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+        ]
+        app.launch()
+
+        XCTAssertTrue(
+            app.otherElements["explore-screen"].waitForExistence(timeout: 60),
+            "The demo Explore screen must be ready"
+        )
+
+        let dismissButton = app.buttons["explore-zoom-onboarding-dismiss"]
+        XCTAssertTrue(dismissButton.waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts["Make Explore yours"].exists)
+        XCTAssertTrue(
+            app.staticTexts[
+                "Pinch the gallery to make circle images larger or fit more on screen."
+            ].exists
+        )
+        takeScreenshot(named: "Explore-Pinch-Zoom-Onboarding")
+
+        dismissButton.tap()
+        XCTAssertFalse(dismissButton.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.collectionViews["explore-gallery"].isHittable)
+    }
+
+    @MainActor
     func testDemoIPadMapSelectorsLeadAndLocationActionsTrail() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")

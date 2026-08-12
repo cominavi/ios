@@ -20,11 +20,14 @@ struct ExploreView<EventDayHeader: View>: View {
     @Binding private var selectedDay: Int
     @State private var model: ExploreModel
     @State private var showsFilters = false
+    @State private var showsGalleryZoomOnboarding = false
     private let eventDayHeader: EventDayHeader
+    private let onboardingStore: FeatureOnboardingStore
 
     init(
         dataSource: CirclemsDataSource,
         selectedDay: Binding<Int>,
+        onboardingDefaults: UserDefaults = .standard,
         @ViewBuilder eventDayHeader: () -> EventDayHeader
     ) {
         _selectedDay = selectedDay
@@ -32,6 +35,7 @@ struct ExploreView<EventDayHeader: View>: View {
             dataSource: dataSource,
             selectedDay: selectedDay.wrappedValue
         ))
+        onboardingStore = FeatureOnboardingStore(defaults: onboardingDefaults)
         self.eventDayHeader = eventDayHeader()
     }
 
@@ -116,6 +120,7 @@ struct ExploreView<EventDayHeader: View>: View {
         .task {
             model.select(day: selectedDay)
             await model.load()
+            presentGalleryZoomOnboardingIfNeeded()
         }
         .onAppear {
             Task {
@@ -124,6 +129,19 @@ struct ExploreView<EventDayHeader: View>: View {
         }
         .onChange(of: selectedDay) { _, day in
             model.select(day: day)
+        }
+        .onChange(of: model.layout) {
+            presentGalleryZoomOnboardingIfNeeded()
+        }
+        .featureOnboardingDialog(
+            isPresented: $showsGalleryZoomOnboarding,
+            accessibilityIdentifier: "explore-zoom-onboarding",
+            title: "Make Explore yours",
+            message: "Pinch the gallery to make circle images larger or fit more on screen.",
+            dismissButtonTitle: "Got it",
+            onDismiss: completeGalleryZoomOnboarding
+        ) {
+            ExploreGalleryZoomOnboardingIllustration()
         }
         .accessibilityIdentifier("explore-screen")
     }
@@ -192,6 +210,30 @@ struct ExploreView<EventDayHeader: View>: View {
             return String(localized: "Try another search or clear a filter.")
         }
         return String(localized: "No circles match the selected filters and interests.")
+    }
+
+    private func presentGalleryZoomOnboardingIfNeeded() {
+        guard model.layout == .gallery,
+              !model.visibleCircles.isEmpty,
+              !showsGalleryZoomOnboarding
+        else { return }
+
+        let arguments = ProcessInfo.processInfo.arguments
+        let isForcedForUITesting = arguments.contains(
+            "-cominavi-ui-testing-show-explore-onboarding"
+        )
+        let isSuppressedFixture = arguments.contains("-cominavi-demo-data")
+            && !isForcedForUITesting
+        guard !isSuppressedFixture,
+              isForcedForUITesting
+                || onboardingStore.shouldPresent(.exploreGalleryZoom)
+        else { return }
+
+        showsGalleryZoomOnboarding = true
+    }
+
+    private func completeGalleryZoomOnboarding() {
+        onboardingStore.markCompleted(.exploreGalleryZoom)
     }
 }
 

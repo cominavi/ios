@@ -321,6 +321,10 @@ struct EntryView: View {
     private var appContent: some View {
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-show-explore-onboarding"
+            ) {
+                ExploreOnboardingUITestSurface()
+            } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-catalog-loading"
             ) {
                 CatalogStatusSurface(
@@ -679,6 +683,33 @@ struct EntryView: View {
         }
     }
 }
+
+#if DEBUG
+private struct ExploreOnboardingUITestSurface: View {
+    @State private var catalogLibrary = CatalogLibrary(initialMode: .demo)
+    @State private var selectedDay = 1
+
+    var body: some View {
+        Group {
+            if let dataSource = catalogLibrary.dataSource,
+               dataSource.readiness == .ready
+            {
+                ExploreView(dataSource: dataSource, selectedDay: $selectedDay) {
+                    EmptyView()
+                }
+            } else {
+                ProgressView("Preparing Explore…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .task {
+            if catalogLibrary.phase == .idle {
+                catalogLibrary.start()
+            }
+        }
+    }
+}
+#endif
 
 private struct AccountDeletionPendingView: View {
     let issue: String?

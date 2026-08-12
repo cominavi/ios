@@ -12297,6 +12297,34 @@
         }
       }
     },
+    "Got it" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "わかりました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알겠어요"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "知道了"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "知道了"
+          }
+        }
+      }
+    },
     "Green" : {
       "localizations" : {
         "ja" : {
@@ -14993,6 +15021,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "洋紅色"
+          }
+        }
+      }
+    },
+    "Make Explore yours" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "見やすい大きさで探す"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "보기 편한 크기로 탐색하세요"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按你喜欢的大小探索"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "依你喜歡的大小探索"
           }
         }
       }
@@ -18001,6 +18057,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在地圖上標記此社團，並遵循現場標示與工作人員指示"
+          }
+        }
+      }
+    },
+    "Pinch the gallery to make circle images larger or fit more on screen." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ギャラリーをピンチすると、サークル画像を大きくしたり、一度に多く表示したりできます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "갤러리를 오므리거나 펼치면 서클 이미지를 크게 보거나 한 화면에 더 많이 표시할 수 있어요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在图库中双指捏合，即可放大社团图片，或在屏幕上同时显示更多图片。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在圖庫中雙指捏合，即可放大社團圖片，或在畫面上同時顯示更多圖片。"
           }
         }
       }
