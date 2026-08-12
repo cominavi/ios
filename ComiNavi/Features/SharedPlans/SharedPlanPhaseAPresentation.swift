@@ -489,6 +489,12 @@ final class SharedPlanNotificationInboxModel {
     private(set) var isLoadingMore = false
     private(set) var issueMessage: String?
 
+    @ObservationIgnored private var markingSeenIDs: Set<String> = []
+
+    var displayItems: [SharedPlanNotificationDisplayItem] {
+        SharedPlanNotificationDisplayItem.collapsing(notifications)
+    }
+
     var unreadCount: Int {
         notifications.count { $0.readAt == nil && !pendingReadIDs.contains($0.id) }
     }
@@ -529,20 +535,39 @@ final class SharedPlanNotificationInboxModel {
         }
     }
 
-    func open(
-        _ notification: SharedPlanNotificationItem,
+    func markSeen(
+        _ displayItem: SharedPlanNotificationDisplayItem,
         using service: any SharedPlanNotificationServicing,
         now: Date = Date()
     ) async {
-        await markRead(notification, using: service, now: now)
+        let unread = displayItem.notifications.filter {
+            $0.readAt == nil
+                && !pendingReadIDs.contains($0.id)
+                && !markingSeenIDs.contains($0.id)
+        }
+        guard !unread.isEmpty else { return }
+
+        let ids = Set(unread.map(\.id))
+        markingSeenIDs.formUnion(ids)
+        defer { markingSeenIDs.subtract(ids) }
+
+        do {
+            for notification in unread {
+                try await service.markNotificationRead(id: notification.id, now: now)
+            }
+        } catch {
+            issueMessage = error.localizedDescription
+        }
+        await service.drainNotificationReadOutbox()
+        synchronize(from: service)
     }
 
     func retryRead(
-        _ notification: SharedPlanNotificationItem,
+        _ displayItem: SharedPlanNotificationDisplayItem,
         using service: any SharedPlanNotificationServicing,
         now: Date = Date()
     ) async {
-        await markRead(notification, using: service, now: now)
+        await markSeen(displayItem, using: service, now: now)
     }
 
     func synchronize(from service: any SharedPlanNotificationServicing) {
@@ -555,21 +580,77 @@ final class SharedPlanNotificationInboxModel {
         readIssues = service.notificationReadIssues
         canLoadMore = service.notificationNextCursor != nil
     }
+}
 
-    private func markRead(
-        _ notification: SharedPlanNotificationItem,
-        using service: any SharedPlanNotificationServicing,
-        now: Date
-    ) async {
-        guard notification.readAt == nil else { return }
-        do {
-            try await service.markNotificationRead(id: notification.id, now: now)
-            await service.drainNotificationReadOutbox()
-            synchronize(from: service)
-        } catch {
-            issueMessage = error.localizedDescription
-            synchronize(from: service)
+struct SharedPlanNotificationDisplayItem: Identifiable, Equatable, Sendable {
+    let notifications: [SharedPlanNotificationItem]
+
+    private init(notifications: [SharedPlanNotificationItem]) {
+        precondition(!notifications.isEmpty)
+        self.notifications = notifications
+    }
+
+    var id: String { primary.id }
+    var primary: SharedPlanNotificationItem { notifications[0] }
+    var isUnread: Bool { notifications.contains { $0.readAt == nil } }
+    var isCircleAndPurchaseAddition: Bool {
+        notifications.count == 2
+            && Self.isCommonCircleAndPurchaseAddition(notifications[0], notifications[1])
+    }
+
+    static func collapsing(
+        _ notifications: [SharedPlanNotificationItem]
+    ) -> [SharedPlanNotificationDisplayItem] {
+        var result: [SharedPlanNotificationDisplayItem] = []
+        var index = notifications.startIndex
+        while index < notifications.endIndex {
+            let current = notifications[index]
+            let nextIndex = notifications.index(after: index)
+            if nextIndex < notifications.endIndex,
+               isCommonCircleAndPurchaseAddition(current, notifications[nextIndex])
+            {
+                result.append(SharedPlanNotificationDisplayItem(
+                    notifications: [current, notifications[nextIndex]]
+                ))
+                index = notifications.index(after: nextIndex)
+            } else {
+                result.append(SharedPlanNotificationDisplayItem(notifications: [current]))
+                index = nextIndex
+            }
         }
+        return result
+    }
+
+    private static func isCommonCircleAndPurchaseAddition(
+        _ first: SharedPlanNotificationItem,
+        _ second: SharedPlanNotificationItem
+    ) -> Bool {
+        guard first.planID == second.planID,
+              abs(first.createdAt.timeIntervalSince(second.createdAt)) <= 15,
+              case .operation(let firstPayload) = first.payload,
+              case .operation(let secondPayload) = second.payload,
+              firstPayload.actorUserID == secondPayload.actorUserID,
+              let firstCircleID = publicCircleID(in: firstPayload.payload),
+              firstCircleID == publicCircleID(in: secondPayload.payload)
+        else { return false }
+
+        let isExpectedPair =
+            firstPayload.operationType == .circlePresence
+                && secondPayload.operationType == .needCreate
+            || firstPayload.operationType == .needCreate
+                && secondPayload.operationType == .circlePresence
+        guard isExpectedPair else { return false }
+
+        let circlePayload = firstPayload.operationType == .circlePresence
+            ? firstPayload.payload
+            : secondPayload.payload
+        return circlePayload["state"]?.stringValue != SharedPlanPresenceState.removed.rawValue
+    }
+
+    private static func publicCircleID(
+        in payload: [String: SharedPlanJSONValue]
+    ) -> Int? {
+        payload["wcID"]?.integerValue.flatMap(Int.init(exactly:))
     }
 }
 
@@ -596,6 +677,32 @@ struct SharedPlanNotificationPresentation {
     let publicCircleID: Int?
 
     static func make(
+        displayItem: SharedPlanNotificationDisplayItem,
+        planName: String?
+    ) -> SharedPlanNotificationPresentation? {
+        guard displayItem.isCircleAndPurchaseAddition,
+              let purchaseNotification = displayItem.notifications.first(where: {
+                  guard case .operation(let payload) = $0.payload else { return false }
+                  return payload.operationType == .needCreate
+              }),
+              let presentation = make(
+                  notification: purchaseNotification,
+                  planName: planName
+              )
+        else {
+            return make(notification: displayItem.primary, planName: planName)
+        }
+        return SharedPlanNotificationPresentation(
+            localizationKey: .needCreate,
+            title: "Circle and purchase added",
+            detail: presentation.detail,
+            systemImage: "cart.badge.plus",
+            isConflict: false,
+            publicCircleID: presentation.publicCircleID
+        )
+    }
+
+    static func make(
         notification: SharedPlanNotificationItem,
         planName: String?
     ) -> SharedPlanNotificationPresentation? {
@@ -609,7 +716,7 @@ struct SharedPlanNotificationPresentation {
             let removed = payload.payload["state"]?.stringValue == "removed"
             return operation(
                 key: key,
-                title: removed ? "Circle removed from Shared Plan" : "Circle added to Shared Plan",
+                title: removed ? "Circle removed" : "Circle added",
                 detail: circleDetail(payload.payload, planName: planName),
                 systemImage: removed ? "minus.circle" : "plus.circle",
                 publicCircleID: publicCircleID(in: payload.payload)
@@ -636,8 +743,8 @@ struct SharedPlanNotificationPresentation {
             guard payload.operationType == .needCreate else { return nil }
             return operation(
                 key: key,
-                title: "Purchase need added",
-                detail: circleDetail(payload.payload, planName: planName),
+                title: "Purchase added",
+                detail: purchaseDetail(payload.payload, planName: planName),
                 systemImage: "cart.badge.plus",
                 publicCircleID: publicCircleID(in: payload.payload)
             )
@@ -645,7 +752,7 @@ struct SharedPlanNotificationPresentation {
             guard payload.operationType == .needDelete else { return nil }
             return operation(
                 key: key,
-                title: "Purchase need removed",
+                title: "Purchase removed",
                 detail: circleDetail(payload.payload, planName: planName),
                 systemImage: "cart.badge.minus",
                 publicCircleID: publicCircleID(in: payload.payload)
@@ -654,7 +761,7 @@ struct SharedPlanNotificationPresentation {
             guard payload.operationType == .needResolveParent else { return nil }
             return operation(
                 key: key,
-                title: "Purchase need conflict resolved",
+                title: "Purchase conflict resolved",
                 detail: circleDetail(payload.payload, planName: planName),
                 systemImage: "checkmark.circle",
                 publicCircleID: publicCircleID(in: payload.payload)
@@ -667,6 +774,7 @@ struct SharedPlanNotificationPresentation {
                 detail: quantityDetail(
                     payload.payload,
                     quantityKey: "wantedQuantity",
+                    format: "%@ • Wanted quantity: %lld",
                     planName: planName
                 ),
                 systemImage: "number.circle",
@@ -676,10 +784,11 @@ struct SharedPlanNotificationPresentation {
             guard payload.operationType == .needBuyerAllocation else { return nil }
             return operation(
                 key: key,
-                title: "Buyer allocation updated",
+                title: "Buyer assignment updated",
                 detail: quantityDetail(
                     payload.payload,
                     quantityKey: "quantity",
+                    format: "%@ • Assigned: %lld",
                     planName: planName
                 ),
                 systemImage: "person.2",
@@ -689,10 +798,11 @@ struct SharedPlanNotificationPresentation {
             guard payload.operationType == .needFulfilledQuantity else { return nil }
             return operation(
                 key: key,
-                title: "Fulfilled quantity updated",
+                title: "Purchase progress updated",
                 detail: quantityDetail(
                     payload.payload,
                     quantityKey: "fulfilledQuantity",
+                    format: "%@ • Purchased: %lld",
                     planName: planName
                 ),
                 systemImage: "checkmark.circle",
@@ -714,7 +824,7 @@ struct SharedPlanNotificationPresentation {
             )
             return SharedPlanNotificationPresentation(
                 localizationKey: key,
-                title: "Conflict needs review",
+                title: "Plan conflict needs review",
                 detail: detail,
                 systemImage: "exclamationmark.triangle.fill",
                 isConflict: true,
@@ -752,14 +862,30 @@ struct SharedPlanNotificationPresentation {
     private static func quantityDetail(
         _ payload: [String: SharedPlanJSONValue],
         quantityKey: String,
+        format: LocalizedStringResource,
         planName: String?
     ) -> String {
         guard let quantity = payload[quantityKey]?.integerValue
         else { return circleDetail(payload, planName: planName) }
         return String.localizedStringWithFormat(
-            String(localized: "%@ • Quantity %lld"),
+            String(localized: format),
             planName ?? String(localized: "Shared Plan"),
             quantity
+        )
+    }
+
+    private static func purchaseDetail(
+        _ payload: [String: SharedPlanJSONValue],
+        planName: String?
+    ) -> String {
+        guard let itemName = payload["itemName"]?.stringValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !itemName.isEmpty
+        else { return circleDetail(payload, planName: planName) }
+        return String.localizedStringWithFormat(
+            String(localized: "%@ • %@"),
+            planName ?? String(localized: "Shared Plan"),
+            itemName
         )
     }
 

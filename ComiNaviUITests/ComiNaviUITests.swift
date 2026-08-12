@@ -103,7 +103,7 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testSharedPlanNotificationDismissesBeforeOpeningItsPlan() {
+    func testSharedPlanNotificationDismissesBeforeOpeningItsCirclePlan() {
         let app = XCUIApplication()
         app.launchArguments += [
             "-cominavi-ui-testing-hide-debugger",
@@ -124,8 +124,9 @@ final class ComiNaviUITests: XCTestCase {
                 .waitForExistence(timeout: 2)
         )
         XCTAssertTrue(
-            app.navigationBars["Travel team"].waitForExistence(timeout: 5),
-            "The notification's plan should open after the sheet closes"
+            app.descendants(matching: .any)["shared-plan-test-circle-purchases"]
+                .waitForExistence(timeout: 5),
+            "The notification's circle plan should open after the sheet closes"
         )
     }
 

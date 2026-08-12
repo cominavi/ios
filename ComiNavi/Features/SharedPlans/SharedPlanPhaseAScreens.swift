@@ -279,7 +279,7 @@ struct SharedPlanNotificationInboxScreen: View {
     let features: SharedPlanPresentationFeatures
     let currentUserID: String?
     let catalogDataSource: CirclemsDataSource?
-    let onOpenPlan: (String) -> Void
+    let onOpenCirclePlan: (String, Int?) -> Void
     @State private var model = SharedPlanNotificationInboxModel()
 
     init(
@@ -287,13 +287,13 @@ struct SharedPlanNotificationInboxScreen: View {
         currentUserID: String? = nil,
         catalogDataSource: CirclemsDataSource? = nil,
         features: SharedPlanPresentationFeatures = .production,
-        onOpenPlan: @escaping (String) -> Void
+        onOpenCirclePlan: @escaping (String, Int?) -> Void
     ) {
         self.store = store
         self.currentUserID = currentUserID
         self.catalogDataSource = catalogDataSource
         self.features = features
-        self.onOpenPlan = onOpenPlan
+        self.onOpenCirclePlan = onOpenCirclePlan
     }
 
     var body: some View {
@@ -304,19 +304,28 @@ struct SharedPlanNotificationInboxScreen: View {
                 }
             }
 
-            ForEach(model.notifications) { notification in
+            ForEach(model.displayItems) { displayItem in
                 SharedPlanNotificationRow(
-                    notification: notification,
-                    planName: model.planNames[notification.planID],
-                    planComiketNumber: model.planComiketNumbers[notification.planID],
-                    isPendingRead: model.pendingReadIDs.contains(notification.id),
-                    readIssue: model.readIssues[notification.id],
+                    displayItem: displayItem,
+                    planName: model.planNames[displayItem.primary.planID],
+                    planComiketNumber: model.planComiketNumbers[displayItem.primary.planID],
+                    isPendingRead: displayItem.notifications.contains {
+                        model.pendingReadIDs.contains($0.id)
+                    },
+                    readIssue: displayItem.notifications.compactMap {
+                        model.readIssues[$0.id]
+                    }.first,
                     catalogDataSource: catalogDataSource
                 ) {
-                    Task { await model.open(notification, using: store) }
-                    onOpenPlan(notification.planID)
+                    onOpenCirclePlan(
+                        displayItem.primary.planID,
+                        displayItem.presentation(planName: model.planNames[displayItem.primary.planID])?
+                            .publicCircleID
+                    )
+                } onSeen: {
+                    Task { await model.markSeen(displayItem, using: store) }
                 } onRetryRead: {
-                    Task { await model.retryRead(notification, using: store) }
+                    Task { await model.retryRead(displayItem, using: store) }
                 }
             }
 
@@ -339,7 +348,7 @@ struct SharedPlanNotificationInboxScreen: View {
                 ) {
                     Text(model.issueMessage == nil ? "No notifications" : "Notifications unavailable")
                         .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    Text(model.issueMessage ?? String(localized: "Shared Plan updates and conflicts will appear here."))
+                    Text(model.issueMessage ?? String(localized: "Circle, purchase, and conflict updates will appear here."))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 12)
@@ -783,13 +792,14 @@ private extension SharedPlanProtectedInvitationAvailability {
 }
 
 private struct SharedPlanNotificationRow: View {
-    let notification: SharedPlanNotificationItem
+    let displayItem: SharedPlanNotificationDisplayItem
     let planName: String?
     let planComiketNumber: Int?
     let isPendingRead: Bool
     let readIssue: String?
     let catalogDataSource: CirclemsDataSource?
     let onOpen: () -> Void
+    let onSeen: () -> Void
     let onRetryRead: () -> Void
     @State private var circleSummary: CatalogNotificationCircle?
 
@@ -805,7 +815,7 @@ private struct SharedPlanNotificationRow: View {
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(presentation.title)
-                                .font(.caption.weight(notification.readAt == nil ? .semibold : .regular))
+                                .font(.caption.weight(displayItem.isUnread ? .semibold : .regular))
                             circleSummaryLine
                             Text(presentation.detail)
                                 .font(.caption2)
@@ -820,9 +830,9 @@ private struct SharedPlanNotificationRow: View {
                             .frame(width: 18)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Shared Plan update")
+                            Text("Plan activity")
                                 .font(.caption.weight(.medium))
-                            Text("Open the plan to review this update.")
+                            Text("Open the plan to see what changed.")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                             notificationTimestamp
@@ -841,7 +851,7 @@ private struct SharedPlanNotificationRow: View {
             .buttonStyle(.plain)
 
             if isPendingRead {
-                Label("Read status waiting to send", systemImage: "clock.arrow.circlepath")
+                Label("Marking as read", systemImage: "clock.arrow.circlepath")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -851,13 +861,14 @@ private struct SharedPlanNotificationRow: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                     Spacer()
-                    Button("Retry read status", action: onRetryRead)
+                    Button("Retry", action: onRetryRead)
                         .font(.caption)
                         .buttonStyle(.borderless)
                 }
             }
         }
         .padding(.vertical, 3)
+        .onAppear(perform: onSeen)
         .task(id: circleSummaryTaskID) {
             circleSummary = nil
             guard let publicCircleID = presentation?.publicCircleID,
@@ -874,10 +885,12 @@ private struct SharedPlanNotificationRow: View {
 
     private var presentation: SharedPlanNotificationPresentation? {
         SharedPlanNotificationPresentation.make(
-            notification: notification,
+            displayItem: displayItem,
             planName: planName
         )
     }
+
+    private var notification: SharedPlanNotificationItem { displayItem.primary }
 
     private var circleSummaryTaskID: String {
         let isReady = catalogDataSource?.readiness == .ready
@@ -923,7 +936,7 @@ private struct SharedPlanNotificationRow: View {
 
     @ViewBuilder
     private var unreadIndicator: some View {
-        if notification.readAt == nil, !isPendingRead {
+        if displayItem.isUnread, !isPendingRead {
             Circle()
                 .fill(Color.accentColor)
                 .frame(width: 8, height: 8)
@@ -933,6 +946,12 @@ private struct SharedPlanNotificationRow: View {
                 .frame(width: 8, height: 8)
                 .accessibilityHidden(true)
         }
+    }
+}
+
+private extension SharedPlanNotificationDisplayItem {
+    func presentation(planName: String?) -> SharedPlanNotificationPresentation? {
+        SharedPlanNotificationPresentation.make(displayItem: self, planName: planName)
     }
 }
 

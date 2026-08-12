@@ -2,6 +2,7 @@ import SwiftUI
 
 private enum SharedPlansRoute: Hashable {
     case plan(String)
+    case circlePlan(planID: String, publicCircleID: Int)
 }
 
 private enum SharedPlansSheet: Identifiable {
@@ -67,6 +68,16 @@ struct SharedPlansScreen: View {
                             favoriteImportService: favoriteImportService,
                             catalogDataSource: catalogDataSource
                         )
+                    case let .circlePlan(planID, publicCircleID):
+                        SharedPlanDetailScreen(
+                            store: store,
+                            planID: planID,
+                            currentUserID: currentUserID,
+                            features: features,
+                            favoriteImportService: favoriteImportService,
+                            catalogDataSource: catalogDataSource,
+                            initialPublicCircleID: publicCircleID
+                        )
                     }
                 }
         }
@@ -84,7 +95,7 @@ struct SharedPlansScreen: View {
                     currentUserID: currentUserID,
                     features: features,
                     catalogDataSource: catalogDataSource,
-                    onOpenPlan: queueOpeningPlan
+                    onOpenCirclePlan: queueOpeningCirclePlan
                 )
             case .planSwitcher(let required):
                 SharedPlanSwitcherSheet(
@@ -271,6 +282,13 @@ struct SharedPlansScreen: View {
         presentedSheet = nil
     }
 
+    private func queueOpeningCirclePlan(_ planID: String, publicCircleID: Int?) {
+        queuedRoute = publicCircleID.map {
+            .circlePlan(planID: planID, publicCircleID: $0)
+        } ?? .plan(planID)
+        presentedSheet = nil
+    }
+
     private func queueSheet(_ sheet: SharedPlansSheet) {
         queuedSheet = sheet
         presentedSheet = nil
@@ -287,6 +305,8 @@ struct SharedPlansScreen: View {
             switch queuedRoute {
             case .plan(let planID):
                 navigationPath = planID == primaryPlanID ? [] : [queuedRoute]
+            case .circlePlan:
+                navigationPath = [queuedRoute]
             }
             return
         }
@@ -664,6 +684,7 @@ private struct SharedPlanJoinGuideSheet: View {
 struct SharedPlanListUITestSurface: View {
     private enum Route: Hashable {
         case plan(String)
+        case circlePlan(planID: String, publicCircleID: Int)
         case information
         case invitations
     }
@@ -676,6 +697,7 @@ struct SharedPlanListUITestSurface: View {
     @State private var showsSwitcher = false
     @State private var showsNotifications = false
     @State private var queuedNotificationPlanID: String?
+    @State private var queuedNotificationCircleID: Int?
 
     private let plans = [
         SharedPlan(
@@ -736,6 +758,11 @@ struct SharedPlanListUITestSurface: View {
                 switch route {
                 case .plan(let planID):
                     planDetail(plans.first { $0.id == planID } ?? primaryPlan)
+                case let .circlePlan(planID, publicCircleID):
+                    circlePlanDetail(
+                        plans.first { $0.id == planID } ?? primaryPlan,
+                        publicCircleID: publicCircleID
+                    )
                 case .information:
                     List {
                         Section("Members") {
@@ -783,12 +810,13 @@ struct SharedPlanListUITestSurface: View {
                 List {
                     Button {
                         queuedNotificationPlanID = Self.secondPlanID
+                        queuedNotificationCircleID = 101
                         showsNotifications = false
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Travel team updated a purchase")
+                            Text("Purchase progress updated")
                                 .font(.headline)
-                            Text("Open the plan to review this update.")
+                            Text("Travel team • Purchased: 3")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -841,9 +869,33 @@ struct SharedPlanListUITestSurface: View {
         }
     }
 
+    private func circlePlanDetail(_ plan: SharedPlan, publicCircleID: Int) -> some View {
+        List {
+            Section("Plan") {
+                LabeledContent("Shared Plan", value: plan.name)
+                LabeledContent("Circle ID", value: String(publicCircleID))
+            }
+            Section("Purchases") {
+                Text("New release set")
+            }
+        }
+        .navigationTitle("Circle purchases")
+        .accessibilityIdentifier("shared-plan-test-circle-purchases")
+    }
+
     private func openQueuedNotificationPlan() {
         guard let queuedNotificationPlanID else { return }
         self.queuedNotificationPlanID = nil
+        if let queuedNotificationCircleID {
+            self.queuedNotificationCircleID = nil
+            navigationPath = [
+                .circlePlan(
+                    planID: queuedNotificationPlanID,
+                    publicCircleID: queuedNotificationCircleID
+                ),
+            ]
+            return
+        }
         navigationPath = queuedNotificationPlanID == primaryPlanID
             ? []
             : [.plan(queuedNotificationPlanID)]
@@ -897,7 +949,7 @@ private struct SharedPlanNotificationInboxSheet: View {
     let currentUserID: String?
     let features: SharedPlanPresentationFeatures
     let catalogDataSource: CirclemsDataSource?
-    let onOpenPlan: (String) -> Void
+    let onOpenCirclePlan: (String, Int?) -> Void
 
     var body: some View {
         NavigationStack {
@@ -906,7 +958,7 @@ private struct SharedPlanNotificationInboxSheet: View {
                 currentUserID: currentUserID,
                 catalogDataSource: catalogDataSource,
                 features: features,
-                onOpenPlan: onOpenPlan
+                onOpenCirclePlan: onOpenCirclePlan
             )
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -1004,6 +1056,7 @@ struct SharedPlanDetailScreen: View {
     let features: SharedPlanPresentationFeatures
     let favoriteImportService: any CirclemsFavoriteImportServicing
     let catalogDataSource: CirclemsDataSource?
+    let initialPublicCircleID: Int?
 
     init(
         store: SharedPlanStore,
@@ -1011,7 +1064,8 @@ struct SharedPlanDetailScreen: View {
         currentUserID: String? = nil,
         features: SharedPlanPresentationFeatures = .production,
         favoriteImportService: any CirclemsFavoriteImportServicing = CominaviServiceClient.shared,
-        catalogDataSource: CirclemsDataSource? = AppData.catalogLibrary.dataSource
+        catalogDataSource: CirclemsDataSource? = AppData.catalogLibrary.dataSource,
+        initialPublicCircleID: Int? = nil
     ) {
         self.store = store
         self.planID = planID
@@ -1019,6 +1073,7 @@ struct SharedPlanDetailScreen: View {
         self.features = features
         self.favoriteImportService = favoriteImportService
         self.catalogDataSource = catalogDataSource
+        self.initialPublicCircleID = initialPublicCircleID
     }
 
     var body: some View {
@@ -1027,7 +1082,8 @@ struct SharedPlanDetailScreen: View {
             planID: planID,
             currentUserID: currentUserID,
             features: features,
-            catalogDataSource: catalogDataSource
+            catalogDataSource: catalogDataSource,
+            initialPublicCircleID: initialPublicCircleID
         )
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

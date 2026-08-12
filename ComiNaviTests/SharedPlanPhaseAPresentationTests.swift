@@ -356,10 +356,85 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
 
         let readAt = cached.createdAt.addingTimeInterval(60)
         store.notificationReadAt = readAt
-        await model.open(cached, using: store, now: cached.createdAt.addingTimeInterval(10))
+        let cachedDisplayItem = try XCTUnwrap(
+            model.displayItems.first { $0.notifications.contains(cached) }
+        )
+        await model.markSeen(
+            cachedDisplayItem,
+            using: store,
+            now: cached.createdAt.addingTimeInterval(10)
+        )
         XCTAssertEqual(model.notifications.first(where: { $0.id == cached.id })?.readAt, readAt)
         XCTAssertEqual(store.markedNotificationIDs, [cached.id])
         XCTAssertEqual(store.drainReadCount, 1)
+    }
+
+    func testNotificationInboxCollapsesCircleAndPurchaseAdditionAndMarksBothSeen() async throws {
+        let createdAt = Date(timeIntervalSince1970: 1_786_320_000)
+        let purchase = makeNotification(
+            idCharacter: "b",
+            operationType: .needCreate,
+            createdAt: createdAt.addingTimeInterval(2),
+            itemName: "New release set"
+        )
+        let circle = makeNotification(
+            idCharacter: "a",
+            operationType: .circlePresence,
+            createdAt: createdAt
+        )
+        let store = PhaseAStoreStub(plan: makePlan())
+        store.notifications = [purchase, circle]
+        store.notificationReadAt = createdAt.addingTimeInterval(30)
+        let model = SharedPlanNotificationInboxModel()
+        model.synchronize(from: store)
+
+        let displayItem = try XCTUnwrap(model.displayItems.first)
+        XCTAssertEqual(model.displayItems.count, 1)
+        XCTAssertEqual(displayItem.notifications.map(\.id), [purchase.id, circle.id])
+        XCTAssertTrue(displayItem.isCircleAndPurchaseAddition)
+
+        let presentation = try XCTUnwrap(
+            SharedPlanNotificationPresentation.make(
+                displayItem: displayItem,
+                planName: "買い物リスト"
+            )
+        )
+        XCTAssertEqual(String(localized: presentation.title), "Circle and purchase added")
+        XCTAssertTrue(presentation.detail.contains("New release set"))
+
+        await model.markSeen(displayItem, using: store, now: createdAt.addingTimeInterval(5))
+        XCTAssertEqual(store.markedNotificationIDs, [purchase.id, circle.id])
+        XCTAssertEqual(store.drainReadCount, 1)
+        XCTAssertTrue(model.notifications.allSatisfy { $0.readAt != nil })
+    }
+
+    func testNotificationInboxDoesNotCollapseUnrelatedAdditions() {
+        let createdAt = Date(timeIntervalSince1970: 1_786_320_000)
+        let circle = makeNotification(
+            idCharacter: "a",
+            operationType: .circlePresence,
+            createdAt: createdAt
+        )
+        let latePurchase = makeNotification(
+            idCharacter: "b",
+            operationType: .needCreate,
+            createdAt: createdAt.addingTimeInterval(16)
+        )
+        let otherCirclePurchase = makeNotification(
+            idCharacter: "c",
+            operationType: .needCreate,
+            wcID: 9_002,
+            createdAt: createdAt.addingTimeInterval(1)
+        )
+
+        XCTAssertEqual(
+            SharedPlanNotificationDisplayItem.collapsing([latePurchase, circle]).count,
+            2
+        )
+        XCTAssertEqual(
+            SharedPlanNotificationDisplayItem.collapsing([otherCirclePurchase, circle]).count,
+            2
+        )
     }
 
     func testNotificationPresentationMapsEveryFrozenI18nKeyWithoutServerProse() throws {
@@ -763,11 +838,15 @@ private extension SharedPlanPhaseAPresentationTests {
 
     func makeNotification(
         idCharacter: Character,
-        operationType: SharedPlanOperationType
+        operationType: SharedPlanOperationType,
+        actorUserID: String = userA,
+        wcID: Int64 = 9_001,
+        createdAt: Date = Date(timeIntervalSince1970: 1_786_320_000),
+        itemName: String? = nil
     ) -> SharedPlanNotificationItem {
         var payload: [String: SharedPlanJSONValue] = [
             "v": .integer(1),
-            "wcID": .integer(9001),
+            "wcID": .integer(wcID),
             "state": .string("active"),
             "wantedQuantity": .integer(2),
             "quantity": .integer(1),
@@ -776,12 +855,15 @@ private extension SharedPlanPhaseAPresentationTests {
         if operationType == .circleMemoSplice {
             payload["insertedTextPreview"] = .string("メモ")
         }
+        if let itemName {
+            payload["itemName"] = .string(itemName)
+        }
         let operation = SharedPlanOperationNotificationPayload(
             v: 1,
             planID: planID,
             operationID: "22222222-2222-4222-8222-222222222222",
             operationType: operationType,
-            actorUserID: userA,
+            actorUserID: actorUserID,
             payload: payload,
             heads: [String(repeating: "a", count: 64)],
             membershipEpoch: 7
@@ -794,7 +876,7 @@ private extension SharedPlanPhaseAPresentationTests {
             i18nKey: String(operationType.rawValue.dropLast(".v1".count)),
             payloadVersion: 1,
             payload: .operation(operation),
-            createdAt: Date(timeIntervalSince1970: 1_786_320_000),
+            createdAt: createdAt,
             readAt: nil
         )
     }
