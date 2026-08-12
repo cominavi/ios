@@ -151,14 +151,6 @@ struct FollowingImportView: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 18)
-
-            Text(
-                "ComiNavi sends your Circle.ms session only to cominavi.net for verification. X accounts are matched to circles on this device. Imports are limited to once every six hours."
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 10)
         }
         .accessibilityIdentifier("following-import-form")
     }

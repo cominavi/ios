@@ -8388,34 +8388,6 @@
         }
       }
     },
-    "ComiNavi sends your Circle.ms session only to cominavi.net for verification. X accounts are matched to circles on this device. Imports are limited to once every six hours.": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ComiNaviは本人確認のため、Circle.msのセッションをcominavi.netにのみ送信します。Xアカウントとサークルの照合はこの端末上で行われます。インポートは6時間に1回までです。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ComiNavi는 본인 확인을 위해 Circle.ms 세션을 cominavi.net에만 전송합니다. X 계정과 서클의 확인은 이 단말기에서 수행됩니다. 임포트는 6시간에 한 번까지 가능합니다."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ComiNavi为了确认本人身份，只将Circle.ms的会话发送到cominavi.net。 X账户和社团的核对在这个设备上进行。 导入6小时最多1次。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ComiNavi為了確認本人身份，只將Circle.ms的會話傳送到cominavi.net。 X帳號和社團的核對在這個裝置上進行。 匯入6小時最多1次。"
-          }
-        }
-      }
-    },
     "ComiNavi sharing is not configured in this build.": {
       "extractionState": "stale",
       "localizations": {
