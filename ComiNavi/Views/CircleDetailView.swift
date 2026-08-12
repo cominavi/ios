@@ -57,7 +57,8 @@ struct CircleDetailView: View {
                     address: circleAddress,
                     isOpeningMap: isOpeningMap,
                     onOpenMap: openOnMap,
-                    externalLinks: externalLinks
+                    externalLinks: externalLinks,
+                    xProfile: xProfile
                 )
 
                 if details?.extensionRecord?.WCId != nil {
@@ -306,6 +307,27 @@ struct CircleDetailView: View {
         }.filter { seen.insert($0.id).inserted }
     }
 
+    private var xProfile: CircleXProfile? {
+        guard let link = externalLinks.first(where: { $0.kind == .xProfile }) else {
+            return nil
+        }
+
+        let post = details?.enrichment?.primaryPost
+        let handle = post?.authorHandle
+            ?? link.preview.trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        let displayName = post?.authorName.nonBlank
+            ?? circle.penName.nonBlank
+            ?? circle.circleName.nonBlank
+            ?? String(localized: "X profile")
+
+        return CircleXProfile(
+            url: link.url,
+            displayName: displayName,
+            handle: handle,
+            avatarURL: post?.authorProfileImageURL
+        )
+    }
+
     private var officialCatalogLinks: [CircleExternalLink] {
         CircleExternalLinkNormalizer.links(from: [
             .init(circle.circlems, hint: .circlems),
@@ -368,6 +390,106 @@ struct CircleDetailView: View {
     }
 }
 
+private struct CircleXProfile {
+    let url: URL
+    let displayName: String
+    let handle: String
+    let avatarURL: URL?
+}
+
+private struct CircleXProfileRow: View {
+    let profile: CircleXProfile
+    var avatarSize: CGFloat = 48
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            IconifyBrandIcon("x", size: 18)
+                .foregroundStyle(.primary)
+                .frame(width: 20, height: avatarSize, alignment: .center)
+
+            CircleXProfileAvatar(url: profile.avatarURL, size: avatarSize)
+
+            VStack(alignment: .leading, spacing: 3) {
+                DimmedCircleDisplayName(displayName: profile.displayName)
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+
+                Text(verbatim: "@\(profile.handle)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            LucideIcon("chevron.forward", size: 16)
+                .foregroundStyle(.tertiary)
+                .padding(.top, 3)
+                .accessibilityHidden(true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(verbatim: profile.displayName))
+        .accessibilityValue(Text(verbatim: "@\(profile.handle)"))
+    }
+}
+
+private struct DimmedCircleDisplayName: View {
+    let displayName: String
+
+    var body: some View {
+        if let atIndex = displayName.firstIndex(of: "@") {
+            let leading = String(displayName[..<atIndex]).trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            let trailing = String(displayName[atIndex...]).trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+
+            if leading.isEmpty {
+                Text(verbatim: trailing)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(verbatim: leading)
+                    .foregroundStyle(.primary)
+                + Text(verbatim: " \(trailing)")
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Text(verbatim: displayName)
+                .foregroundStyle(.primary)
+        }
+    }
+}
+
+private struct CircleXProfileAvatar: View {
+    let url: URL?
+    let size: CGFloat
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFill()
+            default:
+                LucideIcon("person.circle.fill", size: Double(size * 0.62))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(uiColor: .secondarySystemFill))
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(.circle)
+        .overlay {
+            Circle()
+                .stroke(Color(uiColor: .separator).opacity(0.24), lineWidth: 0.5)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 private struct CircleDetailHeader: View {
     let circle: CirclemsDataSchema.ComiketCircleWC
     let dataSource: CirclemsDataSource
@@ -377,6 +499,7 @@ private struct CircleDetailHeader: View {
     let isOpeningMap: Bool
     let onOpenMap: () -> Void
     let externalLinks: [CircleExternalLink]
+    let xProfile: CircleXProfile?
 
     @State private var image: UIImage?
     @State private var didFailLoadingImage = false
@@ -481,10 +604,31 @@ private struct CircleDetailHeader: View {
                     .textSelection(.enabled)
             }
 
-            if !externalLinks.isEmpty {
+            if let xProfile {
+                Link(destination: xProfile.url) {
+                    CircleXProfileRow(profile: xProfile)
+                        .padding(12)
+                        .background(
+                            Color(uiColor: .secondarySystemGroupedBackground),
+                            in: .rect(cornerRadius: 16)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(
+                                    Color(uiColor: .separator).opacity(0.24),
+                                    lineWidth: 0.5
+                                )
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens in your browser")
+                .accessibilityIdentifier("circle-x-profile-row")
+            }
+
+            if !otherExternalLinks.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(externalLinks) { link in
+                        ForEach(otherExternalLinks) { link in
                             Link(destination: link.url) {
                                 CircleExternalLinkIcon(kind: link.kind)
                                     .frame(width: 44, height: 44)
@@ -515,6 +659,10 @@ private struct CircleDetailHeader: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var otherExternalLinks: [CircleExternalLink] {
+        externalLinks.filter { $0.kind != .xProfile }
     }
 
     private struct CircleExternalLinkIcon: View {
@@ -1114,16 +1262,21 @@ private struct ShinagakiPostCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 4) {
-                Text(post.authorName.nonBlank ?? "@\(post.authorHandle)")
-                    .font(.subheadline.weight(.bold))
-                    .lineLimit(1)
-
-                if post.authorName.nonBlank != nil {
-                    Text("@\(post.authorHandle)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                Link(destination: post.authorProfileURL ?? post.postURL) {
+                    CircleXProfileRow(
+                        profile: CircleXProfile(
+                            url: post.authorProfileURL ?? post.postURL,
+                            displayName: post.authorName.nonBlank
+                                ?? "@\(post.authorHandle)",
+                            handle: post.authorHandle,
+                            avatarURL: post.authorProfileImageURL
+                        ),
+                        avatarSize: 44
+                    )
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens in your browser")
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Spacer(minLength: 8)
 
