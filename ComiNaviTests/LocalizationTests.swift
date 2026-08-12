@@ -195,6 +195,22 @@ final class LocalizationTests: XCTestCase {
             ),
             "メンバーが記録した結果"
         )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Plan information",
+                value: nil,
+                table: nil
+            ),
+            "プラン情報"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
+                forKey: "Add member",
+                value: nil,
+                table: nil
+            ),
+            "メンバーを追加"
+        )
     }
 
     func testNewLocalizationsResolveRepresentativeInterfaceCopy() throws {
@@ -216,6 +232,8 @@ final class LocalizationTests: XCTestCase {
                 "Choose a primary plan": "选择主要计划",
                 "How to join a plan": "如何加入计划",
                 "Join": "加入",
+                "Plan information": "计划信息",
+                "Add member": "添加成员",
             ],
             "zh-Hant": [
                 "Map": "地圖",
@@ -234,6 +252,8 @@ final class LocalizationTests: XCTestCase {
                 "Choose a primary plan": "選擇主要計畫",
                 "How to join a plan": "如何加入計畫",
                 "Join": "加入",
+                "Plan information": "計畫資訊",
+                "Add member": "新增成員",
             ],
             "ko": [
                 "Map": "지도",
@@ -252,6 +272,8 @@ final class LocalizationTests: XCTestCase {
                 "Choose a primary plan": "기본 플랜 선택",
                 "How to join a plan": "플랜 참여 방법",
                 "Join": "참여",
+                "Plan information": "플랜 정보",
+                "Add member": "멤버 추가",
             ],
         ]
 

@@ -488,7 +488,12 @@
       }
     },
     "%@ will immediately lose access. Changes they have not sent will not be shared." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "%@さんはすぐにアクセスできなくなります。送信していない変更は共有されません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "%@님은 즉시 액세스 권한을 잃습니다. 아직 전송하지 않은 변경 사항은 공유되지 않습니다。" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@将立即失去访问权限。尚未发送的更改不会共享。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "%@將立即失去存取權限。尚未傳送的更改不會共用。" } }
+      }
     },
     "%@ will immediately lose access. Unsynced work remains only on their device." : {
       "extractionState" : "stale",
@@ -549,7 +554,12 @@
       }
     },
     "%@ will regain access." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "%@さんは再びアクセスできるようになります。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "%@님은 다시 액세스할 수 있습니다。" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%@将恢复访问权限。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "%@將恢復存取權限。" } }
+      }
     },
     "%@, %lld circles" : {
       "localizations" : {
@@ -994,6 +1004,30 @@
             "state" : "new",
             "value" : "%1$@. Requested %2$lld, assigned %3$lld, bought %4$lld. %5$@"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@。リクエスト%2$lld件、担当%3$lld件、購入済み%4$lld件。%5$@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@. 요청 %2$lld개, 배정 %3$lld개, 구매 완료 %4$lld개. %5$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@。请求%2$lld个，已分配%3$lld个，已购买%4$lld个。%5$@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@。請求%2$lld個、已分配%3$lld個、已購買%4$lld個。%5$@"
+          }
         }
       }
     },
@@ -1111,7 +1145,12 @@
       }
     },
     "%lld changes are waiting to send." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "送信待ちの変更が%lld件あります。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "%lld건의 변경 사항이 전송 대기 중입니다。" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "有%lld项更改等待发送。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "有%lld項更改等待傳送。" } }
+      }
     },
     "%lld changes are waiting to sync." : {
       "extractionState" : "stale",
@@ -1206,7 +1245,12 @@
       }
     },
     "%lld choices need attention" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "確認が必要な選択肢が%lld件あります" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "확인이 필요한 선택 항목이 %lld개 있습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "有%lld个选项需要确认" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "有%lld個選項需要確認" } }
+      }
     },
     "%lld circles" : {
       "localizations" : {
@@ -1385,6 +1429,30 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "%1$lld item changes and %2$lld plan updates are available in this recovery copy."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この復旧用コピーには項目の変更%1$lld件とプランの更新%2$lld件があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 복구 사본에는 항목 변경 %1$lld건과 플랜 업데이트 %2$lld건이 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此恢复副本中有%1$lld项项目更改和%2$lld项计划更新。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此復原副本中有%1$lld項項目更改和%2$lld項計畫更新。"
           }
         }
       }
@@ -1631,7 +1699,12 @@
       }
     },
     "%lld remaining" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "残り%lld件" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "%lld개 남음" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "剩余%lld个" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "剩餘%lld個" } }
+      }
     },
     "%lld requests" : {
       "extractionState" : "stale",
@@ -2624,7 +2697,12 @@
       }
     },
     "Account deletion is still being completed. Please try again shortly." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アカウントの削除処理がまだ完了していません。しばらくしてからもう一度お試しください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "계정 삭제가 아직 완료되지 않았습니다. 잠시 후 다시 시도해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "账号删除仍在进行中。请稍后再试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "帳號刪除仍在進行中。請稍後再試。" } }
+      }
     },
     "Accuracy about %lld meters. You always confirm the venue." : {
       "localizations" : {
@@ -2944,7 +3022,348 @@
       }
     },
     "Add a purchase request to start tracking this plan." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "購入リクエストを追加すると、プランの進捗を確認できます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "구매 요청을 추가하면 플랜 진행 상황을 확인할 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加购买请求后，即可查看计划进度。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "新增購買請求後，即可查看計畫進度。" } }
+      }
+    },
+    "Add member" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "メンバーを追加" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "멤버 추가" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加成员" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "新增成員" } }
+      }
+    },
+    "Archive" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アーカイブ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "보관" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存档" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "封存" } }
+      }
+    },
+    "Archive..." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アーカイブ…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "보관…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存档…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "封存…" } }
+      }
+    },
+    "Archived" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アーカイブ済み" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "보관됨" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已归档" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "已封存" } }
+      }
+    },
+    "Archived plans remain available but cannot be edited." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アーカイブしたプランは引き続き表示できますが、編集はできません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "보관한 플랜은 계속 볼 수 있지만 편집할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已存档的计划仍可查看，但无法编辑。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "已封存的計畫仍可查看，但無法編輯。" } }
+      }
+    },
+    "Ask the plan owner to create and share an invitation from Plan information, then Add member." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プラン情報からオーナーに招待を作成・共有してもらい、「メンバーを追加」します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "플랜 정보에서 소유자에게 초대를 만들어 공유해 달라고 한 다음, ‘멤버 추가’를 누르세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请让计划所有者在“计划信息”中创建并分享邀请，然后点击“添加成员”。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "請讓計畫擁有者在「計畫資訊」中建立並分享邀請，然後點選「新增成員」。" } }
+      }
+    },
+    "bought" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "購入済み" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "구매 완료" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已购买" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "已購買" } }
+      }
+    },
+    "Choose a primary plan" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "メインプランを選択" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "기본 플랜 선택" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择主要计划" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "選擇主要計畫" } }
+      }
+    },
+    "Circle import" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "サークルの読み込み" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "서클 가져오기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导入社团" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "匯入社團" } }
+      }
+    },
+    "Confirm your account" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アカウントを確認" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "계정 확인" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "确认账号" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "確認帳號" } }
+      }
+    },
+    "Create a link to add someone to this plan." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このプランに追加する人のためのリンクを作成します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 플랜에 참여할 사람을 위한 링크를 만드세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建链接，以便将其他人添加到此计划。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "建立連結，以便將其他人新增至此計畫。" } }
+      }
+    },
+    "Creates a new Shared Plan." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "新しい共有プランを作成します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "새 공유 플랜을 만듭니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建新的共享计划。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "建立新的共享計畫。" } }
+      }
+    },
+    "Get an invitation link" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "招待リンクを受け取る" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "초대 링크 받기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "获取邀请链接" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "取得邀請連結" } }
+      }
+    },
+    "How to join a plan" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プランへの参加方法" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "플랜 참여 방법" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "如何加入计划" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "如何加入計畫" } }
+      }
+    },
+    "Invitation links" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "招待リンク" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "초대 링크" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "邀请链接" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "邀請連結" } }
+      }
+    },
+    "Invite links stop working when they expire or the plan is archived." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "招待リンクは期限切れになるか、プランがアーカイブされると使えなくなります。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "초대 링크는 만료되거나 플랜이 보관되면 작동하지 않습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "邀请链接过期或计划存档后将无法使用。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "邀請連結過期或計畫封存後將無法使用。" } }
+      }
+    },
+    "Join" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "参加" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "참여" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "加入" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "加入" } }
+      }
+    },
+    "Joining starts from an invitation link; there is no code to enter on this screen." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "参加は招待リンクから始めます。この画面で入力するコードはありません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "참여는 초대 링크에서 시작합니다. 이 화면에 입력할 코드는 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请从邀请链接开始加入；此页面无需输入代码。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "請從邀請連結開始加入；此頁面無需輸入代碼。" } }
+      }
+    },
+    "Load more invitation links" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "招待リンクをさらに読み込む" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "초대 링크 더 불러오기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "加载更多邀请链接" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "載入更多邀請連結" } }
+      }
+    },
+    "Loading invitation links" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "招待リンクを読み込み中" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "초대 링크 불러오는 중" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在加载邀请链接" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在載入邀請連結" } }
+      }
+    },
+    "No active invitation links" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "有効な招待リンクはありません" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "활성 초대 링크가 없습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有有效的邀请链接" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "沒有有效的邀請連結" } }
+      }
+    },
+    "Open" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "開く" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "열기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "開啟" } }
+      }
+    },
+    "Open the link on this iPhone" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このiPhoneでリンクを開く" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 iPhone에서 링크 열기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在这台 iPhone 上打开链接" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "在這部 iPhone 上開啟連結" } }
+      }
+    },
+    "Plan information" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プラン情報" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "플랜 정보" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "计划信息" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "計畫資訊" } }
+      }
+    },
+    "Primary plan" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "メインプラン" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "기본 플랜" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主要计划" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "主要計畫" } }
+      }
+    },
+    "Reinstate member..." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "メンバーを再参加させる…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "멤버 재참여…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "让成员重新加入…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "讓成員重新加入…" } }
+      }
+    },
+    "Remove member..." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "メンバーを削除…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "멤버 삭제…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除成员…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "刪除成員…" } }
+      }
+    },
+    "Reopen" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再開" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다시 열기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重新开启" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "重新開啟" } }
+      }
+    },
+    "Reopen this plan to make it editable again." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再開すると、このプランを再び編集できるようになります。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 플랜을 다시 편집하려면 재개하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重新开启此计划后即可再次编辑。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "重新開啟此計畫後即可再次編輯。" } }
+      }
+    },
+    "Revoke invitation..." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "招待を取り消す…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "초대를 취소합니다…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消邀请…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "取消邀請…" } }
+      }
+    },
+    "Share this link" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このリンクを共有" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 링크 공유" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分享此链接" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "分享此連結" } }
+      }
+    },
+    "Share this link with the person you want to add." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "追加する相手にこのリンクを共有してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "추가하려는 사람에게 이 링크를 공유하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请将此链接分享给要添加的人。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "請將此連結分享給要新增的人。" } }
+      }
+    },
+    "Shows how to join a Shared Plan." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "共有プランへの参加方法を表示します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "공유 플랜에 참여하는 방법을 안내합니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "查看加入共享计划的方法。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "查看加入共享計畫的方法。" } }
+      }
+    },
+    "Sign in as the person who should join, then accept the invitation." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "参加する本人のアカウントでログインして、招待を承認します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "참여할 사람의 계정으로 로그인한 다음 초대를 수락하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用要加入的用户账号登录，然后接受邀请。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "使用要加入的使用者帳號登入，然後接受邀請。" } }
+      }
+    },
+    "Switch plan" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プランを切り替える" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "플랜 전환" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换计划" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "切換計畫" } }
+      }
+    },
+    "Switch primary plan" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "メインプランを切り替える" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "기본 플랜 전환" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换主要计划" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "切換主要計畫" } }
+      }
+    },
+    "The invitation opens in ComiNavi so you can confirm the plan before joining." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "招待がComiNaviで開き、参加する前にプランを確認できます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "초대가 ComiNavi에서 열리며 참여하기 전에 플랜을 확인할 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "邀请会在 ComiNavi 中打开，加入前可以先确认计划。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "邀請會在 ComiNavi 中開啟，加入前可以先確認計畫。" } }
+      }
+    },
+    "This invitation link is no longer available." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この招待リンクは利用できなくなりました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 초대 링크는 더 이상 사용할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此邀请链接已无法使用。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此邀請連結已無法使用。" } }
+      }
+    },
+    "This plan will become read-only. You can reopen it later." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このプランは読み取り専用になります。後で再開できます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 플랜은 읽기 전용이 됩니다. 나중에 다시 열 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此计划将变为只读。之后可以重新开启。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此計畫將變為唯讀。之後可以重新開啟。" } }
+      }
+    },
+    "Transfer ownership..." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "オーナー権限を移譲…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "소유자 권한 이전…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "转让所有者权限…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "轉讓所有者權限…" } }
+      }
+    },
+    "View archived plans" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "アーカイブしたプランを表示" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "보관된 플랜 보기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "查看已归档计划" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "查看已封存計畫" } }
+      }
+    },
+    "Your plans" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "あなたのプラン" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "내 플랜" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "你的计划" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "你的計畫" } }
+      }
     },
     "Add circle" : {
       "extractionState" : "stale",
@@ -3003,9 +3422,6 @@
           }
         }
       }
-    },
-    "Add member" : {
-
     },
     "Add purchase need" : {
       "extractionState" : "stale",
@@ -3548,7 +3964,12 @@
       }
     },
     "Almost ready…" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "もうすぐ完了…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "곧 완료됩니다…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "即将完成…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "即將完成…" } }
+      }
     },
     "AM Entry" : {
       "localizations" : {
@@ -3718,9 +4139,6 @@
         }
       }
     },
-    "Archive" : {
-
-    },
     "Archive plan" : {
       "localizations" : {
         "ja" : {
@@ -3748,15 +4166,6 @@
           }
         }
       }
-    },
-    "Archive..." : {
-
-    },
-    "Archived" : {
-
-    },
-    "Archived plans remain available but cannot be edited." : {
-
     },
     "Ariake Corridor Restroom" : {
       "localizations" : {
@@ -3869,9 +4278,6 @@
           }
         }
       }
-    },
-    "Ask the plan owner to create and share an invitation from Plan information, then Add member." : {
-
     },
     "Assign a buyer" : {
       "localizations" : {
@@ -4728,9 +5134,6 @@
         }
       }
     },
-    "bought" : {
-
-    },
     "Bought" : {
       "localizations" : {
         "ja" : {
@@ -5022,6 +5425,30 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "C%1$lld · %2$lld circles"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C%1$lld・サークル%2$lld件"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C%1$lld · 서클 %2$lld개"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C%1$lld · %2$lld 个社团"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C%1$lld · %2$lld 個社團"
           }
         }
       }
@@ -6339,9 +6766,6 @@
         }
       }
     },
-    "Choose a primary plan" : {
-
-    },
     "Choose a reminder to allow notifications." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7156,9 +7580,6 @@
         }
       }
     },
-    "Circle import" : {
-
-    },
     "Circle memo" : {
       "localizations" : {
         "ja" : {
@@ -7755,7 +8176,12 @@
       }
     },
     "Circle.ms returned an invalid catalog link." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Circle.msが無効なカタログリンクを返しました。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Circle.ms에서 유효하지 않은 카탈로그 링크를 반환했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Circle.ms 返回了无效的目录链接。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Circle.ms 回傳了無效的目錄連結。" } }
+      }
     },
     "Circle.ms returned an invalid non-HTTPS database URL." : {
       "extractionState" : "stale",
@@ -7816,7 +8242,12 @@
       }
     },
     "Circle.ms sign-in is still being completed. Please try again shortly." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Circle.msのサインイン処理がまだ完了していません。しばらくしてからもう一度お試しください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Circle.ms 로그인이 아직 완료되지 않았습니다. 잠시 후 다시 시도해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Circle.ms 登录仍在进行中。请稍后再试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Circle.ms 登入仍在進行中。請稍後再試。" } }
+      }
     },
     "Circle.ms Web Catalog" : {
       "localizations" : {
@@ -8764,7 +9195,12 @@
       }
     },
     "ComiNavi is reconnecting. Editing will be available when it is ready." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ComiNaviが再接続しています。準備が整うと編集できるようになります。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "ComiNavi가 다시 연결 중입니다. 준비가 완료되면 편집할 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "ComiNavi 正在重新连接。准备就绪后即可编辑。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "ComiNavi 正在重新連線。準備就緒後即可編輯。" } }
+      }
     },
     "ComiNavi keeps every meaningful concurrent value until a person makes an explicit choice." : {
       "extractionState" : "stale",
@@ -9331,9 +9767,6 @@
           }
         }
       }
-    },
-    "Confirm your account" : {
-
     },
     "Conflict needs review" : {
       "localizations" : {
@@ -10436,9 +10869,6 @@
         }
       }
     },
-    "Create a link to add someone to this plan." : {
-
-    },
     "Create invitation" : {
       "localizations" : {
         "ja" : {
@@ -10522,9 +10952,6 @@
           }
         }
       }
-    },
-    "Creates a new Shared Plan." : {
-
     },
     "Creation choice" : {
       "localizations" : {
@@ -12152,7 +12579,12 @@
       }
     },
     "Downloading\ncatalog" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カタログをダウンロード中" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "카탈로그 다운로드 중" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在下载目录" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在下載目錄" } }
+      }
     },
     "Downloading\ndatabases" : {
       "extractionState" : "stale",
@@ -12276,7 +12708,12 @@
       }
     },
     "Downloading the catalog, this may take a while…" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カタログをダウンロードしています。しばらくお待ちください…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "카탈로그를 다운로드하는 중입니다. 잠시 시간이 걸릴 수 있습니다…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在下载目录，可能需要一些时间…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在下載目錄，可能需要一些時間…" } }
+      }
     },
     "Downloads catalogs supported by Circle.ms." : {
       "extractionState" : "stale",
@@ -15966,9 +16403,6 @@
         }
       }
     },
-    "Get an invitation link" : {
-
-    },
     "Getting there" : {
       "localizations" : {
         "ja" : {
@@ -16575,9 +17009,6 @@
         }
       }
     },
-    "How to join a plan" : {
-
-    },
     "How to prepare, what to bring, how to read placements, and day-of etiquette." : {
       "localizations" : {
         "ja" : {
@@ -16692,7 +17123,12 @@
       }
     },
     "Images" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "画像" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이미지" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图片" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "圖片" } }
+      }
     },
     "Import" : {
       "localizations" : {
@@ -17463,9 +17899,6 @@
         }
       }
     },
-    "Invitation links" : {
-
-    },
     "Invitation status" : {
       "localizations" : {
         "ja" : {
@@ -17579,9 +18012,6 @@
         }
       }
     },
-    "Invite links stop working when they expire or the plan is archived." : {
-
-    },
     "Invite links stop working when they expire, are revoked, or the plan is archived." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -17667,9 +18097,6 @@
         }
       }
     },
-    "Join" : {
-
-    },
     "Join invitation" : {
       "localizations" : {
         "ja" : {
@@ -17697,9 +18124,6 @@
           }
         }
       }
-    },
-    "Joining starts from an invitation link; there is no code to enter on this screen." : {
-
     },
     "Keep this item" : {
       "localizations" : {
@@ -18379,9 +18803,6 @@
         }
       }
     },
-    "Load more invitation links" : {
-
-    },
     "Load more invitations" : {
       "localizations" : {
         "ja" : {
@@ -18634,9 +19055,6 @@
           }
         }
       }
-    },
-    "Loading invitation links" : {
-
     },
     "Loading invitations" : {
       "localizations" : {
@@ -20607,9 +21025,6 @@
         }
       }
     },
-    "No active invitation links" : {
-
-    },
     "No buyer yet" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -20640,7 +21055,12 @@
       }
     },
     "No changes are waiting to send." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "送信待ちの変更はありません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "전송 대기 중인 변경 사항이 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有等待发送的更改。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "沒有等待傳送的更改。" } }
+      }
     },
     "No changes are waiting to sync." : {
       "extractionState" : "stale",
@@ -22265,10 +22685,20 @@
       }
     },
     "One or more changes could not be saved." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "1件以上の変更を保存できませんでした。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "하나 이상의 변경 사항을 저장하지 못했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "一个或多个更改无法保存。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "一項或多項更改無法儲存。" } }
+      }
     },
     "One or more changes could not be saved. Support code: %@" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "1件以上の変更を保存できませんでした。サポートコード：%@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "하나 이상의 변경 사항을 저장하지 못했습니다. 지원 코드: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "一个或多个更改无法保存。支持代码：%@" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "一項或多項更改無法儲存。支援代碼：%@" } }
+      }
     },
     "One person removed this item while another changed it. Choose what the plan should keep." : {
       "localizations" : {
@@ -22355,9 +22785,6 @@
           }
         }
       }
-    },
-    "Open" : {
-
     },
     "Open %@ details" : {
       "localizations" : {
@@ -22699,9 +23126,6 @@
         }
       }
     },
-    "Open the link on this iPhone" : {
-
-    },
     "Open the plan to review this update." : {
       "localizations" : {
         "ja" : {
@@ -22731,7 +23155,12 @@
       }
     },
     "Open this screen to check for plan updates." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この画面を開いてプランの更新を確認してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "플랜 업데이트를 확인하려면 이 화면을 여세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开此页面以检查计划更新。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "開啟此畫面以檢查計畫更新。" } }
+      }
     },
     "Open this screen while online to check for plan updates." : {
       "extractionState" : "stale",
@@ -23890,9 +24319,6 @@
         }
       }
     },
-    "Plan information" : {
-
-    },
     "Plan outcome" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -24373,10 +24799,20 @@
       }
     },
     "Preparing map…" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "地図を準備中…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "지도 준비 중…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在准备地图…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在準備地圖…" } }
+      }
     },
     "Preparing updates…" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "更新を準備中…" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "업데이트 준비 중…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在准备更新…" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在準備更新…" } }
+      }
     },
     "Presence" : {
       "localizations" : {
@@ -24517,9 +24953,6 @@
           }
         }
       }
-    },
-    "Primary plan" : {
-
     },
     "Private note" : {
       "localizations" : {
@@ -25571,7 +26004,12 @@
       }
     },
     "Reconnect" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "再接続" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다시 연결" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重新连接" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "重新連線" } }
+      }
     },
     "Reconnecting to Shared Plan" : {
       "localizations" : {
@@ -25717,7 +26155,12 @@
       }
     },
     "Recovery copy" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "復旧用コピー" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "복구 사본" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复副本" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "復原副本" } }
+      }
     },
     "Red" : {
       "localizations" : {
@@ -25830,9 +26273,6 @@
           }
         }
       }
-    },
-    "Reinstate member..." : {
-
     },
     "Reload the plan to confirm the current role before editing again." : {
       "localizations" : {
@@ -26030,9 +26470,6 @@
           }
         }
       }
-    },
-    "Remove member..." : {
-
     },
     "Remove need" : {
       "extractionState" : "stale",
@@ -26259,9 +26696,6 @@
         }
       }
     },
-    "Reopen" : {
-
-    },
     "Reopen plan" : {
       "localizations" : {
         "ja" : {
@@ -26318,9 +26752,6 @@
         }
       }
     },
-    "Reopen this plan to make it editable again." : {
-
-    },
     "Repair from latest plan" : {
       "localizations" : {
         "ja" : {
@@ -26350,7 +26781,12 @@
       }
     },
     "Repair keeps recoverable changes and starts from the latest plan." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "修復すると復旧可能な変更を保持し、最新のプランからやり直します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "복구 가능한 변경 사항을 유지하고 최신 플랜에서 다시 시작합니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "修复会保留可恢复的更改，并从最新计划开始。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "修復會保留可復原的更改，並從最新計畫開始。" } }
+      }
     },
     "Repair keeps the changes that can be recovered and starts from the latest shared plan." : {
       "extractionState" : "stale",
@@ -26564,6 +27000,30 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Requested %1$lld, assigned %2$lld, bought %3$lld, %4$lld remaining"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リクエスト%1$lld件、担当%2$lld件、購入済み%3$lld件、残り%4$lld件"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요청 %1$lld개, 배정 %2$lld개, 구매 완료 %3$lld개, 남음 %4$lld개"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请求%1$lld个，已分配%2$lld个，已购买%3$lld个，剩余%4$lld个"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請求%1$lld個、已分配%2$lld個、已購買%3$lld個、剩餘%4$lld個"
           }
         }
       }
@@ -27048,9 +27508,6 @@
         }
       }
     },
-    "Revoke invitation..." : {
-
-    },
     "Revoked invitation" : {
       "localizations" : {
         "ja" : {
@@ -27362,7 +27819,12 @@
       }
     },
     "Saved content remains until you choose a recovery action." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "保存された内容は復旧操作を選択するまで保持されます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "저장된 콘텐츠는 복구 작업을 선택할 때까지 유지됩니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已保存的内容会保留，直到你选择恢复操作。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "已儲存的內容會保留，直到你選擇復原操作。" } }
+      }
     },
     "Saved local recovery branch" : {
       "extractionState" : "stale",
@@ -28144,7 +28606,12 @@
       }
     },
     "Send changes before editing again" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "もう一度編集する前に変更を送信" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다시 편집하기 전에 변경 사항을 전송하세요" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请先发送更改，然后再继续编辑" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "請先傳送更改，再繼續編輯" } }
+      }
     },
     "Service information and updates for Comike Web Catalog." : {
       "localizations" : {
@@ -28342,12 +28809,6 @@
           }
         }
       }
-    },
-    "Share this link" : {
-
-    },
-    "Share this link with the person you want to add." : {
-
     },
     "Shared locations" : {
       "localizations" : {
@@ -29172,9 +29633,6 @@
         }
       }
     },
-    "Shows how to join a Shared Plan." : {
-
-    },
     "Shows this circle on the map" : {
       "localizations" : {
         "ja" : {
@@ -29259,11 +29717,13 @@
         }
       }
     },
-    "Sign in as the person who should join, then accept the invitation." : {
-
-    },
     "Sign in to Circle.ms to open this catalog." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Circle.msにサインインしてこのカタログを開く" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Circle.ms에 로그인하여 이 카탈로그를 여세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "登录 Circle.ms 以打开此目录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "登入 Circle.ms 以開啟此目錄。" } }
+      }
     },
     "Sign in with Apple from the special entry" : {
       "localizations" : {
@@ -29323,7 +29783,12 @@
       }
     },
     "Sign in with Apple is unavailable right now." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Appleでのサインインは現在利用できません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Apple 로그인을 지금 사용할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Apple 登录目前不可用。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Apple 登入目前無法使用。" } }
+      }
     },
     "Sign in with Google" : {
       "localizations" : {
@@ -29411,10 +29876,20 @@
       }
     },
     "Sign in with Google is unavailable right now." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Googleでのサインインは現在利用できません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "Google 로그인을 지금 사용할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Google 登录目前不可用。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "Google 登入目前無法使用。" } }
+      }
     },
     "Sign out is still being completed. Please try again shortly." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "サインアウト処理がまだ完了していません。しばらくしてからもう一度お試しください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "로그아웃이 아직 완료되지 않았습니다. 잠시 후 다시 시도해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出登录仍在完成中。请稍后再试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "登出仍在完成中。請稍後再試。" } }
+      }
     },
     "Single-space circles" : {
       "localizations" : {
@@ -29529,7 +30004,12 @@
       }
     },
     "Some changes are waiting to be saved. Let them finish before editing again." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "保存待ちの変更があります。もう一度編集する前に完了するまでお待ちください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "저장 대기 중인 변경 사항이 있습니다. 다시 편집하기 전에 완료될 때까지 기다려 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "有些更改正在等待保存。请等待完成后再继续编辑。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "有些更改正在等待儲存。請等待完成後再繼續編輯。" } }
+      }
     },
     "Some changes could not be saved online. Download a copy, then reset from the latest plan." : {
       "extractionState" : "stale",
@@ -29590,10 +30070,20 @@
       }
     },
     "Some changes could not be saved. Download a copy, then reset from the latest plan." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "一部の変更を保存できませんでした。コピーをダウンロードしてから、最新のプランからリセットしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "일부 변경 사항을 저장하지 못했습니다. 사본을 다운로드한 다음 최신 플랜에서 재설정하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分更改无法保存。请下载副本，然后从最新计划重置。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "部分更改無法儲存。請下載副本，然後從最新計畫重設。" } }
+      }
     },
     "Some changes could not be saved. Download a copy, then reset from the latest plan. Support code: %@" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "一部の変更を保存できませんでした。コピーをダウンロードしてから、最新のプランからリセットしてください。サポートコード：%@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "일부 변경 사항을 저장하지 못했습니다. 사본을 다운로드한 다음 최신 플랜에서 재설정하세요. 지원 코드: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分更改无法保存。请下载副本，然后从最新计划重置。支持代码：%@" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "部分更改無法儲存。請下載副本，然後從最新計畫重設。支援代碼：%@" } }
+      }
     },
     "Some Circle.ms tags are unavailable. Bundled tags still work offline." : {
       "extractionState" : "stale",
@@ -29681,7 +30171,12 @@
       }
     },
     "Some tags are unavailable right now." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "一部のタグは現在利用できません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "일부 태그를 지금 사용할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分标签目前不可用。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "部分標籤目前無法使用。" } }
+      }
     },
     "Sort" : {
       "localizations" : {
@@ -30365,12 +30860,6 @@
           }
         }
       }
-    },
-    "Switch plan" : {
-
-    },
-    "Switch primary plan" : {
-
     },
     "Sync" : {
       "extractionState" : "stale",
@@ -31176,16 +31665,36 @@
       }
     },
     "The C%d catalog is not available." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "C%dのカタログは利用できません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "C%d 카탈로그를 사용할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "C%d 目录不可用。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "C%d 目錄無法使用。" } }
+      }
     },
     "The catalog could not be downloaded: %@" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カタログをダウンロードできませんでした：%@" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "카탈로그를 다운로드하지 못했습니다: %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法下载目录：%@" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法下載目錄：%@" } }
+      }
     },
     "The catalog could not be opened. Please try downloading it again." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カタログを開けませんでした。もう一度ダウンロードしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "카탈로그를 열 수 없습니다. 다시 다운로드해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法打开目录。请重新下载。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法開啟目錄。請重新下載。" } }
+      }
     },
     "The catalog could not be verified." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カタログを検証できませんでした。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "카탈로그를 확인하지 못했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法验证目录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法驗證目錄。" } }
+      }
     },
     "The catalog does not contain a recognized Tokyo Big Sight venue map." : {
       "extractionState" : "stale",
@@ -31245,7 +31754,12 @@
       }
     },
     "The catalog download could not be resumed. Please try again." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カタログのダウンロードを再開できませんでした。もう一度お試しください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "카탈로그 다운로드를 재개하지 못했습니다. 다시 시도해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法恢复目录下载。请重试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法恢復目錄下載。請重試。" } }
+      }
     },
     "The catalog download could not be verified." : {
       "extractionState" : "stale",
@@ -31306,7 +31820,12 @@
       }
     },
     "The catalog download was incomplete. Please try again." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "カタログのダウンロードが不完全です。もう一度お試しください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "카탈로그 다운로드가 완료되지 않았습니다. 다시 시도해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目录下载不完整。请重试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "目錄下載不完整。請重試。" } }
+      }
     },
     "The circle is hidden by a collaborative tombstone. Its memo and purchase history remain available for conflict resolution and later reactivation." : {
       "extractionState" : "stale",
@@ -31452,7 +31971,12 @@
       }
     },
     "The demo catalog is unavailable. Please choose another catalog." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "デモカタログは利用できません。別のカタログを選択してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "데모 카탈로그를 사용할 수 없습니다. 다른 카탈로그를 선택해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "演示目录不可用。请选择其他目录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "示範目錄無法使用。請選擇其他目錄。" } }
+      }
     },
     "The downloaded %@ database failed its integrity check." : {
       "extractionState" : "stale",
@@ -31513,13 +32037,28 @@
       }
     },
     "The downloaded catalog appears damaged. Please try downloading it again." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダウンロードしたカタログが破損しているようです。もう一度ダウンロードしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다운로드한 카탈로그가 손상된 것 같습니다. 다시 다운로드해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下载的目录似乎已损坏。请重新下载。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "下載的目錄似乎已損壞。請重新下載。" } }
+      }
     },
     "The downloaded catalog could not be opened." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダウンロードしたカタログを開けませんでした。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다운로드한 카탈로그를 열 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法打开下载的目录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法開啟下載的目錄。" } }
+      }
     },
     "The downloaded catalog could not be verified." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダウンロードしたカタログを検証できませんでした。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다운로드한 카탈로그를 확인하지 못했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法验证下载的目录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法驗證下載的目錄。" } }
+      }
     },
     "The downloaded catalog database has invalid circle relationships." : {
       "extractionState" : "stale",
@@ -31580,10 +32119,20 @@
       }
     },
     "The downloaded catalog has invalid circle data. Please try downloading it again." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダウンロードしたカタログのサークルデータが無効です。もう一度ダウンロードしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다운로드한 카탈로그의 서클 데이터가 유효하지 않습니다. 다시 다운로드해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下载的目录包含无效的社团数据。请重新下载。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "下載的目錄包含無效的社團資料。請重新下載。" } }
+      }
     },
     "The downloaded catalog is missing required information. Please try downloading it again." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダウンロードしたカタログに必要な情報がありません。もう一度ダウンロードしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다운로드한 카탈로그에 필요한 정보가 없습니다. 다시 다운로드해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下载的目录缺少必要信息。请重新下载。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "下載的目錄缺少必要資訊。請重新下載。" } }
+      }
     },
     "The field remains in collaborative history but has no current value." : {
       "extractionState" : "stale",
@@ -31671,7 +32220,12 @@
       }
     },
     "The installed catalog could not be verified. Please try downloading it again." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "インストール済みのカタログを検証できませんでした。もう一度ダウンロードしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "설치된 카탈로그를 확인하지 못했습니다. 다시 다운로드해 주세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法验证已安装的目录。请重新下载。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法驗證已安裝的目錄。請重新下載。" } }
+      }
     },
     "The invitation itself remains listed, but this device can never display its token again." : {
       "extractionState" : "stale",
@@ -31701,9 +32255,6 @@
           }
         }
       }
-    },
-    "The invitation opens in ComiNavi so you can confirm the plan before joining." : {
-
     },
     "The invitation token cannot be displayed again after it is discarded." : {
       "extractionState" : "stale",
@@ -32630,10 +33181,20 @@
       }
     },
     "There are too many changes to continue. Download a copy, then repair or reset the plan." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "変更が多すぎるため続行できません。コピーをダウンロードしてから、プランを修復またはリセットしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "변경 사항이 너무 많아 계속할 수 없습니다. 사본을 다운로드한 다음 플랜을 복구하거나 재설정하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更改过多，无法继续。请下载副本，然后修复或重置计划。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "更改過多，無法繼續。請下載副本，然後修復或重設計畫。" } }
+      }
     },
     "There are too many pending changes. Download a copy, then repair or reset the plan." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "保留中の変更が多すぎます。コピーをダウンロードしてから、プランを修復またはリセットしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "대기 중인 변경 사항이 너무 많습니다. 사본을 다운로드한 다음 플랜을 복구하거나 재설정하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "待处理的更改过多。请下载副本，然后修复或重置计划。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "待處理的更改過多。請下載副本，然後修復或重設計畫。" } }
+      }
     },
     "There is no convenience store in the East area. Get drinks before entering." : {
       "localizations" : {
@@ -32749,7 +33310,12 @@
       }
     },
     "This change needs your review before it can be sent." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この変更は送信前に確認が必要です。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 변경 사항은 전송하기 전에 검토가 필요합니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此更改需要在发送前确认。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此更改需要在傳送前確認。" } }
+      }
     },
     "This circle may have been removed. Any saved memo can still be downloaded from plan recovery." : {
       "extractionState" : "stale",
@@ -32781,7 +33347,12 @@
       }
     },
     "This circle may have been removed. Any saved memo can still be downloaded from recovery." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このサークルは削除された可能性があります。保存したメモは引き続き復旧用コピーからダウンロードできます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 서클이 삭제되었을 수 있습니다. 저장된 메모는 복구에서 계속 다운로드할 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此社团可能已被删除。仍可从恢复副本下载已保存的备忘录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此社團可能已被刪除。仍可從復原副本下載已儲存的備忘錄。" } }
+      }
     },
     "This circle will be removed from the plan. Its notes and purchases remain available if another recent change restores it." : {
       "extractionState" : "stale",
@@ -32813,7 +33384,12 @@
       }
     },
     "This circle will be removed from the plan. Its notes and purchases will remain available." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このサークルはプランから削除されます。メモと購入情報は引き続き利用できます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 서클은 플랜에서 삭제됩니다. 메모와 구매 정보는 계속 사용할 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此社团将从计划中删除。其备忘录和购买信息仍可使用。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此社團將從計畫中刪除。其備忘錄和購買資訊仍可使用。" } }
+      }
     },
     "This circle's map location is unavailable." : {
       "localizations" : {
@@ -32927,9 +33503,6 @@
           }
         }
       }
-    },
-    "This invitation link is no longer available." : {
-
     },
     "This is a member-entered plan decision. Live external reports below remain separate and never change it automatically." : {
       "extractionState" : "stale",
@@ -33074,7 +33647,12 @@
       }
     },
     "This plan has too many pending changes" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このプランには保留中の変更が多すぎます" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 플랜에는 대기 중인 변경 사항이 너무 많습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此计划有太多待处理的更改" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此計畫有太多待處理的更改" } }
+      }
     },
     "This plan has too many saved changes. Download a copy, then repair or reset the plan." : {
       "extractionState" : "stale",
@@ -33163,7 +33741,12 @@
       }
     },
     "This plan needs recovery" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このプランには復旧が必要です" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 플랜은 복구가 필요합니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此计划需要恢复" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此計畫需要復原" } }
+      }
     },
     "This plan needs review" : {
       "localizations" : {
@@ -33194,10 +33777,12 @@
       }
     },
     "This plan needs to be reset. Download a copy before resetting it." : {
-
-    },
-    "This plan will become read-only. You can reopen it later." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このプランをリセットする必要があります。リセットする前にコピーをダウンロードしてください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 플랜을 재설정해야 합니다. 재설정하기 전에 사본을 다운로드하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此计划需要重置。请在重置前下载副本。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此計畫需要重設。請在重設前下載副本。" } }
+      }
     },
     "This protected token is retained only for review or discard and can no longer be shared." : {
       "extractionState" : "stale",
@@ -33229,7 +33814,12 @@
       }
     },
     "This purchase request will be removed." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この購入リクエストは削除されます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 구매 요청이 삭제됩니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此购买请求将被删除。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此購買請求將被刪除。" } }
+      }
     },
     "This purchase request will be removed. If someone changed it at the same time, you can choose which version to keep." : {
       "extractionState" : "stale",
@@ -33290,10 +33880,20 @@
       }
     },
     "This removes this account's Shared Plans, unsent changes, and downloaded catalog data." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この操作により、このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログデータが削除されます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 작업을 수행하면 이 계정의 공유 플랜, 전송하지 않은 변경 사항 및 다운로드한 카탈로그 데이터가 삭제됩니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此操作会删除此账号的共享计划、未发送的更改和已下载的目录数据。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此操作會刪除此帳號的共享計畫、未傳送的更改和已下載的目錄資料。" } }
+      }
     },
     "This saved change will be removed and cannot be recovered." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "この保存された変更は削除され、復元できません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 저장된 변경 사항은 삭제되며 복구할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此保存的更改将被删除且无法恢复。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "此儲存的更改將被刪除且無法復原。" } }
+      }
     },
     "This saved document is malformed and is never interpreted. Export or discard are the only safe actions." : {
       "extractionState" : "stale",
@@ -33970,9 +34570,6 @@
         }
       }
     },
-    "Transfer ownership..." : {
-
-    },
     "Transit operator" : {
       "localizations" : {
         "ja" : {
@@ -34465,13 +35062,28 @@
       }
     },
     "Updates" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "更新" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "업데이트" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "更新" } }
+      }
     },
     "Updates are paused" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "更新を一時停止中" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "업데이트가 일시 중지됨" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新已暂停" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "更新已暫停" } }
+      }
     },
     "Updates are paused for review" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "確認のため更新を一時停止しています" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "검토를 위해 업데이트가 일시 중지되었습니다" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新已暂停以供确认" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "更新已暫停以供確認" } }
+      }
     },
     "Updating campus…" : {
       "extractionState" : "stale",
@@ -35124,9 +35736,6 @@
         }
       }
     },
-    "View archived plans" : {
-
-    },
     "View attendance evidence on X" : {
       "localizations" : {
         "ja" : {
@@ -35327,7 +35936,12 @@
       }
     },
     "Waiting for editing access" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "編集権限を待っています" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "편집 권한을 기다리는 중" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在等待编辑权限" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在等待編輯權限" } }
+      }
     },
     "Waiting for the plan to finish connecting" : {
       "localizations" : {
@@ -35387,7 +36001,12 @@
       }
     },
     "Waiting to send." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "送信待ちです。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "전송 대기 중입니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "等待发送。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "等待傳送。" } }
+      }
     },
     "Wanted" : {
       "extractionState" : "stale",
@@ -37091,10 +37710,20 @@
       }
     },
     "You can import again after %@." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "%@後にもう一度読み込めます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "%@ 후에 다시 가져올 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "你可以在%@后再次导入。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "你可以在%@後再次匯入。" } }
+      }
     },
     "You can import once every six hours." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "6時間に1回のみ読み込めます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "6시간마다 한 번만 가져올 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每六小时只能导入一次。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "每六小時只能匯入一次。" } }
+      }
     },
     "You can review collaborative content and recovery data. Editing will appear after interoperable sync is enabled." : {
       "extractionState" : "stale",
@@ -37324,7 +37953,12 @@
       }
     },
     "Your checklist is a reminder, not a replacement for official instructions." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "チェックリストは公式案内の代わりではなく、確認用です。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "체크리스트는 공식 안내를 대신하지 않는 알림입니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清单是提醒，不是官方说明的替代品。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "清單是提醒，不是官方說明的替代品。" } }
+      }
     },
     "Your checklist stays on this device. It is a reminder, not a replacement for official instructions." : {
       "extractionState" : "stale",
@@ -37356,7 +37990,12 @@
       }
     },
     "Your choices are saved. Delivery still follows your iOS notification settings." : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択内容は保存されています。配信はiOSの通知設定に従います。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "선택 사항은 저장되었습니다. 알림 전송은 iOS 알림 설정을 따릅니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "你的选择已保存。发送仍会遵循 iOS 通知设置。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "你的選擇已儲存。傳送仍會遵循 iOS 通知設定。" } }
+      }
     },
     "Your choices stay on this device. Delivery still follows your iOS notification settings." : {
       "extractionState" : "stale",
@@ -37528,9 +38167,6 @@
           }
         }
       }
-    },
-    "Your plans" : {
-
     },
     "Your request" : {
       "extractionState" : "stale",
@@ -38014,7 +38650,12 @@
       }
     },
     "お気に入り変更の確認" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "お気に入り変更の確認" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "즐겨찾기 변경 확인" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "收藏更改确认" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "收藏更改確認" } }
+      }
     },
     "キャンセル" : {
       "localizations" : {
@@ -38131,7 +38772,12 @@
       }
     },
     "このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログを削除します。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログを削除します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 계정의 공유 플랜, 전송하지 않은 변경 사항 및 다운로드한 카탈로그를 삭제합니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将删除此账号的共享计划、未发送的更改和已下载的目录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "將刪除此帳號的共享計畫、未傳送的更改和已下載的目錄。" } }
+      }
     },
     "このお気に入り変更を破棄しますか？" : {
       "localizations" : {
@@ -38360,7 +39006,12 @@
       }
     },
     "このプランへの参加権限が取り消されました。未送信の変更は残っています。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "このプランへの参加権限が取り消されました。未送信の変更は残っています。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이 플랜의 참여 권한이 취소되었습니다. 전송하지 않은 변경 사항은 남아 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "你已被撤销此计划的访问权限。未发送的更改仍会保留。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "你的計畫參與權限已被撤銷。未傳送的更改仍會保留。" } }
+      }
     },
     "このプランを編集する権限がありません。" : {
       "localizations" : {
@@ -38936,7 +39587,12 @@
       }
     },
     "プランのデータが大きすぎます。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プランのデータが大きすぎます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "플랜 데이터가 너무 큽니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "计划数据过大。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "計畫資料過大。" } }
+      }
     },
     "プランの保存データが上限を超えています。" : {
       "extractionState" : "stale",
@@ -39055,7 +39711,12 @@
       }
     },
     "プランを更新できないため、再接続します。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プランを更新できないため、再接続します。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "플랜을 업데이트할 수 없어 다시 연결합니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法更新计划，正在重新连接。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法更新計畫，正在重新連線。" } }
+      }
     },
     "プランを選択" : {
       "extractionState" : "stale",
@@ -39678,7 +40339,12 @@
       }
     },
     "保存されたプランを開けません。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "保存されたプランを開けません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "저장된 플랜을 열 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法打开已保存的计划。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法開啟已儲存的計畫。" } }
+      }
     },
     "先に「書き出す」で保存できます。削除したデータは元に戻せません。" : {
       "extractionState" : "stale",
@@ -39824,10 +40490,20 @@
       }
     },
     "共有プランに接続できません。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "共有プランに接続できません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "공유 플랜에 연결할 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法连接共享计划。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法連線共享計畫。" } }
+      }
     },
     "共有プランのデータを読み込めません。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "共有プランのデータを読み込めません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "공유 플랜 데이터를 불러올 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法加载共享计划数据。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法載入共享計畫資料。" } }
+      }
     },
     "共有プランの名前と参加先アカウントを安全に確認しています。" : {
       "localizations" : {
@@ -39970,7 +40646,12 @@
       }
     },
     "最新のプランを表示しています。残っている変更を確認してください。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "最新のプランを表示しています。残っている変更を確認してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "최신 플랜을 표시하고 있습니다. 남아 있는 변경 사항을 확인하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前显示的是最新计划。请检查剩余的更改。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "目前顯示的是最新計畫。請檢查剩餘的更改。" } }
+      }
     },
     "最新状態でもう一度試す" : {
       "localizations" : {
@@ -40057,7 +40738,12 @@
       }
     },
     "別の場所でプランが更新されました。残っている変更を確認してください。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "別の場所でプランが更新されました。残っている変更を確認してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다른 곳에서 플랜이 업데이트되었습니다. 남아 있는 변경 사항을 확인하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "计划已在其他位置更新。请检查剩余的更改。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "計畫已在其他位置更新。請檢查剩餘的更改。" } }
+      }
     },
     "別の端末でプランが更新されました。端末に残した変更を確認してください。" : {
       "extractionState" : "stale",
@@ -40375,13 +41061,28 @@
       }
     },
     "変更が多いため、このプランを続けて編集できません。内容を書き出してから、最新のプランでやり直してください。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "変更が多いため、このプランを続けて編集できません。内容を書き出してから、最新のプランでやり直してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "변경 사항이 너무 많아 이 플랜을 계속 편집할 수 없습니다. 내용을 내보낸 다음 최신 플랜에서 다시 시도하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更改过多，无法继续编辑此计划。请导出内容，然后在最新计划上重试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "更改過多，無法繼續編輯此計畫。請匯出內容，然後在最新計畫上重試。" } }
+      }
     },
     "変更が多すぎます。内容を書き出してから、最新のプランでやり直してください。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "変更が多すぎます。内容を書き出してから、最新のプランでやり直してください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "변경 사항이 너무 많습니다. 내용을 내보낸 다음 최신 플랜에서 다시 시도하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更改过多。请导出内容，然后在最新计划上重试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "更改過多。請匯出內容，然後在最新計畫上重試。" } }
+      }
     },
     "変更を保存できませんでした。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "変更を保存できませんでした。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "변경 사항을 저장하지 못했습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法保存更改。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法儲存更改。" } }
+      }
     },
     "変更を破棄" : {
       "localizations" : {
@@ -40898,7 +41599,12 @@
       }
     },
     "未保存のメモを保管しています。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "未保存のメモを保管しています。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "저장되지 않은 메모를 보관하고 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在保留未保存的备忘录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "正在保留未儲存的備忘錄。" } }
+      }
     },
     "未保存のメモを同期できないため、端末に保持しています。" : {
       "extractionState" : "stale",
@@ -40987,7 +41693,12 @@
       }
     },
     "残っている変更をすべて破棄" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "残っている変更をすべて破棄" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "남은 변경 사항 모두 삭제" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "丢弃所有剩余更改" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "捨棄所有剩餘更改" } }
+      }
     },
     "破棄" : {
       "localizations" : {
@@ -41190,7 +41901,12 @@
       }
     },
     "編集権限がないため、メモを保管しています。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "編集権限がないため、メモを保管しています。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "편집 권한이 없어 메모를 보관하고 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "由于没有编辑权限，正在保留备忘录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "因沒有編輯權限，正在保留備忘錄。" } }
+      }
     },
     "編集権限がないため、未保存のメモを端末に保持しています。" : {
       "extractionState" : "stale",
@@ -41222,7 +41938,12 @@
       }
     },
     "編集権限が変わったため、メモを保管しています。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "編集権限が変わったため、メモを保管しています。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "편집 권한이 변경되어 메모를 보관하고 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑权限已更改，正在保留备忘录。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "編輯權限已變更，正在保留備忘錄。" } }
+      }
     },
     "編集権限が変わったため、未保存のメモを端末に保持しています。" : {
       "extractionState" : "stale",
@@ -41283,7 +42004,12 @@
       }
     },
     "自分" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "自分" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "본인" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自己" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "自己" } }
+      }
     },
     "表示中のプランは詳細画面で復旧方法を選べます。アクセスできない以前のデータは、書き出してから端末から削除できます。" : {
       "extractionState" : "stale",
@@ -41540,7 +42266,12 @@
       }
     },
     "送信する変更が大きすぎます。内容を減らしてもう一度お試しください。" : {
-
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "送信する変更が大きすぎます。内容を減らしてもう一度お試しください。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "전송할 변경 사항이 너무 큽니다. 내용을 줄인 후 다시 시도하세요." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "要发送的更改过大。请减少内容后重试。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "要傳送的更改過大。請減少內容後重試。" } }
+      }
     },
     "送信できなかったお気に入り変更" : {
       "localizations" : {
