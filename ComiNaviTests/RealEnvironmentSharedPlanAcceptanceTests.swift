@@ -20,10 +20,6 @@ final class RealEnvironmentSharedPlanAcceptanceTests: XCTestCase {
             "COMINAVI_E2E_SHARED_PLAN_LIFECYCLE_REQUIRED"
         ] == "1" else { return }
 
-        #if DEBUG
-            AppEnvironment.setDebugCirclemsEnvironment(.production)
-        #endif
-
         let client = CominaviServiceClient.shared
         let expectedName = Self.acceptancePlanName
         let createRequestID = Self.acceptancePlanRequestID
@@ -88,10 +84,6 @@ final class RealEnvironmentSharedPlanAcceptanceTests: XCTestCase {
         guard ProcessInfo.processInfo.environment[
             "COMINAVI_E2E_SHARED_PLAN_INVITATION_REQUIRED"
         ] == "1" else { return }
-
-        #if DEBUG
-            AppEnvironment.setDebugCirclemsEnvironment(.production)
-        #endif
 
         let client = CominaviServiceClient.shared
         let created = try await client.createPlan(
@@ -173,10 +165,6 @@ final class RealEnvironmentSharedPlanAcceptanceTests: XCTestCase {
     func testProductionTwoMemberOfflineRelaunchConvergenceWhenExplicitlyRequired() async throws {
         let environment = ProcessInfo.processInfo.environment
         guard environment["COMINAVI_E2E_TWO_MEMBER_SYNC_REQUIRED"] == "1" else { return }
-
-        #if DEBUG
-            AppEnvironment.setDebugCirclemsEnvironment(.production)
-        #endif
 
         let ownerSession = try decodeSession(
             environmentKey: "COMINAVI_E2E_OWNER_SESSION_BASE64"
@@ -384,10 +372,6 @@ final class RealEnvironmentSharedPlanAcceptanceTests: XCTestCase {
         let environment = ProcessInfo.processInfo.environment
         guard environment["COMINAVI_E2E_INVITATION_TERMINAL_STATES_REQUIRED"] == "1"
         else { return }
-
-        #if DEBUG
-            AppEnvironment.setDebugCirclemsEnvironment(.production)
-        #endif
 
         let ownerSession = try decodeSession(
             environmentKey: "COMINAVI_E2E_OWNER_SESSION_BASE64"

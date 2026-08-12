@@ -422,29 +422,6 @@ enum AppData {
 
     static let userState = UserState()
 
-    #if DEBUG
-    /// Changes the Circle.ms service used by this Debug build and reloads all
-    /// environment-scoped state without carrying credentials across services.
-    @discardableResult
-    static func selectCirclemsEnvironment(
-        _ environment: CirclemsServiceEnvironment
-    ) -> Bool {
-        guard AppEnvironment.current.build == .debug,
-              environment != AppEnvironment.current.circlems
-        else {
-            return false
-        }
-
-        AppEnvironment.setDebugCirclemsEnvironment(environment)
-        catalogLibrary.reset()
-        if catalogLibrary.mode != .circlems {
-            catalogLibrary.selectMode(.circlems)
-        }
-        userState.reloadFromSelectedEnvironment()
-        return true
-    }
-    #endif
-
     public static func getUserToken() async -> String {
         availableCirclemsAccessToken(for: userState.user)
     }

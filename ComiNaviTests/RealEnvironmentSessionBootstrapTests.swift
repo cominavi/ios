@@ -19,9 +19,6 @@ final class RealEnvironmentSessionBootstrapTests: XCTestCase {
         let pattern = #"\Acominavi-session-export-[0-9a-f]{32}\.json\z"#
         XCTAssertNotNil(fileName.range(of: pattern, options: .regularExpression))
 
-        #if DEBUG
-            AppEnvironment.setDebugCirclemsEnvironment(.production)
-        #endif
         let account = AppEnvironment.storageNamespace(
             build: .debug,
             circlems: .production
@@ -104,9 +101,6 @@ final class RealEnvironmentSessionBootstrapTests: XCTestCase {
             XCTAssertEqual(existingUserID, userID)
         }
 
-        #if DEBUG
-            AppEnvironment.setDebugCirclemsEnvironment(.production)
-        #endif
         let catalogModeKey = "CatalogLibrary.mode.\(AppEnvironment.current.storageNamespace)"
         UserDefaults.standard.set(CatalogDataMode.cominavi.rawValue, forKey: catalogModeKey)
 

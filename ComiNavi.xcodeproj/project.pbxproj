@@ -555,7 +555,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMINAVI_BUILD_ENVIRONMENT = debug;
 				COMINAVI_CIRCLEMS_CLIENT_ID = cominabiv9TZ4Nz096Ngl3DIBtyOQQ9ODQCIKc7C;
-				COMINAVI_CIRCLEMS_ENVIRONMENT = testing;
+				COMINAVI_CIRCLEMS_ENVIRONMENT = production;
 				COMINAVI_GOOGLE_CALLBACK_SCHEME = "com.googleusercontent.apps.90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2";
 				COMINAVI_GOOGLE_CLIENT_ID = "90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2.apps.googleusercontent.com";
 				COMINAVI_OAUTH_CALLBACK_SCHEME = cominavi;

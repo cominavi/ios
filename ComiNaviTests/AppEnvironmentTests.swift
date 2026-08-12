@@ -3,59 +3,18 @@ import XCTest
 @testable import ComiNavi
 
 final class AppEnvironmentTests: XCTestCase {
-    func testDebugBuildAcceptsValidRuntimeOverride() {
+    func testBuildsUseTheExpectedCirclemsEnvironment() {
         XCTAssertEqual(
-            AppEnvironment.resolveCirclemsEnvironment(
-                build: .debug,
-                configured: .testing,
-                debugOverrideRawValue: CirclemsServiceEnvironment.production.rawValue,
-                debugOverridesEnabled: true
-            ),
+            AppEnvironment.expectedCirclemsEnvironment(for: .debug),
             .production
         )
-    }
-
-    func testRuntimeOverrideIsIgnoredOutsideDebugBuild() {
-        let cases: [(
-            build: AppBuildEnvironment,
-            configured: CirclemsServiceEnvironment,
-            attemptedOverride: CirclemsServiceEnvironment
-        )] = [
-            (.staging, .testing, .production),
-            (.testFlight, .production, .testing),
-        ]
-
-        for testCase in cases {
-            XCTAssertEqual(
-                AppEnvironment.resolveCirclemsEnvironment(
-                    build: testCase.build,
-                    configured: testCase.configured,
-                    debugOverrideRawValue: testCase.attemptedOverride.rawValue,
-                    debugOverridesEnabled: true
-                ),
-                testCase.configured
-            )
-        }
-    }
-
-    func testInvalidOrDisabledRuntimeOverrideUsesConfiguredEnvironment() {
         XCTAssertEqual(
-            AppEnvironment.resolveCirclemsEnvironment(
-                build: .debug,
-                configured: .testing,
-                debugOverrideRawValue: "unsupported",
-                debugOverridesEnabled: true
-            ),
+            AppEnvironment.expectedCirclemsEnvironment(for: .staging),
             .testing
         )
         XCTAssertEqual(
-            AppEnvironment.resolveCirclemsEnvironment(
-                build: .debug,
-                configured: .testing,
-                debugOverrideRawValue: CirclemsServiceEnvironment.production.rawValue,
-                debugOverridesEnabled: false
-            ),
-            .testing
+            AppEnvironment.expectedCirclemsEnvironment(for: .testFlight),
+            .production
         )
     }
 
@@ -77,8 +36,12 @@ final class AppEnvironmentTests: XCTestCase {
             "api1.circle.ms"
         )
         XCTAssertNotEqual(
-            AppEnvironment.storageNamespace(build: .debug, circlems: .testing),
+            AppEnvironment.storageNamespace(build: .staging, circlems: .testing),
             AppEnvironment.storageNamespace(build: .debug, circlems: .production)
+        )
+        XCTAssertEqual(
+            AppEnvironment.storageNamespace(build: .debug, circlems: .production),
+            "pre-release-v2/debug/production"
         )
         XCTAssertEqual(
             AppEnvironment.storageNamespace(build: .testFlight, circlems: .production),

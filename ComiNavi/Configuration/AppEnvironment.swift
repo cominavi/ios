@@ -66,28 +66,9 @@ struct AppEnvironment: Sendable {
 
     static let current = load()
 
-    #if DEBUG
-    static let debugCirclemsEnvironmentDefaultsKey = "AppEnvironment.debug.circlems-environment"
-    #endif
-
     let build: AppBuildEnvironment
-    private let configuredCirclems: CirclemsServiceEnvironment
+    let circlems: CirclemsServiceEnvironment
     let oauthCallbackScheme: String
-
-    var circlems: CirclemsServiceEnvironment {
-        #if DEBUG
-        Self.resolveCirclemsEnvironment(
-            build: build,
-            configured: configuredCirclems,
-            debugOverrideRawValue: UserDefaults.standard.string(
-                forKey: Self.debugCirclemsEnvironmentDefaultsKey
-            ),
-            debugOverridesEnabled: true
-        )
-        #else
-        configuredCirclems
-        #endif
-    }
 
     var storageNamespace: String {
         Self.storageNamespace(build: build, circlems: circlems)
@@ -100,31 +81,16 @@ struct AppEnvironment: Sendable {
         "\(storageEpoch)/\(build.rawValue)/\(circlems.rawValue)"
     }
 
-    static func resolveCirclemsEnvironment(
-        build: AppBuildEnvironment,
-        configured: CirclemsServiceEnvironment,
-        debugOverrideRawValue: String?,
-        debugOverridesEnabled: Bool
+    static func expectedCirclemsEnvironment(
+        for build: AppBuildEnvironment
     ) -> CirclemsServiceEnvironment {
-        guard debugOverridesEnabled,
-              build == .debug,
-              let debugOverrideRawValue,
-              let override = CirclemsServiceEnvironment(rawValue: debugOverrideRawValue)
-        else {
-            return configured
+        switch build {
+        case .debug, .testFlight:
+            .production
+        case .staging:
+            .testing
         }
-        return override
     }
-
-    #if DEBUG
-    static func setDebugCirclemsEnvironment(
-        _ environment: CirclemsServiceEnvironment,
-        defaults: UserDefaults = .standard
-    ) {
-        guard current.build == .debug else { return }
-        defaults.set(environment.rawValue, forKey: debugCirclemsEnvironmentDefaultsKey)
-    }
-    #endif
 
     private static var compiledBuild: AppBuildEnvironment {
         #if COMINAVI_TESTFLIGHT
@@ -146,12 +112,7 @@ struct AppEnvironment: Sendable {
             build == compiledBuild,
             "Build-time environment \(compiledBuild.rawValue) does not match Info.plist environment \(build.rawValue)."
         )
-        let expectedCirclemsEnvironment: CirclemsServiceEnvironment = switch build {
-        case .debug, .staging:
-            .testing
-        case .testFlight:
-            .production
-        }
+        let expectedCirclemsEnvironment = expectedCirclemsEnvironment(for: build)
         precondition(
             circlems == expectedCirclemsEnvironment,
             "Circle.ms environment \(circlems.rawValue) is invalid for the \(build.rawValue) build."
@@ -160,7 +121,7 @@ struct AppEnvironment: Sendable {
         let callbackScheme = requiredString(key: "ComiNaviOAuthCallbackScheme", bundle: bundle)
         return AppEnvironment(
             build: build,
-            configuredCirclems: circlems,
+            circlems: circlems,
             oauthCallbackScheme: callbackScheme
         )
     }
