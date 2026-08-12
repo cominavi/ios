@@ -8,6 +8,7 @@
         "name": "Comic Market 108",
         "publishedAt": 103,
         "sourceUpdatedAt": 90,
+        "sourceMainSHA256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "artifact": {
           "url": "/api/v2/catalogs/108/versions/c108-v1-aaaaaaaaaaaaaaaaaaaaaaaa/artifact",
           "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
@@ -30,6 +31,7 @@
     "name": "Comic Market 108",
     "publishedAt": 103,
     "sourceUpdatedAt": 90,
+    "sourceMainSHA256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "artifact": {
       "url": "/api/v2/catalogs/108/versions/c108-v1-aaaaaaaaaaaaaaaaaaaaaaaa/artifact",
       "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",

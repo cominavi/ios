@@ -62,6 +62,16 @@ final class CominaviCatalogTests: XCTestCase {
         XCTAssertEqual(listItem, fixture.catalogVersion)
         XCTAssertNoThrow(try listItem.validated())
         XCTAssertEqual(
+            listItem.sourceMainSHA256,
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        )
+        XCTAssertThrowsError(
+            try replacingSourceMainDigest(
+                in: listItem,
+                with: String(repeating: "C", count: 64)
+            ).validated()
+        )
+        XCTAssertEqual(
             listItem.artifact.url,
             "/api/v2/catalogs/108/versions/c108-v1-aaaaaaaaaaaaaaaaaaaaaaaa/artifact"
         )
@@ -103,6 +113,10 @@ final class CominaviCatalogTests: XCTestCase {
         XCTAssertTrue(installedCatalogs.isEmpty)
         XCTAssertEqual(redownloadedCatalogs.map(\.versionID), [refreshed.catalog.versionID])
         XCTAssertEqual(configuration.main.origin, .local(refreshed.databaseURL))
+        XCTAssertEqual(
+            configuration.tagCatalogPayloadSHA256,
+            refreshed.catalog.sourceMainSHA256
+        )
     }
 
     func testRangeResumeRefreshesAuthorizationAndInstallsOneRawDatabaseForBothReaders() async throws {
@@ -159,6 +173,10 @@ final class CominaviCatalogTests: XCTestCase {
         )
         XCTAssertEqual(configuration.main.origin, .local(installed.url))
         XCTAssertEqual(configuration.image.origin, .local(installed.url))
+        XCTAssertEqual(
+            configuration.tagCatalogPayloadSHA256,
+            fixture.catalog.sourceMainSHA256
+        )
         XCTAssertEqual(configuration.accountPublicUserID, "0123456789abcdef0123456789abcdef")
         XCTAssertFalse(configuration.allowsCirclemsFavoriteMirror)
         XCTAssertFalse(configuration.allowsRemoteMetadata)
@@ -851,6 +869,7 @@ final class CominaviCatalogTests: XCTestCase {
             name: "Comic Market 108",
             publishedAt: 103,
             sourceUpdatedAt: 90,
+            sourceMainSHA256: String(repeating: "c", count: 64),
             artifact: .init(
                 url: CominaviCatalog.artifactPath(comiketNo: 108, versionID: versionID),
                 sha256: digest,
@@ -878,12 +897,31 @@ final class CominaviCatalogTests: XCTestCase {
             name: catalog.name,
             publishedAt: catalog.publishedAt,
             sourceUpdatedAt: catalog.sourceUpdatedAt,
+            sourceMainSHA256: catalog.sourceMainSHA256,
             artifact: .init(
                 url: catalog.artifact.url,
                 sha256: digest,
                 bytes: catalog.artifact.bytes,
                 contentType: catalog.artifact.contentType
             ),
+            counts: catalog.counts,
+            capabilities: catalog.capabilities
+        )
+    }
+
+    private func replacingSourceMainDigest(
+        in catalog: CominaviCatalog,
+        with digest: String
+    ) -> CominaviCatalog {
+        CominaviCatalog(
+            schemaVersion: catalog.schemaVersion,
+            versionID: catalog.versionID,
+            comiketNo: catalog.comiketNo,
+            name: catalog.name,
+            publishedAt: catalog.publishedAt,
+            sourceUpdatedAt: catalog.sourceUpdatedAt,
+            sourceMainSHA256: digest,
+            artifact: catalog.artifact,
             counts: catalog.counts,
             capabilities: catalog.capabilities
         )

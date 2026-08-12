@@ -95,16 +95,16 @@ final class ExploreModelTests: XCTestCase {
         )
     }
 
-    func testEnrichmentTagsPopulateFacetsSearchAndTagFiltering() async {
-        let ocrTag = CatalogEnrichmentTag(
-            termID: "anilist:media:blue-archive",
+    func testDirectCuratedTagsPopulateFacetsSearchAndTagFiltering() async {
+        let curatedTag = CatalogEnrichmentTag(
+            termID: "work.blue-archive",
             canonicalLabel: "ブルーアーカイブ",
             kind: "work",
             provenance: [],
-            matchedAlias: "ブルアカ",
-            evidenceLine: "ブルアカ 新刊セット",
-            mediaPath: "shinagaki.jpg",
-            score: 300
+            matchedAlias: nil,
+            evidenceLine: nil,
+            mediaPath: nil,
+            score: 1_000
         )
         let taggedCircle = makeExploreCircle(
             id: 21,
@@ -121,7 +121,7 @@ final class ExploreModelTests: XCTestCase {
                 date: Date(timeIntervalSince1970: 400),
                 postConfidence: .high,
                 placementConfidence: .high,
-                tags: [ocrTag]
+                directTags: [curatedTag]
             )
         )
         let otherCircle = makeExploreCircle(
@@ -145,18 +145,120 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertEqual(model.visibleCircles.map(\.id), [21])
 
         model.selectedTag = nil
-        model.searchQuery = "ブルアカ"
+        model.searchQuery = "ブルーアーカイブ"
         XCTAssertEqual(model.visibleCircles.map(\.id), [21])
     }
 
-    func testRemoteAndEnrichmentTagLabelsMergeWithoutOverwritingEitherSource() {
+    func testTagOnlyOverlayDoesNotMasqueradeAsShinagaki() async {
+        let tag = CatalogEnrichmentTag(
+            termID: "content.r18",
+            canonicalLabel: "R-18",
+            kind: "content",
+            provenance: [],
+            matchedAlias: nil,
+            evidenceLine: nil,
+            mediaPath: nil,
+            score: 1_000
+        )
+        let circle = makeExploreCircle(
+            id: 23,
+            day: 1,
+            genreID: 10,
+            name: "Tagged Circle",
+            penName: "Artist",
+            description: "New work",
+            tags: [],
+            enrichment: CatalogCircleEnrichment(posts: [], tags: [tag])
+        )
+        let model = ExploreModel(circles: [circle], selectedDay: 1)
+
+        await model.load()
+
+        XCTAssertEqual(model.tagFacets, [ExploreTagFacet(name: "R-18", count: 1)])
+        XCTAssertEqual(model.shinagakiCircleCount, 0)
+        model.shinagakiFilter = .available
+        XCTAssertTrue(model.visibleCircles.isEmpty)
+    }
+
+    func testCanonicalTagLabelsDeduplicateOnlyTheCuratedSource() {
         XCTAssertEqual(
-            ExploreModel.mergedTagLabels(
-                remoteTags: ["Cute", " Ｂｌｕｅ　Ａｒｃｈｉｖｅ "],
-                enrichmentTags: ["blue archive", "ブルーアーカイブ", "", "Cute"]
-            ),
+            ExploreModel.canonicalTagLabels([
+                "Cute", " Ｂｌｕｅ　Ａｒｃｈｉｖｅ ", "blue archive",
+                "ブルーアーカイブ", "", "Cute",
+            ]),
             ["Cute", "Ｂｌｕｅ　Ａｒｃｈｉｖｅ", "ブルーアーカイブ"]
         )
+    }
+
+    func testLegacyPostAttachedTagDoesNotReachFacetsSearchOrFilters() async {
+        let noisyLegacyTag = CatalogEnrichmentTag(
+            termID: "legacy:provider:generic",
+            canonicalLabel: "同人誌",
+            kind: "format",
+            provenance: [],
+            matchedAlias: "doujinshi",
+            evidenceLine: "generic provider label",
+            mediaPath: "legacy.jpg",
+            score: 300
+        )
+        let circle = makeExploreCircle(
+            id: 41,
+            day: 1,
+            genreID: 10,
+            name: "Travel Circle",
+            penName: "Traveller",
+            description: "UK travel photography",
+            tags: [],
+            enrichment: makeEnrichment(
+                postID: "legacy-noise",
+                handle: "travel_circle",
+                text: "C108 お品書き",
+                date: Date(timeIntervalSince1970: 400),
+                postConfidence: .high,
+                placementConfidence: .high,
+                tags: [noisyLegacyTag]
+            )
+        )
+        let model = ExploreModel(circles: [circle], selectedDay: 1)
+
+        await model.load()
+
+        XCTAssertTrue(model.tagFacets.isEmpty)
+        XCTAssertTrue(model.allCircles[0].tags.isEmpty)
+        model.searchQuery = "同人誌"
+        XCTAssertTrue(model.visibleCircles.isEmpty)
+        model.searchQuery = ""
+        model.selectedTag = "同人誌"
+        XCTAssertTrue(model.visibleCircles.isEmpty)
+    }
+
+    func testDirectCuratedTagsSurviveEnrichmentMerge() {
+        let work = CatalogEnrichmentTag(
+            termID: "work.vocaloid",
+            canonicalLabel: "VOCALOID",
+            kind: "work",
+            provenance: [],
+            matchedAlias: nil,
+            evidenceLine: nil,
+            mediaPath: nil,
+            score: 1_000
+        )
+        let character = CatalogEnrichmentTag(
+            termID: "character.hatsune-miku",
+            canonicalLabel: "初音ミク",
+            kind: "character",
+            provenance: [],
+            matchedAlias: nil,
+            evidenceLine: nil,
+            mediaPath: nil,
+            score: 1_000
+        )
+        let first = CatalogCircleEnrichment(posts: [], tags: [work])
+        let second = CatalogCircleEnrichment(posts: [], tags: [character])
+
+        let merged = first.merging(second)
+
+        XCTAssertEqual(merged.tagLabels, ["VOCALOID", "初音ミク"])
     }
 
     func testShinagakiFiltersDistinguishAvailableAndHighConfidenceMatches() async {
@@ -860,6 +962,7 @@ final class ExploreModelTests: XCTestCase {
         placementConfidence: CatalogConfidence,
         media: [CatalogShinagakiMedia] = [],
         tags: [CatalogEnrichmentTag] = [],
+        directTags: [CatalogEnrichmentTag] = [],
         attendanceClaims: [CatalogAttendanceClaim] = []
     ) -> CatalogCircleEnrichment {
         CatalogCircleEnrichment(
@@ -879,7 +982,8 @@ final class ExploreModelTests: XCTestCase {
                 matchScore: 75,
                 matchReasons: []
             )],
-            attendanceClaims: attendanceClaims
+            attendanceClaims: attendanceClaims,
+            tags: directTags
         )
     }
 

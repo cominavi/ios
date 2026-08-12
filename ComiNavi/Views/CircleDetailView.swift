@@ -201,7 +201,8 @@ struct CircleDetailView: View {
                     ? nil
                     : CatalogCircleEnrichment(
                         posts: uniquePosts(enrichments.flatMap(\.posts)),
-                        attendanceClaims: enrichments.flatMap(\.attendanceClaims)
+                        attendanceClaims: enrichments.flatMap(\.attendanceClaims),
+                        tags: enrichments.flatMap(\.tags)
                     )
             )
             await planModel.load(publicCircleIDsByCatalogID: loadedDetails.reduce(into: [:]) {
@@ -265,9 +266,8 @@ struct CircleDetailView: View {
     }
 
     private var combinedTags: [String] {
-        ExploreModel.mergedTagLabels(
-            remoteTags: tags,
-            enrichmentTags: details?.enrichment?.tagLabels ?? []
+        ExploreModel.canonicalTagLabels(
+            details.map { $0.enrichment?.tagLabels ?? [] } ?? tags
         )
     }
 

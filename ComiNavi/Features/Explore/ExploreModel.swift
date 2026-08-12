@@ -202,6 +202,10 @@ struct ExploreCircle: Identifiable {
         preferredCoverURLs.first
     }
 
+    var hasShinagaki: Bool {
+        enrichment?.posts.isEmpty == false
+    }
+
     var searchableText: String {
         [
             circle.circleName,
@@ -409,9 +413,8 @@ final class ExploreModel {
         if let fixtureCircles {
             allCircles = Self.sorted(fixtureCircles.map { circle in
                 var circle = circle
-                circle.tags = Self.mergedTagLabels(
-                    remoteTags: circle.tags,
-                    enrichmentTags: circle.enrichment?.tagLabels ?? []
+                circle.tags = Self.canonicalTagLabels(
+                    circle.tags + (circle.enrichment?.tagLabels ?? [])
                 )
                 return circle
             })
@@ -461,7 +464,8 @@ final class ExploreModel {
                 ? nil
                 : CatalogCircleEnrichment(
                     posts: Self.uniquePosts(memberEnrichments.flatMap(\.posts)),
-                    attendanceClaims: memberEnrichments.flatMap(\.attendanceClaims)
+                    attendanceClaims: memberEnrichments.flatMap(\.attendanceClaims),
+                    tags: memberEnrichments.flatMap(\.tags)
                 )
             return ExploreCircle(
                 circle: circle,
@@ -476,35 +480,7 @@ final class ExploreModel {
         recomputeFacetsAndCircles()
         hasLoaded = true
         isLoading = false
-
-        guard dataSource.allowsRemoteMetadata else {
-            tagState = .ready
-            return
-        }
-
-        tagState = .loading
-        do {
-            let tagsByUpdateID = try await CircleTagIndexLoader.load(
-                eventID: dataSource.eventID,
-                comiketID: dataSource.comiketId
-            )
-            guard !Task.isCancelled, revision == loadRevision else { return }
-            for index in allCircles.indices {
-                let remoteTags = allCircles[index].circles.compactMap { circle in
-                    circle.updateId.flatMap { tagsByUpdateID[$0] }
-                }.flatMap { $0 }
-                allCircles[index].tags = Self.mergedTagLabels(
-                    remoteTags: remoteTags,
-                    enrichmentTags: allCircles[index].enrichment?.tagLabels ?? []
-                )
-            }
-            tagState = .ready
-            recomputeFacetsAndCircles()
-        } catch is CancellationError {
-            return
-        } catch {
-            tagState = .unavailable(error.localizedDescription)
-        }
+        tagState = .ready
     }
 
     func select(day: Int) {
@@ -885,7 +861,7 @@ final class ExploreModel {
         )
         let circlesForDay = allCircles.filter { $0.day == selectedDay }
         selectedDayCircleCount = circlesForDay.count
-        shinagakiCircleCount = circlesForDay.count { $0.enrichment != nil }
+        shinagakiCircleCount = circlesForDay.count { $0.hasShinagaki }
         highConfidenceShinagakiCircleCount = circlesForDay.count {
             $0.enrichment?.hasHighConfidencePost == true
         }
@@ -937,7 +913,7 @@ final class ExploreModel {
             switch shinagakiFilter {
             case .all:
                 break
-            case .available where circle.enrichment == nil:
+            case .available where !circle.hasShinagaki:
                 return false
             case .highConfidence where circle.enrichment?.hasHighConfidencePost != true:
                 return false
@@ -1039,12 +1015,9 @@ final class ExploreModel {
         circles.sorted(by: catalogOrder)
     }
 
-    static func mergedTagLabels(
-        remoteTags: [String],
-        enrichmentTags: [String]
-    ) -> [String] {
+    static func canonicalTagLabels(_ rawTags: [String]) -> [String] {
         var seen: Set<String> = []
-        return (remoteTags + enrichmentTags).compactMap { rawValue in
+        return rawTags.compactMap { rawValue in
             let tag = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !tag.isEmpty else { return nil }
             let key = tag
@@ -1076,85 +1049,6 @@ final class ExploreModel {
         if lhsKey.0 != rhsKey.0 { return lhsKey.0 < rhsKey.0 }
         if lhsKey.1 != rhsKey.1 { return lhsKey.1 < rhsKey.1 }
         return lhsKey.2 < rhsKey.2
-    }
-}
-
-private enum CircleTagIndexLoader {
-    private struct Cache: Codable {
-        let version: Int
-        let tagsByUpdateID: [Int: [String]]
-    }
-
-    static func load(eventID: Int, comiketID: String) async throws -> [Int: [String]] {
-        let cacheURL = DirectoryManager.shared.cachesFor(
-            eventID: eventID,
-            comiketId: comiketID,
-            .circlems,
-            .metadata,
-            createIfNeeded: true
-        )
-        .appendingPathComponent("circle-tags-v1.json")
-
-        if let cached = try await readCache(at: cacheURL), cached.version == 1 {
-            return cached.tagsByUpdateID
-        }
-
-        var tagsByUpdateID: [Int: [String]] = [:]
-        var page = 1
-        var received = 0
-        var total = Int.max
-
-        while received < total, page <= 100 {
-            try Task.checkCancellation()
-            let response = try await CirclemsAPI.queryCircles(
-                eventId: eventID,
-                sort: "1",
-                page: page
-            ).response
-            total = response.maxCount
-            guard !response.list.isEmpty else { break }
-
-            for item in response.list {
-                let tags = parseTags(item.tag)
-                if !tags.isEmpty {
-                    tagsByUpdateID[item.updateId] = tags
-                }
-            }
-            received += response.list.count
-            page += 1
-        }
-
-        try await writeCache(Cache(version: 1, tagsByUpdateID: tagsByUpdateID), to: cacheURL)
-        return tagsByUpdateID
-    }
-
-    private static func parseTags(_ rawValue: String?) -> [String] {
-        guard let rawValue else { return [] }
-        var seen: Set<String> = []
-        return rawValue
-            .split(whereSeparator: { character in
-                character == "," || character == "，" || character == "、"
-            })
-            .compactMap { value -> String? in
-                let tag = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !tag.isEmpty else { return nil }
-                let key = tag.folding(options: [.caseInsensitive, .widthInsensitive], locale: .current)
-                return seen.insert(key).inserted ? tag : nil
-            }
-    }
-
-    private static func readCache(at url: URL) async throws -> Cache? {
-        try await Task.detached(priority: .utility) {
-            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-            return try JSONDecoder().decode(Cache.self, from: Data(contentsOf: url))
-        }.value
-    }
-
-    private static func writeCache(_ cache: Cache, to url: URL) async throws {
-        try await Task.detached(priority: .utility) {
-            let data = try JSONEncoder().encode(cache)
-            try data.write(to: url, options: .atomic)
-        }.value
     }
 }
 

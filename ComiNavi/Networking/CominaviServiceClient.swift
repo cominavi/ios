@@ -111,8 +111,29 @@ struct CominaviRealtimeUpdate: Codable, Hashable, Sendable {
 }
 
 struct CominaviRealtimeUpdatePage: Equatable, Sendable {
+    enum TagOverlayStatus: String, Codable, Sendable {
+        case current
+        case absent
+        case invalidated
+        case unavailable
+    }
+
     let updates: [CominaviRealtimeUpdate]
     let hasMore: Bool
+    let tagOverlay: CominaviCircleTagOverlay?
+    let tagOverlayStatus: TagOverlayStatus?
+
+    init(
+        updates: [CominaviRealtimeUpdate],
+        hasMore: Bool,
+        tagOverlay: CominaviCircleTagOverlay? = nil,
+        tagOverlayStatus: TagOverlayStatus? = nil
+    ) {
+        self.updates = updates
+        self.hasMore = hasMore
+        self.tagOverlay = tagOverlay
+        self.tagOverlayStatus = tagOverlayStatus
+    }
 }
 
 protocol CominaviFavoriteSyncing: Sendable {
@@ -151,8 +172,22 @@ protocol CirclemsFavoriteImportServicing: Sendable {
 protocol CominaviRealtimeFetching: Sendable {
     func realtimeUpdates(
         eventNumber: Int,
-        afterCursor: Int
+        afterCursor: Int,
+        tagRevision: String?
     ) async throws -> CominaviRealtimeUpdatePage
+}
+
+extension CominaviRealtimeFetching {
+    func realtimeUpdates(
+        eventNumber: Int,
+        afterCursor: Int
+    ) async throws -> CominaviRealtimeUpdatePage {
+        try await realtimeUpdates(
+            eventNumber: eventNumber,
+            afterCursor: afterCursor,
+            tagRevision: nil
+        )
+    }
 }
 
 struct CominaviProviderFlowPublicationLease: Equatable, Sendable {
@@ -548,6 +583,8 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         let eventNumber: Int
         let hasMore: Bool
         let updates: [CominaviRealtimeUpdate]
+        let tagOverlay: CominaviCircleTagOverlay?
+        let tagOverlayStatus: CominaviRealtimeUpdatePage.TagOverlayStatus?
     }
 
     private let baseURL: URL
@@ -1246,9 +1283,13 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
 
     func realtimeUpdates(
         eventNumber: Int,
-        afterCursor: Int
+        afterCursor: Int,
+        tagRevision: String?
     ) async throws -> CominaviRealtimeUpdatePage {
-        guard (1...10_000).contains(eventNumber), afterCursor >= 0 else {
+        guard (1...10_000).contains(eventNumber),
+              afterCursor >= 0,
+              tagRevision.map(CominaviCircleTagOverlay.isValidRevisionToken) ?? true
+        else {
             throw CominaviServiceError.invalidResponse
         }
         let output = try await performGeneratedOperation {
@@ -1257,7 +1298,10 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
                 cachePolicy: .useProtocolCachePolicy
             ).listRealtimeUpdates(.init(
                 path: .init(eventNumber: eventNumber),
-                query: .init(afterCursor: afterCursor)
+                query: .init(
+                    afterCursor: afterCursor,
+                    tagRevision: tagRevision.map { .init(value2: $0) }
+                )
             ))
         }
         let snapshot: RealtimeSnapshot
@@ -1290,10 +1334,40 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
                       }
               })
         else { throw CominaviServiceError.invalidResponse }
+        try snapshot.tagOverlay?.validate()
+        try Self.validateTagOverlayResponse(
+            overlay: snapshot.tagOverlay,
+            status: snapshot.tagOverlayStatus,
+            requestedRevision: tagRevision
+        )
         return CominaviRealtimeUpdatePage(
             updates: snapshot.updates,
-            hasMore: snapshot.hasMore
+            hasMore: snapshot.hasMore,
+            tagOverlay: snapshot.tagOverlay,
+            tagOverlayStatus: snapshot.tagOverlayStatus
         )
+    }
+
+    private static func validateTagOverlayResponse(
+        overlay: CominaviCircleTagOverlay?,
+        status: CominaviRealtimeUpdatePage.TagOverlayStatus?,
+        requestedRevision: String?
+    ) throws {
+        guard let requestedRevision else {
+            guard overlay == nil, status == nil else {
+                throw CominaviServiceError.invalidResponse
+            }
+            return
+        }
+        guard let status else { throw CominaviServiceError.invalidResponse }
+        switch status {
+        case .current:
+            guard requestedRevision != CominaviCircleTagOverlay.absentRevision
+                    || overlay != nil
+            else { throw CominaviServiceError.invalidResponse }
+        case .absent, .invalidated, .unavailable:
+            guard overlay == nil else { throw CominaviServiceError.invalidResponse }
+        }
     }
 
     func invalidateSession() async throws {

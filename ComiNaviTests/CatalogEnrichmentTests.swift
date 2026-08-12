@@ -228,7 +228,7 @@ final class CatalogEnrichmentTests: XCTestCase {
         }
     }
 
-    func testEmbeddedTagsDecodeMergeDeterministicallyAndFollowStrongestCircleMatches() throws {
+    func testEmbeddedLegacyTagsDecodeButNeverBecomeVisibleOrSearchable() throws {
         let data = Data(
             """
             [
@@ -351,20 +351,15 @@ final class CatalogEnrichmentTests: XCTestCase {
         )
 
         XCTAssertEqual(enrichment.posts.count, 2)
-        XCTAssertEqual(enrichment.tags.map(\.canonicalLabel), ["Fate", "ブルーアーカイブ"])
-        XCTAssertEqual(enrichment.tags.map(\.termID), ["source-b:fate", "anilist:media:1"])
-
-        let blueArchive = try XCTUnwrap(
-            enrichment.tags.first { $0.termID == "anilist:media:1" }
-        )
-        XCTAssertEqual(blueArchive.kind, "future-work-kind")
-        XCTAssertEqual(blueArchive.matchedAlias, "ブルアカ")
-        XCTAssertEqual(blueArchive.evidenceLine, "ブルアカ 新刊")
-        XCTAssertEqual(blueArchive.provenance.first?.sourceID, "anilist")
-        XCTAssertTrue(enrichment.searchableText.contains("ブルーアーカイブ"))
+        XCTAssertTrue(enrichment.posts.allSatisfy(\.tags.isEmpty))
+        XCTAssertTrue(enrichment.tags.isEmpty)
+        XCTAssertTrue(enrichment.tagLabels.isEmpty)
+        XCTAssertFalse(enrichment.searchableText.contains("ブルーアーカイブ"))
+        XCTAssertFalse(enrichment.searchableText.contains("ブルアカ"))
+        XCTAssertFalse(enrichment.searchableText.contains("Fate"))
         XCTAssertNil(
             index.enrichment(circleID: 20, publicCircleID: 2020),
-            "Tags must follow the same strongest placement match as their post."
+            "Legacy post tags must not create an enrichment for a weaker placement match."
         )
     }
 

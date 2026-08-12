@@ -197,11 +197,12 @@ struct CatalogCircleEnrichment: Equatable, Sendable {
 
     init(
         posts: [CatalogShinagakiPost],
-        attendanceClaims: [CatalogAttendanceClaim] = []
+        attendanceClaims: [CatalogAttendanceClaim] = [],
+        tags: [CatalogEnrichmentTag] = []
     ) {
         self.posts = posts
         self.attendanceClaims = attendanceClaims
-        tags = Self.mergedTags(posts.flatMap(\.tags))
+        self.tags = Self.mergedTags(tags)
     }
 
     var tagLabels: [String] {
@@ -633,7 +634,7 @@ private struct CollectorPost: Decodable {
             authorBio: Self.nonBlank(author?.description),
             authorProfileImageURL: Self.secureURL(author?.profilePicture),
             media: media.compactMap(\.catalogMedia),
-            tags: enrichment?.tags.compactMap(\.catalogTag) ?? [],
+            tags: [],
             postConfidence: postConfidence,
             placementConfidence: placementConfidence,
             matchScore: match.score,

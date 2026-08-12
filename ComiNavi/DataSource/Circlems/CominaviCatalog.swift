@@ -33,6 +33,7 @@ struct CominaviCatalog: Codable, Equatable, Sendable {
     let name: String
     let publishedAt: Int64
     let sourceUpdatedAt: Int64?
+    let sourceMainSHA256: String
     let artifact: Artifact
     let counts: Counts
     let capabilities: Capabilities
@@ -44,6 +45,7 @@ struct CominaviCatalog: Codable, Equatable, Sendable {
               comiketNo > 0,
               !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               Self.isSafeVersionID(versionID),
+              Self.isDigest(sourceMainSHA256),
               artifact.sha256.range(
                 of: "^[0-9a-f]{64}$",
                 options: .regularExpression
@@ -71,6 +73,12 @@ struct CominaviCatalog: Codable, Equatable, Sendable {
         !value.isEmpty
             && value.count <= 160
             && value.range(of: "^[A-Za-z0-9._-]+$", options: .regularExpression) != nil
+    }
+
+    private static func isDigest(_ value: String) -> Bool {
+        value.utf8.count == 64 && value.utf8.allSatisfy { byte in
+            (48...57).contains(byte) || (97...102).contains(byte)
+        }
     }
 }
 
@@ -249,6 +257,7 @@ struct CominaviCatalogSource: CatalogSource {
             ).map {
                 CatalogEnrichmentConfiguration(resourceURL: $0, isRequired: false)
             },
+            tagCatalogPayloadSHA256: installed.catalog.sourceMainSHA256,
             allowsBookmarkSync: true,
             // The public Comiket number is not a Circle.ms provider event ID.
             // Sanitized metadata/realtime uses ComiNavi-owned endpoints only.

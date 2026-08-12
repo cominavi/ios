@@ -63,6 +63,11 @@ struct FileCominaviRealtimeCacheStore: CominaviRealtimeCachePersisting {
 }
 
 actor CominaviRealtimeStore {
+    private enum RefreshAuthority: Equatable {
+        case legacy
+        case tagCatalog(String)
+    }
+
     static let shared = CominaviRealtimeStore()
 
     private struct CacheSnapshot: Codable, Sendable {
@@ -70,6 +75,7 @@ actor CominaviRealtimeStore {
         let eventNumber: Int
         let lastCursor: Int
         let heads: [CominaviRealtimeUpdate]
+        let tagOverlay: CominaviCircleTagOverlay?
     }
 
     private let client: any CominaviRealtimeFetching
@@ -77,9 +83,13 @@ actor CominaviRealtimeStore {
     private var cacheLoadAttemptedEvents: Set<Int> = []
     private var cacheAvailableEvents: Set<Int> = []
     private var lastRefreshByEvent: [Int: Date] = [:]
+    private var lastRefreshAuthorityByEvent: [Int: RefreshAuthority] = [:]
     private var lastCursorByEvent: [Int: Int] = [:]
     private var headsByEvent: [Int: [Int: [String: CominaviRealtimeUpdate]]] = [:]
+    private var tagOverlayByEvent: [Int: CominaviCircleTagOverlay] = [:]
+    private var tagsByEvent: [Int: [Int: [CatalogEnrichmentTag]]] = [:]
     private var revalidationTasks: [Int: Task<Void, Never>] = [:]
+    private var revalidationAuthorityByEvent: [Int: RefreshAuthority] = [:]
 
     init(
         client: any CominaviRealtimeFetching = CominaviServiceClient.shared,
@@ -92,71 +102,214 @@ actor CominaviRealtimeStore {
         self.cacheStore = cacheStore
     }
 
-    func refresh(eventNumber: Int, minimumInterval: TimeInterval = 60) async throws {
-        guard (1...10_000).contains(eventNumber) else {
+    func refresh(
+        eventNumber: Int,
+        expectedTagCatalogPayloadSHA256: String? = nil,
+        minimumInterval: TimeInterval = 60
+    ) async throws {
+        guard (1...10_000).contains(eventNumber),
+              expectedTagCatalogPayloadSHA256.map(Self.isDigest) ?? true
+        else {
             throw CominaviServiceError.invalidResponse
         }
         await loadCacheIfNeeded(eventNumber: eventNumber)
+        try await clearIncompatibleTagOverlayIfNeeded(
+            eventNumber: eventNumber,
+            expectedCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256
+        )
+        let authority = Self.refreshAuthority(
+            expectedCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256
+        )
         if let lastRefresh = lastRefreshByEvent[eventNumber],
+           lastRefreshAuthorityByEvent[eventNumber] == authority,
            Date().timeIntervalSince(lastRefresh) < minimumInterval
         {
             return
         }
-        guard revalidationTasks[eventNumber] == nil else { return }
-        if cacheAvailableEvents.contains(eventNumber) {
-            startRevalidation(eventNumber: eventNumber)
+        if let revalidationTask = revalidationTasks[eventNumber] {
+            guard revalidationAuthorityByEvent[eventNumber] != authority else { return }
+            await revalidationTask.value
+            try await refresh(
+                eventNumber: eventNumber,
+                expectedTagCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256,
+                minimumInterval: minimumInterval
+            )
             return
         }
-        try await revalidate(eventNumber: eventNumber)
+        if cacheAvailableEvents.contains(eventNumber) {
+            startRevalidation(
+                eventNumber: eventNumber,
+                expectedCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256
+            )
+            return
+        }
+        try await revalidate(
+            eventNumber: eventNumber,
+            expectedCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256
+        )
     }
 
     func waitForRevalidation(eventNumber: Int) async {
         await revalidationTasks[eventNumber]?.value
     }
 
-    private func startRevalidation(eventNumber: Int) {
+    private func startRevalidation(
+        eventNumber: Int,
+        expectedCatalogPayloadSHA256: String?
+    ) {
+        revalidationAuthorityByEvent[eventNumber] = Self.refreshAuthority(
+            expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256
+        )
         revalidationTasks[eventNumber] = Task { [weak self] in
             guard let self else { return }
-            try? await self.revalidate(eventNumber: eventNumber)
+            try? await self.revalidate(
+                eventNumber: eventNumber,
+                expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256
+            )
             await self.finishRevalidation(eventNumber: eventNumber)
         }
     }
 
     private func finishRevalidation(eventNumber: Int) {
         revalidationTasks[eventNumber] = nil
+        revalidationAuthorityByEvent[eventNumber] = nil
     }
 
-    private func revalidate(eventNumber: Int) async throws {
-        var cursor = lastCursorByEvent[eventNumber] ?? 0
+    private func revalidate(
+        eventNumber: Int,
+        expectedCatalogPayloadSHA256: String?
+    ) async throws {
+        let initialCursor = lastCursorByEvent[eventNumber] ?? 0
+        let initialHeads = headsByEvent[eventNumber] ?? [:]
+        let initialOverlay = tagOverlayByEvent[eventNumber]
+
+        var cursor = initialCursor
+        var candidateHeads = initialHeads
+        var candidateOverlay = initialOverlay
+        var requestedTagRevision = expectedCatalogPayloadSHA256.map { expectedDigest in
+            candidateOverlay?.catalogPayloadSHA256 == expectedDigest
+                ? candidateOverlay?.revision ?? CominaviCircleTagOverlay.absentRevision
+                : CominaviCircleTagOverlay.absentRevision
+        }
         while true {
             let page = try await client.realtimeUpdates(
                 eventNumber: eventNumber,
-                afterCursor: cursor
+                afterCursor: cursor,
+                tagRevision: requestedTagRevision
             )
-            merge(page.updates, eventNumber: eventNumber)
-            if let pageCursor = page.updates.last?.cursor {
-                cursor = pageCursor
-                lastCursorByEvent[eventNumber] = pageCursor
+            let pageCursors = page.updates.map(\.cursor)
+            guard pageCursors == pageCursors.sorted(),
+                  Set(pageCursors).count == pageCursors.count,
+                  pageCursors.allSatisfy({ $0 > cursor }),
+                  !page.hasMore || pageCursors.last != nil
+            else {
+                throw CominaviServiceError.invalidResponse
             }
-            try await persistCache(eventNumber: eventNumber)
+            try Self.stageTagOverlay(
+                page.tagOverlay,
+                status: page.tagOverlayStatus,
+                requestedRevision: requestedTagRevision,
+                expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256,
+                overlay: &candidateOverlay
+            )
+            requestedTagRevision = expectedCatalogPayloadSHA256.map { expectedDigest in
+                candidateOverlay?.catalogPayloadSHA256 == expectedDigest
+                    ? candidateOverlay?.revision ?? CominaviCircleTagOverlay.absentRevision
+                    : CominaviCircleTagOverlay.absentRevision
+            }
+            candidateHeads = Self.merging(
+                page.updates,
+                into: candidateHeads,
+                eventNumber: eventNumber
+            )
+            if let pageCursor = pageCursors.last {
+                cursor = pageCursor
+            }
             guard page.hasMore else { break }
         }
+
+        guard (lastCursorByEvent[eventNumber] ?? 0) == initialCursor,
+              (headsByEvent[eventNumber] ?? [:]) == initialHeads,
+              tagOverlayByEvent[eventNumber] == initialOverlay
+        else {
+            throw CominaviServiceError.invalidResponse
+        }
+
+        let snapshot = Self.cacheSnapshot(
+            eventNumber: eventNumber,
+            lastCursor: cursor,
+            heads: candidateHeads,
+            tagOverlay: candidateOverlay
+        )
+        try Self.validate(snapshot, eventNumber: eventNumber)
+        try await cacheStore.save(
+            JSONEncoder().encode(snapshot),
+            eventNumber: eventNumber
+        )
+
+        headsByEvent[eventNumber] = candidateHeads
+        lastCursorByEvent[eventNumber] = cursor
+        tagOverlayByEvent[eventNumber] = candidateOverlay
+        tagsByEvent[eventNumber] = candidateOverlay.map(Self.tagsByWCID) ?? [:]
+        cacheAvailableEvents.insert(eventNumber)
         lastRefreshByEvent[eventNumber] = Date()
+        lastRefreshAuthorityByEvent[eventNumber] = Self.refreshAuthority(
+            expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256
+        )
     }
 
     private func loadCacheIfNeeded(eventNumber: Int) async {
         guard cacheLoadAttemptedEvents.insert(eventNumber).inserted else { return }
         guard let data = try? await cacheStore.load(eventNumber: eventNumber),
               let snapshot = try? JSONDecoder().decode(CacheSnapshot.self, from: data),
-              Self.isValid(snapshot, eventNumber: eventNumber)
+              (try? Self.validate(snapshot, eventNumber: eventNumber)) != nil
         else { return }
-        merge(snapshot.heads, eventNumber: eventNumber)
+        headsByEvent[eventNumber] = Self.merging(
+            snapshot.heads,
+            into: [:],
+            eventNumber: eventNumber
+        )
         lastCursorByEvent[eventNumber] = snapshot.lastCursor
+        if let overlay = snapshot.tagOverlay {
+            installTagOverlay(overlay, eventNumber: eventNumber)
+        }
         cacheAvailableEvents.insert(eventNumber)
     }
 
-    private func merge(_ updates: [CominaviRealtimeUpdate], eventNumber: Int) {
-        var eventHeads = headsByEvent[eventNumber] ?? [:]
+    private func clearIncompatibleTagOverlayIfNeeded(
+        eventNumber: Int,
+        expectedCatalogPayloadSHA256: String?
+    ) async throws {
+        guard let expectedCatalogPayloadSHA256,
+              let overlay = tagOverlayByEvent[eventNumber],
+              overlay.catalogPayloadSHA256 != expectedCatalogPayloadSHA256
+        else { return }
+
+        tagOverlayByEvent[eventNumber] = nil
+        tagsByEvent[eventNumber] = [:]
+        lastRefreshByEvent[eventNumber] = nil
+        lastRefreshAuthorityByEvent[eventNumber] = nil
+
+        guard cacheAvailableEvents.contains(eventNumber) else { return }
+        let snapshot = Self.cacheSnapshot(
+            eventNumber: eventNumber,
+            lastCursor: lastCursorByEvent[eventNumber] ?? 0,
+            heads: headsByEvent[eventNumber] ?? [:],
+            tagOverlay: nil
+        )
+        try Self.validate(snapshot, eventNumber: eventNumber)
+        try await cacheStore.save(
+            JSONEncoder().encode(snapshot),
+            eventNumber: eventNumber
+        )
+    }
+
+    private static func merging(
+        _ updates: [CominaviRealtimeUpdate],
+        into existing: [Int: [String: CominaviRealtimeUpdate]],
+        eventNumber: Int
+    ) -> [Int: [String: CominaviRealtimeUpdate]] {
+        var eventHeads = existing
         for update in updates {
             for circle in update.circles where circle.eventNumber == eventNumber {
                 var circleHeads = eventHeads[circle.wcID] ?? [:]
@@ -169,54 +322,112 @@ actor CominaviRealtimeStore {
                 eventHeads[circle.wcID] = circleHeads
             }
         }
-        headsByEvent[eventNumber] = eventHeads
+        return eventHeads
     }
 
-    private func persistCache(eventNumber: Int) async throws {
+    private static func cacheSnapshot(
+        eventNumber: Int,
+        lastCursor: Int,
+        heads: [Int: [String: CominaviRealtimeUpdate]],
+        tagOverlay: CominaviCircleTagOverlay?
+    ) -> CacheSnapshot {
         var headsByEventKey: [String: CominaviRealtimeUpdate] = [:]
-        for circleHeads in (headsByEvent[eventNumber] ?? [:]).values {
+        for circleHeads in heads.values {
             for update in circleHeads.values {
                 headsByEventKey[update.eventKey] = update
             }
         }
-        let snapshot = CacheSnapshot(
-            version: 1,
+        return CacheSnapshot(
+            version: 2,
             eventNumber: eventNumber,
-            lastCursor: lastCursorByEvent[eventNumber] ?? 0,
-            heads: headsByEventKey.values.sorted { $0.cursor < $1.cursor }
+            lastCursor: lastCursor,
+            heads: headsByEventKey.values.sorted { $0.cursor < $1.cursor },
+            tagOverlay: tagOverlay
         )
-        try await cacheStore.save(
-            JSONEncoder().encode(snapshot),
-            eventNumber: eventNumber
-        )
-        cacheAvailableEvents.insert(eventNumber)
     }
 
-    private static func isValid(_ snapshot: CacheSnapshot, eventNumber: Int) -> Bool {
-        snapshot.version == 1
-            && snapshot.eventNumber == eventNumber
-            && snapshot.lastCursor >= 0
-            && Set(snapshot.heads.map(\.eventKey)).count == snapshot.heads.count
-            && snapshot.heads.allSatisfy { update in
-                update.cursor > 0
-                    && update.cursor <= snapshot.lastCursor
-                    && !update.eventKey.isEmpty
-                    && update.sourceRevision > 0
-                    && update.circles.contains {
-                        $0.eventNumber == eventNumber && $0.wcID > 0
-                    }
-            }
-    }
-
-    func enrichment(eventNumber: Int, publicCircleID: Int) -> CatalogCircleEnrichment? {
-        guard let heads = headsByEvent[eventNumber]?[publicCircleID] else { return nil }
-        return Self.enrichment(from: Array(heads.values))
-    }
-
-    func enrichments(eventNumber: Int) -> [Int: CatalogCircleEnrichment] {
-        (headsByEvent[eventNumber] ?? [:]).compactMapValues { heads in
-            Self.enrichment(from: Array(heads.values))
+    private static func validate(_ snapshot: CacheSnapshot, eventNumber: Int) throws {
+        guard [1, 2].contains(snapshot.version),
+              snapshot.eventNumber == eventNumber,
+              snapshot.lastCursor >= 0,
+              Set(snapshot.heads.map(\.eventKey)).count == snapshot.heads.count,
+              snapshot.heads.allSatisfy({ update in
+                  update.cursor > 0
+                      && update.cursor <= snapshot.lastCursor
+                      && !update.eventKey.isEmpty
+                      && update.sourceRevision > 0
+                      && update.circles.contains {
+                          $0.eventNumber == eventNumber && $0.wcID > 0
+                      }
+              }),
+              snapshot.version != 1 || snapshot.tagOverlay == nil
+        else {
+            throw CominaviServiceError.invalidResponse
         }
+        try snapshot.tagOverlay?.validate()
+    }
+
+    func enrichment(
+        eventNumber: Int,
+        publicCircleID: Int,
+        expectedTagCatalogPayloadSHA256: String? = nil
+    ) -> CatalogCircleEnrichment? {
+        let heads = headsByEvent[eventNumber]?[publicCircleID].map {
+            Array($0.values)
+        } ?? []
+        let tags = compatibleTags(
+            eventNumber: eventNumber,
+            publicCircleID: publicCircleID,
+            expectedCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256
+        )
+        return Self.enrichment(from: heads, tags: tags)
+    }
+
+    func enrichments(
+        eventNumber: Int,
+        expectedTagCatalogPayloadSHA256: String? = nil
+    ) -> [Int: CatalogCircleEnrichment] {
+        var circleIDs: Set<Int> = []
+        if let realtimeCircleIDs = headsByEvent[eventNumber]?.keys {
+            circleIDs.formUnion(realtimeCircleIDs)
+        }
+        if let expectedTagCatalogPayloadSHA256,
+           tagOverlayByEvent[eventNumber]?.catalogPayloadSHA256
+            == expectedTagCatalogPayloadSHA256,
+           let taggedCircleIDs = tagsByEvent[eventNumber]?.keys
+        {
+            circleIDs.formUnion(taggedCircleIDs)
+        }
+        return Dictionary(uniqueKeysWithValues: circleIDs.compactMap { publicCircleID in
+            enrichment(
+                eventNumber: eventNumber,
+                publicCircleID: publicCircleID,
+                expectedTagCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256
+            )
+                .map { (publicCircleID, $0) }
+        })
+    }
+
+    func tagOverlayRevision(
+        eventNumber: Int,
+        expectedTagCatalogPayloadSHA256: String
+    ) -> String? {
+        guard tagOverlayByEvent[eventNumber]?.catalogPayloadSHA256
+                == expectedTagCatalogPayloadSHA256
+        else { return nil }
+        return tagOverlayByEvent[eventNumber]?.revision
+    }
+
+    private func compatibleTags(
+        eventNumber: Int,
+        publicCircleID: Int,
+        expectedCatalogPayloadSHA256: String?
+    ) -> [CatalogEnrichmentTag] {
+        guard let expectedCatalogPayloadSHA256,
+              tagOverlayByEvent[eventNumber]?.catalogPayloadSHA256
+                == expectedCatalogPayloadSHA256
+        else { return [] }
+        return tagsByEvent[eventNumber]?[publicCircleID] ?? []
     }
 
     func sharedPlanExternalStates(
@@ -263,7 +474,8 @@ actor CominaviRealtimeStore {
     }
 
     private static func enrichment(
-        from updates: [CominaviRealtimeUpdate]
+        from updates: [CominaviRealtimeUpdate],
+        tags: [CatalogEnrichmentTag] = []
     ) -> CatalogCircleEnrichment? {
         let posts = updates.compactMap(catalogPost).sorted {
             ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast)
@@ -271,8 +483,110 @@ actor CominaviRealtimeStore {
         let attendance = updates.compactMap(attendanceClaim).sorted {
             ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast)
         }
-        guard !posts.isEmpty || !attendance.isEmpty else { return nil }
-        return CatalogCircleEnrichment(posts: posts, attendanceClaims: attendance)
+        guard !posts.isEmpty || !attendance.isEmpty || !tags.isEmpty else { return nil }
+        return CatalogCircleEnrichment(
+            posts: posts,
+            attendanceClaims: attendance,
+            tags: tags
+        )
+    }
+
+    private static func stageTagOverlay(
+        _ overlay: CominaviCircleTagOverlay?,
+        status: CominaviRealtimeUpdatePage.TagOverlayStatus?,
+        requestedRevision: String?,
+        expectedCatalogPayloadSHA256: String?,
+        overlay current: inout CominaviCircleTagOverlay?
+    ) throws {
+        guard let requestedRevision, let expectedCatalogPayloadSHA256 else {
+            guard overlay == nil, status == nil else {
+                throw CominaviServiceError.invalidResponse
+            }
+            return
+        }
+        guard let status else { throw CominaviServiceError.invalidResponse }
+
+        switch status {
+        case .absent, .invalidated:
+            guard overlay == nil else { throw CominaviServiceError.invalidResponse }
+            current = nil
+            return
+        case .unavailable:
+            guard overlay == nil,
+                  current?.catalogPayloadSHA256 == expectedCatalogPayloadSHA256
+                    || current == nil
+            else { throw CominaviServiceError.invalidResponse }
+            return
+        case .current:
+            break
+        }
+
+        guard let overlay else {
+            guard requestedRevision != CominaviCircleTagOverlay.absentRevision,
+                  current?.revision == requestedRevision,
+                  current?.catalogPayloadSHA256 == expectedCatalogPayloadSHA256
+            else { throw CominaviServiceError.invalidResponse }
+            return
+        }
+        try overlay.validate()
+        guard overlay.catalogPayloadSHA256 == expectedCatalogPayloadSHA256 else {
+            throw CominaviServiceError.invalidResponse
+        }
+
+        let currentRevision = current?.revision ?? CominaviCircleTagOverlay.absentRevision
+        guard currentRevision == requestedRevision else {
+            throw CominaviServiceError.invalidResponse
+        }
+        if overlay.revision == currentRevision {
+            guard current == overlay else {
+                throw CominaviServiceError.invalidResponse
+            }
+            return
+        }
+        current = overlay
+    }
+
+    private static func isDigest(_ value: String) -> Bool {
+        value.utf8.count == 64 && value.utf8.allSatisfy { byte in
+            (48...57).contains(byte) || (97...102).contains(byte)
+        }
+    }
+
+    private static func refreshAuthority(
+        expectedCatalogPayloadSHA256: String?
+    ) -> RefreshAuthority {
+        expectedCatalogPayloadSHA256.map(RefreshAuthority.tagCatalog) ?? .legacy
+    }
+
+    private func installTagOverlay(
+        _ overlay: CominaviCircleTagOverlay,
+        eventNumber: Int
+    ) {
+        tagOverlayByEvent[eventNumber] = overlay
+        tagsByEvent[eventNumber] = Self.tagsByWCID(overlay)
+    }
+
+    private static func tagsByWCID(
+        _ overlay: CominaviCircleTagOverlay
+    ) -> [Int: [CatalogEnrichmentTag]] {
+        let termsByID = Dictionary(uniqueKeysWithValues: overlay.terms.map { ($0.id, $0) })
+        return Dictionary(uniqueKeysWithValues: overlay.circles.map { circle in
+            let tags = circle.tagIDs.compactMap { tagID in
+                termsByID[tagID].map { term in
+                    CatalogEnrichmentTag(
+                        termID: term.id,
+                        canonicalLabel: term.label,
+                        kind: term.kind.rawValue,
+                        provenance: [],
+                        matchedAlias: nil,
+                        evidenceLine: nil,
+                        mediaPath: nil,
+                        score: 1_000
+                    )
+                }
+            }
+            return (circle.wcID, tags)
+        })
     }
 
     private static func catalogPost(
@@ -362,7 +676,8 @@ extension CatalogCircleEnrichment {
             },
             attendanceClaims: attendanceByID.values.sorted {
                 ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast)
-            }
+            },
+            tags: tags + other.tags
         )
     }
 }

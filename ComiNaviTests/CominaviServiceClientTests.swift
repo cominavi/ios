@@ -164,6 +164,316 @@ final class CominaviServiceClientTests: XCTestCase {
         XCTAssertEqual(favorites.first?["notificationsEnabled"] as? Bool, true)
     }
 
+    func testRealtimeSnapshotDecodesAndValidatesCuratedTagOverlay() async throws {
+        let overlay = makeTagOverlay(
+            terms: [
+                CominaviCircleTagTerm(
+                    id: "character.hatsune-miku",
+                    label: "初音ミク",
+                    kind: .character
+                ),
+            ],
+            circles: [
+                CominaviCircleTagAssignment(
+                    wcID: 23_000_001,
+                    tagIDs: ["character.hatsune-miku"]
+                ),
+            ]
+        )
+        let response = try realtimeResponse(
+            tagOverlay: overlay,
+            tagOverlayStatus: .current
+        )
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (200, response),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        let page = try await client.realtimeUpdates(
+            eventNumber: 108,
+            afterCursor: 0,
+            tagRevision: CominaviCircleTagOverlay.absentRevision
+        )
+
+        XCTAssertEqual(page.tagOverlay, overlay)
+        XCTAssertEqual(page.tagOverlayStatus, .current)
+        let requests = await transport.requests
+        XCTAssertEqual(
+            requests.first?.url?.query,
+            "afterCursor=0&tagRevision=none"
+        )
+    }
+
+    func testRealtimeSnapshotRejectsSemanticallyInvalidTagOverlay() async throws {
+        let unsorted = makeTagOverlay(
+            terms: [
+                CominaviCircleTagTerm(id: "work.z", label: "Z", kind: .work),
+                CominaviCircleTagTerm(id: "work.a", label: "A", kind: .work),
+            ],
+            circles: [
+                CominaviCircleTagAssignment(
+                    wcID: 23_000_001,
+                    tagIDs: ["work.a", "work.z"]
+                ),
+            ]
+        )
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (
+                200,
+                try realtimeResponse(
+                    tagOverlay: unsorted,
+                    tagOverlayStatus: .current
+                )
+            ),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        do {
+            _ = try await client.realtimeUpdates(
+                eventNumber: 108,
+                afterCursor: 0,
+                tagRevision: CominaviCircleTagOverlay.absentRevision
+            )
+            XCTFail("Unsorted overlay terms must be rejected")
+        } catch CominaviServiceError.invalidResponse {}
+    }
+
+    func testRealtimeSnapshotDecodesAbsentTagOverlayStatus() async throws {
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (
+                200,
+                try realtimeResponse(tagOverlay: nil, tagOverlayStatus: .absent)
+            ),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        let page = try await client.realtimeUpdates(
+            eventNumber: 108,
+            afterCursor: 0,
+            tagRevision: CominaviCircleTagOverlay.absentRevision
+        )
+
+        XCTAssertNil(page.tagOverlay)
+        XCTAssertEqual(page.tagOverlayStatus, .absent)
+    }
+
+    func testRealtimeSnapshotSendsCanonicalRevisionAndAcceptsUnchangedCurrentStatus() async throws {
+        let revision = String(repeating: "a", count: 64)
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (
+                200,
+                try realtimeResponse(tagOverlay: nil, tagOverlayStatus: .current)
+            ),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        let page = try await client.realtimeUpdates(
+            eventNumber: 108,
+            afterCursor: 40,
+            tagRevision: revision
+        )
+
+        XCTAssertNil(page.tagOverlay)
+        XCTAssertEqual(page.tagOverlayStatus, .current)
+        let requests = await transport.requests
+        XCTAssertEqual(
+            requests.first?.url?.query,
+            "afterCursor=40&tagRevision=\(revision)"
+        )
+    }
+
+    func testRealtimeSnapshotRejectsMissingStatusForTagAwareRequest() async throws {
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (
+                200,
+                try realtimeResponse(tagOverlay: nil)
+            ),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        do {
+            _ = try await client.realtimeUpdates(
+                eventNumber: 108,
+                afterCursor: 0,
+                tagRevision: CominaviCircleTagOverlay.absentRevision
+            )
+            XCTFail("A tag-aware response must include its authority status")
+        } catch CominaviServiceError.invalidResponse {}
+    }
+
+    func testLegacyRealtimeSnapshotRejectsUnexpectedTagAuthorityFields() async throws {
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (
+                200,
+                try realtimeResponse(tagOverlay: nil, tagOverlayStatus: .unavailable)
+            ),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        do {
+            _ = try await client.realtimeUpdates(eventNumber: 108, afterCursor: 0)
+            XCTFail("Legacy responses must remain wire-identical")
+        } catch CominaviServiceError.invalidResponse {}
+    }
+
+    func testTagOverlayRevisionMatchesBackendCanonicalFixture() throws {
+        let overlay = CominaviCircleTagOverlay(
+            schemaVersion: 1,
+            revision: "6e08e047e6306d2f51a3db7c03675c603a13db8550387ed0fa8488af003d3ef5",
+            catalogPayloadSHA256: "8ba603" + String(repeating: "0", count: 58),
+            taxonomyRevision: "cominavi-c108-v1",
+            matchingPolicyRevision: "keyword-evidence-v1",
+            evaluatedCircleCount: 22_854,
+            taggedCircleCount: 2,
+            terms: [
+                CominaviCircleTagTerm(
+                    id: "character.hatsune_miku",
+                    label: "初音ミク",
+                    kind: .character
+                ),
+                CominaviCircleTagTerm(id: "content.bl", label: "BL", kind: .content),
+                CominaviCircleTagTerm(id: "content.r18", label: "R-18", kind: .content),
+                CominaviCircleTagTerm(id: "theme.yuri", label: "百合", kind: .theme),
+                CominaviCircleTagTerm(
+                    id: "work.arknights",
+                    label: "アークナイツ",
+                    kind: .work
+                ),
+            ],
+            circles: [
+                CominaviCircleTagAssignment(
+                    wcID: 101,
+                    tagIDs: ["content.r18", "work.arknights"]
+                ),
+                CominaviCircleTagAssignment(
+                    wcID: 202,
+                    tagIDs: [
+                        "character.hatsune_miku",
+                        "content.bl",
+                        "theme.yuri",
+                    ]
+                ),
+            ]
+        )
+
+        XCTAssertEqual(overlay.semanticRevision, overlay.revision)
+        XCTAssertNoThrow(try overlay.validate())
+    }
+
+    func testTagOverlayRejectsBlankLabels() {
+        let overlay = makeTagOverlay(
+            terms: [
+                CominaviCircleTagTerm(id: "content.r18", label: " \n ", kind: .content),
+            ],
+            circles: [
+                CominaviCircleTagAssignment(wcID: 23_000_001, tagIDs: ["content.r18"]),
+            ]
+        )
+
+        XCTAssertThrowsError(try overlay.validate())
+    }
+
+    func testTagOverlayRejectsControlCharactersInLabels() {
+        let overlay = makeTagOverlay(
+            terms: [
+                CominaviCircleTagTerm(
+                    id: "content.r18",
+                    label: "R-18\u{007f}",
+                    kind: .content
+                ),
+            ],
+            circles: [
+                CominaviCircleTagAssignment(wcID: 23_000_001, tagIDs: ["content.r18"]),
+            ]
+        )
+
+        XCTAssertThrowsError(try overlay.validate())
+    }
+
+    func testTagOverlayLabelLimitCountsUnicodeScalars() {
+        let accepted = makeTagOverlay(
+            terms: [
+                CominaviCircleTagTerm(
+                    id: "character.non_bmp_boundary",
+                    label: String(repeating: "😀", count: 200),
+                    kind: .character
+                ),
+            ],
+            circles: [
+                CominaviCircleTagAssignment(
+                    wcID: 23_000_001,
+                    tagIDs: ["character.non_bmp_boundary"]
+                ),
+            ]
+        )
+        let rejected = makeTagOverlay(
+            terms: [
+                CominaviCircleTagTerm(
+                    id: "character.non_bmp_boundary",
+                    label: String(repeating: "😀", count: 201),
+                    kind: .character
+                ),
+            ],
+            circles: [
+                CominaviCircleTagAssignment(
+                    wcID: 23_000_001,
+                    tagIDs: ["character.non_bmp_boundary"]
+                ),
+            ]
+        )
+
+        XCTAssertNoThrow(try accepted.validate())
+        XCTAssertThrowsError(try rejected.validate())
+    }
+
+    private func makeTagOverlay(
+        terms: [CominaviCircleTagTerm],
+        circles: [CominaviCircleTagAssignment]
+    ) -> CominaviCircleTagOverlay {
+        let unsigned = CominaviCircleTagOverlay(
+            schemaVersion: 1,
+            revision: String(repeating: "0", count: 64),
+            catalogPayloadSHA256: String(repeating: "b", count: 64),
+            taxonomyRevision: "cominavi-circle-tags-v1",
+            matchingPolicyRevision: "precision-v1",
+            evaluatedCircleCount: 22_854,
+            taggedCircleCount: circles.count,
+            terms: terms,
+            circles: circles
+        )
+        return CominaviCircleTagOverlay(
+            schemaVersion: unsigned.schemaVersion,
+            revision: unsigned.semanticRevision,
+            catalogPayloadSHA256: unsigned.catalogPayloadSHA256,
+            taxonomyRevision: unsigned.taxonomyRevision,
+            matchingPolicyRevision: unsigned.matchingPolicyRevision,
+            evaluatedCircleCount: unsigned.evaluatedCircleCount,
+            taggedCircleCount: unsigned.taggedCircleCount,
+            terms: unsigned.terms,
+            circles: unsigned.circles
+        )
+    }
+
+    private func realtimeResponse(
+        tagOverlay: CominaviCircleTagOverlay?,
+        tagOverlayStatus: CominaviRealtimeUpdatePage.TagOverlayStatus? = nil
+    ) throws -> Data {
+        var object: [String: Any] = [
+            "eventNumber": 108,
+            "hasMore": false,
+            "updates": [],
+        ]
+        if let tagOverlay {
+            object["tagOverlay"] = try JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(tagOverlay)
+            )
+        }
+        if let tagOverlayStatus {
+            object["tagOverlayStatus"] = tagOverlayStatus.rawValue
+        }
+        return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+
     func testFrozenDirectProfileFixtureDecodesProviderContextAndRelativeAvatar() async throws {
         let fixture = try fixtureData(named: "profile-v1")
         let transport = StaticCominaviTransport(responses: [

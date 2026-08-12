@@ -2303,6 +2303,10 @@
                             "minimum": 0,
                             "maximum": 9007199254740991
                           },
+                          "sourceMainSHA256": {
+                            "type": "string",
+                            "pattern": "^[0-9a-f]{64}$"
+                          },
                           "artifact": {
                             "type": "object",
                             "properties": {
@@ -2382,6 +2386,7 @@
                           "comiketNo",
                           "name",
                           "publishedAt",
+                          "sourceMainSHA256",
                           "artifact",
                           "counts",
                           "capabilities"
@@ -2612,6 +2617,10 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     },
+                    "sourceMainSHA256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
                     "artifact": {
                       "type": "object",
                       "properties": {
@@ -2691,6 +2700,7 @@
                     "comiketNo",
                     "name",
                     "publishedAt",
+                    "sourceMainSHA256",
                     "artifact",
                     "counts",
                     "capabilities"
@@ -5553,6 +5563,406 @@
                     "duplicate",
                     "cursor",
                     "queuedDeliveries"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "400",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "401",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "403",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "404",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "410",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "412",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "413",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "415",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "422",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "428",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "429",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "500",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "502",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "503",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CanonicalErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "crawlerSignature": [],
+            "crawlerTimestamp": [],
+            "crawlerIdempotencyKey": []
+          }
+        ]
+      }
+    },
+    "/api/v2/internal/crawler/tag-overlays": {
+      "post": {
+        "operationId": "publishCrawlerTagOverlay",
+        "summary": "Publish a complete circle tag overlay",
+        "description": "Publishes an immutable, content-addressed tag overlay under a compare-and-swap base revision. The request uses the same exact-byte HMAC convention as crawler event ingress and is bounded to 16 MiB.",
+        "tags": [
+          "Internal Crawler"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "eventNumber": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 10000,
+                    "exclusiveMinimum": 0
+                  },
+                  "baseRevision": {
+                    "anyOf": [
+                      {
+                        "const": "none"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      }
+                    ]
+                  },
+                  "overlay": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "const": 1
+                      },
+                      "revision": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "catalogPayloadSHA256": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
+                      },
+                      "taxonomyRevision": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                      },
+                      "matchingPolicyRevision": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                      },
+                      "evaluatedCircleCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000
+                      },
+                      "taggedCircleCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100000
+                      },
+                      "terms": {
+                        "type": "array",
+                        "maxItems": 10000,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "enum": [
+                                "work",
+                                "character",
+                                "content",
+                                "theme",
+                                "format",
+                                "activity"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "label",
+                            "kind"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "circles": {
+                        "type": "array",
+                        "maxItems": 100000,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "wcID": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "exclusiveMinimum": 0
+                            },
+                            "tagIDs": {
+                              "type": "array",
+                              "minItems": 1,
+                              "maxItems": 512,
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                              }
+                            }
+                          },
+                          "required": [
+                            "wcID",
+                            "tagIDs"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "revision",
+                      "catalogPayloadSHA256",
+                      "taxonomyRevision",
+                      "matchingPolicyRevision",
+                      "evaluatedCircleCount",
+                      "taggedCircleCount",
+                      "terms",
+                      "circles"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "eventNumber",
+                  "baseRevision",
+                  "overlay"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The exact tag overlay publication was replayed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eventNumber": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 10000,
+                      "exclusiveMinimum": 0
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "activeRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "active": {
+                      "const": true
+                    },
+                    "publishedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "duplicate": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "eventNumber",
+                    "revision",
+                    "activeRevision",
+                    "active",
+                    "publishedAt",
+                    "duplicate"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The tag overlay was activated for the first time.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eventNumber": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 10000,
+                      "exclusiveMinimum": 0
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "activeRevision": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "active": {
+                      "const": true
+                    },
+                    "publishedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "duplicate": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "eventNumber",
+                    "revision",
+                    "activeRevision",
+                    "active",
+                    "publishedAt",
+                    "duplicate"
                   ]
                 }
               }
@@ -13037,7 +13447,7 @@
       "get": {
         "operationId": "listRealtimeUpdates",
         "summary": "Get realtime event updates",
-        "description": "Returns immutable realtime circle updates in ascending cursor order. The query-free representation remains a complete snapshot for older clients; afterCursor returns a cacheable page of newer updates.",
+        "description": "Returns immutable realtime circle updates in ascending cursor order. The query-free representation remains a complete snapshot for older clients; afterCursor returns a cacheable page of newer updates. Supplying tagRevision returns an independent tagOverlayStatus and the active full tag overlay only when needed and available.",
         "tags": [
           "Realtime"
         ],
@@ -13060,6 +13470,23 @@
               "type": "integer",
               "minimum": 0,
               "maximum": 9007199254740991
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
+          },
+          {
+            "name": "tagRevision",
+            "in": "query",
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "none"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              ]
             },
             "allowEmptyValue": true,
             "allowReserved": true
@@ -13315,6 +13742,123 @@
                           "circles"
                         ]
                       }
+                    },
+                    "tagOverlayStatus": {
+                      "enum": [
+                        "current",
+                        "absent",
+                        "invalidated",
+                        "unavailable"
+                      ],
+                      "type": "string"
+                    },
+                    "tagOverlay": {
+                      "type": "object",
+                      "properties": {
+                        "schemaVersion": {
+                          "const": 1
+                        },
+                        "revision": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "catalogPayloadSHA256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        },
+                        "taxonomyRevision": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                        },
+                        "matchingPolicyRevision": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                        },
+                        "evaluatedCircleCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000
+                        },
+                        "taggedCircleCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100000
+                        },
+                        "terms": {
+                          "type": "array",
+                          "maxItems": 10000,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "enum": [
+                                  "work",
+                                  "character",
+                                  "content",
+                                  "theme",
+                                  "format",
+                                  "activity"
+                                ],
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "circles": {
+                          "type": "array",
+                          "maxItems": 100000,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "wcID": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "exclusiveMinimum": 0
+                              },
+                              "tagIDs": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 512,
+                                "items": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                                }
+                              }
+                            },
+                            "required": [
+                              "wcID",
+                              "tagIDs"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "schemaVersion",
+                        "revision",
+                        "catalogPayloadSHA256",
+                        "taxonomyRevision",
+                        "matchingPolicyRevision",
+                        "evaluatedCircleCount",
+                        "taggedCircleCount",
+                        "terms",
+                        "circles"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [

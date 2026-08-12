@@ -111,6 +111,7 @@ struct CatalogDataSourceConfiguration: Equatable, Sendable {
     let main: CatalogDatabaseConfiguration
     let image: CatalogDatabaseConfiguration
     let enrichment: CatalogEnrichmentConfiguration?
+    let tagCatalogPayloadSHA256: String?
     let allowsBookmarkSync: Bool
     let allowsRemoteMetadata: Bool
     let allowsCirclemsFavoriteMirror: Bool
@@ -122,6 +123,7 @@ struct CatalogDataSourceConfiguration: Equatable, Sendable {
         main: CatalogDatabaseConfiguration,
         image: CatalogDatabaseConfiguration,
         enrichment: CatalogEnrichmentConfiguration? = nil,
+        tagCatalogPayloadSHA256: String? = nil,
         allowsBookmarkSync: Bool,
         allowsRemoteMetadata: Bool = true,
         allowsCirclemsFavoriteMirror: Bool = false,
@@ -132,6 +134,7 @@ struct CatalogDataSourceConfiguration: Equatable, Sendable {
         self.main = main
         self.image = image
         self.enrichment = enrichment
+        self.tagCatalogPayloadSHA256 = tagCatalogPayloadSHA256
         self.allowsBookmarkSync = allowsBookmarkSync
         self.allowsRemoteMetadata = allowsRemoteMetadata
         self.allowsCirclemsFavoriteMirror = allowsCirclemsFavoriteMirror
@@ -212,6 +215,7 @@ final class CirclemsDataSource {
     private let allowsCirclemsFavoriteMirror: Bool
     private let enrichmentIsRequired: Bool
     private let enrichmentStore: CatalogEnrichmentStore?
+    private let tagCatalogPayloadSHA256: String?
     private let realtimeStore: CominaviRealtimeStore?
     let allowsRemoteMetadata: Bool
     
@@ -267,6 +271,7 @@ final class CirclemsDataSource {
         enrichmentStore = configuration.enrichment.map {
             CatalogEnrichmentStore(resourceURL: $0.resourceURL)
         }
+        tagCatalogPayloadSHA256 = configuration.tagCatalogPayloadSHA256
         realtimeStore = configuration.allowsBookmarkSync ? .shared : nil
         self.comiketId = comiketId
 
@@ -1182,10 +1187,15 @@ final class CirclemsDataSource {
         }
         var realtimeEnrichment: CatalogCircleEnrichment?
         if let realtimeStore, let publicCircleID = extensionRecord?.WCId {
-            try? await realtimeStore.refresh(eventNumber: comiketNumber)
+            try? await realtimeStore.refresh(
+                eventNumber: comiketNumber,
+                expectedTagCatalogPayloadSHA256: tagCatalogPayloadSHA256
+            )
+            await realtimeStore.waitForRevalidation(eventNumber: comiketNumber)
             realtimeEnrichment = await realtimeStore.enrichment(
                 eventNumber: comiketNumber,
-                publicCircleID: publicCircleID
+                publicCircleID: publicCircleID,
+                expectedTagCatalogPayloadSHA256: tagCatalogPayloadSHA256
             )
         }
         let enrichment = if let bundledEnrichment {
@@ -1212,9 +1222,14 @@ final class CirclemsDataSource {
         }
         if let realtimeStore {
             let eventNumber = Int(comiketId) ?? 0
-            try? await realtimeStore.refresh(eventNumber: eventNumber)
+            try? await realtimeStore.refresh(
+                eventNumber: eventNumber,
+                expectedTagCatalogPayloadSHA256: tagCatalogPayloadSHA256
+            )
+            await realtimeStore.waitForRevalidation(eventNumber: eventNumber)
             let realtimeByPublicID = await realtimeStore.enrichments(
-                eventNumber: eventNumber
+                eventNumber: eventNumber,
+                expectedTagCatalogPayloadSHA256: tagCatalogPayloadSHA256
             )
             for (circleID, publicCircleID) in publicCircleIDsByCircleID {
                 guard let realtime = realtimeByPublicID[publicCircleID] else { continue }

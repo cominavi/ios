@@ -261,6 +261,7 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertFalse(enrichment.isRequired)
         XCTAssertTrue(configuration.allowsBookmarkSync)
         XCTAssertTrue(configuration.allowsRemoteMetadata)
+        XCTAssertNil(configuration.tagCatalogPayloadSHA256)
 
         let index = try CatalogEnrichmentIndex(
             data: Data(contentsOf: enrichment.resourceURL)
@@ -269,10 +270,12 @@ final class CatalogLibraryTests: XCTestCase {
         // Guard against accidental truncation without pinning the test to one crawl run.
         XCTAssertGreaterThanOrEqual(index.selectedPostCount, 1_699)
         XCTAssertGreaterThanOrEqual(index.mappedPostCount, 1_483)
-        XCTAssertEqual(
-            index.enrichment(circleID: 8_880, publicCircleID: 23_012_210)?
-                .primaryPost?.id,
-            "2070092138935660893"
+        let retainedMapping = try XCTUnwrap(
+            index.enrichment(circleID: 10_186, publicCircleID: 23_000_046)
+        )
+        XCTAssertTrue(
+            retainedMapping.posts.contains { $0.id == "2062813325411660208" },
+            "A newer post may become primary, but the known high-confidence mapping must remain."
         )
     }
 
@@ -295,6 +298,7 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertEqual(configuration.main.origin, .local(mainURL))
         XCTAssertEqual(configuration.image.origin, .local(imageURL))
         XCTAssertFalse(configuration.allowsBookmarkSync)
+        XCTAssertNil(configuration.tagCatalogPayloadSHA256)
     }
 
     func testDemoModeCannotBeSelectedWhenItWasNotExplicitlyEnabledForAutomation() {
