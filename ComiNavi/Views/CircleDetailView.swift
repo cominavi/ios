@@ -566,7 +566,9 @@ private struct CircleDetailHeader: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Copy circle location")
-                .accessibilityValue(copiedLocation ? "Copied" : "")
+                .accessibilityValue(
+                    copiedLocation ? Text("Copied") : Text(verbatim: "")
+                )
                 .accessibilityHint("Copies \(address.canonicalText)")
                 .accessibilityIdentifier("circle-location-copy-button")
                 .animation(.default, value: copiedLocation)
@@ -740,7 +742,7 @@ private struct CircleDetailNavigationTitle: ViewModifier {
                 .navigationSubtitle(subtitle)
         } else if let subtitle {
             content
-                .navigationTitle("")
+                .navigationTitle(String())
                 .toolbar {
                     ToolbarItem(placement: .principal) {
                         CircleDetailPrincipalTitle(

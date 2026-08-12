@@ -923,7 +923,7 @@ private struct SharedPlanNotificationRow: View {
     private var notificationTimestamp: some View {
         HStack(spacing: 4) {
             Text(notification.createdAt, format: .relative(presentation: .named))
-            Text("•")
+            Text(verbatim: "•")
                 .accessibilityHidden(true)
             Text(
                 notification.createdAt,

@@ -1661,7 +1661,7 @@ private struct SharedPlanCirclePurchasesNavigationTitle: ViewModifier {
                 .navigationSubtitle(identity.navigationSubtitle)
         } else {
             content
-                .navigationTitle("")
+                .navigationTitle(String())
                 .toolbar {
                     ToolbarItem(placement: .principal) {
                         VStack(spacing: 1) {

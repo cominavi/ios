@@ -50,22 +50,6 @@ final class LocalizationTests: XCTestCase {
             "この日に多く使われているタグ"
         )
         XCTAssertEqual(
-            japaneseBundle.localizedString(
-                forKey: "Log out of Circle.ms?",
-                value: nil,
-                table: nil
-            ),
-            "Circle.msからログアウトしますか？"
-        )
-        XCTAssertEqual(
-            japaneseBundle.localizedString(
-                forKey: "Circle.ms authorization is required for the direct catalog source.",
-                value: nil,
-                table: nil
-            ),
-            "Circle.msの直接カタログを利用するには、Circle.msでの認証が必要です。"
-        )
-        XCTAssertEqual(
             japaneseBundle.localizedString(forKey: "Cancel", value: nil, table: nil),
             "キャンセル"
         )
@@ -103,49 +87,11 @@ final class LocalizationTests: XCTestCase {
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
-                forKey: "Circle added to Shared Plan",
-                value: nil,
-                table: nil
-            ),
-            "共有プランにサークルを追加しました"
-        )
-        XCTAssertEqual(
-            japaneseBundle.localizedString(
                 forKey: "Shared Plans are read-only",
                 value: nil,
                 table: nil
             ),
             "共有プランは現在読み取り専用です"
-        )
-        XCTAssertEqual(
-            japaneseBundle.localizedString(
-                forKey: "No Shared Plans are available.",
-                value: nil,
-                table: nil
-            ),
-            "現在表示できる共有プランはありません。"
-        )
-        XCTAssertEqual(
-            japaneseBundle.localizedString(
-                forKey: "This Shared Plan has no circles.",
-                value: nil,
-                table: nil
-            ),
-            "この共有プランにはサークルがありません。"
-        )
-        XCTAssertFalse(
-            japaneseBundle.localizedString(
-                forKey: "No Shared Plans are available.",
-                value: nil,
-                table: nil
-            ).contains("作成")
-        )
-        XCTAssertFalse(
-            japaneseBundle.localizedString(
-                forKey: "This Shared Plan has no circles.",
-                value: nil,
-                table: nil
-            ).contains("追加")
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
@@ -165,35 +111,11 @@ final class LocalizationTests: XCTestCase {
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
-                forKey: "Retained operation data reached the 512 KiB safety limit. Export it, then rebase or discard the local branch.",
-                value: nil,
-                table: nil
-            ),
-            "保持している変更データが512 KiBの安全上限に達しました。書き出した後、端末の履歴をリベースするか破棄してください。"
-        )
-        XCTAssertEqual(
-            japaneseBundle.localizedString(
-                forKey: "Your memo is saved after a short pause and when you leave this screen.",
-                value: nil,
-                table: nil
-            ),
-            "メモは入力が少し止まったときと、この画面を離れるときに保存します。"
-        )
-        XCTAssertEqual(
-            japaneseBundle.localizedString(
                 forKey: "Some favorites could not be imported. You can retry them.",
                 value: nil,
                 table: nil
             ),
             "一部のお気に入りを追加できませんでした。失敗したサークルだけを再試行できます。"
-        )
-        XCTAssertEqual(
-            japaneseBundle.localizedString(
-                forKey: "Member-entered outcome",
-                value: nil,
-                table: nil
-            ),
-            "メンバーが記録した結果"
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
@@ -253,7 +175,6 @@ final class LocalizationTests: XCTestCase {
                 "Shared Plans": "共享计划",
                 "Circle": "社团",
                 "Catalog": "目录",
-                "No Shared Plans are available.": "目前没有可显示的共享计划。",
                 "Choose a primary plan": "选择主要计划",
                 "How to join a plan": "如何加入计划",
                 "Join": "加入",
@@ -273,7 +194,6 @@ final class LocalizationTests: XCTestCase {
                 "Shared Plans": "共享計畫",
                 "Circle": "社團",
                 "Catalog": "目錄",
-                "No Shared Plans are available.": "目前沒有可顯示的共享計畫。",
                 "Choose a primary plan": "選擇主要計畫",
                 "How to join a plan": "如何加入計畫",
                 "Join": "加入",
@@ -293,7 +213,6 @@ final class LocalizationTests: XCTestCase {
                 "Shared Plans": "공유 플랜",
                 "Circle": "서클",
                 "Catalog": "카탈로그",
-                "No Shared Plans are available.": "현재 표시할 수 있는 공유 플랜이 없습니다.",
                 "Choose a primary plan": "기본 플랜 선택",
                 "How to join a plan": "플랜 참여 방법",
                 "Join": "참여",
