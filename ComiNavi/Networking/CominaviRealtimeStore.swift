@@ -25,25 +25,138 @@ struct SharedPlanExternalCircleState: Equatable, Identifiable, Sendable {
     }
 }
 
+protocol CominaviRealtimeCachePersisting: Sendable {
+    func load(eventNumber: Int) async throws -> Data?
+    func save(_ data: Data, eventNumber: Int) async throws
+}
+
+struct FileCominaviRealtimeCacheStore: CominaviRealtimeCachePersisting {
+    let directory: URL
+
+    func load(eventNumber: Int) async throws -> Data? {
+        let url = fileURL(eventNumber: eventNumber)
+        return try await Task.detached(priority: .utility) {
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return try Data(contentsOf: url)
+        }.value
+    }
+
+    func save(_ data: Data, eventNumber: Int) async throws {
+        let directory = directory
+        let url = fileURL(eventNumber: eventNumber)
+        try await Task.detached(priority: .utility) {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+            try data.write(to: url, options: .atomic)
+            try FileManager.default.setAttributes(
+                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+                ofItemAtPath: url.path
+            )
+        }.value
+    }
+
+    private func fileURL(eventNumber: Int) -> URL {
+        directory.appendingPathComponent("event-\(eventNumber)-heads.json")
+    }
+}
+
 actor CominaviRealtimeStore {
     static let shared = CominaviRealtimeStore()
 
-    private let client: any CominaviRealtimeFetching
-    private var lastRefreshByEvent: [Int: Date] = [:]
-    private var headsByEvent: [Int: [Int: [String: CominaviRealtimeUpdate]]] = [:]
+    private struct CacheSnapshot: Codable, Sendable {
+        let version: Int
+        let eventNumber: Int
+        let lastCursor: Int
+        let heads: [CominaviRealtimeUpdate]
+    }
 
-    init(client: any CominaviRealtimeFetching = CominaviServiceClient.shared) {
+    private let client: any CominaviRealtimeFetching
+    private let cacheStore: any CominaviRealtimeCachePersisting
+    private var cacheLoadAttemptedEvents: Set<Int> = []
+    private var cacheAvailableEvents: Set<Int> = []
+    private var lastRefreshByEvent: [Int: Date] = [:]
+    private var lastCursorByEvent: [Int: Int] = [:]
+    private var headsByEvent: [Int: [Int: [String: CominaviRealtimeUpdate]]] = [:]
+    private var revalidationTasks: [Int: Task<Void, Never>] = [:]
+
+    init(
+        client: any CominaviRealtimeFetching = CominaviServiceClient.shared,
+        cacheStore: any CominaviRealtimeCachePersisting = FileCominaviRealtimeCacheStore(
+            directory: DirectoryManager.shared.environmentCachesDirectory
+                .appendingPathComponent("RealtimeUpdates", isDirectory: true)
+        )
+    ) {
         self.client = client
+        self.cacheStore = cacheStore
     }
 
     func refresh(eventNumber: Int, minimumInterval: TimeInterval = 60) async throws {
+        guard (1...10_000).contains(eventNumber) else {
+            throw CominaviServiceError.invalidResponse
+        }
+        await loadCacheIfNeeded(eventNumber: eventNumber)
         if let lastRefresh = lastRefreshByEvent[eventNumber],
            Date().timeIntervalSince(lastRefresh) < minimumInterval
         {
             return
         }
-        let updates = try await client.realtimeUpdates(eventNumber: eventNumber)
-        var eventHeads: [Int: [String: CominaviRealtimeUpdate]] = [:]
+        guard revalidationTasks[eventNumber] == nil else { return }
+        if cacheAvailableEvents.contains(eventNumber) {
+            startRevalidation(eventNumber: eventNumber)
+            return
+        }
+        try await revalidate(eventNumber: eventNumber)
+    }
+
+    func waitForRevalidation(eventNumber: Int) async {
+        await revalidationTasks[eventNumber]?.value
+    }
+
+    private func startRevalidation(eventNumber: Int) {
+        revalidationTasks[eventNumber] = Task { [weak self] in
+            guard let self else { return }
+            try? await self.revalidate(eventNumber: eventNumber)
+            await self.finishRevalidation(eventNumber: eventNumber)
+        }
+    }
+
+    private func finishRevalidation(eventNumber: Int) {
+        revalidationTasks[eventNumber] = nil
+    }
+
+    private func revalidate(eventNumber: Int) async throws {
+        var cursor = lastCursorByEvent[eventNumber] ?? 0
+        while true {
+            let page = try await client.realtimeUpdates(
+                eventNumber: eventNumber,
+                afterCursor: cursor
+            )
+            merge(page.updates, eventNumber: eventNumber)
+            if let pageCursor = page.updates.last?.cursor {
+                cursor = pageCursor
+                lastCursorByEvent[eventNumber] = pageCursor
+            }
+            try await persistCache(eventNumber: eventNumber)
+            guard page.hasMore else { break }
+        }
+        lastRefreshByEvent[eventNumber] = Date()
+    }
+
+    private func loadCacheIfNeeded(eventNumber: Int) async {
+        guard cacheLoadAttemptedEvents.insert(eventNumber).inserted else { return }
+        guard let data = try? await cacheStore.load(eventNumber: eventNumber),
+              let snapshot = try? JSONDecoder().decode(CacheSnapshot.self, from: data),
+              Self.isValid(snapshot, eventNumber: eventNumber)
+        else { return }
+        merge(snapshot.heads, eventNumber: eventNumber)
+        lastCursorByEvent[eventNumber] = snapshot.lastCursor
+        cacheAvailableEvents.insert(eventNumber)
+    }
+
+    private func merge(_ updates: [CominaviRealtimeUpdate], eventNumber: Int) {
+        var eventHeads = headsByEvent[eventNumber] ?? [:]
         for update in updates {
             for circle in update.circles where circle.eventNumber == eventNumber {
                 var circleHeads = eventHeads[circle.wcID] ?? [:]
@@ -57,7 +170,42 @@ actor CominaviRealtimeStore {
             }
         }
         headsByEvent[eventNumber] = eventHeads
-        lastRefreshByEvent[eventNumber] = Date()
+    }
+
+    private func persistCache(eventNumber: Int) async throws {
+        var headsByEventKey: [String: CominaviRealtimeUpdate] = [:]
+        for circleHeads in (headsByEvent[eventNumber] ?? [:]).values {
+            for update in circleHeads.values {
+                headsByEventKey[update.eventKey] = update
+            }
+        }
+        let snapshot = CacheSnapshot(
+            version: 1,
+            eventNumber: eventNumber,
+            lastCursor: lastCursorByEvent[eventNumber] ?? 0,
+            heads: headsByEventKey.values.sorted { $0.cursor < $1.cursor }
+        )
+        try await cacheStore.save(
+            JSONEncoder().encode(snapshot),
+            eventNumber: eventNumber
+        )
+        cacheAvailableEvents.insert(eventNumber)
+    }
+
+    private static func isValid(_ snapshot: CacheSnapshot, eventNumber: Int) -> Bool {
+        snapshot.version == 1
+            && snapshot.eventNumber == eventNumber
+            && snapshot.lastCursor >= 0
+            && Set(snapshot.heads.map(\.eventKey)).count == snapshot.heads.count
+            && snapshot.heads.allSatisfy { update in
+                update.cursor > 0
+                    && update.cursor <= snapshot.lastCursor
+                    && !update.eventKey.isEmpty
+                    && update.sourceRevision > 0
+                    && update.circles.contains {
+                        $0.eventNumber == eventNumber && $0.wcID > 0
+                    }
+            }
     }
 
     func enrichment(eventNumber: Int, publicCircleID: Int) -> CatalogCircleEnrichment? {

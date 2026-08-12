@@ -127,13 +127,17 @@ final class CominaviServiceClientTests: XCTestCase {
                 notificationsEnabled: true
             )]
         )
-        let updates = try await client.realtimeUpdates(eventNumber: 108)
+        let updatePage = try await client.realtimeUpdates(
+            eventNumber: 108,
+            afterCursor: 40
+        )
         try await client.revokeSession()
 
-        XCTAssertEqual(updates.first?.cursor, 41)
-        XCTAssertEqual(updates.first?.stateValue, "sold_out")
+        XCTAssertEqual(updatePage.updates.first?.cursor, 41)
+        XCTAssertEqual(updatePage.updates.first?.stateValue, "sold_out")
+        XCTAssertFalse(updatePage.hasMore)
         let requests = await transport.requests()
-        XCTAssertNil(requests[2].url?.query)
+        XCTAssertEqual(requests[2].url?.query, "afterCursor=40")
         XCTAssertEqual(requests[2].cachePolicy, .useProtocolCachePolicy)
         XCTAssertEqual(requests.map { $0.url?.path }, [
             "/api/v2/me/favorites/108",
@@ -4187,7 +4191,7 @@ private actor CominaviServiceTransportStub {
             body = #"{"eventNumber":108,"revision":3,"favorites":[{"wcID":23000001,"color":2,"notificationsEnabled":true}]}"#
             statusCode = 200
         case ("/api/v2/events/108/updates", "GET"):
-            body = #"{"eventNumber":108,"updates":[{"cursor":41,"eventKey":"twitterapi:1:inventory_sold_out","updateKind":"inventory_sold_out","stateKind":"inventory","stateValue":"sold_out","confidence":"high","occurredAt":"2026-08-15T03:00:00Z","sourceRevision":1,"post":{"id":"1","url":"https://x.com/circle/status/1","text":"完売しました","author":{"xUserID":"9","handle":"circle","name":"Circle","profileImageURL":null},"media":[]},"circles":[{"eventNumber":108,"wcID":23000001,"circleID":100,"circleName":"Circle","day":1,"areaName":"西","blockName":"ア","spaceNo":1,"spaceNoSub":0,"location":"1日目 西 ア01a"}]}]}"#
+            body = #"{"eventNumber":108,"hasMore":false,"updates":[{"cursor":41,"eventKey":"twitterapi:1:inventory_sold_out","updateKind":"inventory_sold_out","stateKind":"inventory","stateValue":"sold_out","confidence":"high","occurredAt":"2026-08-15T03:00:00Z","sourceRevision":1,"post":{"id":"1","url":"https://x.com/circle/status/1","text":"完売しました","author":{"xUserID":"9","handle":"circle","name":"Circle","profileImageURL":null},"media":[]},"circles":[{"eventNumber":108,"wcID":23000001,"circleID":100,"circleName":"Circle","day":1,"areaName":"西","blockName":"ア","spaceNo":1,"spaceNoSub":0,"location":"1日目 西 ア01a"}]}]}"#
             statusCode = 200
         case ("/api/v2/auth/logout", "POST"):
             let requestBody = try XCTUnwrap(request.httpBody)

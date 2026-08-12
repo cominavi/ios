@@ -13037,7 +13037,7 @@
       "get": {
         "operationId": "listRealtimeUpdates",
         "summary": "Get realtime event updates",
-        "description": "Returns one cacheable JSON representation containing every immutable realtime circle update for one Comiket, in ascending cursor order.",
+        "description": "Returns immutable realtime circle updates in ascending cursor order. The query-free representation remains a complete snapshot for older clients; afterCursor returns a cacheable page of newer updates.",
         "tags": [
           "Realtime"
         ],
@@ -13052,6 +13052,17 @@
               "maximum": 10000,
               "exclusiveMinimum": 0
             }
+          },
+          {
+            "name": "afterCursor",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "allowEmptyValue": true,
+            "allowReserved": true
           }
         ],
         "responses": {
@@ -13067,6 +13078,9 @@
                       "minimum": -9007199254740991,
                       "maximum": 10000,
                       "exclusiveMinimum": 0
+                    },
+                    "hasMore": {
+                      "type": "boolean"
                     },
                     "updates": {
                       "type": "array",
@@ -13305,6 +13319,7 @@
                   },
                   "required": [
                     "eventNumber",
+                    "hasMore",
                     "updates"
                   ]
                 }

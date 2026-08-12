@@ -110,6 +110,11 @@ struct CominaviRealtimeUpdate: Codable, Hashable, Sendable {
     let circles: [Circle]
 }
 
+struct CominaviRealtimeUpdatePage: Equatable, Sendable {
+    let updates: [CominaviRealtimeUpdate]
+    let hasMore: Bool
+}
+
 protocol CominaviFavoriteSyncing: Sendable {
     func favoriteSnapshot(eventNumber: Int) async throws -> CominaviFavoriteSnapshot
     func replaceFavorites(
@@ -144,7 +149,10 @@ protocol CirclemsFavoriteImportServicing: Sendable {
 }
 
 protocol CominaviRealtimeFetching: Sendable {
-    func realtimeUpdates(eventNumber: Int) async throws -> [CominaviRealtimeUpdate]
+    func realtimeUpdates(
+        eventNumber: Int,
+        afterCursor: Int
+    ) async throws -> CominaviRealtimeUpdatePage
 }
 
 struct CominaviProviderFlowPublicationLease: Equatable, Sendable {
@@ -538,6 +546,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
 
     private struct RealtimeSnapshot: Decodable {
         let eventNumber: Int
+        let hasMore: Bool
         let updates: [CominaviRealtimeUpdate]
     }
 
@@ -1235,15 +1244,21 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         requiresExplicitAuthentication = true
     }
 
-    func realtimeUpdates(eventNumber: Int) async throws -> [CominaviRealtimeUpdate] {
-        guard (1...10_000).contains(eventNumber) else {
+    func realtimeUpdates(
+        eventNumber: Int,
+        afterCursor: Int
+    ) async throws -> CominaviRealtimeUpdatePage {
+        guard (1...10_000).contains(eventNumber), afterCursor >= 0 else {
             throw CominaviServiceError.invalidResponse
         }
         let output = try await performGeneratedOperation {
             try await generatedClient(
                 validatesErrorResponses: true,
                 cachePolicy: .useProtocolCachePolicy
-            ).listRealtimeUpdates(.init(path: .init(eventNumber: eventNumber)))
+            ).listRealtimeUpdates(.init(
+                path: .init(eventNumber: eventNumber),
+                query: .init(afterCursor: afterCursor)
+            ))
         }
         let snapshot: RealtimeSnapshot
         switch output {
@@ -1261,6 +1276,8 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         guard snapshot.eventNumber == eventNumber,
               cursors == cursors.sorted(),
               Set(cursors).count == cursors.count,
+              cursors.allSatisfy({ $0 > afterCursor }),
+              !snapshot.hasMore || !snapshot.updates.isEmpty,
               snapshot.updates.allSatisfy({ update in
                   update.cursor > 0
                       && update.sourceRevision > 0
@@ -1273,7 +1290,10 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
                       }
               })
         else { throw CominaviServiceError.invalidResponse }
-        return snapshot.updates
+        return CominaviRealtimeUpdatePage(
+            updates: snapshot.updates,
+            hasMore: snapshot.hasMore
+        )
     }
 
     func invalidateSession() async throws {
