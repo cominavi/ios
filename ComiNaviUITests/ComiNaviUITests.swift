@@ -629,9 +629,11 @@ final class ComiNaviUITests: XCTestCase {
         let eventDaySelector = app.buttons["global-event-day-banner"]
         let whereAmI = app.buttons["where-am-i-button"]
         let findTable = app.buttons["find-table-button"]
+        let attribution = app.buttons["map-data-attribution-button"]
         XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 20))
         XCTAssertTrue(whereAmI.waitForExistence(timeout: 20))
         XCTAssertTrue(findTable.waitForExistence(timeout: 20))
+        XCTAssertTrue(attribution.exists)
 
         XCTAssertLessThan(eventDaySelector.frame.midX, app.frame.midX)
         XCTAssertEqual(whereAmI.frame.midY, findTable.frame.midY, accuracy: 2)
@@ -642,6 +644,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertEqual(whereAmI.frame.height, 44, accuracy: 1)
         XCTAssertEqual(findTable.frame.width, 44, accuracy: 1)
         XCTAssertEqual(findTable.frame.height, 44, accuracy: 1)
+        XCTAssertEqual(attribution.frame.maxX, whereAmI.frame.minX - 8, accuracy: 2)
         takeScreenshot(named: "Map-iPad-Location-Actions-Bottom-Trailing")
     }
 
@@ -663,11 +666,13 @@ final class ComiNaviUITests: XCTestCase {
         let layerButton = app.buttons["map-layer-button"]
         let whereAmI = app.buttons["where-am-i-button"]
         let findTable = app.buttons["find-table-button"]
+        let attribution = app.buttons["map-data-attribution-button"]
         XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 20))
         XCTAssertTrue(venueSelector.exists)
         XCTAssertTrue(layerButton.exists)
         XCTAssertTrue(whereAmI.waitForExistence(timeout: 20))
         XCTAssertTrue(findTable.waitForExistence(timeout: 20))
+        XCTAssertTrue(attribution.exists)
 
         XCTAssertEqual(eventDaySelector.frame.midY, venueSelector.frame.midY, accuracy: 2)
         XCTAssertEqual(venueSelector.frame.midY, layerButton.frame.midY, accuracy: 2)
@@ -688,6 +693,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertEqual(whereAmI.frame.height, 44, accuracy: 1)
         XCTAssertEqual(findTable.frame.width, 44, accuracy: 1)
         XCTAssertEqual(findTable.frame.height, 44, accuracy: 1)
+        XCTAssertEqual(attribution.frame.maxX, whereAmI.frame.minX - 8, accuracy: 2)
         takeScreenshot(named: "Map-iPhone-Landscape-Compact-Chrome")
     }
 
@@ -705,8 +711,10 @@ final class ComiNaviUITests: XCTestCase {
 
         let whereAmI = app.buttons["where-am-i-button"]
         let findTable = app.buttons["find-table-button"]
+        let attribution = app.buttons["map-data-attribution-button"]
         XCTAssertTrue(whereAmI.waitForExistence(timeout: 20))
         XCTAssertTrue(findTable.waitForExistence(timeout: 20))
+        XCTAssertTrue(attribution.exists)
 
         XCTAssertEqual(whereAmI.frame.midY, findTable.frame.midY, accuracy: 2)
         XCTAssertLessThan(whereAmI.frame.maxX, findTable.frame.minX)
@@ -717,6 +725,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertEqual(whereAmI.frame.height, 44, accuracy: 1)
         XCTAssertEqual(findTable.frame.width, 44, accuracy: 1)
         XCTAssertEqual(findTable.frame.height, 44, accuracy: 1)
+        XCTAssertEqual(attribution.frame.maxX, whereAmI.frame.minX - 8, accuracy: 2)
         takeScreenshot(named: "Map-iPhone-Portrait-Location-Actions-Bottom-Trailing")
     }
 
@@ -1373,11 +1382,20 @@ final class ComiNaviUITests: XCTestCase {
         let legendToggle = app.buttons["map-legend-toggle"]
         let legendItems = app.scrollViews["map-legend-items"]
         let compass = app.buttons["map-compass-button"]
+        let attribution = app.buttons["map-data-attribution-button"]
+        let whereAmI = app.buttons["where-am-i-button"]
+        let findTable = app.buttons["find-table-button"]
         XCTAssertTrue(legendToggle.waitForExistence(timeout: 5))
         XCTAssertTrue(legendItems.waitForExistence(timeout: 30))
         XCTAssertTrue(compass.waitForExistence(timeout: 5))
-        XCTAssertEqual(legendToggle.frame.maxX, compass.frame.maxX, accuracy: 1)
-        XCTAssertEqual(legendItems.frame.maxX, compass.frame.maxX, accuracy: 1)
+        XCTAssertTrue(attribution.exists)
+        XCTAssertTrue(whereAmI.exists)
+        XCTAssertTrue(findTable.exists)
+        XCTAssertEqual(legendToggle.frame.maxX, findTable.frame.maxX, accuracy: 1)
+        XCTAssertEqual(legendItems.frame.maxX, findTable.frame.maxX, accuracy: 1)
+        XCTAssertEqual(compass.frame.midY, whereAmI.frame.midY, accuracy: 1)
+        XCTAssertEqual(compass.frame.maxX, whereAmI.frame.minX - 8, accuracy: 2)
+        XCTAssertEqual(attribution.frame.maxX, compass.frame.minX - 8, accuracy: 2)
         takeScreenshot(named: "C104-Genre-Overlay-Venue-Scale")
     }
 

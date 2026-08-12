@@ -102,8 +102,8 @@ struct MapView: View {
                     }
                 )
             }
-            .padding(.trailing, MapChromeLayout.trailingInset)
-            .safeAreaPadding(.bottom, 16)
+            .padding(.trailing, MapChromeLayout.edgeInset)
+            .safeAreaPadding(.bottom, MapChromeLayout.edgeInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -418,7 +418,7 @@ private struct MapLocationControls: View {
     @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: MapChromeLayout.controlSpacing) {
             Button(action: onWhereAmI) {
                 MapLocationControlIcon(
                     icon: "location.viewfinder",
@@ -528,7 +528,7 @@ private struct MapLocationControlIcon: View {
     var body: some View {
         LucideIcon(icon, size: 20)
             .foregroundStyle(isActive ? Color.accentColor : Color.primary)
-            .frame(width: 44, height: 44)
+            .frame(width: MapChromeLayout.controlSize, height: MapChromeLayout.controlSize)
             .background(.regularMaterial, in: .circle)
             .overlay {
                 Circle()
@@ -1010,7 +1010,7 @@ private struct InteractiveMapCanvas: View {
             .sensoryFeedback(.success, trigger: longPressFeedback)
             .overlay(alignment: .bottomTrailing) {
                 compassButton(viewportSize: viewportSize)
-                    .padding(.trailing, MapChromeLayout.trailingInset)
+                    .padding(.trailing, MapChromeLayout.edgeInset)
                     .padding(.bottom, 16)
             }
             .onChange(of: committedViewport, initial: true) { _, viewport in

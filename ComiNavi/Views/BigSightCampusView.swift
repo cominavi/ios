@@ -75,7 +75,7 @@ struct BigSightCampusView: View {
             .overlay(alignment: .topTrailing) {
                 northIndicator
                     .padding(.top, 112)
-                    .padding(.trailing, MapChromeLayout.trailingInset)
+                    .padding(.trailing, MapChromeLayout.edgeInset)
             }
             .overlay(alignment: .bottom) {
                 campusLegend

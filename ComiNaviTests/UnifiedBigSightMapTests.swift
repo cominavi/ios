@@ -637,7 +637,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
-    func testAttributionBadgeIsCompactAndTrailingAligned() throws {
+    func testAttributionBadgeIsCompactAndClearsTrailingMapControls() throws {
         let host = UnifiedMapHostView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         host.setNeedsLayout()
         host.layoutIfNeeded()
@@ -647,13 +647,33 @@ final class UnifiedBigSightMapTests: XCTestCase {
                 .first { $0.accessibilityIdentifier == "map-data-attribution-button" }
         )
 
-        XCTAssertEqual(badge.frame.maxX, 380, accuracy: 0.5)
+        XCTAssertEqual(
+            badge.frame.maxX,
+            390 - MapChromeLayout.attributionTrailingInset(showsCompass: false),
+            accuracy: 0.5
+        )
         XCTAssertLessThan(badge.frame.width, 100)
         XCTAssertLessThan(badge.frame.height, 24)
         XCTAssertEqual(badge.titleLabel?.font.pointSize ?? 0, 8, accuracy: 0.1)
         XCTAssertEqual(badge.configuration?.title, "© OpenStreetMap")
         XCTAssertEqual(badge.menu?.title, "Map data attribution")
         XCTAssertEqual(badge.menu?.children.count, 4)
+
+        host.updateCompass(rotation: .pi / 4)
+        host.setNeedsLayout()
+        host.layoutIfNeeded()
+
+        XCTAssertFalse(host.compassButton.isHidden)
+        XCTAssertEqual(
+            badge.frame.maxX,
+            host.compassButton.frame.minX - MapChromeLayout.controlSpacing,
+            accuracy: 0.5
+        )
+        XCTAssertEqual(
+            host.compassButton.frame.maxY,
+            844 - MapChromeLayout.edgeInset,
+            accuracy: 0.5
+        )
     }
 
     @MainActor

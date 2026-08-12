@@ -6,7 +6,22 @@ import SwiftUI
 import UIKit
 
 enum MapChromeLayout {
-    static let trailingInset: CGFloat = 16
+    static let edgeInset: CGFloat = 16
+    static let controlSize: CGFloat = 44
+    static let controlSpacing: CGFloat = 8
+    static let locationControlCount: CGFloat = 2
+
+    static var locationControlsWidth: CGFloat {
+        controlSize * locationControlCount + controlSpacing * (locationControlCount - 1)
+    }
+
+    static var adjacentChromeTrailingInset: CGFloat {
+        edgeInset + locationControlsWidth + controlSpacing
+    }
+
+    static func attributionTrailingInset(showsCompass: Bool) -> CGFloat {
+        adjacentChromeTrailingInset + (showsCompass ? controlSize + controlSpacing : 0)
+    }
 }
 
 enum UnifiedMapAppearance: Equatable {
@@ -379,6 +394,7 @@ final class UnifiedMapHostView: UIView {
     let mapView = SKView(frame: .zero)
     let compassButton = MapCompassButton(type: .system)
     private let dataAttributionButton = UIButton(type: .system)
+    private var dataAttributionTrailingConstraint: NSLayoutConstraint?
     private let campusAccessibilityProxy = UIView(frame: .zero)
     private let venueAccessibilityProxy = UIView(frame: .zero)
     private var requestedBasemapCamera: UnifiedBasemapCamera?
@@ -481,6 +497,12 @@ final class UnifiedMapHostView: UIView {
         dataAttributionButton.showsMenuAsPrimaryAction = true
         addSubview(dataAttributionButton)
 
+        let dataAttributionTrailingConstraint = dataAttributionButton.trailingAnchor.constraint(
+            equalTo: safeAreaLayoutGuide.trailingAnchor,
+            constant: -MapChromeLayout.attributionTrailingInset(showsCompass: false)
+        )
+        self.dataAttributionTrailingConstraint = dataAttributionTrailingConstraint
+
         NSLayoutConstraint.activate([
             basemapView.leadingAnchor.constraint(equalTo: leadingAnchor),
             basemapView.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -490,22 +512,21 @@ final class UnifiedMapHostView: UIView {
             mapView.trailingAnchor.constraint(equalTo: trailingAnchor),
             mapView.topAnchor.constraint(equalTo: topAnchor),
             mapView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            compassButton.widthAnchor.constraint(equalToConstant: 44),
-            compassButton.heightAnchor.constraint(equalToConstant: 44),
+            compassButton.widthAnchor.constraint(equalToConstant: MapChromeLayout.controlSize),
+            compassButton.heightAnchor.constraint(equalToConstant: MapChromeLayout.controlSize),
             compassButton.trailingAnchor.constraint(
                 equalTo: safeAreaLayoutGuide.trailingAnchor,
-                constant: -MapChromeLayout.trailingInset
+                constant: -MapChromeLayout.adjacentChromeTrailingInset
             ),
             compassButton.bottomAnchor.constraint(
-                equalTo: dataAttributionButton.topAnchor, constant: -8),
+                equalTo: safeAreaLayoutGuide.bottomAnchor,
+                constant: -MapChromeLayout.edgeInset
+            ),
             dataAttributionButton.leadingAnchor.constraint(
                 greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor,
                 constant: 10
             ),
-            dataAttributionButton.trailingAnchor.constraint(
-                equalTo: safeAreaLayoutGuide.trailingAnchor,
-                constant: -10
-            ),
+            dataAttributionTrailingConstraint,
             dataAttributionButton.bottomAnchor.constraint(
                 equalTo: safeAreaLayoutGuide.bottomAnchor,
                 constant: -10
@@ -570,7 +591,10 @@ final class UnifiedMapHostView: UIView {
     }
 
     func updateCompass(rotation: CGFloat) {
-        compassButton.isHidden = abs(rotation) < .pi / 180
+        let showsCompass = abs(rotation) >= .pi / 180
+        compassButton.isHidden = !showsCompass
+        dataAttributionTrailingConstraint?.constant =
+            -MapChromeLayout.attributionTrailingInset(showsCompass: showsCompass)
         compassButton.updateIndicator(
             rotation: MapCameraMath.northIndicatorRotation(mapRotation: rotation)
         )
