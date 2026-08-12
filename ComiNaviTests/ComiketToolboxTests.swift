@@ -23,6 +23,12 @@ final class ComiketToolboxTests: XCTestCase {
         XCTAssertTrue(ids.contains("lost-and-found"))
         XCTAssertTrue(ids.contains("big-sight-accessibility"))
         XCTAssertTrue(ids.contains("jma-tokyo-weather"))
+
+        let simplifiedChineseGuide = resources.first { $0.id == "beginner-guide-zh-hans" }
+        XCTAssertEqual(
+            simplifiedChineseGuide?.url.absoluteString,
+            "https://harenohi.comiket.co.jp/index.php/beginnersguide/beginnersguide-sc/"
+        )
     }
 
     func testEveryCategoryIsRepresentedAndFilteringKeepsItsSection() throws {

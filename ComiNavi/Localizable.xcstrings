@@ -3646,7 +3646,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "简体中文初学者指南"
+            "value" : "简体中文新手指南"
           }
         },
         "zh-Hant" : {
@@ -10845,7 +10845,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "举办日期"
+            "value" : "举办日"
           }
         },
         "zh-Hant" : {
@@ -16538,7 +16538,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "官方初学者指南"
+            "value" : "官方新手指南"
           }
         },
         "zh-Hant" : {

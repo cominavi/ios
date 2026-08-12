@@ -350,9 +350,19 @@ final class LocalizationTests: XCTestCase {
         let expectedTerms = [
             "ATM available": ["zh-Hans": "有ATM", "zh-Hant": "有ATM"],
             "AM Entry": ["zh-Hans": "上午入场", "zh-Hant": "上午入場"],
+            "Beginner guide in Simplified Chinese": [
+                "zh-Hans": "简体中文新手指南",
+                "zh-Hant": "簡體中文初學者指南",
+            ],
             "PM Entry": ["zh-Hans": "下午入场", "zh-Hant": "下午入場"],
             "Empty text": ["zh-Hans": "空文本", "zh-Hant": "空文本"],
+            "Event day": ["zh-Hans": "举办日", "zh-Hant": "舉辦日期"],
             "Galleria": ["zh-Hans": "连廊", "zh-Hant": "連廊"],
+            "Import": ["zh-Hans": "导入", "zh-Hant": "匯入"],
+            "Official beginner guide": [
+                "zh-Hans": "官方新手指南",
+                "zh-Hant": "官方初學者指南",
+            ],
             "Owner": ["zh-Hans": "所有者", "zh-Hant": "所有者"],
             "Profile": ["zh-Hans": "我", "zh-Hant": "我"],
             "Match all": ["zh-Hans": "匹配全部", "zh-Hant": "匹配全部"],

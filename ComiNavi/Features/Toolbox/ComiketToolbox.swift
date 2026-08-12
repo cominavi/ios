@@ -390,7 +390,7 @@ enum ComiketToolboxCatalog {
             "Official preparation, packing, and day-of guidance in Simplified Chinese.",
             .comiket,
             "globe",
-            "https://harenohi.comiket.co.jp/index.php/beginnersguide/chinese/",
+            "https://harenohi.comiket.co.jp/index.php/beginnersguide/beginnersguide-sc/",
             "simplified chinese 中文 简体 初心者 guide 中国語"
         ),
     ]
