@@ -720,7 +720,6 @@ struct SharedPlanEditorScreen: View {
                             } label: {
                                 SharedPlanPurchaseSummaryRow(
                                     need: need,
-                                    circleDisplayName: identity.displayName,
                                     hasConflict: model.conflicts.contains { conflict in
                                         conflict.path.contains(need.id.uuidString.lowercased())
                                     }
@@ -1020,7 +1019,6 @@ private struct SharedPlanCircleGroupHeader: View {
 
 private struct SharedPlanPurchaseSummaryRow: View {
     let need: SharedPlanPurchaseNeed
-    let circleDisplayName: String
     let hasConflict: Bool
 
     var body: some View {
@@ -1038,10 +1036,6 @@ private struct SharedPlanPurchaseSummaryRow: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            Text(circleDisplayName)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
             SharedPlanPurchaseStageBar(
                 progress: SharedPlanPurchaseProgressPresentation(
                     need: need,
