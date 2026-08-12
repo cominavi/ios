@@ -487,7 +487,11 @@
         }
       }
     },
+    "%@ will immediately lose access. Changes they have not sent will not be shared." : {
+
+    },
     "%@ will immediately lose access. Unsynced work remains only on their device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -516,6 +520,7 @@
       }
     },
     "%@ will regain access with a new synchronization identity." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -542,6 +547,9 @@
           }
         }
       }
+    },
+    "%@ will regain access." : {
+
     },
     "%@, %lld circles" : {
       "localizations" : {
@@ -1102,7 +1110,11 @@
         }
       }
     },
+    "%lld changes are waiting to send." : {
+
+    },
     "%lld changes are waiting to sync." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -1131,6 +1143,7 @@
       }
     },
     "%lld changes are waiting to upload. Let them finish before editing again. The limit is %lld." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1366,7 +1379,18 @@
         }
       }
     },
+    "%lld item changes and %lld plan updates are available in this recovery copy." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld item changes and %2$lld plan updates are available in this recovery copy."
+          }
+        }
+      }
+    },
     "%lld item changes and %lld plan updates are saved on this device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2311,6 +2335,7 @@
       }
     },
     "A memo draft is never presented as saved when editing authority was lost." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2570,6 +2595,7 @@
       }
     },
     "Account deletion is still being completed and will retry automatically when the network is available." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2597,6 +2623,9 @@
         }
       }
     },
+    "Account deletion is still being completed. Please try again shortly." : {
+
+    },
     "Accuracy about %lld meters. You always confirm the venue." : {
       "localizations" : {
         "ja" : {
@@ -2621,6 +2650,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "精度大約是%lld m。 請務必自己確認會場。"
+          }
+        }
+      }
+    },
+    "Acrylic keychain" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクキー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아크릴 키링"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "亚克力钥匙扣"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "壓克力鑰匙圈"
+          }
+        }
+      }
+    },
+    "Acrylic stand" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アクスタ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아크릴 스탠드"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "亚克力立牌"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "壓克力立牌"
           }
         }
       }
@@ -3462,6 +3547,9 @@
         }
       }
     },
+    "Almost ready…" : {
+
+    },
     "AM Entry" : {
       "localizations" : {
         "ja" : {
@@ -3984,6 +4072,7 @@
       }
     },
     "Attendance confidence" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4040,6 +4129,7 @@
       }
     },
     "Attendance match" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4068,6 +4158,7 @@
       }
     },
     "Attendance policy" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4271,6 +4362,7 @@
       }
     },
     "Automated matching" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4299,6 +4391,7 @@
       }
     },
     "Automatic retry is paused until you review this change." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -4382,6 +4475,34 @@
         }
       }
     },
+    "Available in %lld seconds" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld秒後に実行できます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld초 후에 사용할 수 있습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld秒后可用"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld秒後可用"
+          }
+        }
+      }
+    },
     "Available spaces: %lld through %lld" : {
       "localizations" : {
         "ja" : {
@@ -4435,34 +4556,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "b"
-          }
-        }
-      }
-    },
-    "Available in %lld seconds" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld秒後に実行できます"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld초 후에 사용할 수 있습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld秒后可用"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld秒後可用"
           }
         }
       }
@@ -5277,6 +5370,7 @@
       }
     },
     "catalog data" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -5333,6 +5427,7 @@
       }
     },
     "Catalog record" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7459,6 +7554,7 @@
       }
     },
     "Circle.ms authorization is required for the direct catalog source." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7487,6 +7583,7 @@
       }
     },
     "Circle.ms credentials are being transferred securely. Please try again shortly." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7629,6 +7726,7 @@
       }
     },
     "Circle.ms returned an invalid catalog database URL." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7656,7 +7754,11 @@
         }
       }
     },
+    "Circle.ms returned an invalid catalog link." : {
+
+    },
     "Circle.ms returned an invalid non-HTTPS database URL." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -7712,6 +7814,9 @@
           }
         }
       }
+    },
+    "Circle.ms sign-in is still being completed. Please try again shortly." : {
+
     },
     "Circle.ms Web Catalog" : {
       "localizations" : {
@@ -8658,6 +8763,9 @@
         }
       }
     },
+    "ComiNavi is reconnecting. Editing will be available when it is ready." : {
+
+    },
     "ComiNavi keeps every meaningful concurrent value until a person makes an explicit choice." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8824,6 +8932,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請再次登入ComiNavi。"
+          }
+        }
+      }
+    },
+    "Common purchase items" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "よく買うもの"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자주 사는 물건"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常买的物品"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "常買的物品"
           }
         }
       }
@@ -11017,34 +11153,6 @@
         }
       }
     },
-    "Delete ComiNavi account" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNaviアカウントを削除"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi 계정을 삭제합니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除ComiNavi账户"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刪除ComiNavi帳號"
-          }
-        }
-      }
-    },
     "Delete available in %lld seconds" : {
       "localizations" : {
         "ja" : {
@@ -11069,6 +11177,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "還需等待%lld秒才能刪除"
+          }
+        }
+      }
+    },
+    "Delete ComiNavi account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviアカウントを削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 계정을 삭제합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除ComiNavi账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除ComiNavi帳號"
           }
         }
       }
@@ -11242,6 +11378,7 @@
       }
     },
     "Detected from shinagaki text or OCR by the collector's tag matcher." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -12014,7 +12151,11 @@
         }
       }
     },
+    "Downloading\ncatalog" : {
+
+    },
     "Downloading\ndatabases" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -12100,6 +12241,7 @@
       }
     },
     "Downloading databases, this may take a while..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12133,7 +12275,11 @@
         }
       }
     },
+    "Downloading the catalog, this may take a while…" : {
+
+    },
     "Downloads catalogs supported by Circle.ms." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -12162,6 +12308,7 @@
       }
     },
     "Downloads the verified ComiNavi catalog for every signed-in account." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -14254,6 +14401,7 @@
       }
     },
     "Failed to download the catalog database: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -14564,6 +14712,34 @@
         }
       }
     },
+    "Fills the item name field." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "品名欄に入力します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "품목명 입력란에 입력합니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填入物品名称。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "填入物品名稱。"
+          }
+        }
+      }
+    },
     "Filter" : {
       "localizations" : {
         "ja" : {
@@ -14649,6 +14825,7 @@
       }
     },
     "Finalizing..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -15244,226 +15421,30 @@
         }
       }
     },
-    "For example: new-release set, new release only, or acrylic keychain": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "例：新刊セット、新刊のみ、アクキーなど"
+    "For example: new-release set, new release only, or acrylic keychain" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例：新刊セット、新刊のみ、アクキーなど"
           }
         },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "예: 신간 세트, 신간 단품, 아크릴 키링 등"
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예: 신간 세트, 신간 단품, 아크릴 키링 등"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "例：新刊套装、仅新刊、亚克力钥匙扣等"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例：新刊套装、仅新刊、亚克力钥匙扣等"
           }
         },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "例：新刊套組、僅新刊、壓克力鑰匙圈等"
-          }
-        }
-      }
-    },
-    "Acrylic keychain": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アクキー"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "아크릴 키링"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "亚克力钥匙扣"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "壓克力鑰匙圈"
-          }
-        }
-      }
-    },
-    "Acrylic stand": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "アクスタ"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "아크릴 스탠드"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "亚克力立牌"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "壓克力立牌"
-          }
-        }
-      }
-    },
-    "Common purchase items": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "よく買うもの"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "자주 사는 물건"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "常买的物品"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "常買的物品"
-          }
-        }
-      }
-    },
-    "Fills the item name field.": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "品名欄に入力します。"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "품목명 입력란에 입력합니다."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "填入物品名称。"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "填入物品名稱。"
-          }
-        }
-      }
-    },
-    "New release only": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新刊のみ"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "신간 단품"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "仅新刊"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "僅新刊"
-          }
-        }
-      }
-    },
-    "New-release set": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新刊セット"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "신간 세트"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新刊套装"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "新刊套組"
-          }
-        }
-      }
-    },
-    "Sticker set": {
-      "localizations": {
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "ステッカーセット"
-          }
-        },
-        "ko": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "스티커 세트"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "贴纸套装"
-          }
-        },
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "貼紙套組"
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例：新刊套組、僅新刊、壓克力鑰匙圈等"
           }
         }
       }
@@ -16654,6 +16635,7 @@
       }
     },
     "image data" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -16708,6 +16690,9 @@
           }
         }
       }
+    },
+    "Images" : {
+
     },
     "Import" : {
       "localizations" : {
@@ -16822,6 +16807,7 @@
       }
     },
     "Imports start only when you tap the button. They are limited to once every six hours." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -17048,6 +17034,7 @@
       }
     },
     "Initializing databases..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -17743,6 +17730,7 @@
       }
     },
     "Keep this screen open while ComiNavi reconnects. No local edit will be accepted until authority is confirmed." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -18192,6 +18180,7 @@
       }
     },
     "Links" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -18706,6 +18695,7 @@
       }
     },
     "Loading social data..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -19359,6 +19349,7 @@
       }
     },
     "Logout is still being completed. Please try again when the network is available." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -19528,6 +19519,7 @@
       }
     },
     "Manual import is available after %@. Nothing will start automatically." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -19815,6 +19807,7 @@
       }
     },
     "Match reasons" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -19871,6 +19864,7 @@
       }
     },
     "Matching policy" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -20500,6 +20494,62 @@
         }
       }
     },
+    "New release only" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新刊のみ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신간 단품"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅新刊"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "僅新刊"
+          }
+        }
+      }
+    },
+    "New-release set" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新刊セット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신간 세트"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新刊套装"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新刊套組"
+          }
+        }
+      }
+    },
     "Next import" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -20589,7 +20639,11 @@
         }
       }
     },
+    "No changes are waiting to send." : {
+
+    },
     "No changes are waiting to sync." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -21734,6 +21788,7 @@
       }
     },
     "OCR evidence" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -22209,6 +22264,12 @@
         }
       }
     },
+    "One or more changes could not be saved." : {
+
+    },
+    "One or more changes could not be saved. Support code: %@" : {
+
+    },
     "One person removed this item while another changed it. Choose what the plan should keep." : {
       "localizations" : {
         "ja" : {
@@ -22669,7 +22730,11 @@
         }
       }
     },
+    "Open this screen to check for plan updates." : {
+
+    },
     "Open this screen while online to check for plan updates." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -22811,6 +22876,7 @@
       }
     },
     "Opens the bundled C104 catalog without a network connection." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -23403,6 +23469,34 @@
         }
       }
     },
+    "Permanently deletes your account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウントを完全に削除します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정을 영구적으로 삭제합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久删除账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "永久刪除帳號"
+          }
+        }
+      }
+    },
     "Phone and power bank" : {
       "localizations" : {
         "ja" : {
@@ -23884,62 +23978,6 @@
         }
       }
     },
-    "Permanently deletes your account" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アカウントを完全に削除します"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "계정을 영구적으로 삭제합니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "永久删除账户"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "永久刪除帳號"
-          }
-        }
-      }
-    },
-    "Please wait before deleting your account." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アカウントを削除する前にお待ちください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "계정을 삭제하기 전에 잠시 기다려 주세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请在删除账户前稍候。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "請在刪除帳號前稍候。"
-          }
-        }
-      }
-    },
     "Please sign in again before opening the catalog." : {
       "localizations" : {
         "ja" : {
@@ -23992,6 +24030,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請再試一次。"
+          }
+        }
+      }
+    },
+    "Please wait before deleting your account." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウントを削除する前にお待ちください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정을 삭제하기 전에 잠시 기다려 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在删除账户前稍候。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請在刪除帳號前稍候。"
           }
         }
       }
@@ -24250,6 +24316,7 @@
       }
     },
     "Preloading map data..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -24304,6 +24371,12 @@
           }
         }
       }
+    },
+    "Preparing map…" : {
+
+    },
+    "Preparing updates…" : {
+
     },
     "Presence" : {
       "localizations" : {
@@ -25497,6 +25570,9 @@
         }
       }
     },
+    "Reconnect" : {
+
+    },
     "Reconnecting to Shared Plan" : {
       "localizations" : {
         "ja" : {
@@ -25639,6 +25715,9 @@
           }
         }
       }
+    },
+    "Recovery copy" : {
+
     },
     "Red" : {
       "localizations" : {
@@ -26270,7 +26349,11 @@
         }
       }
     },
+    "Repair keeps recoverable changes and starts from the latest plan." : {
+
+    },
     "Repair keeps the changes that can be recovered and starts from the latest shared plan." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -26767,6 +26850,7 @@
       }
     },
     "Retrieved: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -26851,6 +26935,7 @@
       }
     },
     "Retry sync" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -27248,6 +27333,7 @@
       }
     },
     "Saved content remains on this device until you choose a recovery action." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -27274,6 +27360,9 @@
           }
         }
       }
+    },
+    "Saved content remains until you choose a recovery action." : {
+
     },
     "Saved local recovery branch" : {
       "extractionState" : "stale",
@@ -27334,6 +27423,7 @@
       }
     },
     "Saved on this device" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -27362,6 +27452,7 @@
       }
     },
     "Saved on this device and waiting to send." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -27475,6 +27566,7 @@
       }
     },
     "Saved recovery copy" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -28050,6 +28142,9 @@
           }
         }
       }
+    },
+    "Send changes before editing again" : {
+
     },
     "Service information and updates for Comike Web Catalog." : {
       "localizations" : {
@@ -28762,6 +28857,7 @@
       }
     },
     "Shinagaki match" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -29166,6 +29262,9 @@
     "Sign in as the person who should join, then accept the invitation." : {
 
     },
+    "Sign in to Circle.ms to open this catalog." : {
+
+    },
     "Sign in with Apple from the special entry" : {
       "localizations" : {
         "ja" : {
@@ -29195,6 +29294,7 @@
       }
     },
     "Sign in with Apple is unavailable on this device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -29221,6 +29321,9 @@
           }
         }
       }
+    },
+    "Sign in with Apple is unavailable right now." : {
+
     },
     "Sign in with Google" : {
       "localizations" : {
@@ -29279,6 +29382,7 @@
       }
     },
     "Sign in with Google is unavailable on this device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -29305,6 +29409,12 @@
           }
         }
       }
+    },
+    "Sign in with Google is unavailable right now." : {
+
+    },
+    "Sign out is still being completed. Please try again shortly." : {
+
     },
     "Single-space circles" : {
       "localizations" : {
@@ -29418,7 +29528,11 @@
         }
       }
     },
+    "Some changes are waiting to be saved. Let them finish before editing again." : {
+
+    },
     "Some changes could not be saved online. Download a copy, then reset from the latest plan." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -29447,6 +29561,7 @@
       }
     },
     "Some changes could not be saved online. Download a copy, then reset from the latest plan. Support code: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -29474,7 +29589,14 @@
         }
       }
     },
+    "Some changes could not be saved. Download a copy, then reset from the latest plan." : {
+
+    },
+    "Some changes could not be saved. Download a copy, then reset from the latest plan. Support code: %@" : {
+
+    },
     "Some Circle.ms tags are unavailable. Bundled tags still work offline." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -29558,6 +29680,9 @@
         }
       }
     },
+    "Some tags are unavailable right now." : {
+
+    },
     "Sort" : {
       "localizations" : {
         "ja" : {
@@ -29615,6 +29740,7 @@
       }
     },
     "Source record" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -29643,6 +29769,7 @@
       }
     },
     "Source records" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -30042,6 +30169,34 @@
         }
       }
     },
+    "Sticker set" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ステッカーセット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스티커 세트"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "贴纸套装"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "貼紙套組"
+          }
+        }
+      }
+    },
     "Strong shopping bags" : {
       "localizations" : {
         "ja" : {
@@ -30218,6 +30373,7 @@
 
     },
     "Sync" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -30275,6 +30431,7 @@
       }
     },
     "Sync before editing again" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -30303,6 +30460,7 @@
       }
     },
     "Sync is paused for review" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -30331,6 +30489,7 @@
       }
     },
     "Sync is stopped" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -30443,6 +30602,7 @@
       }
     },
     "Tag provenance" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -30471,6 +30631,7 @@
       }
     },
     "Tag source" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -30871,6 +31032,7 @@
       }
     },
     "The %@ database is damaged. Please try downloading it again." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -30899,6 +31061,7 @@
       }
     },
     "The %@ database is missing required data: %@." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -30984,6 +31147,7 @@
       }
     },
     "The C%d catalog is not available on this device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -31010,6 +31174,18 @@
           }
         }
       }
+    },
+    "The C%d catalog is not available." : {
+
+    },
+    "The catalog could not be downloaded: %@" : {
+
+    },
+    "The catalog could not be opened. Please try downloading it again." : {
+
+    },
+    "The catalog could not be verified." : {
+
     },
     "The catalog does not contain a recognized Tokyo Big Sight venue map." : {
       "extractionState" : "stale",
@@ -31068,7 +31244,11 @@
         }
       }
     },
+    "The catalog download could not be resumed. Please try again." : {
+
+    },
     "The catalog download could not be verified." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -31097,6 +31277,7 @@
       }
     },
     "The catalog download did not match its published version." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -31123,6 +31304,9 @@
           }
         }
       }
+    },
+    "The catalog download was incomplete. Please try again." : {
+
     },
     "The circle is hidden by a collaborative tombstone. Its memo and purchase history remain available for conflict resolution and later reactivation." : {
       "extractionState" : "stale",
@@ -31239,6 +31423,7 @@
       }
     },
     "The demo catalog is missing %@. Run Scripts/prepare-demo-catalog.sh before building." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -31266,7 +31451,11 @@
         }
       }
     },
+    "The demo catalog is unavailable. Please choose another catalog." : {
+
+    },
     "The downloaded %@ database failed its integrity check." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -31295,6 +31484,7 @@
       }
     },
     "The downloaded %@ file is not a valid catalog database." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -31322,7 +31512,17 @@
         }
       }
     },
+    "The downloaded catalog appears damaged. Please try downloading it again." : {
+
+    },
+    "The downloaded catalog could not be opened." : {
+
+    },
+    "The downloaded catalog could not be verified." : {
+
+    },
     "The downloaded catalog database has invalid circle relationships." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -31351,6 +31551,7 @@
       }
     },
     "The downloaded catalog database is invalid." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -31377,6 +31578,12 @@
           }
         }
       }
+    },
+    "The downloaded catalog has invalid circle data. Please try downloading it again." : {
+
+    },
+    "The downloaded catalog is missing required information. Please try downloading it again." : {
+
     },
     "The field remains in collaborative history but has no current value." : {
       "extractionState" : "stale",
@@ -31462,6 +31669,9 @@
           }
         }
       }
+    },
+    "The installed catalog could not be verified. Please try downloading it again." : {
+
     },
     "The invitation itself remains listed, but this device can never display its token again." : {
       "extractionState" : "stale",
@@ -31781,6 +31991,7 @@
       }
     },
     "The official catalog allocation is preserved even when later public attendance evidence says the circle withdrew." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -31952,6 +32163,7 @@
       }
     },
     "The previously installed catalog could not be verified." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32009,6 +32221,7 @@
       }
     },
     "The saved catalog download could not be resumed safely." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32037,6 +32250,7 @@
       }
     },
     "The saved intent will be removed from this device and cannot be recovered." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32094,6 +32308,7 @@
       }
     },
     "The server could not verify one or more saved changes. They remain on this device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32180,6 +32395,7 @@
       }
     },
     "The server could not verify one or more saved changes. They remain on this device. Support code: %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32208,6 +32424,7 @@
       }
     },
     "The server rejected an oversized sync backlog" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32236,6 +32453,7 @@
       }
     },
     "The server requires plan recovery" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32377,6 +32595,7 @@
       }
     },
     "There are %lld unsent changes, above the %lld-change upload limit. Download a copy, then repair or reset the plan." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -32409,6 +32628,12 @@
           }
         }
       }
+    },
+    "There are too many changes to continue. Download a copy, then repair or reset the plan." : {
+
+    },
+    "There are too many pending changes. Download a copy, then repair or reset the plan." : {
+
     },
     "There is no convenience store in the East area. Get drinks before entering." : {
       "localizations" : {
@@ -32467,6 +32692,7 @@
       }
     },
     "These changes are not retried automatically. Review them before retrying or discarding them." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32522,7 +32748,11 @@
         }
       }
     },
+    "This change needs your review before it can be sent." : {
+
+    },
     "This circle may have been removed. Any saved memo can still be downloaded from plan recovery." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32550,7 +32780,11 @@
         }
       }
     },
+    "This circle may have been removed. Any saved memo can still be downloaded from recovery." : {
+
+    },
     "This circle will be removed from the plan. Its notes and purchases remain available if another recent change restores it." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32577,6 +32811,9 @@
           }
         }
       }
+    },
+    "This circle will be removed from the plan. Its notes and purchases will remain available." : {
+
     },
     "This circle's map location is unavailable." : {
       "localizations" : {
@@ -32808,6 +33045,7 @@
       }
     },
     "This plan cannot be repaired automatically. Download a copy before resetting it." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32835,7 +33073,11 @@
         }
       }
     },
+    "This plan has too many pending changes" : {
+
+    },
     "This plan has too many saved changes. Download a copy, then repair or reset the plan." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32892,6 +33134,7 @@
       }
     },
     "This plan needs compact recovery" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -32918,6 +33161,9 @@
           }
         }
       }
+    },
+    "This plan needs recovery" : {
+
     },
     "This plan needs review" : {
       "localizations" : {
@@ -32946,6 +33192,9 @@
           }
         }
       }
+    },
+    "This plan needs to be reset. Download a copy before resetting it." : {
+
     },
     "This plan will become read-only. You can reopen it later." : {
 
@@ -32979,7 +33228,11 @@
         }
       }
     },
+    "This purchase request will be removed." : {
+
+    },
     "This purchase request will be removed. If someone changed it at the same time, you can choose which version to keep." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -33008,6 +33261,7 @@
       }
     },
     "This removes this account's Shared Plans, unsent changes, and downloaded catalog data from this device." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -33034,6 +33288,12 @@
           }
         }
       }
+    },
+    "This removes this account's Shared Plans, unsent changes, and downloaded catalog data." : {
+
+    },
+    "This saved change will be removed and cannot be recovered." : {
+
     },
     "This saved document is malformed and is never interpreted. Export or discard are the only safe actions." : {
       "extractionState" : "stale",
@@ -34204,6 +34464,15 @@
         }
       }
     },
+    "Updates" : {
+
+    },
+    "Updates are paused" : {
+
+    },
+    "Updates are paused for review" : {
+
+    },
     "Updating campus…" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -35057,6 +35326,9 @@
         }
       }
     },
+    "Waiting for editing access" : {
+
+    },
     "Waiting for the plan to finish connecting" : {
       "localizations" : {
         "ja" : {
@@ -35086,6 +35358,7 @@
       }
     },
     "Waiting for writable sync" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -35112,6 +35385,9 @@
           }
         }
       }
+    },
+    "Waiting to send." : {
+
     },
     "Wanted" : {
       "extractionState" : "stale",
@@ -36108,6 +36384,7 @@
       }
     },
     "When enabled, ComiNavi checks new clipboard text while the app is active. iOS may ask before allowing access. Clipboard contents are never uploaded or saved." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -36361,6 +36638,7 @@
       }
     },
     "Withdrawal match" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -36671,6 +36949,7 @@
       }
     },
     "You" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -36810,6 +37089,12 @@
           }
         }
       }
+    },
+    "You can import again after %@." : {
+
+    },
+    "You can import once every six hours." : {
+
     },
     "You can review collaborative content and recovery data. Editing will appear after interoperable sync is enabled." : {
       "extractionState" : "stale",
@@ -37038,7 +37323,11 @@
         }
       }
     },
+    "Your checklist is a reminder, not a replacement for official instructions." : {
+
+    },
     "Your checklist stays on this device. It is a reminder, not a replacement for official instructions." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -37066,7 +37355,11 @@
         }
       }
     },
+    "Your choices are saved. Delivery still follows your iOS notification settings." : {
+
+    },
     "Your choices stay on this device. Delivery still follows your iOS notification settings." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -37095,6 +37388,7 @@
       }
     },
     "Your deletion request is stored securely on this device and will finish automatically when the network is available." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -37691,6 +37985,7 @@
       }
     },
     "お気に入り同期の要確認" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -37717,6 +38012,9 @@
           }
         }
       }
+    },
+    "お気に入り変更の確認" : {
+
     },
     "キャンセル" : {
       "localizations" : {
@@ -37804,6 +38102,7 @@
       }
     },
     "このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログをこの端末から削除します。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -37830,6 +38129,9 @@
           }
         }
       }
+    },
+    "このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログを削除します。" : {
+
     },
     "このお気に入り変更を破棄しますか？" : {
       "localizations" : {
@@ -38029,6 +38331,7 @@
       }
     },
     "このプランへの参加権限が取り消されました。未同期の変更は端末に残っています。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -38055,6 +38358,9 @@
           }
         }
       }
+    },
+    "このプランへの参加権限が取り消されました。未送信の変更は残っています。" : {
+
     },
     "このプランを編集する権限がありません。" : {
       "localizations" : {
@@ -38341,6 +38647,7 @@
       }
     },
     "サーバー上の最新状態を表示しています。端末に残した変更は自動送信されません。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -38628,7 +38935,11 @@
         }
       }
     },
+    "プランのデータが大きすぎます。" : {
+
+    },
     "プランの保存データが上限を超えています。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -38742,6 +39053,9 @@
           }
         }
       }
+    },
+    "プランを更新できないため、再接続します。" : {
+
     },
     "プランを選択" : {
       "extractionState" : "stale",
@@ -39278,6 +39592,7 @@
       }
     },
     "作成にはネットワーク接続が必要です。送信できない場合は、同じリクエストを端末に保存して自動で再試行します。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -39334,6 +39649,7 @@
       }
     },
     "保存されたプランが現在のプランと一致しません。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -39360,6 +39676,9 @@
           }
         }
       }
+    },
+    "保存されたプランを開けません。" : {
+
     },
     "先に「書き出す」で保存できます。削除したデータは元に戻せません。" : {
       "extractionState" : "stale",
@@ -39419,6 +39738,7 @@
       }
     },
     "共同編集サーバーに接続できません。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -39502,6 +39822,12 @@
           }
         }
       }
+    },
+    "共有プランに接続できません。" : {
+
+    },
+    "共有プランのデータを読み込めません。" : {
+
     },
     "共有プランの名前と参加先アカウントを安全に確認しています。" : {
       "localizations" : {
@@ -39643,6 +39969,9 @@
         }
       }
     },
+    "最新のプランを表示しています。残っている変更を確認してください。" : {
+
+    },
     "最新状態でもう一度試す" : {
       "localizations" : {
         "ja" : {
@@ -39727,7 +40056,11 @@
         }
       }
     },
+    "別の場所でプランが更新されました。残っている変更を確認してください。" : {
+
+    },
     "別の端末でプランが更新されました。端末に残した変更を確認してください。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -39956,6 +40289,7 @@
       }
     },
     "同期する変更が大きすぎます。内容を減らしてもう一度お試しください。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -39984,6 +40318,7 @@
       }
     },
     "同期セッションを安全に続けられないため、再接続します。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40039,6 +40374,15 @@
         }
       }
     },
+    "変更が多いため、このプランを続けて編集できません。内容を書き出してから、最新のプランでやり直してください。" : {
+
+    },
+    "変更が多すぎます。内容を書き出してから、最新のプランでやり直してください。" : {
+
+    },
+    "変更を保存できませんでした。" : {
+
+    },
     "変更を破棄" : {
       "localizations" : {
         "ja" : {
@@ -40068,6 +40412,7 @@
       }
     },
     "変更を端末に保存できませんでした。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40096,6 +40441,7 @@
       }
     },
     "変更履歴が端末の安全な上限に達しました。内容を確認して書き出すか、同期済みの状態からやり直してください。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40269,6 +40615,7 @@
       }
     },
     "拒否された変更は自動再送せず保存しています。ほかのお気に入り変更は引き続き同期されます。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40550,7 +40897,11 @@
         }
       }
     },
+    "未保存のメモを保管しています。" : {
+
+    },
     "未保存のメモを同期できないため、端末に保持しています。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40579,6 +40930,7 @@
       }
     },
     "未同期の変更が1,000件の上限に達しました。内容を確認して書き出すか、同期済みの状態からやり直してください。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40634,8 +40986,10 @@
         }
       }
     },
+    "残っている変更をすべて破棄" : {
+
+    },
     "破棄" : {
-      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40721,6 +41075,7 @@
       }
     },
     "端末から破棄" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40749,6 +41104,7 @@
       }
     },
     "端末に保存された共同編集データを安全に読み込めません。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40777,6 +41133,7 @@
       }
     },
     "端末の変更をすべて破棄" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40832,7 +41189,11 @@
         }
       }
     },
+    "編集権限がないため、メモを保管しています。" : {
+
+    },
     "編集権限がないため、未保存のメモを端末に保持しています。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40860,7 +41221,11 @@
         }
       }
     },
+    "編集権限が変わったため、メモを保管しています。" : {
+
+    },
     "編集権限が変わったため、未保存のメモを端末に保持しています。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -40916,6 +41281,9 @@
           }
         }
       }
+    },
+    "自分" : {
+
     },
     "表示中のプランは詳細画面で復旧方法を選べます。アクセスできない以前のデータは、書き出してから端末から削除できます。" : {
       "extractionState" : "stale",
@@ -41170,6 +41538,9 @@
           }
         }
       }
+    },
+    "送信する変更が大きすぎます。内容を減らしてもう一度お試しください。" : {
+
     },
     "送信できなかったお気に入り変更" : {
       "localizations" : {
