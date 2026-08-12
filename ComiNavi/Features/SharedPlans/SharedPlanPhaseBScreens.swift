@@ -1655,7 +1655,7 @@ private struct SharedPlanPurchaseStageBar: View {
     let progress: SharedPlanPurchaseProgressPresentation
     let accessibilityIdentifier: String
 
-    @ScaledMetric(relativeTo: .caption) private var barHeight = 7.0
+    @ScaledMetric(relativeTo: .caption) private var barHeight = 10.5
 
     var body: some View {
         VStack(spacing: 3) {
@@ -1954,41 +1954,10 @@ private struct SharedPlanQuantityControl: View {
     let range: ClosedRange<Int>
 
     var body: some View {
-        HStack(spacing: 14) {
+        Stepper(value: $quantity, in: range) {
             Text(title)
                 .font(.body.weight(.medium))
-            Spacer()
-            Button {
-                quantity = max(range.lowerBound, quantity - 1)
-            } label: {
-                LucideIcon("minus", size: 18)
-                    .frame(width: 36, height: 36)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.circle)
-            .disabled(quantity <= range.lowerBound)
-            .accessibilityLabel("Decrease \(title)")
-
-            Text(quantity.formatted())
-                .font(.title3.weight(.bold))
-                .monospacedDigit()
-                .frame(minWidth: 32)
-                .contentTransition(.numericText())
-
-            Button {
-                quantity = min(range.upperBound, quantity + 1)
-            } label: {
-                LucideIcon("plus", size: 18)
-                    .frame(width: 36, height: 36)
-                    .contentShape(.rect)
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.circle)
-            .disabled(quantity >= range.upperBound)
-            .accessibilityLabel("Increase \(title)")
         }
-        .accessibilityElement(children: .contain)
     }
 }
 
