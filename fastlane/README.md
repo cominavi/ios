@@ -15,6 +15,38 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 ## iOS
 
+### ios asc_check
+
+```sh
+[bundle exec] fastlane ios asc_check
+```
+
+Verify App Store Connect API access
+
+### ios build_testflight
+
+```sh
+[bundle exec] fastlane ios build_testflight
+```
+
+Build a signed TestFlight archive and IPA without uploading it
+
+### ios upload_ipa
+
+```sh
+[bundle exec] fastlane ios upload_ipa
+```
+
+Upload an existing signed IPA to TestFlight
+
+### ios beta
+
+```sh
+[bundle exec] fastlane ios beta
+```
+
+Build and upload the current version to TestFlight
+
 ### ios upload_metadata
 
 ```sh

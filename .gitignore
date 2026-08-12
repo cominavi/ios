@@ -13,6 +13,16 @@ __pycache__/
 .impeccable/
 *-maestro.png*
 
+# Fastlane local state and App Store Connect credentials
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/
+fastlane/.env
+fastlane/.env.*
+!fastlane/.env.example
+fastlane/AuthKey_*.p8
+fastlane/api_key*.json
+
 # Swift Package Manager local state
 .build/
 .swiftpm/

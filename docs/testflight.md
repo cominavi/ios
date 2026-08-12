@@ -13,6 +13,53 @@ this build, and its bundled SQLite fixtures are excluded from the app. The
 optional C108 crawl enrichment remains available to the live Circle.ms catalog;
 there is no standalone crawl catalog mode.
 
+## Fastlane
+
+Fastlane is configured for App Store Connect API-key authentication, automatic
+signing, local IPA builds, and internal TestFlight uploads. The checked-in
+configuration contains only the key ID and issuer ID. The private `.p8` key is
+ignored by Git and must remain local.
+
+The default key location is `fastlane/AuthKey_672X4QRBR9.p8`. Keep it readable
+only by your account:
+
+```sh
+install -m 600 /path/to/AuthKey_672X4QRBR9.p8 fastlane/AuthKey_672X4QRBR9.p8
+```
+
+Verify that the credentials can access the ComiNavi app without changing App
+Store Connect state:
+
+```sh
+FASTLANE_SKIP_UPDATE_CHECK=1 fastlane ios asc_check
+```
+
+Build a signed archive and IPA without uploading it:
+
+```sh
+FASTLANE_SKIP_UPDATE_CHECK=1 fastlane ios build_testflight
+```
+
+This lane uses `Configuration/FastlaneExportOptions.plist`, whose destination is
+`export`. Its `app-store` method spelling is Fastlane 2.232 compatible; the
+existing `Configuration/TestFlightExportOptions.plist` retains Xcode's newer
+`app-store-connect` spelling and its `upload` destination for the manual
+`xcodebuild -exportArchive` workflow below.
+
+Build and upload the current version to internal TestFlight testing:
+
+```sh
+FASTLANE_SKIP_UPDATE_CHECK=1 fastlane ios beta
+```
+
+To upload an existing IPA instead, set `IPA_PATH` and run `fastlane ios
+upload_ipa`. Set `CHANGELOG` to populate TestFlight's **What to Test** text.
+
+The defaults can be overridden with `ASC_KEY_ID`, `ASC_ISSUER_ID`, and
+`ASC_KEY_FILEPATH`; see `fastlane/.env.example`. Increase
+`CURRENT_PROJECT_VERSION` before each upload because App Store Connect does not
+accept a build number twice.
+
 ## Prepare an archive
 
 1. Sign in to an Apple Developer account in Xcode that has access to team
