@@ -197,6 +197,31 @@ final class LocalizationTests: XCTestCase {
         )
     }
 
+    func testNotificationCopyHasReviewedTranslations() throws {
+        let data = try Data(contentsOf: sourceCatalogURL)
+        let root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let strings = try XCTUnwrap(root["strings"] as? [String: Any])
+        let expected = [
+            "ja": "サークルと買い物を追加しました",
+            "ko": "서클과 구매 항목을 추가했습니다",
+            "zh-Hans": "已添加社团和购物项",
+            "zh-Hant": "已新增社團和購物項目",
+        ]
+        let entry = try XCTUnwrap(strings["Circle and purchase added"] as? [String: Any])
+        let localizations = try XCTUnwrap(entry["localizations"] as? [String: Any])
+
+        for (language, expectedValue) in expected {
+            let localization = try XCTUnwrap(
+                localizations[language] as? [String: Any]
+            )
+            let unit = try XCTUnwrap(localization["stringUnit"] as? [String: Any])
+            XCTAssertEqual(unit["state"] as? String, "translated")
+            XCTAssertEqual(unit["value"] as? String, expectedValue)
+        }
+    }
+
     func testNewLocalizationsResolveRepresentativeInterfaceCopy() throws {
         let expectations: [String: [String: String]] = [
             "zh-Hans": [

@@ -422,18 +422,23 @@ struct SharedPlanEditorScreen: View {
     @State private var presentedSheet: SharedPlanEditorSheet?
     @State private var confirmation: SharedPlanEditorConfirmation?
     @State private var catalogCircles: [SharedPlanCircleKey: CirclemsDataSchema.ComiketCircleWC] = [:]
+    @State private var initialCircleNavigationPresented = false
+    @State private var hasHandledInitialCircleNavigation = false
     @Environment(\.scenePhase) private var scenePhase
+    let initialPublicCircleID: Int?
 
     init(
         store: SharedPlanStore,
         planID: String,
         currentUserID: String? = nil,
         features: SharedPlanPresentationFeatures = .production,
-        catalogDataSource: CirclemsDataSource? = nil
+        catalogDataSource: CirclemsDataSource? = nil,
+        initialPublicCircleID: Int? = nil
     ) {
         self.store = store
         self.currentUserID = currentUserID
         self.catalogDataSource = catalogDataSource
+        self.initialPublicCircleID = initialPublicCircleID
         _model = State(initialValue: SharedPlanEditorModel(
             planID: planID,
             features: features
@@ -460,6 +465,29 @@ struct SharedPlanEditorScreen: View {
         }
         .task(id: catalogCircleTaskID) {
             await loadCatalogCircles()
+        }
+        .onChange(of: initialCircleNavigationKey, initial: true) {
+            presentInitialCircleDestinationIfReady()
+        }
+        .navigationDestination(isPresented: $initialCircleNavigationPresented) {
+            if let initialCircle {
+                SharedPlanCircleEditorScreen(
+                    model: model,
+                    store: store,
+                    circle: initialCircle,
+                    currentUserID: currentUserID,
+                    identity: circleIdentity(for: initialCircle)
+                )
+            } else {
+                ContentUnavailableView(
+                    "Circle content is unavailable",
+                    systemImage: "building.2",
+                    description: Text(
+                        "This circle may have been removed. Any saved memo can still be downloaded from recovery."
+                    )
+                )
+                .navigationTitle("Circle purchases")
+            }
         }
         .task(id: scenePhase) {
             guard scenePhase != .active else { return }
@@ -733,6 +761,24 @@ struct SharedPlanEditorScreen: View {
         let circleIDs = model.circles.map(\.key.id).joined(separator: ",")
         let isReady = catalogDataSource?.readiness == .ready
         return "\(catalogDataSource?.eventID ?? 0):\(isReady):\(circleIDs)"
+    }
+
+    private var initialCircle: SharedPlanCircleKey? {
+        guard let initialPublicCircleID else { return nil }
+        return model.circles.first { $0.key.wcID == initialPublicCircleID }?.key
+    }
+
+    private var initialCircleNavigationKey: String {
+        "\(initialPublicCircleID ?? 0):\(model.appliedProjectionGeneration.map { String($0) } ?? "")"
+    }
+
+    private func presentInitialCircleDestinationIfReady() {
+        guard initialPublicCircleID != nil,
+              model.appliedProjectionGeneration != nil,
+              !hasHandledInitialCircleNavigation
+        else { return }
+        hasHandledInitialCircleNavigation = true
+        initialCircleNavigationPresented = true
     }
 
     private func loadCatalogCircles() async {
