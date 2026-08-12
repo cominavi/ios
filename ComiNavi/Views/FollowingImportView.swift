@@ -81,13 +81,6 @@ struct FollowingImportView: View {
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text(
-                "Import the public X accounts you follow and match them to this catalog on your device."
-            )
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 12)
-
             CatalogActivityIndicator(accessibilityLabel: "Import followed circles")
                 .padding(.top, 30)
         }
@@ -220,7 +213,7 @@ struct FollowingImportView: View {
                 }
             }
 
-            Section {
+            Section("Imported circles (\(model.importedPublicCircleCount))") {
                 ForEach(model.importedCircles) { importedCircle in
                     HStack(alignment: .top, spacing: 10) {
                         NavigationLink {
@@ -255,14 +248,6 @@ struct FollowingImportView: View {
                         .disabled(model.activity != .idle)
                         .accessibilityLabel("Favorite this circle")
                     }
-                }
-            } header: {
-                Text("Imported circles (\(model.importedPublicCircleCount))")
-            } footer: {
-                if let importState = model.importState {
-                    Text(
-                        "Last successful import: \(importState.importedAt.formatted(date: .abbreviated, time: .shortened)). Existing circles stay in this list when later imports add new matches."
-                    )
                 }
             }
         }

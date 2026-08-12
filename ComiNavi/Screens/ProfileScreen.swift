@@ -237,10 +237,6 @@ struct ProfileScreen: View {
                         }
                     }
                     .accessibilityIdentifier("profile-following-import")
-
-                    Text("Import the public X accounts you follow and match them to this catalog on your device.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 }
             }
 
