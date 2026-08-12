@@ -49,6 +49,10 @@ final class ComiNaviUITests: XCTestCase {
             "The primary plan must open directly"
         )
         XCTAssertTrue(app.navigationBars["買い物リスト"].exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["shared-plan-empty-circles"].exists,
+            "An empty plan should show the designed empty-state card"
+        )
 
         for _ in 0 ..< 3 {
             let switcher = app.buttons["shared-plan-switcher-button"]
@@ -230,7 +234,7 @@ final class ComiNaviUITests: XCTestCase {
         app.buttons["Done"].tap()
         XCTAssertFalse(app.navigationBars["Purchase progress"].waitForExistence(timeout: 2))
 
-        let firstRowMenu = app.buttons["More actions for 新幹線チケット"]
+        let firstRowMenu = app.buttons["More actions for 新刊セット"]
         XCTAssertTrue(firstRowMenu.waitForExistence(timeout: 3))
         firstRowMenu.tap()
         let purchaseProgressAction = app.buttons["Purchase progress"].firstMatch
