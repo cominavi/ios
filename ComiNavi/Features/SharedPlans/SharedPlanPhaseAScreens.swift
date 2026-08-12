@@ -667,28 +667,59 @@ struct SharedPlanCreatedInvitationSheet: View {
     private func content(
         availability: SharedPlanProtectedInvitationAvailability
     ) -> some View {
-            Form {
-                Section {
-                    LabeledContent("Expires") {
-                        Text(invitation.expiresAt, format: .dateTime.year().month().day().hour().minute())
-                    }
-                    LabeledContent("Invitation status") {
-                        Label(availability.title, systemImage: availability.systemImage)
-                            .foregroundStyle(availability.color)
-                    }
-                } header: {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 10) {
                     Text("Share this link")
-                } footer: {
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 20)
+
+                    VStack(spacing: 0) {
+                        LabeledContent("Expires") {
+                            Text(invitation.expiresAt, format: .dateTime.year().month().day().hour().minute())
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+
+                        Divider()
+                            .padding(.leading, 16)
+
+                        LabeledContent("Invitation status") {
+                            Label(availability.title, systemImage: availability.systemImage)
+                                .foregroundStyle(availability.color)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        Color(uiColor: .secondarySystemGroupedBackground),
+                        in: .rect(cornerRadius: 24)
+                    )
+
                     Text(availability.canShare
                         ? String(localized: "Share this link with the person you want to add.")
                         : String(localized: "This invitation link is no longer available."))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 20)
                 }
 
-                Section {
+                VStack(spacing: 0) {
                     ShareLink(item: invitation.canonicalURL) {
                         Label("Share invitation link", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .buttonStyle(.plain)
                     .disabled(!availability.canShare)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 16)
+
+                    Divider()
+                        .padding(.leading, 16)
+
                     Button {
                         UIPasteboard.general.url = invitation.canonicalURL
                         copied = true
@@ -698,18 +729,31 @@ struct SharedPlanCreatedInvitationSheet: View {
                             copied ? "Invitation link copied" : "Copy invitation link",
                             systemImage: copied ? "checkmark" : "doc.on.doc"
                         )
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .buttonStyle(.plain)
                     .disabled(!availability.canShare)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 16)
                 }
-
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: .rect(cornerRadius: 24)
+                )
             }
-            .navigationTitle("Invitation link")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 20)
+        }
+        .scrollIndicators(.hidden)
+        .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
+        .navigationTitle("Invitation link")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") { dismiss() }
             }
+        }
     }
 }
 
