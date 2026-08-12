@@ -1416,59 +1416,57 @@ private struct SharedPlanCircleEditorScreen: View {
     @ViewBuilder
     private func presenceSection(_ content: SharedPlanCircleContent) -> some View {
         if model.canEdit || content.presence != .present {
-            SharedPlanCirclePanel(title: String(localized: "Plan")) {
-                switch content.presence {
-                case .present:
-                    if model.canEdit {
-                        Button(role: .destructive) {
-                            confirmsCircleRemoval = true
-                        } label: {
-                            SharedPlanActionRowLabel(
-                                title: "Remove circle from plan",
-                                tint: .red
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(model.isPerformingMutation)
-                        .confirmationDialog(
-                            "Remove this circle from the plan?",
-                            isPresented: $confirmsCircleRemoval,
-                            titleVisibility: .visible
-                        ) {
-                            Button("Remove circle", role: .destructive) {
-                                confirmsCircleRemoval = false
-                                Task {
-                                    await model.setCirclePresence(
-                                        .removed,
-                                        circle: circle,
-                                        using: store
-                                    )
-                                }
-                            }
-                            Button("Cancel", role: .cancel) {}
-                        } message: {
-                            Text("This circle will be removed from the plan. Its notes and purchases will remain available.")
-                        }
-                    }
-                case .removed:
-                    LucideLabel("Removed", icon: "minus")
-                        .foregroundStyle(.secondary)
-                    Button {
-                        Task {
-                            await model.setCirclePresence(.active, circle: circle, using: store)
-                        }
+            switch content.presence {
+            case .present:
+                if model.canEdit {
+                    Button(role: .destructive) {
+                        confirmsCircleRemoval = true
                     } label: {
-                        LucideLabel("Reactivate circle", icon: "rotate-cw")
+                        SharedPlanActionRowLabel(
+                            title: "Remove circle from plan",
+                            tint: .red
+                        )
                     }
+                    .buttonStyle(.plain)
                     .disabled(model.isPerformingMutation)
-                case .conflicted:
-                    LucideLabel("Needs review", icon: "triangle-alert")
-                        .foregroundStyle(.orange)
-                    if model.canEdit {
-                        Text("Choose whether this circle should stay in the plan.")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
+                    .confirmationDialog(
+                        "Remove this circle from the plan?",
+                        isPresented: $confirmsCircleRemoval,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Remove circle", role: .destructive) {
+                            confirmsCircleRemoval = false
+                            Task {
+                                await model.setCirclePresence(
+                                    .removed,
+                                    circle: circle,
+                                    using: store
+                                )
+                            }
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("This circle will be removed from the plan. Its notes and purchases will remain available.")
                     }
+                }
+            case .removed:
+                LucideLabel("Removed", icon: "minus")
+                    .foregroundStyle(.secondary)
+                Button {
+                    Task {
+                        await model.setCirclePresence(.active, circle: circle, using: store)
+                    }
+                } label: {
+                    LucideLabel("Reactivate circle", icon: "rotate-cw")
+                }
+                .disabled(model.isPerformingMutation)
+            case .conflicted:
+                LucideLabel("Needs review", icon: "triangle-alert")
+                    .foregroundStyle(.orange)
+                if model.canEdit {
+                    Text("Choose whether this circle should stay in the plan.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
                 }
             }
         }
