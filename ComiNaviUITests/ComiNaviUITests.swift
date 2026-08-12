@@ -178,12 +178,12 @@ final class ComiNaviUITests: XCTestCase {
                 .waitForExistence(timeout: 8)
         )
 
-        XCTAssertGreaterThanOrEqual(
+        XCTAssertEqual(
             app.staticTexts.matching(
                 NSPredicate(format: "label == %@", "うどん道場 · 青井")
             ).count,
-            5,
-            "Every compact purchase row must show the circle and pen name"
+            1,
+            "The circle and pen name should remain available in the navigation subtitle"
         )
         XCTAssertFalse(app.staticTexts["Day 1 · 東A12a"].exists)
         XCTAssertFalse(app.staticTexts["Active"].exists)

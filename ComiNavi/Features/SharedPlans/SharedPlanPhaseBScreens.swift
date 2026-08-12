@@ -1532,7 +1532,6 @@ private struct SharedPlanCircleEditorScreen: View {
                 ForEach(content.needs) { need in
                     SharedPlanNeedEditorRow(
                         need: need,
-                        circleDisplayName: identity.displayName,
                         currentUserID: currentUserID,
                         members: model.members,
                         hasConflict: model.conflicts.contains { conflict in
@@ -1747,7 +1746,6 @@ private struct SharedPlanPurchaseStageBar: View {
 
 private struct SharedPlanNeedEditorRow: View {
     let need: SharedPlanPurchaseNeed
-    let circleDisplayName: String
     let currentUserID: String?
     let members: [SharedPlanMember]
     let hasConflict: Bool
@@ -1773,11 +1771,6 @@ private struct SharedPlanNeedEditorRow: View {
                         .lineLimit(2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                Text(circleDisplayName)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
 
                 if let unitPrice = need.unitPrice {
                     Text(
@@ -1820,6 +1813,7 @@ private struct SharedPlanNeedEditorRow: View {
                 .padding(.vertical, 2)
             }
             .scrollIndicators(.hidden)
+            .scrollClipDisabled()
             .frame(maxWidth: .infinity, minHeight: avatarSize + 4, alignment: .leading)
 
             if canEdit {
@@ -2484,7 +2478,6 @@ struct SharedPlanPurchaseUITestSurface: View {
                     ForEach(needs) { need in
                         SharedPlanNeedEditorRow(
                             need: need,
-                            circleDisplayName: identity.displayName,
                             currentUserID: Self.requesterID,
                             members: members,
                             hasConflict: false,
