@@ -345,8 +345,7 @@ extension SharedPlanJSONValue {
             guard let member = members[key] else { return nil }
             let label = SharedPlanMemberPresentation.label(
                 member,
-                currentUserID: currentUserID,
-                includesRole: false
+                currentUserID: currentUserID
             )
             let displayValue = value.sharedPlanDisplayText(
                 members: members,
@@ -390,21 +389,11 @@ extension SharedPlanJSONValue {
 private enum SharedPlanMemberPresentation {
     static func label(
         _ member: SharedPlanMember,
-        currentUserID: String?,
-        includesRole: Bool = true
+        currentUserID: String?
     ) -> String {
-        var pieces = [member.displayName]
-        if member.userID == currentUserID { pieces.append(String(localized: "You")) }
-        if includesRole { pieces.append(role(member.role)) }
-        return pieces.joined(separator: " · ")
-    }
-
-    static func role(_ role: SharedPlanRole) -> String {
-        switch role {
-        case .owner: String(localized: "Owner")
-        case .editor: String(localized: "Editor")
-        case .viewer: String(localized: "Viewer")
-        }
+        member.userID == currentUserID
+            ? "\(member.displayName) (自分)"
+            : member.displayName
     }
 }
 
@@ -1972,9 +1961,17 @@ private struct SharedPlanNeedEditorRow: View {
         var id: String { userID }
 
         var accessibilityLabel: String {
-            let name = isCurrentUser
-                ? String(localized: "You")
-                : member?.displayName ?? String(localized: "Former member")
+            let name: String
+            if let member {
+                name = SharedPlanMemberPresentation.label(
+                    member,
+                    currentUserID: isCurrentUser ? userID : nil
+                )
+            } else if isCurrentUser {
+                name = String(localized: "自分")
+            } else {
+                name = String(localized: "Former member")
+            }
             switch (requestedQuantity, assignedQuantity) {
             case let (.some(requested), assigned) where assigned > 0:
                 return String(localized: "\(name), requested \(requested), assigned \(assigned)")
@@ -2044,7 +2041,7 @@ private struct SharedPlanCreateNeedSheet: View {
                         "Requester",
                         value: currentUserID == nil
                             ? String(localized: "Verified profile required")
-                            : String(localized: "You")
+                            : String(localized: "自分")
                     )
 
                     TextField(
@@ -2354,6 +2351,7 @@ private struct SharedPlanBuyerAllocationSheet: View {
                 currentUserID: currentUserID
             ))
         }
+        .padding(.vertical, 2)
     }
 
     private func save() {
