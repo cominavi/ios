@@ -537,7 +537,7 @@ final class ComiNaviUITests: XCTestCase {
     /// The stable prefix names only agent-created test data; no account or
     /// invitation capability is embedded in source. Devices without it skip.
     @MainActor
-    func testLiveSharedPlanRebootstrapReachesSynchronizedState() throws {
+    func testLiveSharedPlanRebootstrapStaysQuietAfterSuccess() throws {
         #if targetEnvironment(simulator)
             throw XCTSkip("The live Shared Plan acceptance runs only on a physical device")
         #else
@@ -574,15 +574,11 @@ final class ComiNaviUITests: XCTestCase {
                 confirm.tap()
             }
 
-            let syncStatus = app.descendants(matching: .any)[
-                "shared-plan-editor-sync-status"
-            ]
-            XCTAssertTrue(syncStatus.waitForExistence(timeout: 10))
-            expectation(
-                for: NSPredicate(format: "label CONTAINS[c] %@", "up to date"),
-                evaluatedWith: syncStatus
+            let editor = app.descendants(matching: .any)["shared-plan-editor"]
+            XCTAssertTrue(editor.waitForExistence(timeout: 10))
+            XCTAssertFalse(
+                app.descendants(matching: .any)["shared-plan-editor-sync-status"].exists
             )
-            waitForExpectations(timeout: 30)
             XCTAssertFalse(recovery.exists)
 
             // A framing regression can briefly clear recovery while reconnecting

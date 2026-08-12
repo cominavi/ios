@@ -136,16 +136,13 @@ struct SharedPlansScreen: View {
         .onChange(of: store.isLoaded) {
             reconcilePrimaryPlan()
         }
-        .alert(
-            "共有プランを更新できませんでした",
-            isPresented: Binding(
-                get: { store.issueMessage != nil },
-                set: { if !$0 { store.issueMessage = nil } }
+        .onChange(of: store.issueMessage) { _, message in
+            guard let message else { return }
+            AppToast.showError(
+                String(localized: "Shared Plan could not be updated"),
+                subtitle: message
             )
-        ) {
-            Button("OK") { store.issueMessage = nil }
-        } message: {
-            Text(store.issueMessage ?? "しばらくしてからもう一度お試しください。")
+            store.issueMessage = nil
         }
     }
 
@@ -1298,16 +1295,13 @@ private struct SharedPlanInformationScreen: View {
                 } message: { item in
                     Text(confirmationMessage(item))
                 }
-                .alert(
-                    "Shared Plan could not be updated",
-                    isPresented: Binding(
-                        get: { managementModel.actionIssue != nil },
-                        set: { if !$0 { managementModel.dismissActionIssue() } }
+                .onChange(of: managementModel.actionIssue) { _, message in
+                    guard let message else { return }
+                    AppToast.showError(
+                        String(localized: "Shared Plan could not be updated"),
+                        subtitle: message
                     )
-                ) {
-                    Button("OK") { managementModel.dismissActionIssue() }
-                } message: {
-                    Text(managementModel.actionIssue ?? String(localized: "Please try again."))
+                    managementModel.dismissActionIssue()
                 }
             } else {
                 FocusedActionSurface(

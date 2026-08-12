@@ -616,34 +616,6 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(model.readOnlyReason, .waitingForWritableSync)
     }
 
-    func testEditorStatusPresentationDistinguishesSyncAndPendingStates() {
-        let presentations = [
-            SharedPlanEditorStatusPresentation(status: .idle, pendingOperationCount: 0),
-            SharedPlanEditorStatusPresentation(status: .connecting, pendingOperationCount: 2),
-            SharedPlanEditorStatusPresentation(
-                status: .connected(mutationsEnabled: false, pendingOperationCount: 2),
-                pendingOperationCount: 2
-            ),
-            SharedPlanEditorStatusPresentation(
-                status: .synchronized(mutationsEnabled: true, pendingOperationCount: 0),
-                pendingOperationCount: 0
-            ),
-            SharedPlanEditorStatusPresentation(
-                status: .reconnecting("offline"),
-                pendingOperationCount: 2
-            ),
-            SharedPlanEditorStatusPresentation(
-                status: .quarantined(.membershipRevoked),
-                pendingOperationCount: 2
-            ),
-        ]
-
-        XCTAssertEqual(Set(presentations.map(\.title)).count, presentations.count)
-        XCTAssertEqual(presentations[3].tone, .success)
-        XCTAssertEqual(presentations[5].tone, .warning)
-        XCTAssertTrue(presentations[1].detail.contains("2"))
-    }
-
     func testEveryReadOnlyAuthorityHasDistinctActionablePresentation() {
         let reasons: [SharedPlanEditorReadOnlyReason] = [
             .featureDisabled,
@@ -762,7 +734,6 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         let otherNeed = UUID(uuidString: "77777777-7777-4777-8777-777777777777")!
         let identifiers = [
             SharedPlanEditorAccessibilityID.screen,
-            SharedPlanEditorAccessibilityID.syncStatus,
             SharedPlanEditorAccessibilityID.readOnly,
             SharedPlanEditorAccessibilityID.circle(Self.circle),
             SharedPlanEditorAccessibilityID.circle(otherCircle),

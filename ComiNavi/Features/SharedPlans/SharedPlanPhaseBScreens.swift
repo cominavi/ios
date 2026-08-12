@@ -2,7 +2,6 @@ import SwiftUI
 
 enum SharedPlanEditorAccessibilityID {
     static let screen = "shared-plan-editor"
-    static let syncStatus = "shared-plan-editor-sync-status"
     static let readOnly = "shared-plan-editor-read-only"
     static let recovery = "shared-plan-editor-recovery"
     static let recoveryRebase = "shared-plan-editor-recovery-rebase"
@@ -94,65 +93,6 @@ struct SharedPlanPurchaseProgressPresentation: Equatable, Sendable {
 
     var boughtFraction: Double {
         min(Double(bought) / Double(requested), 1)
-    }
-}
-
-struct SharedPlanEditorStatusPresentation: Equatable, Sendable {
-    enum Tone: Equatable, Sendable {
-        case neutral
-        case progress
-        case success
-        case warning
-    }
-
-    let title: String
-    let detail: String
-    let systemImage: String
-    let tone: Tone
-
-    init(status: SharedPlanSyncConnectionStatus, pendingOperationCount: Int) {
-        switch status {
-        case .idle:
-            title = String(localized: "Updates are paused")
-            detail = String(localized: "Open this screen to check for plan updates.")
-            systemImage = "circle"
-            tone = .neutral
-        case .connecting:
-            title = String(localized: "Connecting to Shared Plan")
-            detail = Self.pendingDetail(pendingOperationCount)
-            systemImage = "refresh-cw"
-            tone = .progress
-        case .connected(let mutationsEnabled, let pending):
-            title = mutationsEnabled
-                ? String(localized: "Shared Plan is connected")
-                : String(localized: "Connected in read-only mode")
-            detail = Self.pendingDetail(pending)
-            systemImage = "circle"
-            tone = mutationsEnabled ? .progress : .neutral
-        case .synchronized(let mutationsEnabled, let pending):
-            title = mutationsEnabled
-                ? String(localized: "Shared Plan is up to date")
-                : String(localized: "Shared Plan is up to date and read-only")
-            detail = Self.pendingDetail(pending)
-            systemImage = pending == 0 ? "circle-check-big" : "refresh-cw"
-            tone = pending == 0 ? .success : .progress
-        case .reconnecting:
-            title = String(localized: "Reconnecting to Shared Plan")
-            detail = Self.pendingDetail(pendingOperationCount)
-            systemImage = "refresh-cw"
-            tone = .warning
-        case .quarantined:
-            title = String(localized: "Updates are paused for review")
-            detail = String(localized: "Saved content remains until you choose a recovery action.")
-            systemImage = "triangle-alert"
-            tone = .warning
-        }
-    }
-
-    private static func pendingDetail(_ count: Int) -> String {
-        count == 0
-            ? String(localized: "No changes are waiting to send.")
-            : String(localized: "\(count) changes are waiting to send.")
     }
 }
 
@@ -454,7 +394,6 @@ struct SharedPlanEditorScreen: View {
             readOnlySection
             recoverySection
             memoRecoverySection
-            statusSection
         }
         .accessibilityIdentifier(SharedPlanEditorAccessibilityID.screen)
         .navigationTitle(model.plan?.name ?? String(localized: "Plan content"))
@@ -526,46 +465,20 @@ struct SharedPlanEditorScreen: View {
         } message: { _ in
             Text("Export the recovery data first if you may need it. Discarding cannot be undone.")
         }
-        .alert(
-            "Shared Plan could not be updated",
-            isPresented: Binding(
-                get: { model.issueMessage != nil },
-                set: { if !$0 { model.dismissIssue() } }
+        .onChange(of: model.issueMessage) { _, message in
+            guard let message else { return }
+            AppToast.showError(
+                String(localized: "Shared Plan could not be updated"),
+                subtitle: message
             )
-        ) {
-            Button("OK") { model.dismissIssue() }
-        } message: {
-            Text(model.issueMessage ?? String(localized: "Please try again."))
+            model.dismissIssue()
         }
-    }
-
-    private var statusSection: some View {
-        let presentation = SharedPlanEditorStatusPresentation(
-            status: model.syncStatus,
-            pendingOperationCount: model.pendingOperationCount
-        )
-        return Section("Updates") {
-            Label {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(presentation.title)
-                        .font(.headline)
-                    Text(presentation.detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } icon: {
-                LucideIcon(presentation.systemImage)
-                    .foregroundStyle(statusColor(presentation.tone))
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier(SharedPlanEditorAccessibilityID.syncStatus)
-
-            if case .reconnecting = model.syncStatus {
-                Button("Reconnect") {
-                    Task { await model.retrySync(using: store) }
-                }
-                .disabled(model.isStartingSync)
-            }
+        .onChange(of: model.syncStatus) { _, status in
+            guard case .reconnecting(let message) = status else { return }
+            AppToast.showError(
+                String(localized: "Shared Plan could not be updated"),
+                subtitle: message
+            )
         }
     }
 
@@ -854,14 +767,6 @@ struct SharedPlanEditorScreen: View {
         }.count
     }
 
-    private func statusColor(_ tone: SharedPlanEditorStatusPresentation.Tone) -> Color {
-        switch tone {
-        case .neutral: .secondary
-        case .progress: .accentColor
-        case .success: .green
-        case .warning: .orange
-        }
-    }
 }
 
 struct SharedPlanEmptyCirclesView: View {
