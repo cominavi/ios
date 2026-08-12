@@ -254,7 +254,7 @@ struct CircleDetailView: View {
         if AppData.profileStore.isIdentityVerified,
            AppData.profileStore.profile?.id != nil
         {
-            CircleDetailSection("Shared Plans") {
+            CircleDetailSection("Shared Plans", contentInsets: EdgeInsets()) {
                 Button {
                     isShowingSharedPlanRequest = true
                 } label: {
