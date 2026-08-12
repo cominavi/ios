@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-private enum SharedPlanManagementSheet: Identifiable {
+enum SharedPlanManagementSheet: Identifiable {
     case createInvitation
     case createdInvitation(SharedPlanCreatedInvitation)
 
@@ -17,13 +17,11 @@ private enum SharedPlanManagementSheet: Identifiable {
 struct SharedPlanManagementScreen: View {
     private enum Confirmation: Identifiable {
         case administrative(SharedPlanAdministrativeAction)
-        case discardProtectedInvitation(UUID)
         case discardQuarantinedWrite(UUID)
 
         var id: String {
             switch self {
             case .administrative(let action): action.id
-            case .discardProtectedInvitation(let id): "discard-protected:\(id)"
             case .discardQuarantinedWrite(let id): "discard-quarantine:\(id)"
             }
         }
@@ -53,7 +51,6 @@ struct SharedPlanManagementScreen: View {
             }
 
             pendingAndRecoverySections
-            protectedInvitationsSection
             membersSection
             invitationsSection
         }
@@ -85,8 +82,7 @@ struct SharedPlanManagementScreen: View {
             case .createdInvitation(let invitation):
                 SharedPlanCreatedInvitationSheet(
                     invitation: invitation,
-                    model: model,
-                    store: store
+                    model: model
                 )
             }
         }
@@ -163,35 +159,6 @@ struct SharedPlanManagementScreen: View {
         }
     }
 
-    @ViewBuilder
-    private var protectedInvitationsSection: some View {
-        if !model.protectedInvitations.isEmpty {
-            Section {
-                ForEach(model.protectedInvitations) { invitation in
-                    TimelineView(.periodic(from: .now, by: 30)) { context in
-                        SharedPlanProtectedInvitationRow(
-                            invitation: invitation,
-                            availability: model.protectedInvitationAvailability(
-                                for: invitation,
-                                now: context.date
-                            ),
-                            onOpen: { presentedSheet = .createdInvitation(invitation) },
-                            onDiscard: {
-                                confirmation = .discardProtectedInvitation(
-                                    invitation.requestID
-                                )
-                            }
-                        )
-                    }
-                }
-            } header: {
-                Text("One-time invitation links")
-            } footer: {
-                Text("Invitation tokens are protected on this device. Discard each one after sharing it.")
-            }
-        }
-    }
-
     private var membersSection: some View {
         Section {
             if model.members.isEmpty, model.memberIssue == nil, model.isRefreshing {
@@ -237,16 +204,16 @@ struct SharedPlanManagementScreen: View {
 
     private var invitationsSection: some View {
         Section {
-            if model.invitations.isEmpty, model.invitationIssue == nil, model.isRefreshing {
+            if model.visibleInvitations.isEmpty, model.invitationIssue == nil, model.isRefreshing {
                 SharedPlanLoadingRow(label: "Loading invitations")
-            } else if model.invitations.isEmpty {
+            } else if model.visibleInvitations.isEmpty {
                 ContentUnavailableView(
-                    "No invitations",
+                    "No active invitation links",
                     systemImage: "link",
-                    description: Text(model.invitationIssue ?? String(localized: "No invitations have been created for this plan."))
+                    description: Text(model.invitationIssue ?? String(localized: "Create a link to add someone to this plan."))
                 )
             } else {
-                ForEach(model.invitations) { invitation in
+                ForEach(model.visibleInvitations) { invitation in
                     SharedPlanInvitationRow(
                         invitation: invitation,
                         canManage: model.permitsInvitationRevocation(
@@ -268,7 +235,7 @@ struct SharedPlanManagementScreen: View {
                 }
             }
 
-            if let issue = model.invitationIssue, !model.invitations.isEmpty {
+            if let issue = model.invitationIssue, !model.visibleInvitations.isEmpty {
                 SharedPlanInlineIssue(message: issue) {
                     Task { await model.refresh(using: store) }
                 }
@@ -276,7 +243,7 @@ struct SharedPlanManagementScreen: View {
         } header: {
             Text("Invitations")
         } footer: {
-            Text("Invite links stop working when they expire, are revoked, or the plan is archived.")
+            Text("Invite links stop working when they expire or the plan is archived.")
         }
     }
 
@@ -291,17 +258,6 @@ struct SharedPlanManagementScreen: View {
                 Text(action.confirmationButtonTitle)
             }
             Button("Cancel", role: .cancel) { confirmation = nil }
-        case .discardProtectedInvitation(let requestID):
-            Button("Discard invitation token", role: .destructive) {
-                confirmation = nil
-                Task {
-                    _ = await model.discardProtectedInvitation(
-                        requestID: requestID,
-                        using: store
-                    )
-                }
-            }
-            Button("Cancel", role: .cancel) { confirmation = nil }
         case .discardQuarantinedWrite(let id):
             Button("Discard saved change", role: .destructive) {
                 confirmation = nil
@@ -314,8 +270,6 @@ struct SharedPlanManagementScreen: View {
     private func confirmationMessage(_ item: Confirmation) -> String {
         switch item {
         case .administrative(let action): action.confirmationMessage
-        case .discardProtectedInvitation:
-            String(localized: "The invitation token cannot be displayed again after it is discarded.")
         case .discardQuarantinedWrite:
             String(localized: "The saved intent will be removed from this device and cannot be recovered.")
         }
@@ -429,7 +383,7 @@ struct SharedPlanReadOnlyNotice: View {
     }
 }
 
-private struct SharedPlanMemberRow: View {
+struct SharedPlanMemberRow: View {
     let member: SharedPlanMember
     let canManage: Bool
     let onAction: (SharedPlanAdministrativeAction) -> Void
@@ -489,7 +443,7 @@ private struct SharedPlanMemberRow: View {
     }
 }
 
-private struct SharedPlanInvitationRow: View {
+struct SharedPlanInvitationRow: View {
     let invitation: SharedPlanInvitation
     let canManage: Bool
     let onRevoke: () -> Void
@@ -514,7 +468,7 @@ private struct SharedPlanInvitationRow: View {
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("Revoke invitation")
+                .accessibilityLabel("Revoke invitation...")
             }
         }
         .padding(.vertical, 2)
@@ -556,40 +510,6 @@ private struct SharedPlanInvitationRow: View {
     }
 }
 
-private struct SharedPlanProtectedInvitationRow: View {
-    let invitation: SharedPlanCreatedInvitation
-    let availability: SharedPlanProtectedInvitationAvailability
-    let onOpen: () -> Void
-    let onDiscard: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button(action: onOpen) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Protected invitation link")
-                            .font(.body.weight(.medium))
-                        Label(availability.title, systemImage: availability.systemImage)
-                            .font(.caption)
-                            .foregroundStyle(availability.color)
-                        Text(invitation.expiresAt, format: .dateTime.year().month().day().hour().minute())
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
-            }
-            .buttonStyle(.plain)
-            Button("Discard token", role: .destructive, action: onDiscard)
-                .buttonStyle(.borderless)
-        }
-    }
-}
-
 private struct SharedPlanAdministrativeWriteRow: View {
     let write: SharedPlanRESTWrite
     let issue: String?
@@ -614,7 +534,7 @@ private struct SharedPlanAdministrativeWriteRow: View {
     }
 }
 
-private struct SharedPlanInlineIssue: View {
+struct SharedPlanInlineIssue: View {
     let message: String
     let retry: () -> Void
 
@@ -630,7 +550,7 @@ private struct SharedPlanInlineIssue: View {
     }
 }
 
-private struct SharedPlanLoadingRow: View {
+struct SharedPlanLoadingRow: View {
     let label: LocalizedStringResource
 
     var body: some View {
@@ -642,7 +562,7 @@ private struct SharedPlanLoadingRow: View {
     }
 }
 
-private struct SharedPlanLoadMoreRow: View {
+struct SharedPlanLoadMoreRow: View {
     let label: LocalizedStringResource
     let isLoading: Bool
     let action: () -> Void
@@ -659,7 +579,7 @@ private struct SharedPlanLoadMoreRow: View {
     }
 }
 
-private struct SharedPlanCreateInvitationSheet: View {
+struct SharedPlanCreateInvitationSheet: View {
     let model: SharedPlanManagementModel
     let store: SharedPlanStore
     @Binding var presentedSheet: SharedPlanManagementSheet?
@@ -726,13 +646,11 @@ private struct SharedPlanCreateInvitationSheet: View {
     }
 }
 
-private struct SharedPlanCreatedInvitationSheet: View {
+struct SharedPlanCreatedInvitationSheet: View {
     @Environment(\.dismiss) private var dismiss
     let invitation: SharedPlanCreatedInvitation
     let model: SharedPlanManagementModel
-    let store: SharedPlanStore
     @State private var copied = false
-    @State private var confirmsDiscard = false
     @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
@@ -751,12 +669,6 @@ private struct SharedPlanCreatedInvitationSheet: View {
     ) -> some View {
             Form {
                 Section {
-                    LabeledContent("Invitation code") {
-                        Text(invitation.token)
-                            .font(.body.monospaced())
-                            .textSelection(.enabled)
-                            .privacySensitive()
-                    }
                     LabeledContent("Expires") {
                         Text(invitation.expiresAt, format: .dateTime.year().month().day().hour().minute())
                     }
@@ -765,11 +677,11 @@ private struct SharedPlanCreatedInvitationSheet: View {
                             .foregroundStyle(availability.color)
                     }
                 } header: {
-                    Text("Save this invitation now")
+                    Text("Share this link")
                 } footer: {
                     Text(availability.canShare
-                        ? String(localized: "For security, the server returns this token only once. ComiNavi keeps it protected on this device until you discard it.")
-                        : String(localized: "This protected token is retained only for review or discard and can no longer be shared."))
+                        ? String(localized: "Share this link with the person you want to add.")
+                        : String(localized: "This invitation link is no longer available."))
                 }
 
                 Section {
@@ -790,11 +702,6 @@ private struct SharedPlanCreatedInvitationSheet: View {
                     .disabled(!availability.canShare)
                 }
 
-                Section {
-                    Button("Discard invitation token", role: .destructive) {
-                        confirmsDiscard = true
-                    }
-                }
             }
             .navigationTitle("Invitation link")
             .navigationBarTitleDisplayMode(.inline)
@@ -802,25 +709,6 @@ private struct SharedPlanCreatedInvitationSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
-            }
-            .confirmationDialog(
-                "Discard this invitation token?",
-                isPresented: $confirmsDiscard,
-                titleVisibility: .visible
-            ) {
-                Button("Discard token", role: .destructive) {
-                    Task {
-                        if await model.discardProtectedInvitation(
-                            requestID: invitation.requestID,
-                            using: store
-                        ) {
-                            dismiss()
-                        }
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("The invitation itself remains listed, but this device can never display its token again.")
             }
     }
 }
@@ -1006,8 +894,17 @@ private struct SharedPlanNotificationRow: View {
     }
 }
 
-private extension SharedPlanAdministrativeAction {
+extension SharedPlanAdministrativeAction {
     var menuTitle: LocalizedStringResource {
+        switch self {
+        case .revokeMember: "Remove member..."
+        case .reinstateMember: "Reinstate member..."
+        case .transferOwnership: "Transfer ownership..."
+        case .revokeInvitation: "Revoke invitation..."
+        }
+    }
+
+    var confirmationButtonTitle: LocalizedStringResource {
         switch self {
         case .revokeMember: "Remove member"
         case .reinstateMember: "Reinstate member"
@@ -1015,8 +912,6 @@ private extension SharedPlanAdministrativeAction {
         case .revokeInvitation: "Revoke invitation"
         }
     }
-
-    var confirmationButtonTitle: LocalizedStringResource { menuTitle }
 
     var confirmationMessage: String {
         switch self {

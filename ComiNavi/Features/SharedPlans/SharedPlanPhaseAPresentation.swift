@@ -165,6 +165,10 @@ final class SharedPlanManagementModel {
             && plan?.lifecycle == .active
     }
 
+    var visibleInvitations: [SharedPlanInvitation] {
+        invitations.filter { $0.revokedAt == nil }
+    }
+
     var permitsQuarantineRetry: Bool {
         !quarantinedWrites.isEmpty && quarantinedWrites.allSatisfy(permits)
     }
