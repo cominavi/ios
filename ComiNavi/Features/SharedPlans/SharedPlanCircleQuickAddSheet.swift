@@ -117,6 +117,11 @@ struct SharedPlanCircleQuickAddSheet: View {
                 .textInputAutocapitalization(.sentences)
                 .accessibilityIdentifier("circle-shared-plan-request-item-name")
 
+                SharedPlanPurchaseItemPresetRow { selectedItemName in
+                    itemName = selectedItemName
+                    focusedField = .itemName
+                }
+
                 Stepper("Quantity: \(wantedQuantity)", value: $wantedQuantity, in: 1...999)
                     .accessibilityIdentifier("circle-shared-plan-request-quantity")
 

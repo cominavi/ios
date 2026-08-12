@@ -87,6 +87,20 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         ])
     }
 
+    func testPurchaseItemPresetsCoverCommonComiketMerchandise() {
+        XCTAssertEqual(
+            SharedPlanPurchaseItemPreset.allCases.map(\.rawValue),
+            [
+                "newReleaseSet",
+                "newReleaseOnly",
+                "acrylicKeychain",
+                "acrylicStand",
+                "stickerSet",
+            ]
+        )
+        XCTAssertTrue(SharedPlanPurchaseItemPreset.allCases.allSatisfy { !$0.itemName.isEmpty })
+    }
+
     func testPurchaseProgressUpdateRoutesRequestedAndBoughtTogether() async {
         let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()

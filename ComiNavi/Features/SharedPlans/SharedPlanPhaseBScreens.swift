@@ -2092,6 +2092,11 @@ private struct SharedPlanCreateNeedSheet: View {
                     .textInputAutocapitalization(.sentences)
                     .accessibilityIdentifier("shared-plan-need-item-name")
 
+                    SharedPlanPurchaseItemPresetRow { selectedItemName in
+                        itemName = selectedItemName
+                        focusedField = .itemName
+                    }
+
                     SharedPlanQuantityControl(
                         title: String(localized: "Requested"),
                         quantity: $wantedQuantity,
