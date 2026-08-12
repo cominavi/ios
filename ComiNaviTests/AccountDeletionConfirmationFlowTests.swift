@@ -2,7 +2,7 @@
 import XCTest
 
 final class AccountDeletionConfirmationFlowTests: XCTestCase {
-    func testFirstCountdownAdvancesToConsequencesWithoutAllowingDeletion() {
+    func testFirstCountdownUnlocksNextWithoutAdvancing() {
         var flow = AccountDeletionConfirmationFlow()
 
         XCTAssertEqual(flow.step, .accountSeparation)
@@ -10,44 +10,65 @@ final class AccountDeletionConfirmationFlowTests: XCTestCase {
             flow.secondsRemaining,
             AccountDeletionConfirmationFlow.countdownDuration
         )
-        XCTAssertFalse(flow.isFinalConfirmationAvailable)
+        XCTAssertFalse(flow.canContinue)
+        XCTAssertFalse(flow.canDelete)
 
         for _ in 1 ..< AccountDeletionConfirmationFlow.countdownDuration {
-            XCTAssertNil(flow.tick())
+            flow.tick()
             XCTAssertEqual(flow.step, .accountSeparation)
-            XCTAssertFalse(flow.isFinalConfirmationAvailable)
+            XCTAssertFalse(flow.canContinue)
         }
 
-        XCTAssertEqual(flow.tick(), .showConsequences)
+        flow.tick()
+
+        XCTAssertEqual(flow.step, .accountSeparation)
+        XCTAssertEqual(flow.secondsRemaining, 0)
+        XCTAssertTrue(flow.canContinue)
+        XCTAssertFalse(flow.canDelete)
+    }
+
+    func testNextRequiresFirstCountdownAndStartsSecondCountdown() {
+        var flow = AccountDeletionConfirmationFlow()
+
+        XCTAssertFalse(flow.continueToConsequences())
+        advanceCountdown(&flow)
+        XCTAssertTrue(flow.continueToConsequences())
+
         XCTAssertEqual(flow.step, .consequences)
         XCTAssertEqual(
             flow.secondsRemaining,
             AccountDeletionConfirmationFlow.countdownDuration
         )
-        XCTAssertFalse(flow.isFinalConfirmationAvailable)
+        XCTAssertFalse(flow.canContinue)
+        XCTAssertFalse(flow.canDelete)
     }
 
-    func testSecondCountdownMakesOnlySystemConfirmationAvailable() {
+    func testSecondCountdownUnlocksDeleteWithoutOpeningConfirmation() {
         var flow = AccountDeletionConfirmationFlow()
         advanceCountdown(&flow)
+        XCTAssertTrue(flow.continueToConsequences())
 
         for _ in 1 ..< AccountDeletionConfirmationFlow.countdownDuration {
-            XCTAssertNil(flow.tick())
-            XCTAssertFalse(flow.isFinalConfirmationAvailable)
+            flow.tick()
+            XCTAssertEqual(flow.step, .consequences)
+            XCTAssertFalse(flow.canDelete)
         }
 
-        XCTAssertEqual(flow.tick(), .showSystemConfirmation)
+        flow.tick()
+
         XCTAssertEqual(flow.step, .consequences)
         XCTAssertEqual(flow.secondsRemaining, 0)
-        XCTAssertTrue(flow.isFinalConfirmationAvailable)
-        XCTAssertNil(flow.tick())
+        XCTAssertTrue(flow.canDelete)
+        flow.tick()
+        XCTAssertEqual(flow.secondsRemaining, 0)
     }
 
     func testReturningToExplanationRestartsBothSafetyGates() {
         var flow = AccountDeletionConfirmationFlow()
         advanceCountdown(&flow)
+        XCTAssertTrue(flow.continueToConsequences())
         advanceCountdown(&flow)
-        XCTAssertTrue(flow.isFinalConfirmationAvailable)
+        XCTAssertTrue(flow.canDelete)
 
         flow.returnToAccountSeparation()
 
@@ -56,12 +77,13 @@ final class AccountDeletionConfirmationFlowTests: XCTestCase {
             flow.secondsRemaining,
             AccountDeletionConfirmationFlow.countdownDuration
         )
-        XCTAssertFalse(flow.isFinalConfirmationAvailable)
+        XCTAssertFalse(flow.canContinue)
+        XCTAssertFalse(flow.canDelete)
     }
 
     private func advanceCountdown(_ flow: inout AccountDeletionConfirmationFlow) {
         for _ in 0 ..< AccountDeletionConfirmationFlow.countdownDuration {
-            _ = flow.tick()
+            flow.tick()
         }
     }
 }

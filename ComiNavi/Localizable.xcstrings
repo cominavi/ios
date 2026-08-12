@@ -8812,30 +8812,58 @@
         }
       }
     },
-    "Consequences shown in %lld seconds" : {
+    "Delete" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "あと%lld秒で削除内容を表示します"
+            "value" : "削除"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld초 후 삭제 결과를 표시합니다"
+            "value" : "삭제"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld秒后显示删除后果"
+            "value" : "删除"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld秒後顯示刪除後果"
+            "value" : "刪除"
+          }
+        }
+      }
+    },
+    "Delete available in %lld seconds" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あと%lld秒で「削除」を選べます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld초 후 삭제할 수 있습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld秒后可选择“删除”"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld秒後可選擇「刪除」"
           }
         }
       }
@@ -8952,142 +8980,170 @@
         }
       }
     },
-    "Final confirmation is ready." : {
+    "Next" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最終確認の準備ができました。"
+            "value" : "次へ"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "최종 확인을 진행할 수 있습니다."
+            "value" : "다음"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可以进行最终确认了"
+            "value" : "下一步"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可以進行最終確認了"
+            "value" : "下一步"
           }
         }
       }
     },
-    "Opens the system confirmation. Your Circle.ms account will not be deleted." : {
+    "Next available in %lld seconds" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "システムの最終確認を表示します。Circle.msアカウントは削除されません。"
+            "value" : "あと%lld秒で「次へ」を選べます"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "시스템 최종 확인을 엽니다. Circle.ms 계정은 삭제되지 않습니다."
+            "value" : "%lld초 후 다음으로 진행할 수 있습니다"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开系统最终确认。你的Circle.ms账户不会被删除"
+            "value" : "%lld秒后可选择“下一步”"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "開啟系統最終確認。你的Circle.ms帳號不會被刪除"
+            "value" : "%lld秒後可選擇「下一步」"
           }
         }
       }
     },
-    "Reviewing account separation…" : {
+    "Read this before continuing" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "アカウントの違いを確認しています…"
+            "value" : "続ける前にお読みください"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "계정 구분을 확인하는 중…"
+            "value" : "계속하기 전에 읽어 주세요"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在确认账户区别…"
+            "value" : "请先阅读以下内容"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在確認帳號區別…"
+            "value" : "請先閱讀以下內容"
           }
         }
       }
     },
-    "Reviewing deletion consequences…" : {
+    "Ready to continue" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "削除による影響を確認しています…"
+            "value" : "次へ進めます"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "삭제 결과를 확인하는 중…"
+            "value" : "다음으로 진행할 수 있습니다"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在确认删除后果…"
+            "value" : "可以进入下一步"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在確認刪除後果…"
+            "value" : "可以進入下一步"
           }
         }
       }
     },
-    "Show final confirmation" : {
+    "Ready to delete" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "最終確認を表示"
+            "value" : "削除できます"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "최종 확인 표시"
+            "value" : "삭제할 수 있습니다"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "显示最终确认"
+            "value" : "可以删除"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "顯示最終確認"
+            "value" : "可以刪除"
+          }
+        }
+      }
+    },
+    "Review the consequences" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除による影響を確認してください"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제 결과를 확인해 주세요"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请确认删除后的影响"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請確認刪除後的影響"
           }
         }
       }
@@ -9148,30 +9204,30 @@
         }
       }
     },
-    "System confirmation shown in %lld seconds" : {
+    "Yes, Delete" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "あと%lld秒でシステムの確認画面を表示します"
+            "value" : "はい、削除します"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld초 후 시스템 확인을 표시합니다"
+            "value" : "예, 삭제합니다"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld秒后显示系统确认"
+            "value" : "确认删除"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld秒後顯示系統確認"
+            "value" : "確認刪除"
           }
         }
       }

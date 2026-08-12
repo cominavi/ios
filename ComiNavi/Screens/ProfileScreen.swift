@@ -630,38 +630,36 @@ enum AccountDeletionConfirmationStep: Equatable {
     case consequences
 }
 
-enum AccountDeletionConfirmationEvent: Equatable {
-    case showConsequences
-    case showSystemConfirmation
-}
-
 struct AccountDeletionConfirmationFlow: Equatable {
-    static let countdownDuration = 5
+    static let countdownDuration = 10
 
     private(set) var step = AccountDeletionConfirmationStep.accountSeparation
     private(set) var secondsRemaining = Self.countdownDuration
-    private(set) var isFinalConfirmationAvailable = false
 
-    mutating func tick() -> AccountDeletionConfirmationEvent? {
-        guard secondsRemaining > 0 else { return nil }
+    var canContinue: Bool {
+        step == .accountSeparation && secondsRemaining == 0
+    }
+
+    var canDelete: Bool {
+        step == .consequences && secondsRemaining == 0
+    }
+
+    mutating func tick() {
+        guard secondsRemaining > 0 else { return }
         secondsRemaining -= 1
-        guard secondsRemaining == 0 else { return nil }
+    }
 
-        switch step {
-        case .accountSeparation:
-            step = .consequences
-            secondsRemaining = Self.countdownDuration
-            return .showConsequences
-        case .consequences:
-            isFinalConfirmationAvailable = true
-            return .showSystemConfirmation
-        }
+    @discardableResult
+    mutating func continueToConsequences() -> Bool {
+        guard canContinue else { return false }
+        step = .consequences
+        secondsRemaining = Self.countdownDuration
+        return true
     }
 
     mutating func returnToAccountSeparation() {
         step = .accountSeparation
         secondsRemaining = Self.countdownDuration
-        isFinalConfirmationAvailable = false
     }
 }
 
@@ -704,7 +702,7 @@ private struct AccountDeletionConfirmationView: View {
             await runCountdown(for: flow.step)
         }
         .alert("Delete only your ComiNavi account?", isPresented: $isShowingFinalConfirmation) {
-            Button("Delete ComiNavi account", role: .destructive) {
+            Button("Yes, Delete", role: .destructive) {
                 onDelete()
                 dismiss()
             }
@@ -757,20 +755,33 @@ private struct AccountDeletionConfirmationView: View {
             .padding(.top, 28)
 
             countdownStatus(
-                title: "Reviewing account separation…",
-                countdown: "Consequences shown in \(flow.secondsRemaining) seconds"
+                title: flow.canContinue
+                    ? "Ready to continue"
+                    : "Read this before continuing",
+                countdown: "Next available in \(flow.secondsRemaining) seconds"
             )
             .padding(.top, 28)
 
-            FocusedActionButton(
-                role: .cancel,
-                emphasis: .secondary,
-                tint: .secondary,
-                action: dismiss.callAsFunction
-            ) {
-                Text("Cancel")
+            VStack(spacing: 12) {
+                FocusedActionButton(
+                    tint: .accentColor,
+                    action: continueToConsequences
+                ) {
+                    Label("Next", systemImage: "arrow.right")
+                }
+                .disabled(!flow.canContinue)
+                .accessibilityIdentifier("profile-account-deletion-next")
+
+                FocusedActionButton(
+                    role: .cancel,
+                    emphasis: .secondary,
+                    tint: .secondary,
+                    action: dismiss.callAsFunction
+                ) {
+                    Text("Cancel")
+                }
+                .accessibilityIdentifier("profile-cancel-delete-account")
             }
-            .accessibilityIdentifier("profile-cancel-delete-account")
             .padding(.top, 28)
         }
         .accessibilityIdentifier("profile-account-deletion-separation")
@@ -805,27 +816,26 @@ private struct AccountDeletionConfirmationView: View {
             .padding(.top, 22)
 
             countdownStatus(
-                title: flow.isFinalConfirmationAvailable
-                    ? "Final confirmation is ready."
-                    : "Reviewing deletion consequences…",
-                countdown: "System confirmation shown in \(flow.secondsRemaining) seconds"
+                title: flow.canDelete
+                    ? "Ready to delete"
+                    : "Review the consequences",
+                countdown: "Delete available in \(flow.secondsRemaining) seconds"
             )
             .padding(.top, 28)
 
             VStack(spacing: 12) {
-                if flow.isFinalConfirmationAvailable {
-                    FocusedActionButton(
-                        role: .destructive,
-                        tint: .red,
-                        action: {
-                            isShowingFinalConfirmation = true
-                        }
-                    ) {
-                        Label("Show final confirmation", systemImage: "exclamationmark.triangle")
+                FocusedActionButton(
+                    role: .destructive,
+                    tint: .red,
+                    action: {
+                        guard flow.canDelete else { return }
+                        isShowingFinalConfirmation = true
                     }
-                    .accessibilityIdentifier("profile-show-final-account-deletion-confirmation")
-                    .accessibilityHint("Opens the system confirmation. Your Circle.ms account will not be deleted.")
+                ) {
+                    Label("Delete", systemImage: "trash")
                 }
+                .disabled(!flow.canDelete)
+                .accessibilityIdentifier("profile-delete-account")
 
                 FocusedActionButton(
                     role: .cancel,
@@ -877,14 +887,15 @@ private struct AccountDeletionConfirmationView: View {
             }
 
             guard !Task.isCancelled else { return }
-            guard flow.step == expectedStep, let event = flow.tick() else { continue }
-            switch event {
-            case .showConsequences:
-                break
-            case .showSystemConfirmation:
-                isShowingFinalConfirmation = true
-            }
-            return
+            guard flow.step == expectedStep else { return }
+            flow.tick()
+        }
+    }
+
+    private func continueToConsequences() {
+        guard flow.canContinue else { return }
+        withAnimation(.snappy) {
+            _ = flow.continueToConsequences()
         }
     }
 

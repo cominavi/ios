@@ -468,6 +468,49 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    func testAccountDeletionActionsUseUserIntentCopy() throws {
+        let data = try Data(contentsOf: sourceCatalogURL)
+        let root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let strings = try XCTUnwrap(root["strings"] as? [String: Any])
+        let expectedCopy = [
+            "Next": [
+                "ja": "次へ",
+                "ko": "다음",
+                "zh-Hans": "下一步",
+                "zh-Hant": "下一步",
+            ],
+            "Delete": [
+                "ja": "削除",
+                "ko": "삭제",
+                "zh-Hans": "删除",
+                "zh-Hant": "刪除",
+            ],
+            "Yes, Delete": [
+                "ja": "はい、削除します",
+                "ko": "예, 삭제합니다",
+                "zh-Hans": "确认删除",
+                "zh-Hant": "確認刪除",
+            ],
+        ]
+
+        for (key, translations) in expectedCopy {
+            let entry = try XCTUnwrap(strings[key] as? [String: Any])
+            let localizations = try XCTUnwrap(entry["localizations"] as? [String: Any])
+            for language in supportedLanguages {
+                let localization = try XCTUnwrap(
+                    localizations[language] as? [String: Any]
+                )
+                let unit = try XCTUnwrap(localization["stringUnit"] as? [String: Any])
+                XCTAssertEqual(unit["value"] as? String, translations[language])
+            }
+        }
+
+        XCTAssertNil(strings["Show final confirmation"])
+        XCTAssertNil(strings["System confirmation shown in %lld seconds"])
+    }
+
     private let supportedLanguages = ["ja", "zh-Hans", "zh-Hant", "ko"]
 
     private func localizedBundle(for language: String) throws -> Bundle {
