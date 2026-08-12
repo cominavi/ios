@@ -723,7 +723,6 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         catalog: CominaviCatalog
     ) throws {
         guard response.value(forHTTPHeaderField: "Content-Type") == catalog.artifact.contentType,
-              response.value(forHTTPHeaderField: "Accept-Ranges")?.lowercased() == "bytes",
               response.value(forHTTPHeaderField: "X-Content-Type-Options")?.lowercased()
                 == "nosniff",
               response.value(forHTTPHeaderField: "Digest") == Self.digestHeader(

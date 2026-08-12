@@ -189,6 +189,35 @@ final class CominaviCatalogTests: XCTestCase {
         )
     }
 
+    func testRangeDownloadAcceptsResponseWithoutAdvisoryAcceptRangesHeader() async throws {
+        let root = try temporaryDirectory(named: "range-proxy-headers")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fixture = try makeCatalogDatabase(in: root, versionID: "c108-proxy-v1")
+        let transport = CatalogTransportStub(
+            artifact: try Data(contentsOf: fixture.databaseURL),
+            catalog: fixture.catalog,
+            omitsAcceptRanges: true
+        )
+        let installer = CominaviCatalogInstaller(
+            authorizer: CatalogAuthorizerStub(),
+            transport: transport,
+            rootDirectory: root.appendingPathComponent("installed"),
+            chunkBytes: 64 * 1_024,
+            retryDelay: .zero
+        )
+
+        let installed = try await installer.install(
+            fixture.catalog,
+            publicUserID: "account-a",
+            progress: nil
+        )
+
+        XCTAssertTrue(installed.isCurrentVersion)
+        XCTAssertNoThrow(
+            try CirclemsDataSource.validateDatabase(at: installed.url, type: .main)
+        )
+    }
+
     func testCancellationPreservesCheckpointAndRelaunchContinuesAtDurableRangeBoundary() async throws {
         let root = try temporaryDirectory(named: "cancel-relaunch")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -894,6 +923,7 @@ private actor CatalogTransportStub: CominaviCatalogDownloadTransporting {
     private let artifact: Data
     private let catalog: CominaviCatalog
     private let omitsContentLength: Bool
+    private let omitsAcceptRanges: Bool
     private var steps: [Step]
     private var recordedRequests: [URLRequest] = []
     private var headRequests = 0
@@ -902,12 +932,14 @@ private actor CatalogTransportStub: CominaviCatalogDownloadTransporting {
         artifact: Data,
         catalog: CominaviCatalog,
         steps: [Step] = [],
-        omitsContentLength: Bool = false
+        omitsContentLength: Bool = false,
+        omitsAcceptRanges: Bool = false
     ) {
         self.artifact = artifact
         self.catalog = catalog
         self.steps = steps
         self.omitsContentLength = omitsContentLength
+        self.omitsAcceptRanges = omitsAcceptRanges
     }
 
     func download(for request: URLRequest) async throws -> (URL, HTTPURLResponse) {
@@ -970,7 +1002,6 @@ private actor CatalogTransportStub: CominaviCatalogDownloadTransporting {
         bodyBytes: Int
     ) -> HTTPURLResponse {
         var headers: [String: String] = [
-            "Accept-Ranges": "bytes",
             "Content-Type": catalog.artifact.contentType,
             "Digest": digestHeader(catalog.artifact.sha256),
             "ETag": catalog.expectedETag,
@@ -978,6 +1009,9 @@ private actor CatalogTransportStub: CominaviCatalogDownloadTransporting {
         ]
         if !omitsContentLength {
             headers["Content-Length"] = String(bodyBytes)
+        }
+        if !omitsAcceptRanges {
+            headers["Accept-Ranges"] = "bytes"
         }
         if status == 206, let range {
             headers["Content-Range"] = "bytes \(range.0)-\(min(range.1, artifact.count - 1))/\(artifact.count)"
