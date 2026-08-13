@@ -165,5 +165,5 @@ Xcode Cloud installs the pinned CLI version automatically. Configure
 archive fails with an actionable build error if the CLI is missing,
 unauthenticated, or cannot finish processing the debug symbols.
 
-Build `1.0 (2026081303)` is the current prepared TestFlight build. Increase
+Build `1.0 (2026081304)` is the current prepared TestFlight build. Increase
 `CURRENT_PROJECT_VERSION` for every subsequent upload.

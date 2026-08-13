@@ -23,6 +23,14 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 Verify App Store Connect API access
 
+### ios asc_inventory
+
+```sh
+[bundle exec] fastlane ios asc_inventory
+```
+
+Show current App Store and TestFlight review state without changing it
+
 ### ios build_testflight
 
 ```sh
@@ -78,6 +86,14 @@ Verify an external TestFlight build without changing App Store Connect
 ```
 
 Submit an already-uploaded build to External Beta and verify the result
+
+### ios replace_app_review
+
+```sh
+[bundle exec] fastlane ios replace_app_review
+```
+
+Build a new binary, replace the current App Review submission, and verify it
 
 ### ios upload_metadata
 
