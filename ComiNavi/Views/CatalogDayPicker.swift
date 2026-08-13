@@ -144,8 +144,7 @@ struct CatalogEventDayBanner: View {
     }
 
     private var primaryLabel: String {
-        let eventName = event?.shortName ?? String(localized: "Comiket")
-        return "\(eventName) · \(String(localized: "Day \(selectedDay)"))"
+        String(localized: "Day \(selectedDay)")
     }
 
     private var accessibilityLabel: String {
@@ -181,8 +180,7 @@ struct CatalogEventDayToolbarButton: View {
     }
 
     private var label: String {
-        let eventName = event?.shortName ?? String(localized: "Comiket")
-        return "\(eventName) · \(String(localized: "Day \(selectedDay)"))"
+        String(localized: "Day \(selectedDay)")
     }
 
     private var accessibilityLabel: String {
