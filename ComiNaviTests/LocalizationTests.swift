@@ -262,10 +262,7 @@ final class LocalizationTests: XCTestCase {
                 }
                 guard let localizations = entry["localizations"] as? [String: Any],
                       let localization = localizations[language] as? [String: Any],
-                      let unit = localization["stringUnit"] as? [String: Any],
-                      unit["state"] as? String == "translated",
-                      let value = unit["value"] as? String,
-                      !value.isEmpty
+                      hasReviewedCopy(in: localization)
                 else { return key }
                 return nil
             }
@@ -320,11 +317,11 @@ final class LocalizationTests: XCTestCase {
             for (key, rawEntry) in strings {
                 guard let entry = rawEntry as? [String: Any],
                       let localizations = entry["localizations"] as? [String: Any],
-                      let localization = localizations[language] as? [String: Any],
-                      let unit = localization["stringUnit"] as? [String: Any],
-                      let value = unit["value"] as? String
+                      let localization = localizations[language] as? [String: Any]
                 else { continue }
-                if placeholders(in: key) != placeholders(in: value) {
+                if localizedValues(in: localization).contains(where: {
+                    placeholders(in: key) != placeholders(in: $0)
+                }) {
                     mismatches.append(key)
                 }
             }
@@ -392,28 +389,28 @@ final class LocalizationTests: XCTestCase {
             for (key, rawEntry) in strings {
                 guard let entry = rawEntry as? [String: Any],
                       let localizations = entry["localizations"] as? [String: Any],
-                      let localization = localizations[language] as? [String: Any],
-                      let unit = localization["stringUnit"] as? [String: Any],
-                      let value = unit["value"] as? String
+                      let localization = localizations[language] as? [String: Any]
                 else { continue }
 
-                if value.hasSuffix("。") { trailingFullStops.append(key) }
-                if value.contains("先生")
-                    || value.contains("老板")
-                    || value.contains("老闆")
-                    || value.contains("业主")
-                    || value.contains("業主")
-                    || value.contains("擁有者")
-                    || value.contains("课文")
-                    || value.contains("課文")
-                {
-                    bannedTerms.append(key)
-                }
-                for name in protectedNames
-                where key.localizedCaseInsensitiveContains(name)
-                    && !value.contains(name)
-                {
-                    alteredNames.append(key)
+                for value in localizedValues(in: localization) {
+                    if value.hasSuffix("。") { trailingFullStops.append(key) }
+                    if value.contains("先生")
+                        || value.contains("老板")
+                        || value.contains("老闆")
+                        || value.contains("业主")
+                        || value.contains("業主")
+                        || value.contains("擁有者")
+                        || value.contains("课文")
+                        || value.contains("課文")
+                    {
+                        bannedTerms.append(key)
+                    }
+                    for name in protectedNames
+                    where key.localizedCaseInsensitiveContains(name)
+                        && !value.contains(name)
+                    {
+                        alteredNames.append(key)
+                    }
                 }
             }
 
@@ -513,6 +510,75 @@ final class LocalizationTests: XCTestCase {
 
     private let supportedLanguages = ["ja", "zh-Hans", "zh-Hant", "ko"]
 
+    private let pluralizedKeys = [
+        "%@ | %lld blocks",
+        "%lld choices",
+        "%lld choices need attention",
+        "%lld circles",
+        "%lld circles have a recorded result",
+        "%lld columns",
+        "%lld matching circles",
+        "%lld table spaces",
+        "%lld unread notifications",
+        "Affected circles: %lld",
+        "Delete available in %lld seconds",
+        "Imported circles (%lld)",
+        "Next available in %lld seconds",
+    ]
+
+    func testPluralEntriesHaveReviewedLocaleForms() throws {
+        let data = try Data(contentsOf: sourceCatalogURL)
+        let root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let strings = try XCTUnwrap(root["strings"] as? [String: Any])
+
+        for key in pluralizedKeys {
+            let entry = try XCTUnwrap(strings[key] as? [String: Any], "Missing plural entry: \(key)")
+            let localizations = try XCTUnwrap(entry["localizations"] as? [String: Any])
+            let expectedCategories = [
+                "en": ["one", "other"],
+                "ja": ["other"],
+                "ko": ["other"],
+                "zh-Hans": ["other"],
+                "zh-Hant": ["other"],
+            ]
+
+            for (language, categories) in expectedCategories {
+                let localization = try XCTUnwrap(
+                    localizations[language] as? [String: Any],
+                    "Missing \(language) plural localization for \(key)"
+                )
+                let variations = try XCTUnwrap(
+                    localization["variations"] as? [String: Any],
+                    "Missing plural variations for \(language): \(key)"
+                )
+                let plural = try XCTUnwrap(
+                    variations["plural"] as? [String: Any],
+                    "Missing plural rule for \(language): \(key)"
+                )
+                XCTAssertEqual(
+                    Set(plural.keys),
+                    Set(categories),
+                    "Unexpected plural categories for \(language): \(key)"
+                )
+
+                for category in categories {
+                    let variant = try XCTUnwrap(plural[category] as? [String: Any])
+                    let unit = try XCTUnwrap(variant["stringUnit"] as? [String: Any])
+                    XCTAssertEqual(unit["state"] as? String, "translated")
+                    let value = try XCTUnwrap(unit["value"] as? String)
+                    XCTAssertFalse(value.isEmpty)
+                    XCTAssertEqual(
+                        placeholders(in: key),
+                        placeholders(in: value),
+                        "Format placeholders differ in \(language) \(category) for: \(key)"
+                    )
+                }
+            }
+        }
+    }
+
     private func localizedBundle(for language: String) throws -> Bundle {
         let bundles = [Bundle.main] + Bundle.allBundles
         let appBundle = try XCTUnwrap(bundles.first { bundle in
@@ -529,6 +595,48 @@ final class LocalizationTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "ComiNavi/Localizable.xcstrings")
+    }
+
+    private func localizedValues(in localization: [String: Any]) -> [String] {
+        if let unit = localization["stringUnit"] as? [String: Any],
+           let value = unit["value"] as? String
+        {
+            return [value]
+        }
+
+        guard let variations = localization["variations"] as? [String: Any],
+              let plural = variations["plural"] as? [String: Any]
+        else { return [] }
+
+        return plural.values.compactMap { rawVariant in
+            guard let variant = rawVariant as? [String: Any],
+                  let unit = variant["stringUnit"] as? [String: Any],
+                  let value = unit["value"] as? String
+            else { return nil }
+            return value
+        }
+    }
+
+    private func hasReviewedCopy(in localization: [String: Any]) -> Bool {
+        if let unit = localization["stringUnit"] as? [String: Any] {
+            return unit["state"] as? String == "translated"
+                && unit["value"] as? String != nil
+                && !(unit["value"] as? String ?? "").isEmpty
+        }
+
+        guard let variations = localization["variations"] as? [String: Any],
+              let plural = variations["plural"] as? [String: Any],
+              !plural.isEmpty
+        else { return false }
+
+        return plural.values.allSatisfy { rawVariant in
+            guard let variant = rawVariant as? [String: Any],
+                  let unit = variant["stringUnit"] as? [String: Any],
+                  unit["state"] as? String == "translated",
+                  let value = unit["value"] as? String
+            else { return false }
+            return !value.isEmpty
+        }
     }
 
     private func placeholders(in value: String) -> [String] {

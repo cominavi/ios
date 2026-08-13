@@ -118,7 +118,7 @@ private struct GenreLegendRow: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(2)
-                Text("\(genre.spaceCount.formatted()) table spaces")
+                Text("\(genre.spaceCount) table spaces")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
