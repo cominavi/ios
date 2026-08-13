@@ -32,6 +32,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             options.enableAutoBreadcrumbTracking = true
             options.enableNetworkBreadcrumbs = true
             options.sendDefaultPii = false
+            // Screenshot-triggered feedback stays disabled. The report screen uses an explicit Photos picker.
             #if DEBUG
             options.enabled = false
             #else

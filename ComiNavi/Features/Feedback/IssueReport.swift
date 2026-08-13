@@ -1,5 +1,7 @@
 import Foundation
+import ImageIO
 import Observation
+import PhotosUI
 import Sentry
 import SwiftUI
 import UIKit
@@ -48,6 +50,7 @@ struct IssueReportSubmission: Equatable, Sendable {
     let message: String
     let contactEmail: String?
     let context: IssueReportContext
+    let screenshotPNGData: Data?
 }
 
 @MainActor
@@ -57,15 +60,55 @@ protocol IssueReportSubmitting {
 
 enum IssueReportError: LocalizedError {
     case emptyMessage
+    case screenshotUnavailable
     case unavailable
 
     var errorDescription: String? {
         switch self {
         case .emptyMessage:
             String(localized: "Please describe the issue before sending.")
+        case .screenshotUnavailable:
+            String(localized: "The selected screenshot could not be attached. Please choose another screenshot.")
         case .unavailable:
             String(localized: "Issue reporting is unavailable right now.")
         }
+    }
+}
+
+enum IssueReportScreenshotProcessor {
+    static let maximumAttachmentSize = 18 * 1_024 * 1_024
+
+    static func makePNGData(from selectedData: Data) async throws -> Data {
+        try await Task.detached(priority: .userInitiated) {
+            try autoreleasepool {
+                guard let source = CGImageSourceCreateWithData(selectedData as CFData, nil) else {
+                    throw IssueReportError.screenshotUnavailable
+                }
+
+                for maximumPixelSize in [3_072, 2_560, 2_048, 1_536, 1_024] {
+                    let options: [CFString: Any] = [
+                        kCGImageSourceShouldCache: false,
+                        kCGImageSourceCreateThumbnailFromImageAlways: true,
+                        kCGImageSourceCreateThumbnailWithTransform: true,
+                        kCGImageSourceThumbnailMaxPixelSize: maximumPixelSize,
+                        kCGImageSourceShouldCacheImmediately: true,
+                    ]
+                    guard let image = CGImageSourceCreateThumbnailAtIndex(
+                        source,
+                        0,
+                        options as CFDictionary
+                    ), let pngData = UIImage(cgImage: image).pngData()
+                    else {
+                        continue
+                    }
+                    if pngData.count <= maximumAttachmentSize {
+                        return pngData
+                    }
+                }
+
+                throw IssueReportError.screenshotUnavailable
+            }
+        }.value
     }
 }
 
@@ -80,6 +123,7 @@ struct SentryIssueReporter: IssueReportSubmitting {
         var breadcrumbData: [String: Any] = [
             "installation_id": context.installationID,
             "catalog_mode": context.catalogMode,
+            "screenshot_attached": submission.screenshotPNGData != nil,
         ]
         breadcrumbData["comiket_number"] = context.comiketNumber
         let breadcrumb = Breadcrumb(level: .info, category: "user.feedback")
@@ -98,6 +142,10 @@ struct SentryIssueReporter: IssueReportSubmitting {
             }
 
             scope.setTag(value: "in_app", key: "feedback.source")
+            scope.setTag(
+                value: submission.screenshotPNGData == nil ? "false" : "true",
+                key: "feedback.screenshot_attached"
+            )
             scope.setTag(value: context.installationID, key: "cominavi.installation_id")
             scope.setTag(value: context.buildEnvironment, key: "cominavi.build_environment")
             scope.setTag(value: context.catalogMode, key: "cominavi.catalog_mode")
@@ -128,7 +176,8 @@ struct SentryIssueReporter: IssueReportSubmitting {
                 name: context.displayName,
                 email: submission.contactEmail,
                 source: .custom,
-                associatedEventId: eventID
+                associatedEventId: eventID,
+                attachments: submission.screenshotPNGData.map { [$0] }
             )
         )
         return eventID.sentryIdString
@@ -144,9 +193,13 @@ final class IssueReportModel {
     var contactEmail = ""
     private(set) var referenceID: String?
     private(set) var errorMessage: String?
+    private(set) var screenshotErrorMessage: String?
+    private(set) var screenshotPNGData: Data?
+    private(set) var isLoadingScreenshot = false
 
     let context: IssueReportContext
     @ObservationIgnored private let reporter: any IssueReportSubmitting
+    @ObservationIgnored private var screenshotLoadGeneration = 0
 
     init(
         context: IssueReportContext,
@@ -157,7 +210,55 @@ final class IssueReportModel {
     }
 
     var canSubmit: Bool {
-        !trimmedMessage.isEmpty && message.count <= Self.maximumMessageLength
+        !trimmedMessage.isEmpty
+            && message.count <= Self.maximumMessageLength
+            && !isLoadingScreenshot
+    }
+
+    var screenshotImage: UIImage? {
+        screenshotPNGData.flatMap(UIImage.init(data:))
+    }
+
+    func loadScreenshot(from item: PhotosPickerItem) async {
+        screenshotLoadGeneration += 1
+        let loadGeneration = screenshotLoadGeneration
+        isLoadingScreenshot = true
+        screenshotErrorMessage = nil
+
+        defer {
+            if loadGeneration == screenshotLoadGeneration {
+                isLoadingScreenshot = false
+            }
+        }
+
+        do {
+            guard let selectedData = try await item.loadTransferable(type: Data.self) else {
+                throw IssueReportError.screenshotUnavailable
+            }
+            let pngData = try await IssueReportScreenshotProcessor.makePNGData(from: selectedData)
+            try Task.checkCancellation()
+            guard loadGeneration == screenshotLoadGeneration else { return }
+            screenshotPNGData = pngData
+        } catch is CancellationError {
+            return
+        } catch {
+            guard loadGeneration == screenshotLoadGeneration else { return }
+            screenshotErrorMessage = IssueReportError.screenshotUnavailable.localizedDescription
+        }
+    }
+
+    func attachPreparedScreenshot(_ pngData: Data) {
+        screenshotLoadGeneration += 1
+        screenshotPNGData = pngData
+        screenshotErrorMessage = nil
+        isLoadingScreenshot = false
+    }
+
+    func removeScreenshot() {
+        screenshotLoadGeneration += 1
+        screenshotPNGData = nil
+        screenshotErrorMessage = nil
+        isLoadingScreenshot = false
     }
 
     func submit() {
@@ -172,7 +273,8 @@ final class IssueReportModel {
                 IssueReportSubmission(
                     message: trimmedMessage,
                     contactEmail: email.isEmpty ? nil : email,
-                    context: context
+                    context: context,
+                    screenshotPNGData: screenshotPNGData
                 )
             )
             errorMessage = nil
@@ -193,6 +295,7 @@ final class IssueReportModel {
 struct IssueReportScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var model: IssueReportModel
+    @State private var selectedScreenshotItem: PhotosPickerItem?
 
     @MainActor
     init(
@@ -244,6 +347,10 @@ struct IssueReportScreen: View {
                     Text(errorMessage)
                 }
             }
+            .task(id: selectedScreenshotItem) {
+                guard let selectedScreenshotItem else { return }
+                await model.loadScreenshot(from: selectedScreenshotItem)
+            }
         }
     }
 
@@ -282,6 +389,55 @@ struct IssueReportScreen: View {
                 .accessibilityIdentifier("issue-report-email")
         }
 
+        Section("Screenshot (optional)") {
+            if let screenshotImage = model.screenshotImage {
+                Image(uiImage: screenshotImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 260)
+                    .clipShape(.rect(cornerRadius: 12))
+                    .accessibilityLabel("Selected screenshot")
+
+                PhotosPicker(
+                    selection: $selectedScreenshotItem,
+                    matching: .screenshots,
+                    preferredItemEncoding: .current
+                ) {
+                    Label("Choose another screenshot", systemImage: "photo.badge.plus")
+                }
+
+                Button("Remove screenshot", systemImage: "trash", role: .destructive) {
+                    selectedScreenshotItem = nil
+                    model.removeScreenshot()
+                }
+            } else if model.isLoadingScreenshot {
+                HStack(spacing: 12) {
+                    ProgressView()
+                    Text("Preparing screenshot…")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                PhotosPicker(
+                    selection: $selectedScreenshotItem,
+                    matching: .screenshots,
+                    preferredItemEncoding: .current
+                ) {
+                    Label("Choose screenshot from Photos", systemImage: "photo.badge.plus")
+                }
+                .accessibilityIdentifier("issue-report-choose-screenshot")
+            }
+
+            if let screenshotErrorMessage = model.screenshotErrorMessage {
+                Label(screenshotErrorMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            Text("ComiNavi can access only the screenshot you choose.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+
         Section("Included diagnostics") {
             if let publicUserID = model.context.publicUserID {
                 LabeledContent("ComiNavi account ID") {
@@ -300,7 +456,7 @@ struct IssueReportScreen: View {
             Label("App version, device model, and operating system", systemImage: "iphone")
             Label("Recent app actions and network breadcrumbs", systemImage: "list.bullet.rectangle")
 
-            Text("Passwords, authentication tokens, catalog contents, and screenshots are not included.")
+            Text("Passwords, authentication tokens, and catalog contents are not included. A screenshot is attached only when you choose one.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

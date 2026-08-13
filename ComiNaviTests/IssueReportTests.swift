@@ -1,4 +1,5 @@
 @testable import ComiNavi
+import UIKit
 import XCTest
 
 @MainActor
@@ -18,7 +19,8 @@ final class IssueReportTests: XCTestCase {
             IssueReportSubmission(
                 message: "Favorite colors disappeared after import.",
                 contactEmail: nil,
-                context: context
+                context: context,
+                screenshotPNGData: nil
             ),
         ])
     }
@@ -50,6 +52,39 @@ final class IssueReportTests: XCTestCase {
         XCTAssertTrue(reporter.submissions.isEmpty)
         XCTAssertNil(model.referenceID)
         XCTAssertNotNil(model.errorMessage)
+    }
+
+    func testSubmitIncludesOnlyExplicitlyAttachedScreenshot() {
+        let reporter = RecordingIssueReportReporter()
+        let context = fixtureContext(publicUserID: "user-public-42")
+        let model = IssueReportModel(context: context, reporter: reporter)
+        let screenshot = Data([0x89, 0x50, 0x4E, 0x47])
+        model.message = "The marker is missing"
+        model.attachPreparedScreenshot(screenshot)
+
+        model.submit()
+
+        XCTAssertEqual(reporter.submissions.first?.screenshotPNGData, screenshot)
+
+        model.removeScreenshot()
+        XCTAssertNil(model.screenshotPNGData)
+    }
+
+    func testScreenshotProcessorNormalizesSelectedImageToPNG() async throws {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 48, height: 96))
+        let image = renderer.image { context in
+            UIColor.systemGreen.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 48, height: 96))
+        }
+        let jpegData = try XCTUnwrap(image.jpegData(compressionQuality: 0.8))
+
+        let pngData = try await IssueReportScreenshotProcessor.makePNGData(from: jpegData)
+
+        XCTAssertEqual(Array(pngData.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        XCTAssertLessThanOrEqual(
+            pngData.count,
+            IssueReportScreenshotProcessor.maximumAttachmentSize
+        )
     }
 
     private func fixtureContext(publicUserID: String?) -> IssueReportContext {

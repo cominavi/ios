@@ -34033,13 +34033,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当前无法报告问题，请稍后再试。"
+            "value" : "当前无法报告问题，请稍后再试"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "目前無法回報問題，請稍後再試。"
+            "value" : "目前無法回報問題，請稍後再試"
           }
         }
       }
@@ -34061,13 +34061,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不会包含密码、身份验证令牌、目录内容和屏幕截图。"
+            "value" : "不会包含密码、身份验证令牌、目录内容和屏幕截图"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "不會包含密碼、驗證權杖、場刊內容和螢幕截圖。"
+            "value" : "不會包含密碼、驗證權杖、場刊內容和螢幕截圖"
           }
         }
       }
@@ -34089,13 +34089,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请先描述问题，再发送报告。"
+            "value" : "请先描述问题，再发送报告"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先描述問題，再傳送回報。"
+            "value" : "請先描述問題，再傳送回報"
           }
         }
       }
@@ -34341,13 +34341,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "感谢您的报告。报告和诊断信息已加入发送队列。"
+            "value" : "感谢您的报告。报告和诊断信息已加入发送队列"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "感謝您的回報。回報和診斷資訊已加入傳送佇列。"
+            "value" : "感謝您的回報。回報和診斷資訊已加入傳送佇列"
           }
         }
       }
@@ -34369,13 +34369,265 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请说明发生了什么，以及您原本期待的结果。"
+            "value" : "请说明发生了什么，以及您原本期待的结果"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請說明發生了什麼，以及您原本預期的結果。"
+            "value" : "請說明發生了什麼，以及您原本預期的結果"
+          }
+        }
+      }
+    },
+    "Choose another screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別のスクリーンショットを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 스크린샷 선택"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择其他截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇其他螢幕截圖"
+          }
+        }
+      }
+    },
+    "Choose screenshot from Photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真からスクリーンショットを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사진에서 스크린샷 선택"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从照片中选择截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從照片中選擇螢幕截圖"
+          }
+        }
+      }
+    },
+    "ComiNavi can access only the screenshot you choose." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviがアクセスできるのは、選択したスクリーンショットだけです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi는 사용자가 선택한 스크린샷에만 접근할 수 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 只能访问您所选择的截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 只能存取您所選擇的螢幕截圖"
+          }
+        }
+      }
+    },
+    "Passwords, authentication tokens, and catalog contents are not included. A screenshot is attached only when you choose one." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パスワード、認証トークン、カタログの内容は送信されません。スクリーンショットは、選択した場合にのみ添付されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "비밀번호, 인증 토큰 및 카탈로그 내용은 포함되지 않습니다. 스크린샷은 직접 선택한 경우에만 첨부됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不会包含密码、身份验证令牌和目录内容。仅当您主动选择截图时才会附加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不會包含密碼、驗證權杖和場刊內容。只有在您主動選擇時才會附加螢幕截圖"
+          }
+        }
+      }
+    },
+    "Preparing screenshot…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショットを準備中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크린샷 준비 중…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备截图…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在準備螢幕截圖…"
+          }
+        }
+      }
+    },
+    "Remove screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショットを削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크린샷 삭제"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除螢幕截圖"
+          }
+        }
+      }
+    },
+    "Screenshot (optional)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショット（任意）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크린샷(선택 사항)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图（可选）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "螢幕截圖（選填）"
+          }
+        }
+      }
+    },
+    "Selected screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したスクリーンショット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 스크린샷"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选择的截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已選擇的螢幕截圖"
+          }
+        }
+      }
+    },
+    "The selected screenshot could not be attached. Please choose another screenshot." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したスクリーンショットを添付できませんでした。別のスクリーンショットを選択してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 스크린샷을 첨부할 수 없습니다. 다른 스크린샷을 선택해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法附加所选截图，请选择其他截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法附加所選螢幕截圖，請選擇其他螢幕截圖"
           }
         }
       }
