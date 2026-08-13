@@ -672,6 +672,63 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
+    func testEdgeCircleCanBeCenteredAtDetailAndMaximumZoom() async throws {
+        let baseCampus = makeSingleVenueCampus()
+        let venue = try XCTUnwrap(baseCampus.venues.first)
+        let table = try XCTUnwrap(venue.scene.tables.first)
+        let campus = BigSightCampusScene(
+            id: baseCampus.id,
+            venues: baseCampus.venues,
+            connections: [],
+            bounds: venue.bounds
+        )
+        let renderer = UnifiedBigSightScene(campus: campus)
+        renderer.reduceMotion = true
+        let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        view.presentScene(renderer)
+        try await Task.sleep(for: .milliseconds(30))
+
+        let destination = MapDestination(
+            sceneID: venue.scene.id,
+            tableID: table.id,
+            blockName: table.blockName,
+            subspace: 0,
+            venueDisplayName: "Test Hall",
+            canonicalVenueName: "Test Hall",
+            point: table.origin,
+            selectedAt: Date(timeIntervalSince1970: 500)
+        )
+        renderer.update(
+            campus: campus,
+            scope: .venue,
+            selectedMapID: venue.id,
+            selectedTableID: table.id,
+            circlePlacements: [],
+            circleArtwork: [:],
+            searchMatches: [],
+            searchActive: false,
+            genrePlacements: [],
+            bookmarks: [],
+            locatedUser: nil,
+            destination: destination
+        )
+        try await Task.sleep(for: .milliseconds(30))
+        renderer.didFinishUpdate()
+
+        let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        let campusPoint = table.origin.applying(venue.transform)
+        var onScreen = renderer.viewPoint(forCampus: campusPoint, in: view)
+        XCTAssertEqual(onScreen.x, center.x, accuracy: 0.5)
+        XCTAssertEqual(onScreen.y, center.y, accuracy: 0.5)
+
+        renderer.zoom(by: 100, around: center, in: view)
+        renderer.didFinishUpdate()
+        onScreen = renderer.viewPoint(forCampus: campusPoint, in: view)
+        XCTAssertEqual(onScreen.x, center.x, accuracy: 0.5)
+        XCTAssertEqual(onScreen.y, center.y, accuracy: 0.5)
+    }
+
+    @MainActor
     func testPositiveRotationGestureTurnsMapClockwise() async throws {
         let renderer = UnifiedBigSightScene(campus: makeGeographicCampus())
         let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))

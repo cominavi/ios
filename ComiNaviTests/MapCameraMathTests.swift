@@ -313,6 +313,35 @@ final class MapCameraMathTests: XCTestCase {
         }
     }
 
+    func testMapEdgesCanReachViewportCenterAtEveryZoom() {
+        let geometry = MapCameraGeometry(
+            contentSize: CGSize(width: 1_200, height: 800),
+            viewportSize: CGSize(width: 390, height: 844),
+            fittedScale: 0.32
+        )
+
+        for zoom in [MapCameraTuning.venue.zoomRange.lowerBound, 8, 64] {
+            for rotation in [CGFloat.zero, .pi / 4] {
+                let camera = MapCamera(zoom: zoom, rotation: rotation)
+                let limits = MapCameraMath.translationLimits(
+                    camera: camera,
+                    geometry: geometry,
+                    tuning: .venue
+                )
+                let scale = geometry.fittedScale * zoom
+                let cosine = abs(cos(rotation))
+                let sine = abs(sin(rotation))
+                let rotatedWidth = (geometry.contentSize.width * cosine
+                    + geometry.contentSize.height * sine) * scale
+                let rotatedHeight = (geometry.contentSize.width * sine
+                    + geometry.contentSize.height * cosine) * scale
+
+                XCTAssertGreaterThanOrEqual(limits.width, rotatedWidth / 2)
+                XCTAssertGreaterThanOrEqual(limits.height, rotatedHeight / 2)
+            }
+        }
+    }
+
     func testLiveOverscrollUsesResistanceBeforeSettling() {
         let geometry = MapCameraGeometry(
             contentSize: CGSize(width: 1_000, height: 700),

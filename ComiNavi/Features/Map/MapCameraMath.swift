@@ -31,7 +31,8 @@ struct MapCameraGeometry: Equatable {
 struct MapCameraTuning: Equatable {
     /// Zoom relative to the fitted content scale, not an absolute pixel scale.
     let zoomRange: ClosedRange<CGFloat>
-    /// Maximum intentionally exposed blank edge as a fraction of the shorter viewport side.
+    /// Additional blank edge retained after allowing any map point to reach the viewport center,
+    /// as a fraction of the shorter viewport side.
     let edgeMarginFraction: CGFloat
     /// Maximum inertial travel after release as a fraction of the shorter viewport side.
     let maximumPanProjectionFraction: CGFloat
@@ -285,9 +286,12 @@ enum MapCameraMath {
             geometry.viewportSize.width,
             geometry.viewportSize.height
         ) * tuning.edgeMarginFraction
+        // Use the full rotated content extent instead of keeping the content
+        // rectangle inside the viewport. This lets a circle at any map edge
+        // be placed at the center of the screen at every zoom level.
         return CGSize(
-            width: max(0, (rotatedWidth - geometry.viewportSize.width) / 2) + margin,
-            height: max(0, (rotatedHeight - geometry.viewportSize.height) / 2) + margin
+            width: rotatedWidth / 2 + margin,
+            height: rotatedHeight / 2 + margin
         )
     }
 
