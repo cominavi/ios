@@ -1922,6 +1922,20 @@ final class UnifiedBigSightScene: SKScene {
             addUser(user, venue: venue)
         }
 
+        let venuesByMapID = Dictionary(uniqueKeysWithValues: campus.venues.map { ($0.id, $0) })
+        for match in searchMatches {
+            guard let venue = venuesByMapID[match.mapID],
+                  let table = venue.scene.tableByID[match.tableID]
+            else { continue }
+            addRectOverlay(
+                subspaceRect(table: table, subspace: match.subspace, scene: venue.scene),
+                venue: venue,
+                fill: UIColor.systemYellow.withAlphaComponent(searchActive ? 0.82 : 0.45),
+                stroke: .systemOrange,
+                zPosition: 44
+            )
+        }
+
         guard let venue = selectedVenue else { return }
         let scene = venue.scene
 
@@ -1945,17 +1959,6 @@ final class UnifiedBigSightScene: SKScene {
                 fill: bookmark.color.uiColor.withAlphaComponent(0.62),
                 stroke: bookmark.color.uiColor,
                 zPosition: 43
-            )
-        }
-
-        for match in searchMatches {
-            guard let table = scene.tableByID[match.tableID] else { continue }
-            addRectOverlay(
-                subspaceRect(table: table, subspace: match.subspace, scene: scene),
-                venue: venue,
-                fill: UIColor.systemYellow.withAlphaComponent(searchActive ? 0.82 : 0.45),
-                stroke: .systemOrange,
-                zPosition: 44
             )
         }
 
@@ -2199,7 +2202,12 @@ final class UnifiedBigSightScene: SKScene {
         hasher.combine(artwork.count)
         artwork.keys.sorted().forEach { hasher.combine($0) }
         hasher.combine(matches.count)
-        matches.forEach { hasher.combine($0.id) }
+        matches.forEach {
+            hasher.combine($0.id)
+            hasher.combine($0.mapID)
+            hasher.combine($0.tableID)
+            hasher.combine($0.subspace)
+        }
         hasher.combine(searchActive)
         hasher.combine(genres.count)
         genres.forEach {

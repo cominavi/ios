@@ -37,6 +37,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
             searchMatches: [
                 CatalogMapSearchMatch(
                     id: 7,
+                    mapID: venue.id,
                     tableID: table.id,
                     subspace: 0,
                     circleName: "一年戦争",
@@ -55,6 +56,97 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertEqual(renderer.baseMapAlpha, 0.18, accuracy: 0.001)
         XCTAssertTrue(renderer.areMapIconsHiddenForSearch)
     }
+
+    @MainActor
+    func testGlobalSearchOverlaysEveryVenueAtCampusScope() {
+        let tableID = CatalogMapTable.ID(blockID: 1, spaceNumber: 1)
+        let firstScene = CatalogMapScene(
+            id: .init(day: 1, mapID: 1),
+            name: "First Hall",
+            size: CGSize(width: 400, height: 400),
+            tableSize: CGSize(width: 40, height: 40),
+            tables: [
+                CatalogMapTable(
+                    id: tableID,
+                    blockName: "A",
+                    origin: CGPoint(x: 100, y: 100),
+                    orientation: .aLeft
+                )
+            ]
+        )
+        let secondScene = CatalogMapScene(
+            id: .init(day: 1, mapID: 2),
+            name: "Second Hall",
+            size: CGSize(width: 400, height: 400),
+            tableSize: CGSize(width: 40, height: 40),
+            tables: [
+                CatalogMapTable(
+                    id: tableID,
+                    blockName: "A",
+                    origin: CGPoint(x: 100, y: 100),
+                    orientation: .aLeft
+                )
+            ]
+        )
+        let firstVenue = BigSightVenuePlacement(
+            kind: .east123,
+            scene: firstScene,
+            coordinate: BigSightCampusLayout.eastBuilding,
+            center: CGPoint(x: -30, y: 0),
+            rotation: 0,
+            metersPerMapPoint: BigSightCampusLayout.metersPerMapPoint
+        )
+        let secondVenue = BigSightVenuePlacement(
+            kind: .west,
+            scene: secondScene,
+            coordinate: BigSightCampusLayout.eastBuilding,
+            center: CGPoint(x: 30, y: 0),
+            rotation: 0,
+            metersPerMapPoint: BigSightCampusLayout.metersPerMapPoint
+        )
+        let campus = BigSightCampusScene(
+            id: .init(day: 1, mapIDs: [firstVenue.id, secondVenue.id]),
+            venues: [firstVenue, secondVenue],
+            connections: [],
+            bounds: firstVenue.bounds.union(secondVenue.bounds).insetBy(dx: -20, dy: -20)
+        )
+        let renderer = UnifiedBigSightScene(campus: campus)
+
+        renderer.update(
+            campus: campus,
+            scope: .campus,
+            selectedMapID: firstVenue.id,
+            selectedTableID: nil,
+            circlePlacements: [],
+            circleArtwork: [:],
+            searchMatches: [
+                CatalogMapSearchMatch(
+                    id: 7,
+                    mapID: firstVenue.id,
+                    tableID: tableID,
+                    subspace: 0,
+                    circleName: "First Circle",
+                    penName: "Creator"
+                ),
+                CatalogMapSearchMatch(
+                    id: 8,
+                    mapID: secondVenue.id,
+                    tableID: tableID,
+                    subspace: 1,
+                    circleName: "Second Circle",
+                    penName: "Creator"
+                ),
+            ],
+            searchActive: true,
+            genrePlacements: [],
+            bookmarks: [],
+            locatedUser: nil
+        )
+
+        XCTAssertEqual(renderer.persistentOverlayShapeCount, 2)
+        XCTAssertTrue(renderer.areMapIconsHiddenForSearch)
+    }
+
     func testAllComiNaviBigSightSVGsCompileAsImageAssets() {
         for icon in BigSightMapIcon.allCases {
             guard let assetName = icon.assetName else { continue }
@@ -1126,6 +1218,32 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
         try await waitUntilReady(model)
         XCTAssertEqual(model.campusScene?.id.day, 1)
+    }
+
+    @MainActor
+    func testGlobalSearchStaysActiveAcrossCampusAndVenueScopes() async throws {
+        let model = MapScreenModel.previewCampusFixture()
+        model.load()
+        try await waitUntilReady(model)
+
+        model.setSearchPresented(true)
+        model.updateSearchQuery("Fixture")
+        try await waitUntil { !model.isSearching && !model.searchMatches.isEmpty }
+        let matches = model.searchMatches
+
+        model.select(mapID: 101)
+
+        XCTAssertEqual(model.scope, .venue)
+        XCTAssertTrue(model.isSearchPresented)
+        XCTAssertEqual(model.searchQuery, "Fixture")
+        XCTAssertEqual(model.searchMatches, matches)
+
+        model.showCampus()
+
+        XCTAssertEqual(model.scope, .campus)
+        XCTAssertTrue(model.isSearchPresented)
+        XCTAssertEqual(model.searchQuery, "Fixture")
+        XCTAssertEqual(model.searchMatches, matches)
     }
 
     @MainActor

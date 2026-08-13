@@ -413,7 +413,7 @@ final class CirclemsDataSource {
                 )
             }
             let query = String(circle.circleName.prefix(3))
-            let matches = try await mapCatalog.search(day: 1, mapID: 1, query: query)
+            let matches = try await mapCatalog.search(day: 1, query: query)
             guard matches.contains(where: { $0.id == circle.id }) else {
                 throw NSError(
                     domain: "CirclemsDataSource.MapIndexProbe",

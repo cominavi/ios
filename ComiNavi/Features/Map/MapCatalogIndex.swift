@@ -118,7 +118,6 @@ actor MapCatalogIndex {
 
     func search(
         day: Int,
-        mapID: Int,
         normalizedTerms: [String]
     ) async throws -> [CatalogMapSearchMatch] {
         guard !normalizedTerms.isEmpty else { return [] }
@@ -133,6 +132,7 @@ actor MapCatalogIndex {
                 database,
                 sql: """
                     SELECT CAST(circleID AS INTEGER) AS circleID,
+                           CAST(mapID AS INTEGER) AS mapID,
                            CAST(blockID AS INTEGER) AS blockID,
                            CAST(spaceNumber AS INTEGER) AS spaceNumber,
                            CAST(subspace AS INTEGER) AS subspace,
@@ -141,13 +141,17 @@ actor MapCatalogIndex {
                     FROM circle_search
                     WHERE circle_search MATCH ?
                       AND CAST(day AS INTEGER) = ?
-                      AND CAST(mapID AS INTEGER) = ?
-                    ORDER BY rank
+                    ORDER BY rank,
+                             CAST(mapID AS INTEGER),
+                             CAST(blockID AS INTEGER),
+                             CAST(spaceNumber AS INTEGER),
+                             CAST(subspace AS INTEGER)
                     LIMIT 1000
                     """,
-                arguments: [matchExpression, day, mapID]
+                arguments: [matchExpression, day]
             ).compactMap { row -> CatalogMapSearchMatch? in
                 guard let id: Int = row["circleID"],
+                      let mapID: Int = row["mapID"],
                       let blockID: Int = row["blockID"],
                       let spaceNumber: Int = row["spaceNumber"]
                 else {
@@ -155,6 +159,7 @@ actor MapCatalogIndex {
                 }
                 return CatalogMapSearchMatch(
                     id: id,
+                    mapID: mapID,
                     tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
                     subspace: row["subspace"] ?? 0,
                     circleName: row["circleName"] ?? "",

@@ -147,6 +147,7 @@ final class MapScreenModel {
         visibleCirclePlacements = []
         visibleCircleArtwork = [:]
         searchMatches = []
+        isSearching = false
         genrePlacements = []
         bookmarks = [:]
         sceneError = nil
@@ -206,6 +207,9 @@ final class MapScreenModel {
                     }
                     self.campusScene = campus
                     self.phase = .ready
+                    if !self.searchQuery.isEmpty {
+                        self.updateSearchQuery(self.searchQuery)
+                    }
                     return
                 }
 
@@ -271,14 +275,12 @@ final class MapScreenModel {
     func showCampus() {
         guard scope != .campus else { return }
         scope = .campus
-        setSearchPresented(false)
         if showsGenreOverlay {
             toggleGenreOverlay()
         }
         selection = nil
         visibleCirclePlacements = []
         visibleCircleArtwork = [:]
-        searchMatches = []
         genrePlacements = []
         bookmarks = [:]
         if campusScene != nil {
@@ -359,22 +361,17 @@ final class MapScreenModel {
         sceneTask?.cancel()
         selectionTask?.cancel()
         viewportTask?.cancel()
-        searchTask?.cancel()
         genreTask?.cancel()
         bookmarkTask?.cancel()
         selection = nil
         scene = cachedScene
         visibleCirclePlacements = []
         visibleCircleArtwork = [:]
-        searchMatches = []
         genrePlacements = []
         bookmarks = [:]
         phase = .ready
         if showsGenreOverlay {
             loadGenrePlacements()
-        }
-        if !searchQuery.isEmpty {
-            updateSearchQuery(searchQuery)
         }
         loadBookmarks()
     }
@@ -546,7 +543,7 @@ final class MapScreenModel {
         searchTask?.cancel()
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard !normalizedQuery.isEmpty, let scene else {
+        guard !normalizedQuery.isEmpty, phase == .ready else {
             isSearching = false
             searchMatches = []
             return
@@ -554,16 +551,13 @@ final class MapScreenModel {
 
         isSearching = true
         let day = selectedDay
-        let mapID = scene.id.mapID
         searchTask = Task { [weak self, catalog] in
             do {
                 try await Task.sleep(for: .milliseconds(260))
-                let matches = try await catalog.search(
-                    day: day, mapID: mapID, query: normalizedQuery)
+                let matches = try await catalog.search(day: day, query: normalizedQuery)
                 try Task.checkCancellation()
                 guard let self,
                     self.selectedDay == day,
-                    self.selectedMapID == mapID,
                     self.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
                         == normalizedQuery
                 else {

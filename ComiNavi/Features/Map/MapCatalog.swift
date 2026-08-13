@@ -228,6 +228,7 @@ private extension Int {
 
 struct CatalogMapSearchMatch: Identifiable, Equatable, Sendable {
     let id: Int
+    let mapID: Int
     let tableID: CatalogMapTable.ID
     let subspace: Int
     let circleName: String
@@ -271,7 +272,7 @@ protocol MapCatalog: Sendable {
     func circles(day: Int, tableID: CatalogMapTable.ID) async throws -> [CatalogMapCircle]
     func circlePlacements(in viewport: CatalogMapViewport) async throws -> [CatalogMapCirclePlacement]
     func circleImages(circleIDs: [Int]) async throws -> [Int: Data]
-    func search(day: Int, mapID: Int, query: String) async throws -> [CatalogMapSearchMatch]
+    func search(day: Int, query: String) async throws -> [CatalogMapSearchMatch]
     func genrePlacements(day: Int, mapID: Int) async throws -> [CatalogMapGenrePlacement]
     func bookmarkLocations(updateIDs: [Int]) async throws -> [CatalogBookmarkLocation]
     func bookmarkLocations(publicCircleIDs: [Int]) async throws -> [CatalogBookmarkLocation]
@@ -525,13 +526,12 @@ struct SQLiteMapCatalog: MapCatalog {
         }
     }
 
-    func search(day: Int, mapID: Int, query: String) async throws -> [CatalogMapSearchMatch] {
+    func search(day: Int, query: String) async throws -> [CatalogMapSearchMatch] {
         let terms = JapaneseSearchNormalizer.normalizedTerms(in: query)
         guard !terms.isEmpty else { return [] }
         if let index, terms.allSatisfy({ $0.unicodeScalars.count >= 3 }) {
             return try await index.search(
                 day: day,
-                mapID: mapID,
                 normalizedTerms: terms
             )
         }
@@ -541,6 +541,7 @@ struct SQLiteMapCatalog: MapCatalog {
                 database,
                 sql: """
                     SELECT circle.id,
+                           layout.mapId,
                            circle.blockId,
                            circle.spaceNo,
                            circle.spaceNoSub,
@@ -553,16 +554,16 @@ struct SQLiteMapCatalog: MapCatalog {
                       ON layout.blockId = circle.blockId
                      AND layout.spaceNo = circle.spaceNo
                     WHERE circle.day = ?
-                      AND layout.mapId = ?
-                    ORDER BY circle.blockId, circle.spaceNo, circle.spaceNoSub
+                    ORDER BY layout.mapId, circle.blockId, circle.spaceNo, circle.spaceNoSub
                     """,
-                arguments: [day, mapID]
+                arguments: [day]
             )
             var matches: [CatalogMapSearchMatch] = []
             matches.reserveCapacity(1000)
 
             while let row = try rows.next() {
                 guard let id: Int = row["id"],
+                      let mapID: Int = row["mapId"],
                       let blockID: Int = row["blockId"],
                       let spaceNumber: Int = row["spaceNo"]
                 else {
@@ -584,6 +585,7 @@ struct SQLiteMapCatalog: MapCatalog {
 
                 matches.append(CatalogMapSearchMatch(
                     id: id,
+                    mapID: mapID,
                     tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
                     subspace: row["spaceNoSub"] ?? 0,
                     circleName: circleName,
@@ -870,12 +872,13 @@ struct FixtureMapCatalog: MapCatalog {
         return Dictionary(uniqueKeysWithValues: Set(circleIDs).map { ($0, image) })
     }
 
-    func search(day: Int, mapID: Int, query: String) async throws -> [CatalogMapSearchMatch] {
+    func search(day: Int, query: String) async throws -> [CatalogMapSearchMatch] {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
         let table = fixtureScene.tables[0]
         return [
             CatalogMapSearchMatch(
                 id: table.id.blockID * 100 + 2,
+                mapID: fixtureScene.id.mapID,
                 tableID: table.id,
                 subspace: 0,
                 circleName: "Fixture Circle A",

@@ -306,7 +306,7 @@ struct MapView: View {
                     selectedTableID: model.selection?.table.id,
                     circlePlacements: model.visibleCirclePlacements,
                     circleArtwork: model.visibleCircleArtwork,
-                    searchMatches: model.searchMatches,
+                    searchMatches: model.searchMatches.filter { $0.mapID == scene.id.mapID },
                     searchActive: !model.searchQuery.isEmpty,
                     genrePlacements: model.genrePlacements,
                     bookmarks: Array(model.favoriteBookmarks.values),
@@ -649,19 +649,19 @@ private struct MapSelectorBar: View {
             )
             .accessibilityIdentifier("map-layer-button")
 
-            if model.scope == .venue {
-                Button {
-                    model.setSearchPresented(!model.isSearchPresented)
-                } label: {
-                    LucideIcon(model.isSearchPresented ? "xmark" : "magnifyingglass")
-                        .font(.callout.weight(.semibold))
-                        .frame(width: 44, height: 44)
-                        .background(.thinMaterial, in: .circle)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(model.isSearchPresented ? "Close map search" : "Search circles")
-                .accessibilityIdentifier("map-search-button")
+            Button {
+                model.setSearchPresented(!model.isSearchPresented)
+            } label: {
+                LucideIcon(model.isSearchPresented ? "xmark" : "magnifyingglass")
+                    .font(.callout.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .background(.thinMaterial, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(model.isSearchPresented ? "Close map search" : "Search circles")
+            .accessibilityIdentifier("map-search-button")
 
+            if model.scope == .venue {
                 Button {
                     model.toggleGenreOverlay()
                 } label: {

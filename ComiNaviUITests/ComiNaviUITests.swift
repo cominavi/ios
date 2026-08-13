@@ -1242,6 +1242,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(map.waitForExistence(timeout: 30))
         XCTAssertTrue(app.buttons["global-event-day-banner"].exists)
         XCTAssertTrue(app.buttons["map-venue-selector"].exists)
+        XCTAssertTrue(app.buttons["map-search-button"].exists)
         selectEast123(in: app)
 
         app.buttons["map-search-button"].tap()

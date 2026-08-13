@@ -11,7 +11,7 @@ final class MapCatalogSearchTests: XCTestCase {
         "ブルーアーカイブ",
     ]
 
-    func testSQLiteFallbackAndExploreTreatHiraganaAndKatakanaAsEquivalent() async throws {
+    func testSQLiteFallbackSearchesEveryVenueForDayAndNormalizesKana() async throws {
         let database = try makeCatalogDatabase()
         let catalog = SQLiteMapCatalog(
             mainDatabase: database,
@@ -21,8 +21,9 @@ final class MapCatalogSearchTests: XCTestCase {
         await exploreModel.load()
 
         for query in oppositeScriptQueries {
-            let mapMatches = try await catalog.search(day: 1, mapID: 1, query: query)
-            XCTAssertEqual(mapMatches.map(\.id), [1], "Map fallback failed for \(query)")
+            let mapMatches = try await catalog.search(day: 1, query: query)
+            XCTAssertEqual(mapMatches.map(\.id), [1, 3], "Map fallback failed for \(query)")
+            XCTAssertEqual(mapMatches.map(\.mapID), [1, 2])
 
             exploreModel.searchQuery = query
             XCTAssertEqual(
@@ -31,9 +32,13 @@ final class MapCatalogSearchTests: XCTestCase {
                 "Explore failed for \(query)"
             )
         }
+
+        let otherDayMatches = try await catalog.search(day: 2, query: oppositeScriptQueries[0])
+        XCTAssertEqual(otherDayMatches.map(\.id), [4])
+        XCTAssertEqual(otherDayMatches.map(\.mapID), [2])
     }
 
-    func testIndexedSearchTreatsHiraganaAndKatakanaAsEquivalent() async throws {
+    func testIndexedSearchesEveryVenueForDayAndNormalizesKana() async throws {
         let database = try makeCatalogDatabase()
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("map-catalog-search-\(UUID().uuidString)", isDirectory: true)
@@ -52,11 +57,16 @@ final class MapCatalogSearchTests: XCTestCase {
         )
 
         for query in oppositeScriptQueries {
-            let matches = try await catalog.search(day: 1, mapID: 1, query: query)
-            XCTAssertEqual(matches.map(\.id), [1], "Map index failed for \(query)")
+            let matches = try await catalog.search(day: 1, query: query)
+            XCTAssertEqual(matches.map(\.id), [1, 3], "Map index failed for \(query)")
+            XCTAssertEqual(matches.map(\.mapID), [1, 2])
             XCTAssertEqual(matches.first?.circleName, "アイスココナステッカー")
             XCTAssertEqual(matches.first?.penName, "カタカナ作家")
         }
+
+        let otherDayMatches = try await catalog.search(day: 2, query: oppositeScriptQueries[0])
+        XCTAssertEqual(otherDayMatches.map(\.id), [4])
+        XCTAssertEqual(otherDayMatches.map(\.mapID), [2])
     }
 
     private func makeCatalogDatabase() throws -> DatabaseQueue {
@@ -91,7 +101,9 @@ final class MapCatalogSearchTests: XCTestCase {
                 sql: """
                     INSERT INTO ComiketLayoutWC(blockId, spaceNo, mapId, xpos2, ypos2)
                     VALUES (10, 20, 1, 100, 200),
-                           (11, 21, 1, 140, 200)
+                           (11, 21, 1, 140, 200),
+                           (12, 22, 2, 100, 240),
+                           (13, 23, 2, 140, 240)
                     """
             )
             try database.execute(
@@ -101,7 +113,9 @@ final class MapCatalogSearchTests: XCTestCase {
                         circleName, circleKana, penName, description
                     ) VALUES
                         (1, 1, 10, 20, 0, ?, ?, ?, ?),
-                        (2, 1, 11, 21, 0, ?, ?, ?, ?)
+                        (2, 1, 11, 21, 0, ?, ?, ?, ?),
+                        (3, 1, 12, 22, 0, ?, ?, ?, ?),
+                        (4, 2, 13, 23, 0, ?, ?, ?, ?)
                     """,
                 arguments: [
                     "アイスココナステッカー",
@@ -112,6 +126,14 @@ final class MapCatalogSearchTests: XCTestCase {
                     "オリジナルザッカ",
                     "別の作家",
                     "創作作品",
+                    "アイスココナステッカー",
+                    "アイスココナステッカー",
+                    "カタカナ作家",
+                    "ぶるーあーかいぶ",
+                    "アイスココナステッカー",
+                    "アイスココナステッカー",
+                    "カタカナ作家",
+                    "ぶるーあーかいぶ",
                 ]
             )
         }
