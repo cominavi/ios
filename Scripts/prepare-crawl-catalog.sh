@@ -14,6 +14,7 @@ if [ -d "${shinagaki_input}" ]; then
 else
     shinagaki_source="${shinagaki_input}"
 fi
+ocr_source=${3:-"$(dirname -- "${shinagaki_source}")/enrichment.json"}
 
 if [ ! -f "${catalog_source}" ]; then
     echo "Missing authoritative catalog used to validate crawl enrichment: ${catalog_source}" >&2
@@ -22,6 +23,11 @@ fi
 
 if [ ! -f "${shinagaki_source}" ]; then
     echo "Missing crawl enrichment: ${shinagaki_source}" >&2
+    exit 1
+fi
+
+if [ ! -f "${ocr_source}" ]; then
+    echo "Missing OCR enrichment archive: ${ocr_source}" >&2
     exit 1
 fi
 
@@ -51,8 +57,40 @@ trap cleanup 0
 trap 'exit 1' 1 2 3 15
 
 staged_enrichment="${staging_directory}/crawl-c108-shinagaki.json"
+staged_ocr_search="${staging_directory}/crawl-c108-ocr-search.json"
 cp "${shinagaki_source}" "${staged_enrichment}"
+jq -c --slurpfile selected "${shinagaki_source}" '
+    ($selected[0] | INDEX(.tweet_id)) as $selected_post_ids |
+    {
+        schema_version: 1,
+        minimum_confidence: 0.80,
+        posts: (
+            reduce .posts[] as $post ({};
+                (
+                    $post.ocr // [] |
+                    [
+                        .[].lines[]? |
+                        select(
+                            (.confidence | type == "number") and
+                            .confidence >= 0.80 and
+                            (.rawText | type == "string" and length > 0)
+                        ) |
+                        .rawText
+                    ] |
+                    unique |
+                    join("\n")
+                ) as $text |
+                if $selected_post_ids[$post.tweetId] != null and ($text | length) > 0 then
+                    .[$post.tweetId] = $text
+                else
+                    .
+                end
+            )
+        )
+    }
+' "${ocr_source}" >"${staged_ocr_search}"
 chmod 0644 "${staged_enrichment}"
+chmod 0644 "${staged_ocr_search}"
 
 if [ ! -s "${staged_enrichment}" ]; then
     echo "Crawl enrichment is empty: ${shinagaki_source}" >&2
@@ -160,6 +198,7 @@ if [ "${unresolved_circle_count}" -ne 0 ]; then
 fi
 
 mv -f "${staged_enrichment}" "${destination}/crawl-c108-shinagaki.json"
+mv -f "${staged_ocr_search}" "${destination}/crawl-c108-ocr-search.json"
 rm -f "${expected_circles}"
 rmdir "${staging_directory}"
 staging_directory=

@@ -6107,30 +6107,30 @@
         }
       }
     },
-    "Circle, creator, X handle, post, or tag" : {
+    "Circle, creator, X handle, post, artwork text, or tag" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "サークル・作家・Xアカウント・投稿・タグ"
+            "value" : "サークル・作家・Xアカウント・投稿・画像内テキスト・タグ"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "서클·작가·X 계정·게시물·태그"
+            "value" : "서클·작가·X 계정·게시물·이미지 속 텍스트·태그"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "社团·作家·X账号·投稿·标签"
+            "value" : "社团·作家·X账号·投稿·图片文字·标签"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "社團、作家、X 帳號、貼文或標籤"
+            "value" : "社團、作家、X 帳號、貼文、圖片文字或標籤"
           }
         }
       }

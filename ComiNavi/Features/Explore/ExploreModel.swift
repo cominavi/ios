@@ -221,6 +221,10 @@ struct ExploreCircle: Identifiable {
         .compactMap { $0 }
         .joined(separator: "\n")
     }
+
+    var ocrSearchableText: String {
+        enrichment?.ocrSearchableText ?? ""
+    }
 }
 
 struct ExploreGenreFacet: Identifiable, Equatable {
@@ -337,6 +341,7 @@ final class ExploreModel {
     @ObservationIgnored private var discoveryTask: Task<Void, Never>?
     @ObservationIgnored private var loadRevision = 0
     @ObservationIgnored private var normalizedSearchTextByCircleID: [Int: String] = [:]
+    @ObservationIgnored private var normalizedOCRSearchTextByCircleID: [Int: String] = [:]
     @ObservationIgnored private let artworkLoader: CircleDetailArtworkLoader?
     @ObservationIgnored private let imageCache = NSCache<NSNumber, NSData>()
     @ObservationIgnored private let coverThumbnailCache = NSCache<NSString, NSData>()
@@ -859,6 +864,11 @@ final class ExploreModel {
                 (circle.id, JapaneseSearchNormalizer.normalize(circle.searchableText))
             }
         )
+        normalizedOCRSearchTextByCircleID = Dictionary(
+            uniqueKeysWithValues: allCircles.map { circle in
+                (circle.id, JapaneseSearchNormalizer.normalize(circle.ocrSearchableText))
+            }
+        )
         let circlesForDay = allCircles.filter { $0.day == selectedDay }
         selectedDayCircleCount = circlesForDay.count
         shinagakiCircleCount = circlesForDay.count { $0.hasShinagaki }
@@ -905,6 +915,11 @@ final class ExploreModel {
         let keywords = searchQuery
             .split(whereSeparator: \.isWhitespace)
             .map { JapaneseSearchNormalizer.normalize(String($0)) }
+        let searchScores = Dictionary(
+            uniqueKeysWithValues: allCircles.compactMap { circle in
+                searchScore(for: circle.id, keywords: keywords).map { (circle.id, $0) }
+            }
+        )
 
         let filteredCircles = allCircles.filter { circle in
             guard circle.day == selectedDay else { return false }
@@ -968,21 +983,43 @@ final class ExploreModel {
                 default: break
                 }
             }
-            return keywords.allSatisfy {
-                normalizedSearchTextByCircleID[circle.id]?.contains($0) == true
+            return keywords.isEmpty || searchScores[circle.id] != nil
+        }
+        visibleCircles = filteredCircles.sorted { lhs, rhs in
+            if !keywords.isEmpty {
+                let lhsScore = searchScores[lhs.id] ?? 0
+                let rhsScore = searchScores[rhs.id] ?? 0
+                if lhsScore != rhsScore { return lhsScore > rhsScore }
+            }
+
+            switch sort {
+            case .catalog:
+                return Self.catalogOrder(lhs, rhs)
+            case .latestShinagaki:
+                let lhsDate = lhs.enrichment?.latestPostDate ?? .distantPast
+                let rhsDate = rhs.enrichment?.latestPostDate ?? .distantPast
+                if lhsDate != rhsDate { return lhsDate > rhsDate }
+                return Self.catalogOrder(lhs, rhs)
             }
         }
-        switch sort {
-        case .catalog:
-            visibleCircles = filteredCircles
-        case .latestShinagaki:
-            visibleCircles = filteredCircles.sorted {
-                let lhs = $0.enrichment?.latestPostDate ?? .distantPast
-                let rhs = $1.enrichment?.latestPostDate ?? .distantPast
-                if lhs != rhs { return lhs > rhs }
-                return Self.catalogOrder($0, $1)
+    }
+
+    private func searchScore(for circleID: Int, keywords: [String]) -> Int? {
+        guard !keywords.isEmpty else { return 0 }
+
+        let primaryText = normalizedSearchTextByCircleID[circleID] ?? ""
+        let ocrText = normalizedOCRSearchTextByCircleID[circleID] ?? ""
+        var score = 0
+        for keyword in keywords {
+            if primaryText.contains(keyword) {
+                score += 100
+            } else if ocrText.contains(keyword) {
+                score += 1
+            } else {
+                return nil
             }
         }
+        return score
     }
 
     private func scheduleDiscoveryRebuild(for circles: [ExploreCircle]) {

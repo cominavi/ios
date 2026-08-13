@@ -158,6 +158,39 @@ struct CatalogEventDayBanner: View {
     }
 }
 
+struct CatalogEventDayToolbarButton: View {
+    let event: CatalogEvent?
+    let selectedDay: Int
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                LucideIcon("calendar.badge.clock")
+                    .accessibilityHidden(true)
+
+                Text(label)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .font(.subheadline.weight(.semibold))
+        }
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint("Change event day or Comiket")
+        .accessibilityIdentifier("global-event-day-banner")
+    }
+
+    private var label: String {
+        let eventName = event?.shortName ?? String(localized: "Comiket")
+        return "\(eventName) · \(String(localized: "Day \(selectedDay)"))"
+    }
+
+    private var accessibilityLabel: String {
+        let eventName = event?.displayName ?? String(localized: "Comiket")
+        return "\(eventName), \(String(localized: "Day \(selectedDay)"))"
+    }
+}
+
 struct CatalogEventDaySheet: View {
     let catalogLibrary: CatalogLibrary
     @Binding var selectedDay: Int

@@ -105,7 +105,10 @@ final class CatalogEnrichmentTests: XCTestCase {
             """.utf8
         )
 
-        let index = try CatalogEnrichmentIndex(data: data)
+        let index = try CatalogEnrichmentIndex(
+            data: data,
+            ocrSearchTextByPostID: ["100": "画像だけにある頒布物名"]
+        )
 
         XCTAssertEqual(index.selectedPostCount, 3)
         XCTAssertEqual(index.mappedPostCount, 2)
@@ -115,6 +118,7 @@ final class CatalogEnrichmentTests: XCTestCase {
         )
         XCTAssertEqual(strongest.id, "100")
         XCTAssertEqual(strongest.authorHandle, "test_circle")
+        XCTAssertEqual(strongest.ocrSearchText, "画像だけにある頒布物名")
         XCTAssertEqual(strongest.media.first?.displayURL.absoluteString, "https://pbs.twimg.com/media/menu-small.jpg")
         XCTAssertTrue(strongest.isHighConfidence)
         XCTAssertEqual(strongest.matchingPolicyID, "c108-shinagaki-placement-v2")

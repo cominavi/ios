@@ -1111,6 +1111,12 @@ final class ComiNaviUITests: XCTestCase {
         let searchField = app.textFields["explore-search-field"]
         XCTAssertTrue(eventDayBanner.exists)
         XCTAssertTrue(searchField.exists)
+        XCTAssertEqual(
+            eventDayBanner.frame.midY,
+            filterButton.frame.midY,
+            accuracy: 4,
+            "The event/day selector should share Explore's navigation toolbar."
+        )
 
         let terms = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "explore-discovery-term-")

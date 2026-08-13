@@ -269,7 +269,10 @@ final class CirclemsDataSource {
         self.allowsRemoteMetadata = configuration.allowsRemoteMetadata
         enrichmentIsRequired = configuration.enrichment?.isRequired == true
         enrichmentStore = configuration.enrichment.map {
-            CatalogEnrichmentStore(resourceURL: $0.resourceURL)
+            CatalogEnrichmentStore(
+                resourceURL: $0.resourceURL,
+                ocrSearchResourceURL: $0.ocrSearchResourceURL
+            )
         }
         tagCatalogPayloadSHA256 = configuration.tagCatalogPayloadSHA256
         realtimeStore = configuration.allowsBookmarkSync ? .shared : nil

@@ -255,7 +255,13 @@ struct CominaviCatalogSource: CatalogSource {
             enrichment: CatalogResourceLocator.url(
                 named: "crawl-c\(installed.catalog.comiketNo)-shinagaki.json"
             ).map {
-                CatalogEnrichmentConfiguration(resourceURL: $0, isRequired: false)
+                CatalogEnrichmentConfiguration(
+                    resourceURL: $0,
+                    ocrSearchResourceURL: CatalogResourceLocator.url(
+                        named: "crawl-c\(installed.catalog.comiketNo)-ocr-search.json"
+                    ),
+                    isRequired: false
+                )
             },
             tagCatalogPayloadSHA256: installed.catalog.sourceMainSHA256,
             allowsBookmarkSync: true,

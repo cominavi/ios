@@ -2,7 +2,18 @@ import Foundation
 
 struct CatalogEnrichmentConfiguration: Equatable, Sendable {
     let resourceURL: URL
+    let ocrSearchResourceURL: URL?
     let isRequired: Bool
+
+    init(
+        resourceURL: URL,
+        ocrSearchResourceURL: URL? = nil,
+        isRequired: Bool
+    ) {
+        self.resourceURL = resourceURL
+        self.ocrSearchResourceURL = ocrSearchResourceURL
+        self.isRequired = isRequired
+    }
 }
 
 enum CatalogConfidence: String, Codable, CaseIterable, Sendable {
@@ -125,6 +136,7 @@ struct CatalogShinagakiPost: Identifiable, Hashable, Sendable {
     let id: String
     let postURL: URL
     let text: String
+    let ocrSearchText: String?
     let createdAt: Date?
     let authorHandle: String
     let authorName: String?
@@ -145,6 +157,7 @@ struct CatalogShinagakiPost: Identifiable, Hashable, Sendable {
         id: String,
         postURL: URL,
         text: String,
+        ocrSearchText: String? = nil,
         createdAt: Date?,
         authorHandle: String,
         authorName: String?,
@@ -164,6 +177,7 @@ struct CatalogShinagakiPost: Identifiable, Hashable, Sendable {
         self.id = id
         self.postURL = postURL
         self.text = text
+        self.ocrSearchText = ocrSearchText
         self.createdAt = createdAt
         self.authorHandle = authorHandle
         self.authorName = authorName
@@ -252,6 +266,10 @@ struct CatalogCircleEnrichment: Equatable, Sendable {
             .compactMap { $0 }
         }
         return (postText + tagText + attendanceText).joined(separator: "\n")
+    }
+
+    var ocrSearchableText: String {
+        posts.compactMap(\.ocrSearchText).joined(separator: "\n")
     }
 
     private static func mergedTags(
@@ -371,7 +389,10 @@ struct CatalogEnrichmentIndex: Sendable {
     let mappedPostCount: Int
     let mappedPublicCircleCount: Int
 
-    init(data: Data) throws {
+    init(
+        data: Data,
+        ocrSearchTextByPostID: [String: String] = [:]
+    ) throws {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         let sourcePosts = try decoder.decode([CollectorPost].self, from: data)
@@ -408,7 +429,10 @@ struct CatalogEnrichmentIndex: Sendable {
             guard !strongestMatches.isEmpty else { continue }
 
             for match in strongestMatches {
-                guard let post = sourcePost.catalogPost(match: match) else { continue }
+                guard let post = sourcePost.catalogPost(
+                    match: match,
+                    ocrSearchText: ocrSearchTextByPostID[sourcePost.tweetId]
+                ) else { continue }
                 if let publicCircleID = match.wcId {
                     postsByPublicCircleID[publicCircleID, default: []].append(post)
                 } else {
@@ -543,10 +567,12 @@ struct CatalogEnrichmentIndex: Sendable {
 
 actor CatalogEnrichmentStore {
     private let resourceURL: URL
+    private let ocrSearchResourceURL: URL?
     private var loadedIndex: CatalogEnrichmentIndex?
 
-    init(resourceURL: URL) {
+    init(resourceURL: URL, ocrSearchResourceURL: URL? = nil) {
         self.resourceURL = resourceURL
+        self.ocrSearchResourceURL = ocrSearchResourceURL
     }
 
     func prepare() throws {
@@ -589,9 +615,57 @@ actor CatalogEnrichmentStore {
             return loadedIndex
         }
         let data = try Data(contentsOf: resourceURL, options: .mappedIfSafe)
-        let index = try CatalogEnrichmentIndex(data: data)
+        let index = try CatalogEnrichmentIndex(
+            data: data,
+            ocrSearchTextByPostID: loadOCRSearchText()
+        )
         loadedIndex = index
         return index
+    }
+
+    private func loadOCRSearchText() -> [String: String] {
+        guard let ocrSearchResourceURL else { return [:] }
+
+        do {
+            let data = try Data(contentsOf: ocrSearchResourceURL, options: .mappedIfSafe)
+            let sidecar = try JSONDecoder.catalogEnrichment.decode(
+                CatalogOCRSearchSidecar.self,
+                from: data
+            )
+            guard sidecar.schemaVersion == 1 else {
+                throw CatalogOCRSearchSidecarError.unsupportedSchemaVersion(
+                    sidecar.schemaVersion
+                )
+            }
+            guard sidecar.minimumConfidence >= 0.80 else {
+                throw CatalogOCRSearchSidecarError.unsafeMinimumConfidence(
+                    sidecar.minimumConfidence
+                )
+            }
+            return sidecar.posts
+        } catch {
+            NSLog("Ignoring invalid OCR search sidecar: %@", error.localizedDescription)
+            return [:]
+        }
+    }
+}
+
+private struct CatalogOCRSearchSidecar: Decodable {
+    let schemaVersion: Int
+    let minimumConfidence: Double
+    let posts: [String: String]
+}
+
+private enum CatalogOCRSearchSidecarError: Error {
+    case unsupportedSchemaVersion(Int)
+    case unsafeMinimumConfidence(Double)
+}
+
+private extension JSONDecoder {
+    static var catalogEnrichment: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
     }
 }
 
@@ -614,7 +688,8 @@ private struct CollectorPost: Decodable {
     let enrichment: CollectorPostEnrichment?
 
     func catalogPost(
-        match: CollectorCircleMatch
+        match: CollectorCircleMatch,
+        ocrSearchText: String?
     ) -> CatalogShinagakiPost? {
         guard postConfidence.rank >= CatalogConfidence.medium.rank else {
             return nil
@@ -628,6 +703,7 @@ private struct CollectorPost: Decodable {
             id: tweetId,
             postURL: postURL,
             text: text,
+            ocrSearchText: ocrSearchText?.nilIfBlank,
             createdAt: Self.date(from: createdAt),
             authorHandle: authorHandle,
             authorName: authorName ?? author?.name,

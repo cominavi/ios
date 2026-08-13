@@ -44,13 +44,6 @@ struct ExploreView<EventDayHeader: View>: View {
 
         NavigationStack {
             VStack(spacing: 0) {
-                HStack {
-                    eventDayHeader
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
-                .padding(.top, 8)
-
                 ExploreSearchField(model: model)
 
                 Group {
@@ -76,6 +69,10 @@ struct ExploreView<EventDayHeader: View>: View {
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    eventDayHeader
+                }
+
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
                         showsFilters = true
@@ -269,7 +266,7 @@ private struct ExploreSearchField: View {
                 .accessibilityHidden(true)
 
             TextField(
-                "Circle, creator, X handle, post, or tag",
+                "Circle, creator, X handle, post, artwork text, or tag",
                 text: $model.searchQuery
             )
             .textInputAutocapitalization(.never)

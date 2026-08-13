@@ -269,9 +269,8 @@ private struct CatalogContentView: View {
                         value: .explore
                     ) {
                         ExploreView(dataSource: circle, selectedDay: $selectedDay) {
-                            CatalogEventDayBanner(
+                            CatalogEventDayToolbarButton(
                                 event: catalogLibrary.selectedEvent,
-                                days: circle.comiket.days,
                                 selectedDay: selectedDay
                             ) {
                                 showsCatalogSettings = true

@@ -58,6 +58,45 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertEqual(model.visibleCircles.map(\.id), [1])
     }
 
+    func testSearchIncludesOCRTextAtLowerWeightThanCatalogMetadata() async {
+        let ocrOnlyCircle = makeExploreCircle(
+            id: 1,
+            day: 1,
+            genreID: 10,
+            name: "First Circle",
+            penName: "First Artist",
+            description: "Original goods",
+            tags: [],
+            enrichment: makeEnrichment(
+                postID: "ocr-only",
+                handle: "first_artist",
+                text: "C108 お品書き",
+                ocrSearchText: "限定セットあります",
+                date: Date(timeIntervalSince1970: 100),
+                postConfidence: .high,
+                placementConfidence: .high
+            )
+        )
+        let catalogMatchCircle = makeExploreCircle(
+            id: 2,
+            day: 1,
+            genreID: 10,
+            name: "限定セット本舗",
+            penName: "Second Artist",
+            description: "Original books",
+            tags: []
+        )
+        let model = ExploreModel(
+            circles: [ocrOnlyCircle, catalogMatchCircle],
+            selectedDay: 1
+        )
+        await model.load()
+
+        model.searchQuery = "限定セット"
+
+        XCTAssertEqual(model.visibleCircles.map(\.id), [2, 1])
+    }
+
     func testSearchTreatsHiraganaAndKatakanaAsEquivalent() async {
         let circle = makeExploreCircle(
             id: 31,
@@ -957,6 +996,7 @@ final class ExploreModelTests: XCTestCase {
         postID: String,
         handle: String,
         text: String,
+        ocrSearchText: String? = nil,
         date: Date,
         postConfidence: CatalogConfidence,
         placementConfidence: CatalogConfidence,
@@ -970,6 +1010,7 @@ final class ExploreModelTests: XCTestCase {
                 id: postID,
                 postURL: URL(string: "https://x.com/\(handle)/status/\(postID)")!,
                 text: text,
+                ocrSearchText: ocrSearchText,
                 createdAt: date,
                 authorHandle: handle,
                 authorName: nil,

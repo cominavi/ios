@@ -31,6 +31,7 @@ prepare_case() {
     case_project="${case_root}/ios"
     case_collector="${case_root}/collector"
     case_enrichment="${case_collector}/out/c108-enriched/selected-posts.json"
+    case_ocr="${case_collector}/out/c108-enriched/enrichment.json"
     case_catalog="${case_collector}/out/catalog-seed/webcatalog108.db"
     case_destination="${case_project}/ComiNavi/Resources/CrawlCatalogs/C108"
     case_stdout="${case_root}/stdout.txt"
@@ -103,6 +104,25 @@ SQL
             }
         ]
     ' >"${case_enrichment}"
+
+    jq -n '
+        {
+            schemaVersion: 1,
+            posts: [
+                {
+                    tweetId: "test-post",
+                    ocr: [
+                        {
+                            lines: [
+                                {rawText: "高信頼OCRテキスト", confidence: 0.93},
+                                {rawText: "低信頼OCRテキスト", confidence: 0.79}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ' >"${case_ocr}"
 }
 
 run_success_case() {
@@ -118,6 +138,18 @@ run_success_case() {
 
     if [ ! -f "${case_destination}/crawl-c108-shinagaki.json" ]; then
         fail "$1 did not stage crawl-c108-shinagaki.json"
+    fi
+    if ! cmp -s "${case_enrichment}" \
+        "${case_destination}/crawl-c108-shinagaki.json"; then
+        fail "$1 rewrote the validated Shinagaki catalog"
+    fi
+    if ! jq -e '
+        .schema_version == 1 and
+        .minimum_confidence == 0.8 and
+        .posts["test-post"] == "高信頼OCRテキスト" and
+        (.posts["test-post"] | contains("低信頼OCRテキスト") | not)
+    ' "${case_destination}/crawl-c108-ocr-search.json" >/dev/null; then
+        fail "$1 did not publish only high-confidence OCR search text"
     fi
     echo "PASS: $1"
 }
@@ -140,6 +172,9 @@ run_failure_case() {
 
     if [ -e "${case_destination}/crawl-c108-shinagaki.json" ]; then
         fail "$1 published crawl-c108-shinagaki.json after validation failed"
+    fi
+    if [ -e "${case_destination}/crawl-c108-ocr-search.json" ]; then
+        fail "$1 published crawl-c108-ocr-search.json after validation failed"
     fi
     echo "PASS: $1"
 }

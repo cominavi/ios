@@ -22,8 +22,12 @@ Scripts/prepare-crawl-catalog.sh
 ```
 
 The script validates the compact export against the collector's authoritative
-C108 seed database before publishing only `crawl-c108-shinagaki.json`. It
-requires complete post provenance, exact `(comiket_no, circle_id, wc_id)`
-resolution, unique WCId ownership, and Circle.ms provenance bound to the seed
-database digest. Shinagaki media stays at its HTTPS source and is cached by iOS
-instead of being copied into the application bundle.
+C108 seed database before publishing `crawl-c108-shinagaki.json` alongside the
+compact `crawl-c108-ocr-search.json` search sidecar. The sidecar includes text
+from the collector enrichment archive only when the individual OCR line has at
+least 0.80 confidence. The app uses that text only as a low-weight local search
+signal. Publication requires complete post provenance, exact
+`(comiket_no, circle_id, wc_id)` resolution, unique WCId ownership, and
+Circle.ms provenance bound to the seed database digest. Shinagaki media stays
+at its HTTPS source and is cached by iOS instead of being copied into the
+application bundle.

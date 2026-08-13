@@ -182,6 +182,9 @@ struct CirclemsCatalogSource: CatalogSource {
             .map {
                 CatalogEnrichmentConfiguration(
                     resourceURL: $0,
+                    ocrSearchResourceURL: CatalogResourceLocator.url(
+                        named: "crawl-c\(event.number)-ocr-search.json"
+                    ),
                     isRequired: false
                 )
             },
