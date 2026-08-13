@@ -1,1 +1,1 @@
-Catalog downloads are now more reliable. Authenticated streaming and resumable chunked downloads improve large data transfers.
+Circle tags are now available. Curated work, character, and content tags derived from catalog descriptions, publications, posts, and Shinagaki can be viewed, searched, and filtered.
