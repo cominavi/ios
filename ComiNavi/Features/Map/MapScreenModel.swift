@@ -601,6 +601,14 @@ final class MapScreenModel {
             return
         }
 
+        AppTrack.userIntent(
+            bookmarks[publicCircleID] == nil ? .favoriteAdded : .favoriteRemoved,
+            data: [
+                "event_number": eventNumber,
+                "public_circle_id": publicCircleID,
+                "source": "map",
+            ]
+        )
         bookmarkTask?.cancel()
         bookmarkError = nil
 
@@ -651,6 +659,15 @@ final class MapScreenModel {
             return
         }
 
+        AppTrack.userIntent(
+            bookmarks[publicCircleID] == nil ? .favoriteAdded : .favoriteColorChanged,
+            data: [
+                "event_number": eventNumber,
+                "public_circle_id": publicCircleID,
+                "color": color.rawValue,
+                "source": "map",
+            ]
+        )
         var bookmark =
             bookmarks[publicCircleID]
             ?? MapBookmark(

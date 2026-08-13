@@ -92,6 +92,10 @@ final class SignInViewModel: NSObject, ObservableObject,
 
     func signIn() {
         guard state == .anonymous else { return }
+        AppTrack.userIntent(
+            .authenticationStarted,
+            data: ["provider": "circlems"]
+        )
         state = .authenticating
         authenticationError = nil
         Task {
@@ -129,6 +133,13 @@ final class SignInViewModel: NSObject, ObservableObject,
                   SharedPlanInvitationLink.isValid(token: invitationToken)
             else { return }
         }
+        AppTrack.userIntent(
+            .authenticationStarted,
+            data: [
+                "provider": "google",
+                "entry_context": entryContext.rawValue,
+            ]
+        )
         state = .authenticating
         authenticationError = nil
         Task {
@@ -174,6 +185,13 @@ final class SignInViewModel: NSObject, ObservableObject,
                   SharedPlanInvitationLink.isValid(token: invitationToken)
             else { return }
         }
+        AppTrack.userIntent(
+            .authenticationStarted,
+            data: [
+                "provider": "apple",
+                "entry_context": entryContext.rawValue,
+            ]
+        )
         state = .authenticating
         authenticationError = nil
         Task {
@@ -213,6 +231,10 @@ final class SignInViewModel: NSObject, ObservableObject,
         guard state == .anonymous else {
             throw CirclemsAuthorizationFlowError.flowPending
         }
+        AppTrack.userIntent(
+            .identityLinkStarted,
+            data: ["provider": "circlems"]
+        )
         state = .authenticating
         defer { state = .anonymous }
         return try await perform(purpose: .link, expectedPublicUserID: publicUserID)

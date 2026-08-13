@@ -459,6 +459,10 @@ final class SharedPlanStore {
             throw SharedPlanError.planLimitReached(comiketNo: comiketNo)
         }
         guard actorUserID() != nil else { throw SharedPlanError.profileRequired }
+        AppTrack.userIntent(
+            .sharedPlanCreated,
+            data: ["comiket_no": comiketNo]
+        )
         let requestID = UUID()
         let write = SharedPlanRESTWrite(
             id: requestID,
@@ -929,6 +933,13 @@ final class SharedPlanStore {
         var plan = try editablePlan(id: id, ownerOnly: true)
         let name = try SharedPlanValidation.normalizedPlanName(name)
         guard name != plan.name else { return }
+        AppTrack.userIntent(
+            .sharedPlanRenamed,
+            data: [
+                "plan_id": id,
+                "comiket_no": plan.comiketNo,
+            ]
+        )
         let write = SharedPlanRESTWrite(
             id: UUID(),
             planID: id,
@@ -952,6 +963,13 @@ final class SharedPlanStore {
         defer { releaseAuthorityOperation() }
         var plan = try editablePlan(id: id, ownerOnly: true)
         guard plan.lifecycle != .archived else { return }
+        AppTrack.userIntent(
+            .sharedPlanArchived,
+            data: [
+                "plan_id": id,
+                "comiket_no": plan.comiketNo,
+            ]
+        )
         let write = SharedPlanRESTWrite(
             id: UUID(),
             planID: id,
@@ -978,6 +996,13 @@ final class SharedPlanStore {
         guard createAvailability(comiketNo: plan.comiketNo).canCreate else {
             throw SharedPlanError.planLimitReached(comiketNo: plan.comiketNo)
         }
+        AppTrack.userIntent(
+            .sharedPlanReopened,
+            data: [
+                "plan_id": id,
+                "comiket_no": plan.comiketNo,
+            ]
+        )
         let write = SharedPlanRESTWrite(
             id: UUID(),
             planID: id,
@@ -1003,6 +1028,7 @@ final class SharedPlanStore {
             throw SharedPlanError.invalidInvite
         }
         guard actorUserID() != nil else { throw SharedPlanError.profileRequired }
+        AppTrack.userIntent(.sharedPlanInvitationAccepted)
         let requestID = UUID()
         let write = SharedPlanRESTWrite(
             id: requestID,
@@ -1218,6 +1244,13 @@ final class SharedPlanStore {
         guard userID != actorUserID(), Self.isPublicUserID(userID) else {
             throw SharedPlanError.insufficientRole
         }
+        AppTrack.userIntent(
+            .sharedPlanMemberRevoked,
+            data: [
+                "plan_id": planID,
+                "comiket_no": plan.comiketNo,
+            ]
+        )
         return try await enqueueAdministrativeWrite(
             plan: plan,
             kind: .revokeMember,
@@ -1236,6 +1269,13 @@ final class SharedPlanStore {
         defer { releaseAuthorityOperation() }
         let plan = try editablePlan(id: planID, ownerOnly: true)
         guard Self.isPublicUserID(userID) else { throw SharedPlanError.insufficientRole }
+        AppTrack.userIntent(
+            .sharedPlanMemberReinstated,
+            data: [
+                "plan_id": planID,
+                "comiket_no": plan.comiketNo,
+            ]
+        )
         return try await enqueueAdministrativeWrite(
             plan: plan,
             kind: .reinstateMember,
@@ -1257,6 +1297,13 @@ final class SharedPlanStore {
             $0.userID == newOwnerUserID
         }), member.membershipStatus == .active, member.role == .editor
         else { throw SharedPlanError.insufficientRole }
+        AppTrack.userIntent(
+            .sharedPlanOwnershipTransferred,
+            data: [
+                "plan_id": planID,
+                "comiket_no": plan.comiketNo,
+            ]
+        )
         return try await enqueueAdministrativeWrite(
             plan: plan,
             kind: .transferOwnership,
@@ -1310,6 +1357,13 @@ final class SharedPlanStore {
         guard expiresAt > SharedPlanInvitationExpiration.canonical(now) else {
             throw SharedPlanError.invalidInvite
         }
+        AppTrack.userIntent(
+            .sharedPlanInvitationCreated,
+            data: [
+                "plan_id": planID,
+                "comiket_no": plan.comiketNo,
+            ]
+        )
         return try await enqueueAdministrativeWrite(
             plan: plan,
             kind: .createInvitation,
@@ -1331,6 +1385,13 @@ final class SharedPlanStore {
             $0.invitationID == invitationID
         }), invitation.currentUserCanRevoke
         else { throw SharedPlanError.insufficientRole }
+        AppTrack.userIntent(
+            .sharedPlanInvitationRevoked,
+            data: [
+                "plan_id": planID,
+                "comiket_no": plan.comiketNo,
+            ]
+        )
         return try await enqueueAdministrativeWrite(
             plan: plan,
             kind: .revokeInvitation,
@@ -2164,6 +2225,13 @@ final class SharedPlanStore {
             $0.planID == planID && $0.quarantineReason == .revisionConflict
         }
         guard !selectedWrites.isEmpty else { return }
+        AppTrack.userIntent(
+            .sharedPlanMetadataDiscarded,
+            data: [
+                "plan_id": planID,
+                "change_count": selectedWrites.count,
+            ]
+        )
         let selectedIDs = Set(selectedWrites.map(\.id))
         let observedGeneration = authorityOperationGeneration
         let fetchedPlan = try await authoritativePlan(id: planID)
@@ -2200,6 +2268,13 @@ final class SharedPlanStore {
             .filter { $0.planID == planID && $0.quarantineReason == .revisionConflict }
             .sorted(by: Self.writeOrder)
         guard !selected.isEmpty else { return }
+        AppTrack.userIntent(
+            .sharedPlanMetadataRetry,
+            data: [
+                "plan_id": planID,
+                "change_count": selected.count,
+            ]
+        )
         let selectedIDs = Set(selected.map(\.id))
         let observedGeneration = authorityOperationGeneration
         let fetchedPlan = try await authoritativePlan(id: planID)
@@ -2260,6 +2335,13 @@ final class SharedPlanStore {
 
     func discardQuarantinedWrite(id: UUID) async throws {
         guard let write = quarantinedRESTWrites.first(where: { $0.id == id }) else { return }
+        AppTrack.userIntent(
+            .sharedPlanMetadataDiscarded,
+            data: [
+                "plan_id": write.planID,
+                "change_count": 1,
+            ]
+        )
         if Self.isMetadataWrite(write.kind) {
             let observedGeneration = authorityOperationGeneration
             let fetchedPlan = try await authoritativePlan(id: write.planID)

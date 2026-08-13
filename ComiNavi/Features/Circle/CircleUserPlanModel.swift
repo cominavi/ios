@@ -106,6 +106,10 @@ final class CircleUserPlanModel {
                 saveState = .idle
                 return
             }
+            AppTrack.userIntent(
+                .favoriteRemoved,
+                data: favoriteIntentData()
+            )
             let previousBookmarks = groupBookmarks
             let previousMemo = memo
             let now = Date()
@@ -126,11 +130,19 @@ final class CircleUserPlanModel {
                 memo: previousMemo
             )
         } else {
+            AppTrack.userIntent(
+                .favoriteAdded,
+                data: favoriteIntentData(color: .orange)
+            )
             createOrUpdate(color: .orange, memo: memo)
         }
     }
 
     func selectColor(_ color: BookmarkColor) {
+        AppTrack.userIntent(
+            isFavorite ? .favoriteColorChanged : .favoriteAdded,
+            data: favoriteIntentData(color: color)
+        )
         createOrUpdate(color: color, memo: memo)
     }
 
@@ -281,6 +293,18 @@ final class CircleUserPlanModel {
             }
         }
         return bookmarks.max { $0.modifiedAt < $1.modifiedAt }
+    }
+
+    private func favoriteIntentData(color: BookmarkColor? = nil) -> [String: Any] {
+        var data: [String: Any] = [
+            "event_number": dataSource.comiket.number,
+            "circle_count": publicCircleIDsByCatalogID.count,
+            "source": "circle_detail",
+        ]
+        if let color {
+            data["color"] = color.rawValue
+        }
+        return data
     }
 }
 

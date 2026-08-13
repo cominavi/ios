@@ -64,6 +64,10 @@ final class FollowingImportModel {
 
     func importNow() {
         guard let userName = normalizedTwitterUserName, canImport else { return }
+        AppTrack.userIntent(
+            .followingImportStarted,
+            data: ["event_number": dataSource.comiket.number]
+        )
         activity = .importing
         errorMessage = nil
         activityTask = Task { [weak self] in
@@ -140,11 +144,16 @@ final class FollowingImportModel {
     }
 
     func favorite(_ importedCircle: FollowingImportedCircle) {
-        favorite(circles: [importedCircle])
+        favorite(
+            circles: [importedCircle],
+            intent: favoriteColor(for: importedCircle) == nil
+                ? .favoriteAdded
+                : .favoriteRemoved
+        )
     }
 
     func favoriteAll() {
-        favorite(circles: importedCircles)
+        favorite(circles: importedCircles, intent: .favoritesImported)
     }
 
     func favoriteColor(for importedCircle: FollowingImportedCircle) -> BookmarkColor? {
@@ -165,8 +174,21 @@ final class FollowingImportModel {
         errorMessage = nil
     }
 
-    private func favorite(circles imported: [FollowingImportedCircle]) {
+    private func favorite(
+        circles imported: [FollowingImportedCircle],
+        intent: AppTrack.UserIntent
+    ) {
         guard activity == .idle, !imported.isEmpty else { return }
+        AppTrack.userIntent(
+            intent,
+            data: [
+                "event_number": dataSource.comiket.number,
+                "circle_count": Set(
+                    imported.flatMap(\.publicCircleIDsByCatalogID.values)
+                ).count,
+                "source": "following_import",
+            ]
+        )
         activity = .favoriting
         errorMessage = nil
         let previousFavoriteColors = favoriteColorsByPublicID

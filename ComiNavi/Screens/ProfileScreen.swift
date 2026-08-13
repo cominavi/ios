@@ -402,6 +402,7 @@ struct ProfileScreen: View {
             return
         }
         guard !isLoggingOut else { return }
+        AppTrack.userIntent(.signOutStarted)
         isLoggingOut = true
         Task {
             let coordinator = ProfileLogoutCoordinator(
@@ -431,6 +432,7 @@ struct ProfileScreen: View {
 
     private func deleteAccount() {
         guard !isDeletingAccount, profileStore.isIdentityVerified else { return }
+        AppTrack.userIntent(.accountDeletionRequested)
         isDeletingAccount = true
         Task {
             do {
@@ -486,6 +488,10 @@ struct ProfileScreen: View {
         guard let recovery = favoriteRecoveryPendingDiscard,
               let dataSource = catalogLibrary.dataSource
         else { return }
+        AppTrack.userIntent(
+            .favoriteRecoveryDiscarded,
+            data: ["event_number": recovery.mutation.eventNumber]
+        )
         favoriteRecoveryPendingDiscard = nil
         Task {
             do {

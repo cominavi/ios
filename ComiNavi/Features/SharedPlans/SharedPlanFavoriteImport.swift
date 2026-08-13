@@ -128,6 +128,17 @@ final class SharedPlanFavoriteImportModel {
             issueMessage = String(localized: "Shared Plan changes are currently read-only.")
             return
         }
+        let importCount = missingItems.count { selectedWCIDs.contains($0.wcID) }
+        if importCount > 0 {
+            AppTrack.userIntent(
+                .sharedPlanFavoritesImported,
+                data: [
+                    "plan_id": planID,
+                    "event_number": eventNumber,
+                    "circle_count": importCount,
+                ]
+            )
+        }
         isImporting = true
         defer { isImporting = false }
         var nextFailures: [SharedPlanFavoriteImportFailure] = []

@@ -279,6 +279,14 @@ final class ComiketReminderStore {
         _ enabled: Bool,
         for kind: ComiketReminderKind
     ) -> ReminderSelectionMutation {
+        AppTrack.userIntent(
+            .eventReminderChanged,
+            data: [
+                "event_number": ComiketEventReminderCatalog.eventNumber,
+                "kind": kind.rawValue,
+                "enabled": enabled,
+            ]
+        )
         updateRevision += 1
         errorMessage = nil
         let previousEnabledKinds = enabledKinds

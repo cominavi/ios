@@ -649,6 +649,10 @@ struct EntryView: View {
 
     private func logOutAndResetAfterCatalogError() {
         guard !isResettingAfterCatalogError else { return }
+        AppTrack.userIntent(
+            .signOutStarted,
+            data: ["reason": "catalog_error_reset"]
+        )
         isResettingAfterCatalogError = true
         catalogResetIssue = nil
         let dataSource = AppData.circlems

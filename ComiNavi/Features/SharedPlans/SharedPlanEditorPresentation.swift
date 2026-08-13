@@ -667,7 +667,11 @@ final class SharedPlanEditorModel {
         using service: any SharedPlanEditorServicing,
         now: Date = Date()
     ) async {
-        await performMutation(using: service) {
+        await performMutation(
+            intent: state == .active ? .sharedPlanCircleAdded : .sharedPlanCircleRemoved,
+            circle: circle,
+            using: service
+        ) {
             switch state {
             case .active:
                 try await service.addCircle(circle, to: self.planID, now: now)
@@ -782,7 +786,15 @@ final class SharedPlanEditorModel {
             issueMessage = String(localized: "Enter what should be purchased.")
             return
         }
-        await performMutation(using: service) {
+        await performMutation(
+            intent: .sharedPlanPurchaseNeedCreated,
+            circle: circle,
+            data: [
+                "wanted_quantity": wantedQuantity,
+                "has_unit_price": unitPrice != nil,
+            ],
+            using: service
+        ) {
             try await service.createPurchaseNeed(
                 need,
                 circle: circle,
@@ -798,7 +810,11 @@ final class SharedPlanEditorModel {
         using service: any SharedPlanEditorServicing,
         now: Date = Date()
     ) async {
-        await performMutation(using: service) {
+        await performMutation(
+            intent: .sharedPlanPurchaseNeedDeleted,
+            circle: circle,
+            using: service
+        ) {
             try await service.deletePurchaseNeed(
                 needID,
                 circle: circle,
@@ -815,7 +831,12 @@ final class SharedPlanEditorModel {
         using service: any SharedPlanEditorServicing,
         now: Date = Date()
     ) async {
-        await performMutation(using: service) {
+        await performMutation(
+            intent: .sharedPlanWantedQuantityUpdated,
+            circle: circle,
+            data: ["quantity": quantity],
+            using: service
+        ) {
             try await service.setWantedQuantity(
                 quantity,
                 needID: needID,
@@ -843,7 +864,15 @@ final class SharedPlanEditorModel {
         let boughtChanged = boughtQuantity != need.fulfilledQuantity
         guard requestedChanged || boughtChanged else { return }
 
-        await performMutation(using: service) {
+        await performMutation(
+            intent: .sharedPlanPurchaseProgressUpdated,
+            circle: circle,
+            data: [
+                "requested_quantity": requestedQuantity,
+                "bought_quantity": boughtQuantity,
+            ],
+            using: service
+        ) {
             var changed = false
 
             if boughtChanged, boughtQuantity < need.fulfilledQuantity {
@@ -888,7 +917,12 @@ final class SharedPlanEditorModel {
         using service: any SharedPlanEditorServicing,
         now: Date = Date()
     ) async {
-        await performMutation(using: service) {
+        await performMutation(
+            intent: .sharedPlanBuyerAllocationUpdated,
+            circle: circle,
+            data: ["quantity": quantity],
+            using: service
+        ) {
             try await service.setBuyerAllocation(
                 quantity,
                 buyerUserID: buyerUserID,
@@ -907,7 +941,12 @@ final class SharedPlanEditorModel {
         using service: any SharedPlanEditorServicing,
         now: Date = Date()
     ) async {
-        await performMutation(using: service) {
+        await performMutation(
+            intent: .sharedPlanFulfilledQuantityUpdated,
+            circle: circle,
+            data: ["quantity": quantity],
+            using: service
+        ) {
             try await service.setFulfilledQuantity(
                 quantity,
                 needID: needID,
@@ -925,7 +964,12 @@ final class SharedPlanEditorModel {
         using service: any SharedPlanEditorServicing,
         now: Date = Date()
     ) async {
-        await performMutation(using: service) {
+        await performMutation(
+            intent: .sharedPlanCommunicationUpdated,
+            circle: circle,
+            data: ["field": field],
+            using: service
+        ) {
             try await service.setCommunication(
                 value,
                 field: field,
@@ -942,7 +986,10 @@ final class SharedPlanEditorModel {
         using service: any SharedPlanEditorServicing,
         now: Date = Date()
     ) async {
-        await performMutation(using: service) {
+        await performMutation(
+            intent: .sharedPlanConflictResolved,
+            using: service
+        ) {
             try await service.resolveDocumentConflict(
                 planID: self.planID,
                 conflictID: conflictID,
@@ -1074,7 +1121,14 @@ final class SharedPlanEditorModel {
                     value: candidate.value
                 )
             }
-            await performMutation(using: service) {
+            let circle = switch draft.target {
+            case .circle(let circle), .need(let circle, _): circle
+            }
+            await performMutation(
+                intent: .sharedPlanConflictResolved,
+                circle: circle,
+                using: service
+            ) {
                 switch draft.target {
                 case .circle(let circle):
                     try await service.resolveCircleParent(
@@ -1113,7 +1167,10 @@ final class SharedPlanEditorModel {
             issueMessage = SharedPlanError.syncProtocolViolation.localizedDescription
             return
         }
-        await performRecovery(using: service) {
+        await performRecovery(
+            intent: .sharedPlanUnsyncedContentDiscarded,
+            using: service
+        ) {
             try await service.discardUnsyncedContentAndRebootstrap(planID: self.planID)
         }
     }
@@ -1126,7 +1183,10 @@ final class SharedPlanEditorModel {
             issueMessage = SharedPlanError.syncProtocolViolation.localizedDescription
             return
         }
-        await performRecovery(using: service) {
+        await performRecovery(
+            intent: .sharedPlanUnsyncedContentRebased,
+            using: service
+        ) {
             try await service.rebaseUnsyncedContent(planID: self.planID, now: now)
         }
     }
@@ -1140,6 +1200,9 @@ final class SharedPlanEditorModel {
     }
 
     private func performMutation(
+        intent: AppTrack.UserIntent,
+        circle: SharedPlanCircleKey? = nil,
+        data: [String: Any] = [:],
         using service: any SharedPlanEditorServicing,
         operation: () async throws -> Bool
     ) async {
@@ -1153,6 +1216,10 @@ final class SharedPlanEditorModel {
             issueMessage = String(localized: "このプランは現在読み取り専用です。")
             return
         }
+        AppTrack.userIntent(
+            intent,
+            data: userIntentData(circle: circle, additionalData: data)
+        )
         do {
             _ = try await operation()
             await reload(using: service)
@@ -1166,11 +1233,13 @@ final class SharedPlanEditorModel {
     }
 
     private func performRecovery(
+        intent: AppTrack.UserIntent,
         using service: any SharedPlanEditorServicing,
         operation: () async throws -> Void
     ) async {
         await acquireMutationOperation()
         defer { releaseMutationOperation() }
+        AppTrack.userIntent(intent, data: userIntentData())
         do {
             try await operation()
             await reload(using: service)
@@ -1190,6 +1259,21 @@ final class SharedPlanEditorModel {
             readOnlyReason = .waitingForWritableSync
         }
         if let mutationIssue { issueMessage = mutationIssue }
+    }
+
+    private func userIntentData(
+        circle: SharedPlanCircleKey? = nil,
+        additionalData: [String: Any] = [:]
+    ) -> [String: Any] {
+        var data = additionalData
+        data["plan_id"] = planID
+        if let comiketNo = circle?.comiketNo ?? plan?.comiketNo {
+            data["comiket_no"] = comiketNo
+        }
+        if let circle {
+            data["wc_id"] = circle.wcID
+        }
+        return data
     }
 
     private func apply(_ snapshot: SharedPlanEditorSnapshot) {
@@ -1265,6 +1349,10 @@ final class SharedPlanEditorModel {
             return
         }
 
+        AppTrack.userIntent(
+            .sharedPlanMemoUpdated,
+            data: userIntentData(circle: draft.circle)
+        )
         do {
             _ = try await service.commitMemoDraft(draft, now: now)
             if memoDrafts[draftID]?.generation == draft.generation {

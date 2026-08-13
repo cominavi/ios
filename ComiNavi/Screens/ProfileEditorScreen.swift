@@ -159,6 +159,18 @@ struct ProfileEditorScreen: View {
         let shouldSaveDisplayName = hasDisplayNameChange
         let displayName = displayName
         let avatarChange = avatarChange
+        let avatarAction = switch avatarChange {
+        case .unchanged: "unchanged"
+        case .selected: "upload"
+        case .removed: "remove"
+        }
+        AppTrack.userIntent(
+            .profileUpdated,
+            data: [
+                "display_name_changed": shouldSaveDisplayName,
+                "avatar_action": avatarAction,
+            ]
+        )
         isSavingChanges = true
         Task {
             defer { isSavingChanges = false }
