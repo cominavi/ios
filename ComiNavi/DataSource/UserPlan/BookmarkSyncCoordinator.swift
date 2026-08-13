@@ -208,12 +208,17 @@ actor BookmarkSyncCoordinator {
             ]
         )
         await importInitialCirclemsFavoritesIfNeeded(canonicalRevision: canonical.revision)
-        let remoteIDs = Set(canonical.favorites.map(\.publicCircleID))
+        // Color zero is Circle.ms's memo-only state. It remains useful local
+        // data, but it is not a favorite and must never enter ComiNavi's
+        // canonical favorite set or render as a gray favorite.
+        let canonicalFavorites = canonical.favorites.filter { $0.color.isFavorite }
+        let hasMemoOnlyCanonicalFavorites = canonicalFavorites.count != canonical.favorites.count
+        let remoteIDs = Set(canonicalFavorites.map(\.publicCircleID))
         let existingLocal = try await localStore.allBookmarks(eventNumber: eventNumber)
         let pendingIDs = Set(existingLocal.filter { $0.syncState != .synced }.map(\.publicCircleID))
 
         let locations = try await catalog.bookmarkLocations(
-            publicCircleIDs: canonical.favorites.map(\.publicCircleID)
+            publicCircleIDs: canonicalFavorites.map(\.publicCircleID)
         )
         let locationByPublicID = Dictionary(
             uniqueKeysWithValues: locations.map { ($0.publicCircleID, $0) }
@@ -222,7 +227,7 @@ actor BookmarkSyncCoordinator {
             uniqueKeysWithValues: existingLocal.map { ($0.publicCircleID, $0) }
         )
 
-        for remoteFavorite in canonical.favorites {
+        for remoteFavorite in canonicalFavorites {
             guard !pendingIDs.contains(remoteFavorite.publicCircleID),
                   let location = locationByPublicID[remoteFavorite.publicCircleID]
             else { continue }
@@ -243,7 +248,9 @@ actor BookmarkSyncCoordinator {
         }
 
         for local in existingLocal
-        where local.syncState == .synced && !remoteIDs.contains(local.publicCircleID) {
+        where local.syncState == .synced
+            && local.color.isFavorite
+            && !remoteIDs.contains(local.publicCircleID) {
             try await localStore.remove(
                 eventNumber: eventNumber,
                 publicCircleID: local.publicCircleID
@@ -251,20 +258,24 @@ actor BookmarkSyncCoordinator {
         }
 
         let pendingChanges = try await localStore.pendingChanges(eventNumber: eventNumber)
-        guard !pendingChanges.isEmpty else { return }
+        guard !pendingChanges.isEmpty || hasMemoOnlyCanonicalFavorites else { return }
         var desired = Dictionary(
-            uniqueKeysWithValues: canonical.favorites.map { ($0.publicCircleID, $0) }
+            uniqueKeysWithValues: canonicalFavorites.map { ($0.publicCircleID, $0) }
         )
         for bookmark in pendingChanges {
             switch bookmark.syncState {
             case .pendingDelete:
                 desired[bookmark.publicCircleID] = nil
             case .pendingUpsert:
-                desired[bookmark.publicCircleID] = CominaviFavorite(
-                    publicCircleID: bookmark.publicCircleID,
-                    color: bookmark.color,
-                    notificationsEnabled: true
-                )
+                if bookmark.color.isFavorite {
+                    desired[bookmark.publicCircleID] = CominaviFavorite(
+                        publicCircleID: bookmark.publicCircleID,
+                        color: bookmark.color,
+                        notificationsEnabled: true
+                    )
+                } else {
+                    desired[bookmark.publicCircleID] = nil
+                }
             case .synced, .quarantined:
                 break
             }

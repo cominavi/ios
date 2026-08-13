@@ -48,12 +48,13 @@ final class CircleUserPlanModel {
     }
 
     var isFavorite: Bool {
-        favoriteOverride ?? (bookmark?.syncState != .pendingDelete && bookmark != nil)
+        favoriteOverride ?? (bookmark?.isFavorite == true)
     }
 
     var selectedColor: BookmarkColor? {
         guard isFavorite else { return nil }
-        return colorOverride ?? bookmark?.color
+        let color = colorOverride ?? bookmark?.color
+        return color?.isFavorite == true ? color : nil
     }
 
     func load(publicCircleID: Int?) async {
@@ -139,6 +140,7 @@ final class CircleUserPlanModel {
     }
 
     func selectColor(_ color: BookmarkColor) {
+        guard color.isFavorite else { return }
         AppTrack.userIntent(
             isFavorite ? .favoriteColorChanged : .favoriteAdded,
             data: favoriteIntentData(color: color)
@@ -178,8 +180,8 @@ final class CircleUserPlanModel {
     private func createOrUpdate(color: BookmarkColor, memo: String) {
         saveTask?.cancel()
         let previousBookmarks = groupBookmarks
-        favoriteOverride = true
-        colorOverride = color
+        favoriteOverride = color.isFavorite
+        colorOverride = color.isFavorite ? color : nil
         saveState = .saving
         saveTask = Task { [weak self] in
             guard let self else { return }

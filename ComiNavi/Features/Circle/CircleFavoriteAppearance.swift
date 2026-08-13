@@ -38,10 +38,11 @@ extension BookmarkColor {
 }
 
 /// The color mark is aligned to the blank box authored into Circle.ms circle cuts.
-/// Ratios come from the official 211 x 300 cut format and scale with every rendition.
+/// Pixel scans place its fill area at x/y 7..<55 in the official 211 x 300 cut format;
+/// those ratios scale with every rendition.
 enum CircleFavoriteMarkGeometry {
     private static let referenceSize = CGSize(width: 211, height: 300)
-    private static let referenceRect = CGRect(x: 8, y: 8, width: 46, height: 46)
+    private static let referenceRect = CGRect(x: 7, y: 7, width: 48, height: 48)
 
     static func rect(in size: CGSize) -> CGRect {
         guard size.width > 0, size.height > 0 else { return .zero }
@@ -59,7 +60,7 @@ struct CircleFavoriteMark: View {
 
     var body: some View {
         GeometryReader { proxy in
-            if let color {
+            if let color, color.isFavorite {
                 let rect = CircleFavoriteMarkGeometry.rect(in: proxy.size)
                 Rectangle()
                     .fill(color.swiftUIColor)

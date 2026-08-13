@@ -40,6 +40,41 @@ final class BookmarkSyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(importedPages, 1)
     }
 
+    func testCirclemsMemoOnlyRowsRemainNotesInsteadOfGrayFavorites() async throws {
+        let localStore = InMemoryUserPlanStore()
+        let service = IdempotentFavoriteService(initialRevision: 0)
+        let circlemsImport = CirclemsFavoriteImportStub(items: [
+            CirclemsFavoriteImportItem(
+                wcID: 9_902,
+                updateID: 9_902,
+                circleName: "Memo Circle",
+                color: BookmarkColor.memoOnly.rawValue,
+                memo: "check this later"
+            ),
+        ])
+        let coordinator = BookmarkSyncCoordinator(
+            eventID: 3_248,
+            eventNumber: 108,
+            catalog: FixtureMapCatalog(),
+            localStore: localStore,
+            serviceFavoriteSync: service,
+            circlemsImport: circlemsImport
+        )
+
+        try await coordinator.sync()
+
+        let stored = try await localStore.bookmark(
+            eventNumber: 108,
+            publicCircleID: 9_902
+        )
+        let snapshot = await service.currentSnapshot()
+        XCTAssertEqual(stored?.color, .memoOnly)
+        XCTAssertEqual(stored?.memo, "check this later")
+        XCTAssertEqual(stored?.syncState, .synced)
+        XCTAssertFalse(stored?.isFavorite ?? true)
+        XCTAssertTrue(snapshot.favorites.isEmpty)
+    }
+
     func testConcurrentRequestsCoalesceIntoOneTrailingReconciliation() async throws {
         let localStore = InMemoryUserPlanStore()
         let serviceSync = BlockingCominaviFavoriteSync()

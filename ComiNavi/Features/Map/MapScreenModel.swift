@@ -95,6 +95,10 @@ final class MapScreenModel {
         days.first(where: { $0.dayIndex == selectedDay })?.halls ?? []
     }
 
+    var favoriteBookmarks: [Int: MapBookmark] {
+        bookmarks.filter { $0.value.isFavorite }
+    }
+
     init(
         days: [UFDSchema.Day],
         eventNumber: Int,
@@ -589,7 +593,7 @@ final class MapScreenModel {
 
     func bookmark(for circle: CatalogMapCircle?) -> MapBookmark? {
         guard let publicCircleID = circle?.publicCircleID else { return nil }
-        return bookmarks[publicCircleID]
+        return favoriteBookmarks[publicCircleID]
     }
 
     func toggleBookmark() {
@@ -601,8 +605,10 @@ final class MapScreenModel {
             return
         }
 
+        let existingBookmark = bookmarks[publicCircleID]
+        let isFavorite = existingBookmark?.isFavorite == true
         AppTrack.userIntent(
-            bookmarks[publicCircleID] == nil ? .favoriteAdded : .favoriteRemoved,
+            isFavorite ? .favoriteRemoved : .favoriteAdded,
             data: [
                 "event_number": eventNumber,
                 "public_circle_id": publicCircleID,
@@ -612,7 +618,7 @@ final class MapScreenModel {
         bookmarkTask?.cancel()
         bookmarkError = nil
 
-        if var existing = bookmarks[publicCircleID] {
+        if var existing = existingBookmark, isFavorite {
             let previousBookmarks = bookmarks
             bookmarks[publicCircleID] = nil
             existing.modifiedAt = Date()
@@ -631,7 +637,7 @@ final class MapScreenModel {
             return
         }
 
-        let bookmark = MapBookmark(
+        var bookmark = existingBookmark ?? MapBookmark(
             eventNumber: eventNumber,
             publicCircleID: publicCircleID,
             catalogCircleID: circle.id,
@@ -645,12 +651,16 @@ final class MapScreenModel {
             modifiedAt: Date(),
             syncState: .pendingUpsert
         )
+        bookmark.color = .orange
+        bookmark.modifiedAt = Date()
+        bookmark.syncState = .pendingUpsert
         let previousBookmarks = bookmarks
         bookmarks[publicCircleID] = bookmark
         persist(bookmark, restoring: previousBookmarks)
     }
 
     func setBookmarkColor(_ color: BookmarkColor) {
+        guard color.isFavorite else { return }
         guard let selection,
             let circle = selection.selectedCircle,
             let publicCircleID = circle.publicCircleID,
@@ -660,7 +670,9 @@ final class MapScreenModel {
         }
 
         AppTrack.userIntent(
-            bookmarks[publicCircleID] == nil ? .favoriteAdded : .favoriteColorChanged,
+            bookmarks[publicCircleID]?.isFavorite == true
+                ? .favoriteColorChanged
+                : .favoriteAdded,
             data: [
                 "event_number": eventNumber,
                 "public_circle_id": publicCircleID,

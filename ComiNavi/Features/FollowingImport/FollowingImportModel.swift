@@ -308,9 +308,7 @@ final class FollowingImportModel {
         importedCircles = resolvedCircles
         favoriteColorsByPublicID = Dictionary(
             bookmarks.compactMap { bookmark in
-                bookmark.syncState == .pendingDelete
-                    ? nil
-                    : (bookmark.publicCircleID, bookmark.color)
+                bookmark.isFavorite ? (bookmark.publicCircleID, bookmark.color) : nil
             },
             uniquingKeysWith: { first, _ in first }
         )

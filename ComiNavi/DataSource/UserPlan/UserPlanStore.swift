@@ -18,6 +18,9 @@ enum BookmarkColor: Int, CaseIterable, Codable, Identifiable, Sendable {
     static var selectableColors: [BookmarkColor] {
         allCases.filter { $0 != .memoOnly }
     }
+
+    /// Circle.ms uses color zero for a memo without a checked/favorited circle.
+    var isFavorite: Bool { self != .memoOnly }
 }
 
 enum BookmarkSyncState: String, Codable, Sendable {
@@ -43,6 +46,50 @@ struct MapBookmark: Identifiable, Equatable, Sendable {
     // Retained only so databases and sync payloads written by older builds remain readable.
     var modifiedAt: Date
     var syncState: BookmarkSyncState
+
+    var isFavorite: Bool {
+        color.isFavorite && syncState != .pendingDelete
+    }
+}
+
+private actor UserPlanBookmarkUpdateBroker {
+    private var revisionsByEventNumber: [Int: UInt64] = [:]
+    private var continuationsByEventNumber:
+        [Int: [UUID: AsyncStream<UInt64>.Continuation]] = [:]
+
+    func updates(eventNumber: Int) -> AsyncStream<UInt64> {
+        let continuationID = UUID()
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            continuationsByEventNumber[eventNumber, default: [:]][continuationID] = continuation
+            continuation.yield(revisionsByEventNumber[eventNumber, default: 0])
+            continuation.onTermination = { [weak self] _ in
+                Task {
+                    await self?.removeContinuation(
+                        eventNumber: eventNumber,
+                        continuationID: continuationID
+                    )
+                }
+            }
+        }
+    }
+
+    func publish(eventNumbers: Set<Int>) {
+        for eventNumber in eventNumbers {
+            revisionsByEventNumber[eventNumber, default: 0] &+= 1
+            let revision = revisionsByEventNumber[eventNumber, default: 0]
+            guard let continuations = continuationsByEventNumber[eventNumber] else { continue }
+            for continuation in continuations.values {
+                continuation.yield(revision)
+            }
+        }
+    }
+
+    private func removeContinuation(eventNumber: Int, continuationID: UUID) {
+        continuationsByEventNumber[eventNumber]?[continuationID] = nil
+        if continuationsByEventNumber[eventNumber]?.isEmpty == true {
+            continuationsByEventNumber[eventNumber] = nil
+        }
+    }
 }
 
 struct FollowingImportState: Equatable, Sendable {
@@ -66,6 +113,7 @@ struct ImportedCircleSource: Equatable, Hashable, Sendable {
 }
 
 protocol UserPlanStoring: Sendable {
+    func bookmarkUpdates(eventNumber: Int) async -> AsyncStream<UInt64>
     func bookmark(eventNumber: Int, publicCircleID: Int) async throws -> MapBookmark?
     func bookmarks(eventNumber: Int, day: Int, mapID: Int) async throws -> [MapBookmark]
     func allBookmarks(eventNumber: Int) async throws -> [MapBookmark]
@@ -118,6 +166,7 @@ protocol UserPlanStoring: Sendable {
 
 actor SQLiteUserPlanStore: UserPlanStoring {
     private let database: DatabasePool
+    private let bookmarkUpdateBroker = UserPlanBookmarkUpdateBroker()
 
     init(path: String) throws {
         database = try DatabasePool(path: path)
@@ -215,6 +264,10 @@ actor SQLiteUserPlanStore: UserPlanStoring {
         try migrator.migrate(database)
     }
 
+    func bookmarkUpdates(eventNumber: Int) async -> AsyncStream<UInt64> {
+        await bookmarkUpdateBroker.updates(eventNumber: eventNumber)
+    }
+
     func bookmark(eventNumber: Int, publicCircleID: Int) async throws -> MapBookmark? {
         try await database.read { database in
             try BookmarkRecord
@@ -242,6 +295,7 @@ actor SQLiteUserPlanStore: UserPlanStoring {
         try await database.write { database in
             try BookmarkRecord(bookmark).save(database)
         }
+        await bookmarkUpdateBroker.publish(eventNumbers: [bookmark.eventNumber])
     }
 
     func upsert(_ bookmarks: [MapBookmark]) async throws {
@@ -250,6 +304,7 @@ actor SQLiteUserPlanStore: UserPlanStoring {
                 try BookmarkRecord(bookmark).save(database)
             }
         }
+        await bookmarkUpdateBroker.publish(eventNumbers: Set(bookmarks.map(\.eventNumber)))
     }
 
     func pendingChanges(eventNumber: Int) async throws -> [MapBookmark] {
@@ -283,6 +338,7 @@ actor SQLiteUserPlanStore: UserPlanStoring {
                 .filter(Column("publicCircleID") == publicCircleID)
                 .deleteAll(database)
         }
+        await bookmarkUpdateBroker.publish(eventNumbers: [eventNumber])
     }
 
     func pendingCanonicalFavoriteMutation(
@@ -353,9 +409,13 @@ actor SQLiteUserPlanStore: UserPlanStoring {
                         .filter(Column("publicCircleID") == bookmark.publicCircleID)
                         .deleteAll(database)
                 case .pendingUpsert:
-                    guard let favorite = acknowledged[bookmark.publicCircleID],
-                          favorite.color == bookmark.color
-                    else { continue }
+                    if bookmark.color.isFavorite {
+                        guard let favorite = acknowledged[bookmark.publicCircleID],
+                              favorite.color == bookmark.color
+                        else { continue }
+                    } else {
+                        guard acknowledged[bookmark.publicCircleID] == nil else { continue }
+                    }
                     bookmark.syncState = .synced
                     bookmark.modifiedAt = Date()
                     try BookmarkRecord(bookmark).save(database)
@@ -364,6 +424,7 @@ actor SQLiteUserPlanStore: UserPlanStoring {
                 }
             }
         }
+        await bookmarkUpdateBroker.publish(eventNumbers: [mutation.eventNumber])
     }
 
     func discardCanonicalFavoriteMutation(
@@ -407,7 +468,7 @@ actor SQLiteUserPlanStore: UserPlanStoring {
         affectedPublicCircleIDs: [Int],
         rejectedAt: Date
     ) async throws -> QuarantinedCanonicalFavoriteMutation {
-        try await database.write { database in
+        let quarantine = try await database.write { database in
             guard let pending = try CanonicalFavoriteMutationRecord.fetchOne(
                 database,
                 key: mutation.eventNumber
@@ -441,6 +502,8 @@ actor SQLiteUserPlanStore: UserPlanStoring {
             }
             return quarantine
         }
+        await bookmarkUpdateBroker.publish(eventNumbers: [mutation.eventNumber])
+        return quarantine
     }
 
     func discardQuarantinedCanonicalFavoriteMutation(
@@ -468,6 +531,7 @@ actor SQLiteUserPlanStore: UserPlanStoring {
             }
             try record.delete(database)
         }
+        await bookmarkUpdateBroker.publish(eventNumbers: [eventNumber])
     }
 
     func hasCompletedInitialCirclemsFavoriteImport(eventNumber: Int) async throws -> Bool {
@@ -485,7 +549,7 @@ actor SQLiteUserPlanStore: UserPlanStoring {
         bookmarks: [MapBookmark],
         completedAt: Date
     ) async throws -> Int {
-        try await database.write { database in
+        let importedCount = try await database.write { database in
             if try CirclemsFavoriteImportCompletionRecord.fetchOne(
                 database,
                 key: eventNumber
@@ -509,6 +573,10 @@ actor SQLiteUserPlanStore: UserPlanStoring {
             ).insert(database)
             return importedCount
         }
+        if importedCount > 0 {
+            await bookmarkUpdateBroker.publish(eventNumbers: [eventNumber])
+        }
+        return importedCount
     }
 
     func followingImportState(eventNumber: Int) async throws -> FollowingImportState? {
@@ -786,6 +854,7 @@ private struct ImportedCircleSourceRecord: Codable, FetchableRecord, Persistable
 }
 
 actor InMemoryUserPlanStore: UserPlanStoring {
+    private let bookmarkUpdateBroker = UserPlanBookmarkUpdateBroker()
     private var storedBookmarks: [Int: MapBookmark] = [:]
     private var canonicalFavoriteMutations: [Int: PendingCanonicalFavoriteMutation] = [:]
     private var canonicalFavoriteQuarantines:
@@ -793,6 +862,10 @@ actor InMemoryUserPlanStore: UserPlanStoring {
     private var followingStates: [Int: FollowingImportState] = [:]
     private var importedSources: [ImportedSourceKey: ImportedCircleSource] = [:]
     private var completedInitialCirclemsFavoriteImports: Set<Int> = []
+
+    func bookmarkUpdates(eventNumber: Int) async -> AsyncStream<UInt64> {
+        await bookmarkUpdateBroker.updates(eventNumber: eventNumber)
+    }
 
     func bookmark(eventNumber: Int, publicCircleID: Int) async throws -> MapBookmark? {
         guard let bookmark = storedBookmarks[publicCircleID],
@@ -809,12 +882,14 @@ actor InMemoryUserPlanStore: UserPlanStoring {
 
     func upsert(_ bookmark: MapBookmark) async throws {
         storedBookmarks[bookmark.publicCircleID] = bookmark
+        await bookmarkUpdateBroker.publish(eventNumbers: [bookmark.eventNumber])
     }
 
     func upsert(_ bookmarks: [MapBookmark]) async throws {
         for bookmark in bookmarks {
             storedBookmarks[bookmark.publicCircleID] = bookmark
         }
+        await bookmarkUpdateBroker.publish(eventNumbers: Set(bookmarks.map(\.eventNumber)))
     }
 
     func allBookmarks(eventNumber: Int) async throws -> [MapBookmark] {
@@ -832,6 +907,7 @@ actor InMemoryUserPlanStore: UserPlanStoring {
 
     func remove(eventNumber: Int, publicCircleID: Int) async throws {
         storedBookmarks[publicCircleID] = nil
+        await bookmarkUpdateBroker.publish(eventNumbers: [eventNumber])
     }
 
     func pendingCanonicalFavoriteMutation(
@@ -867,7 +943,11 @@ actor InMemoryUserPlanStore: UserPlanStoring {
             case .pendingDelete where acknowledged[publicCircleID] == nil:
                 storedBookmarks[publicCircleID] = nil
             case .pendingUpsert:
-                guard acknowledged[publicCircleID]?.color == bookmark.color else { continue }
+                if bookmark.color.isFavorite {
+                    guard acknowledged[publicCircleID]?.color == bookmark.color else { continue }
+                } else {
+                    guard acknowledged[publicCircleID] == nil else { continue }
+                }
                 bookmark.syncState = .synced
                 bookmark.modifiedAt = Date()
                 storedBookmarks[publicCircleID] = bookmark
@@ -875,6 +955,7 @@ actor InMemoryUserPlanStore: UserPlanStoring {
                 continue
             }
         }
+        await bookmarkUpdateBroker.publish(eventNumbers: [mutation.eventNumber])
     }
 
     func discardCanonicalFavoriteMutation(
@@ -934,6 +1015,7 @@ actor InMemoryUserPlanStore: UserPlanStoring {
             bookmark.syncState = .quarantined
             storedBookmarks[publicCircleID] = bookmark
         }
+        await bookmarkUpdateBroker.publish(eventNumbers: [mutation.eventNumber])
         return quarantine
     }
 
@@ -949,6 +1031,7 @@ actor InMemoryUserPlanStore: UserPlanStoring {
             storedBookmarks[publicCircleID] = nil
         }
         canonicalFavoriteQuarantines[eventNumber]?[mutationID] = nil
+        await bookmarkUpdateBroker.publish(eventNumbers: [eventNumber])
     }
 
     func hasCompletedInitialCirclemsFavoriteImport(eventNumber: Int) async throws -> Bool {
@@ -971,6 +1054,9 @@ actor InMemoryUserPlanStore: UserPlanStoring {
         {
             storedBookmarks[bookmark.publicCircleID] = bookmark
             importedCount += 1
+        }
+        if importedCount > 0 {
+            await bookmarkUpdateBroker.publish(eventNumbers: [eventNumber])
         }
         return importedCount
     }

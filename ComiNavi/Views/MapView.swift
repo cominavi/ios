@@ -145,7 +145,7 @@ struct MapView: View {
         .sheet(item: $model.selection) { selection in
             CircleMapDetailSheet(
                 selection: selection,
-                bookmarks: model.bookmarks,
+                bookmarks: model.favoriteBookmarks,
                 dataSource: dataSource,
                 eventNumber: model.eventNumber,
                 mapID: model.selectedMapID,
@@ -276,7 +276,7 @@ struct MapView: View {
                     searchMatches: model.searchMatches,
                     searchActive: !model.searchQuery.isEmpty,
                     genrePlacements: model.genrePlacements,
-                    bookmarks: Array(model.bookmarks.values),
+                    bookmarks: Array(model.favoriteBookmarks.values),
                     locatedUser: model.locatedUser,
                     destination: model.destination,
                     visibleMapLayers: visibleMapLayers,
@@ -309,7 +309,7 @@ struct MapView: View {
                     searchMatches: model.searchMatches,
                     searchActive: !model.searchQuery.isEmpty,
                     genrePlacements: model.genrePlacements,
-                    bookmarks: Array(model.bookmarks.values),
+                    bookmarks: Array(model.favoriteBookmarks.values),
                     locatedUser: model.locatedUser,
                     locationFocusBottomInset: currentLocationMapBottomInset,
                     onViewportChange: model.updateViewport,

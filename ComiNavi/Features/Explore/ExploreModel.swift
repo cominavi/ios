@@ -332,10 +332,13 @@ final class ExploreModel {
     private(set) var bookmarksByCatalogCircleID: [Int: MapBookmark] = [:]
 
     @ObservationIgnored private let dataSource: CirclemsDataSource?
+    @ObservationIgnored private let userPlanStore: (any UserPlanStoring)?
+    @ObservationIgnored private let eventNumber: Int?
     @ObservationIgnored private let fixtureCircles: [ExploreCircle]?
     @ObservationIgnored private let fixedTag: String?
     @ObservationIgnored private var hasLoaded = false
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var bookmarkUpdatesTask: Task<Void, Never>?
     @ObservationIgnored private var discoveryIndex = ExploreDiscoveryIndex.empty
     @ObservationIgnored private var discoveryRevision = 0
     @ObservationIgnored private var discoveryTask: Task<Void, Never>?
@@ -352,6 +355,8 @@ final class ExploreModel {
         selectedTag: String? = nil
     ) {
         self.dataSource = dataSource
+        userPlanStore = dataSource.userPlanStore
+        eventNumber = dataSource.comiket.number
         fixtureCircles = nil
         fixedTag = selectedTag
         self.selectedDay = selectedDay
@@ -364,8 +369,21 @@ final class ExploreModel {
         coverThumbnailCache.totalCostLimit = 12 * 1_024 * 1_024
     }
 
-    init(circles: [ExploreCircle], selectedDay: Int) {
+    deinit {
+        loadTask?.cancel()
+        discoveryTask?.cancel()
+        bookmarkUpdatesTask?.cancel()
+    }
+
+    init(
+        circles: [ExploreCircle],
+        selectedDay: Int,
+        userPlanStore: (any UserPlanStoring)? = nil,
+        eventNumber: Int? = nil
+    ) {
         dataSource = nil
+        self.userPlanStore = userPlanStore
+        self.eventNumber = eventNumber
         fixtureCircles = circles
         fixedTag = nil
         self.selectedDay = selectedDay
@@ -394,6 +412,12 @@ final class ExploreModel {
             return
         }
 
+        let bookmarkUpdates: AsyncStream<UInt64>? = if let userPlanStore, let eventNumber {
+            await userPlanStore.bookmarkUpdates(eventNumber: eventNumber)
+        } else {
+            nil
+        }
+
         let task = Task<Void, Never> { [weak self] in
             guard let self else { return }
             await self.performLoad()
@@ -401,6 +425,9 @@ final class ExploreModel {
         loadTask = task
         await task.value
         loadTask = nil
+        if let bookmarkUpdates {
+            observeBookmarkUpdates(bookmarkUpdates)
+        }
     }
 
     private func performLoad() async {
@@ -423,6 +450,11 @@ final class ExploreModel {
                 )
                 return circle
             })
+            if let userPlanStore, let eventNumber {
+                applyBookmarks(
+                    (try? await userPlanStore.allBookmarks(eventNumber: eventNumber)) ?? []
+                )
+            }
             tagState = .ready
             recomputeFacetsAndCircles()
             hasLoaded = true
@@ -502,19 +534,28 @@ final class ExploreModel {
     }
 
     func refreshUserPlan() async {
-        guard let dataSource,
-              let bookmarks = try? await dataSource.userPlanStore.allBookmarks(
-                  eventNumber: dataSource.comiket.number
-              )
+        guard let userPlanStore,
+              let eventNumber,
+              let bookmarks = try? await userPlanStore.allBookmarks(eventNumber: eventNumber)
         else { return }
 
         applyBookmarks(bookmarks)
         recomputeVisibleCircles()
     }
 
+    private func observeBookmarkUpdates(_ updates: AsyncStream<UInt64>) {
+        guard bookmarkUpdatesTask == nil else { return }
+        bookmarkUpdatesTask = Task { [weak self] in
+            for await _ in updates {
+                guard !Task.isCancelled, let self else { return }
+                await self.refreshUserPlan()
+            }
+        }
+    }
+
     private func applyBookmarks(_ bookmarks: [MapBookmark]) {
         bookmarksByCatalogCircleID = bookmarks.reduce(into: [:]) { result, bookmark in
-            guard bookmark.syncState != .pendingDelete else { return }
+            guard bookmark.isFavorite else { return }
             if let existing = result[bookmark.catalogCircleID],
                existing.modifiedAt >= bookmark.modifiedAt {
                 return

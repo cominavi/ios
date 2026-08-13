@@ -917,6 +917,13 @@ struct ExploreCircleArtwork: View {
         loadedArtwork?.source == .shinagaki
     }
 
+    private var borderStyle: ExploreArtworkBorderStyle {
+        ExploreArtworkBorderStyle.resolve(
+            isShowingShinagaki: isShowingShinagaki,
+            bookmarkColor: bookmarkColor
+        )
+    }
+
     var body: some View {
         Group {
             if let loadedArtwork {
@@ -942,14 +949,13 @@ struct ExploreCircleArtwork: View {
         .compositingGroup()
         .clipShape(.rect(cornerRadius: 10))
         .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(
-                    isShowingShinagaki
-                        ? bookmarkColor?.swiftUIColor
-                            ?? Color(uiColor: .separator).opacity(0.35)
-                        : Color(uiColor: .separator).opacity(0.35),
-                    lineWidth: isShowingShinagaki && bookmarkColor != nil ? 2 : 0.5
-                )
+            switch borderStyle {
+            case .favorite(let color):
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(color.swiftUIColor, lineWidth: 2)
+            case .none:
+                EmptyView()
+            }
         }
         .overlay(alignment: .topTrailing) {
             if isShowingShinagaki {
@@ -989,6 +995,21 @@ struct ExploreCircleArtwork: View {
 
     private var artworkTaskID: String {
         "cover-\(circle.id)-\(circle.preferredCoverURL?.absoluteString ?? "circle")-\(targetPixelSize.cacheKey)"
+    }
+}
+
+enum ExploreArtworkBorderStyle: Equatable {
+    case none
+    case favorite(BookmarkColor)
+
+    static func resolve(
+        isShowingShinagaki: Bool,
+        bookmarkColor: BookmarkColor?
+    ) -> ExploreArtworkBorderStyle {
+        if isShowingShinagaki, let bookmarkColor, bookmarkColor.isFavorite {
+            return .favorite(bookmarkColor)
+        }
+        return .none
     }
 }
 

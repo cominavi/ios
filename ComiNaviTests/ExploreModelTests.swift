@@ -30,6 +30,41 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertEqual(model.visibleCircles.map(\.id), [2])
     }
 
+    func testFavoriteMutationRefreshesLoadedExploreModel() async throws {
+        let store = InMemoryUserPlanStore()
+        let model = ExploreModel(
+            circles: [fixtures[0]],
+            selectedDay: 1,
+            userPlanStore: store,
+            eventNumber: 108
+        )
+        await model.load()
+        XCTAssertNil(model.bookmark(for: fixtures[0]))
+
+        try await store.upsert(makeBookmark(color: .blue))
+
+        try await waitUntil {
+            model.bookmark(for: self.fixtures[0])?.color == .blue
+        }
+    }
+
+    func testMemoOnlyBookmarkIsNotPresentedAsFavorite() async throws {
+        let store = InMemoryUserPlanStore()
+        try await store.upsert(makeBookmark(color: .memoOnly))
+        let model = ExploreModel(
+            circles: [fixtures[0]],
+            selectedDay: 1,
+            userPlanStore: store,
+            eventNumber: 108
+        )
+
+        await model.load()
+
+        XCTAssertNil(model.bookmark(for: fixtures[0]))
+        model.favoriteFilter = .saved
+        XCTAssertTrue(model.visibleCircles.isEmpty)
+    }
+
     func testSwitchingDaysClearsEveryFilterThatIsNoLongerAvailable() async {
         let model = ExploreModel(circles: fixtures, selectedDay: 1)
         await model.load()
@@ -990,6 +1025,38 @@ final class ExploreModelTests: XCTestCase {
             tags: tags,
             enrichment: enrichment
         )
+    }
+
+    private func makeBookmark(color: BookmarkColor) -> MapBookmark {
+        MapBookmark(
+            eventNumber: 108,
+            publicCircleID: 1_001,
+            catalogCircleID: fixtures[0].id,
+            updateID: fixtures[0].circle.updateId,
+            day: 1,
+            mapID: 1,
+            tableID: .init(blockID: 1, spaceNumber: 1),
+            subspace: 0,
+            color: color,
+            memo: color == .memoOnly ? "memo without favorite" : "",
+            modifiedAt: Date(timeIntervalSince1970: 1_000),
+            syncState: .pendingUpsert
+        )
+    }
+
+    private func waitUntil(
+        timeout: Duration = .milliseconds(300),
+        condition: @MainActor () -> Bool
+    ) async throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+        while !condition() {
+            guard clock.now < deadline else {
+                XCTFail("Timed out waiting for Explore to reflect the favorite mutation")
+                return
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
     }
 
     private func makeEnrichment(
