@@ -4301,6 +4301,10 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         }
     }
 
+    static var diagnosticsInstallationID: String {
+        installationID
+    }
+
     private static var installationID: String {
         let key = "cominavi.service.installation-id.\(AppEnvironment.current.storageNamespace)"
         if let stored = UserDefaults.standard.string(forKey: key),

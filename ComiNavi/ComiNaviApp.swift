@@ -28,6 +28,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         SentrySDK.start { options in
             options.dsn = "https://36a7d7a2a5e4f350eef0142c1ec297e0@o4508052459225088.ingest.us.sentry.io/4508052462305280"
             options.tracesSampleRate = 0.5 // Sample 50% of transactions
+            options.maxBreadcrumbs = 100
+            options.enableAutoBreadcrumbTracking = true
+            options.enableNetworkBreadcrumbs = true
+            options.sendDefaultPii = false
             #if DEBUG
             options.enabled = false
             #else

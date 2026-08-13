@@ -153,6 +153,11 @@ actor BookmarkSyncCoordinator {
     }
 
     private func performSync() async throws {
+        AppDiagnostics.addBreadcrumb(
+            "Favorite sync started",
+            category: "favorites.sync",
+            data: ["comiket_number": eventNumber]
+        )
         if let pending = try await localStore.pendingCanonicalFavoriteMutation(
             eventNumber: eventNumber
         ) {
@@ -193,6 +198,15 @@ actor BookmarkSyncCoordinator {
         guard canonical.eventNumber == eventNumber else {
             throw CominaviServiceError.invalidResponse
         }
+        AppDiagnostics.addBreadcrumb(
+            "Canonical favorites fetched",
+            category: "favorites.sync",
+            data: [
+                "comiket_number": eventNumber,
+                "revision": canonical.revision,
+                "favorite_count": canonical.favorites.count,
+            ]
+        )
         await importInitialCirclemsFavoritesIfNeeded(canonicalRevision: canonical.revision)
         let remoteIDs = Set(canonical.favorites.map(\.publicCircleID))
         let existingLocal = try await localStore.allBookmarks(eventNumber: eventNumber)
@@ -343,15 +357,33 @@ actor BookmarkSyncCoordinator {
                     syncState: .pendingUpsert
                 )
             }
-            _ = try await localStore.completeInitialCirclemsFavoriteImport(
+            let importedCount = try await localStore.completeInitialCirclemsFavoriteImport(
                 eventNumber: eventNumber,
                 bookmarks: bookmarks,
                 completedAt: Date()
+            )
+            AppDiagnostics.addBreadcrumb(
+                "Initial Circle.ms favorites imported",
+                category: "favorites.circlems_import",
+                data: [
+                    "comiket_number": eventNumber,
+                    "provider_favorite_count": itemsByPublicCircleID.count,
+                    "imported_count": importedCount,
+                ]
             )
         } catch {
             // Provider import is a one-time compatibility convenience. A provider
             // or network failure must not block ComiNavi's canonical favorites.
             NSLog("Initial Circle.ms favorite import failed: \(error)")
+            AppDiagnostics.addBreadcrumb(
+                "Initial Circle.ms favorite import failed",
+                category: "favorites.circlems_import",
+                level: .warning,
+                data: [
+                    "comiket_number": eventNumber,
+                    "error_type": String(describing: type(of: error)),
+                ]
+            )
         }
     }
 

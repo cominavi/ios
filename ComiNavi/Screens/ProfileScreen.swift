@@ -26,8 +26,16 @@ struct ProfileLogoutCoordinator {
 }
 
 struct ProfileScreen: View {
-    private struct ProfileEditorPresentation: Identifiable {
-        let id: String
+    private enum PresentedSheet: Identifiable {
+        case profileEditor(userID: String)
+        case issueReport
+
+        var id: String {
+            switch self {
+            case .profileEditor(let userID): "profile-editor-\(userID)"
+            case .issueReport: "issue-report"
+            }
+        }
     }
 
     @AppStorage(SharedLocationClipboardImporter.enabledDefaultsKey)
@@ -41,7 +49,7 @@ struct ProfileScreen: View {
     let sharedLocationInbox: SharedLocationInbox
     @State private var profileIssue: String?
     @State private var isShowingPendingMutationDiscardConfirmation = false
-    @State private var profileEditorPresentation: ProfileEditorPresentation?
+    @State private var presentedSheet: PresentedSheet?
     @State private var favoriteRecoveries: [QuarantinedCanonicalFavoriteMutation] = []
     @State private var favoriteRecoveryIssue: String?
     @State private var favoriteRecoveryPendingDiscard: QuarantinedCanonicalFavoriteMutation?
@@ -118,7 +126,7 @@ struct ProfileScreen: View {
                                 Spacer(minLength: 0)
 
                                 Button {
-                                    profileEditorPresentation = .init(id: profile.id)
+                                    presentedSheet = .profileEditor(userID: profile.id)
                                 } label: {
                                     Label("編集", systemImage: "pencil")
                                 }
@@ -259,6 +267,15 @@ struct ProfileScreen: View {
                 }
             }
 
+            Section("Support") {
+                Button {
+                    presentedSheet = .issueReport
+                } label: {
+                    Label("Report an issue", systemImage: "exclamationmark.bubble")
+                }
+                .accessibilityIdentifier("profile-report-issue")
+            }
+
             Section("Account") {
                 Button {
                     if !isLoggedIn {
@@ -291,9 +308,14 @@ struct ProfileScreen: View {
             }
         }
         .navigationTitle("Profile")
-        .sheet(item: $profileEditorPresentation) { _ in
-            NavigationStack {
-                ProfileEditorScreen(profileStore: profileStore)
+        .sheet(item: $presentedSheet) { sheet in
+            switch sheet {
+            case .profileEditor:
+                NavigationStack {
+                    ProfileEditorScreen(profileStore: profileStore)
+                }
+            case .issueReport:
+                IssueReportScreen()
             }
         }
         .fullScreenCover(isPresented: $isShowingAccountDeletionConfirmation) {
