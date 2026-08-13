@@ -3,7 +3,7 @@ import Foundation
 import XCTest
 
 @MainActor
-final class SharedPlanPhaseAPresentationTests: XCTestCase {
+final class SharedPlanManagementPresentationTests: XCTestCase {
     func testPrimaryPlanPreferenceIsLocalScopedAndRejectsArchivedPlans() throws {
         let suiteName = "SharedPlanPrimaryPlanPreferenceTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -33,7 +33,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     func testProductionSharedPlanWritesAreEnabled() {
         XCTAssertTrue(SharedPlanPresentationFeatures.production.writesEnabled)
 
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         let model = SharedPlanManagementModel(planID: planID)
         model.synchronize(from: store)
 
@@ -42,7 +42,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     }
 
     func testManagementPaginationPreservesCachedRowsWhenRefreshFails() async throws {
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         store.firstMembers = [makeMember(userID: userA, name: "Owner", role: .owner)]
         store.nextMembers = [makeMember(userID: userB, name: "Editor", role: .editor)]
         store.firstInvitations = [makeInvitation(id: invitationA)]
@@ -75,7 +75,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     }
 
     func testVisibleInvitationsExcludeRevokedRows() {
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         store.invitationsByPlanID[planID] = [
             makeInvitation(id: invitationA),
             makeInvitation(
@@ -92,7 +92,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     }
 
     func testExplicitReadOnlyGateRejectsAdministrativeMutation() async {
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         let model = SharedPlanManagementModel(
             planID: planID,
             features: SharedPlanPresentationFeatures(writesEnabled: false)
@@ -111,7 +111,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     }
 
     func testNonOwnerCannotAdministerWhenWriteFeatureIsEnabled() async {
-        let store = PhaseAStoreStub(plan: makePlan(role: .editor))
+        let store = ManagementStoreStub(plan: makePlan(role: .editor))
         let model = SharedPlanManagementModel(
             planID: planID,
             features: SharedPlanPresentationFeatures(writesEnabled: true)
@@ -130,7 +130,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     }
 
     func testEditorCanCreateAndRevokeOnlyInvitationsAuthorizedByTheRow() async {
-        let store = PhaseAStoreStub(plan: makePlan(role: .editor))
+        let store = ManagementStoreStub(plan: makePlan(role: .editor))
         store.invitationsByPlanID[planID] = [
             makeInvitation(id: invitationA, currentUserCanRevoke: true),
             makeInvitation(id: invitationB, currentUserCanRevoke: false),
@@ -169,7 +169,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     }
 
     func testOwnerCreateInvitationDrainsToProtectedOneTimeResult() async throws {
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         let model = SharedPlanManagementModel(planID: planID)
         model.synchronize(from: store)
         let expiresAt = Date(timeIntervalSince1970: 1_786_886_400)
@@ -196,7 +196,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     }
 
     func testOwnerActionsAndQuarantineRecoveryUseStoreAuthority() async {
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         let quarantinedID = UUID()
         store.quarantinedRESTWrites = [makeAdministrativeWrite(
             id: quarantinedID,
@@ -227,7 +227,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     func testProtectedInvitationRequiresMatchingAuthoritativeActiveRowAcrossRelaunch() {
         let expiresAt = Date(timeIntervalSince1970: 1_900_000_000)
         let protected = makeProtectedInvitation(expiresAt: expiresAt)
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         store.createdInvitations[protected.requestID] = protected
         store.invitationsByPlanID[planID] = [makeInvitation(
             id: protected.invitationID,
@@ -292,7 +292,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     }
 
     func testPresentationModelsMutuallyExcludeRefreshAndPagination() async {
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         store.firstMembers = [makeMember(userID: userA, name: "Owner", role: .owner)]
         store.nextMembers = [makeMember(userID: userB, name: "Editor", role: .editor)]
         store.firstInvitations = [makeInvitation(id: invitationA)]
@@ -300,7 +300,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
         let management = SharedPlanManagementModel(planID: planID)
         await management.load(using: store)
 
-        let refreshGate = PhaseATestGate()
+        let refreshGate = ManagementTestGate()
         store.memberRefreshGate = refreshGate
         let refresh = Task { @MainActor in
             await management.refresh(using: store)
@@ -321,7 +321,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
         )]
         let inbox = SharedPlanNotificationInboxModel()
         await inbox.load(using: store)
-        let loadMoreGate = PhaseATestGate()
+        let loadMoreGate = ManagementTestGate()
         store.notificationLoadMoreGate = loadMoreGate
         let loadMore = Task { @MainActor in
             await inbox.loadMore(using: store)
@@ -337,7 +337,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     func testNotificationInboxRetainsCachedHistoryPaginatesAndMarksRead() async throws {
         let cached = makeNotification(idCharacter: "a", operationType: .circleMemoSplice)
         let next = makeNotification(idCharacter: "b", operationType: .needCreate)
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         store.notifications = [cached]
         store.notificationError = URLError(.notConnectedToInternet)
         let model = SharedPlanNotificationInboxModel()
@@ -382,7 +382,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
             operationType: .circlePresence,
             createdAt: createdAt
         )
-        let store = PhaseAStoreStub(plan: makePlan())
+        let store = ManagementStoreStub(plan: makePlan())
         store.notifications = [purchase, circle]
         store.notificationReadAt = createdAt.addingTimeInterval(30)
         let model = SharedPlanNotificationInboxModel()
@@ -489,7 +489,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
     }
 
     func testSynchronizingAnotherAccountRemovesPriorAccountPresentationState() {
-        let firstStore = PhaseAStoreStub(plan: makePlan())
+        let firstStore = ManagementStoreStub(plan: makePlan())
         firstStore.firstMembers = [makeMember(userID: userA, name: "Owner", role: .owner)]
         firstStore.membersByPlanID[planID] = firstStore.firstMembers
         firstStore.notifications = [makeNotification(
@@ -504,7 +504,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
         XCTAssertFalse(management.members.isEmpty)
         XCTAssertFalse(inbox.notifications.isEmpty)
 
-        let secondStore = PhaseAStoreStub(plan: nil)
+        let secondStore = ManagementStoreStub(plan: nil)
         management.synchronize(from: secondStore)
         inbox.synchronize(from: secondStore)
         XCTAssertEqual(management.members, [])
@@ -515,7 +515,7 @@ final class SharedPlanPhaseAPresentationTests: XCTestCase {
 }
 
 @MainActor
-private final class PhaseAStoreStub: SharedPlanManagementServicing,
+private final class ManagementStoreStub: SharedPlanManagementServicing,
     SharedPlanNotificationServicing
 {
     var plans: [SharedPlan]
@@ -552,8 +552,8 @@ private final class PhaseAStoreStub: SharedPlanManagementServicing,
     var invitationLoadMoreCount = 0
     var notificationRefreshCount = 0
     var notificationLoadMoreCount = 0
-    var memberRefreshGate: PhaseATestGate?
-    var notificationLoadMoreGate: PhaseATestGate?
+    var memberRefreshGate: ManagementTestGate?
+    var notificationLoadMoreGate: ManagementTestGate?
     private var queuedInvitation: (UUID, Date)?
 
     init(plan: SharedPlan?) {
@@ -660,8 +660,8 @@ private final class PhaseAStoreStub: SharedPlanManagementServicing,
             )
             createdInvitations[requestID] = SharedPlanCreatedInvitation(
                 requestID: requestID,
-                planID: SharedPlanPhaseAPresentationTests.planID,
-                invitationID: SharedPlanPhaseAPresentationTests.invitationA,
+                planID: SharedPlanManagementPresentationTests.planID,
+                invitationID: SharedPlanManagementPresentationTests.invitationA,
                 token: "AQEBAQEBAQEB",
                 expiresAt: expiresAt,
                 canonicalURL: URL(string: "https://cominavi.net/join/AQEBAQEBAQEB")!,
@@ -712,7 +712,7 @@ private final class PhaseAStoreStub: SharedPlanManagementServicing,
         let id = UUID()
         pendingRESTWrites.append(SharedPlanRESTWrite(
             id: id,
-            planID: SharedPlanPhaseAPresentationTests.planID,
+            planID: SharedPlanManagementPresentationTests.planID,
             kind: kind,
             baseRevision: 4,
             name: nil,
@@ -736,7 +736,7 @@ private final class PhaseAStoreStub: SharedPlanManagementServicing,
     }
 }
 
-private extension SharedPlanPhaseAPresentationTests {
+private extension SharedPlanManagementPresentationTests {
     static let planID = "11111111-1111-4111-8111-111111111111"
     static let userA = "00000000000000000000000000000001"
     static let userB = "00000000000000000000000000000002"
@@ -905,7 +905,7 @@ private extension SharedPlanPhaseAPresentationTests {
     }
 }
 
-private actor PhaseATestGate {
+private actor ManagementTestGate {
     private var hasEntered = false
     private var isOpen = false
     private var entryWaiters: [CheckedContinuation<Void, Never>] = []

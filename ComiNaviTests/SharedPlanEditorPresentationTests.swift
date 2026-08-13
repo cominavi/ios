@@ -3,9 +3,9 @@ import Foundation
 import XCTest
 
 @MainActor
-final class SharedPlanPhaseBPresentationTests: XCTestCase {
+final class SharedPlanEditorPresentationTests: XCTestCase {
     func testProductionGateStartsWritableSyncAndRoutesMutation() async {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = SharedPlanEditorModel(planID: Self.planID)
 
         await model.load(using: service)
@@ -23,7 +23,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testExpectedCancellationDoesNotBecomeAnEditorIssue() async throws {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()
         await model.load(using: service)
 
@@ -47,7 +47,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testExplicitDisabledGateKeepsEditorReadOnlyAndSendsNoMutation() async {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = SharedPlanEditorModel(
             planID: Self.planID,
             features: SharedPlanPresentationFeatures(writesEnabled: false)
@@ -69,7 +69,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testPurchaseRequestRequiresANameAndCarriesRequesterPrice() async {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()
         await model.load(using: service)
 
@@ -126,7 +126,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testPurchaseProgressUpdateRoutesRequestedAndBoughtTogether() async {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()
         await model.load(using: service)
 
@@ -159,7 +159,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
             ],
             selectedParentID: Self.needParentID
         )
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot(
+        let service = EditorServiceStub(snapshot: makeSnapshot(
             conflicts: [circleParent.parentConflict, needParent.parentConflict]
         ))
         service.circleParentInventory = circleParent
@@ -273,7 +273,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testMemoDebounceCoalescesUnicodeDraftAndStopFlushesLatestValue() async throws {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel(memoDebounce: .milliseconds(30))
         await model.load(using: service)
 
@@ -295,7 +295,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testMemoProductionDebounceWaitsFourSecondsAndStopFlushesImmediately() async throws {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()
         await model.load(using: service)
 
@@ -342,7 +342,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         ]
 
         for (model, snapshot) in cases {
-            let service = PhaseBEditorServiceStub(snapshot: snapshot)
+            let service = EditorServiceStub(snapshot: snapshot)
             await model.load(using: service)
             model.stageMemo("保存してはいけない", circle: Self.circle, using: service)
             XCTAssertFalse(model.hasUnsavedMemoDrafts)
@@ -352,7 +352,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testMemoDebounceWaitsForAnotherMutationAndPersistsLatestUnicodeOnce() async throws {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         service.suspendNextWantedMutation = true
         let model = makeWritableModel(memoDebounce: .milliseconds(10))
         await model.load(using: service)
@@ -383,7 +383,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testRemovedCircleBeforeStopPreservesKeyedMemoRecoveryExport() async {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel(memoDebounce: .seconds(30))
         await model.load(using: service)
         model.stageMemo("消してはいけない下書き", circle: Self.circle, using: service)
@@ -408,7 +408,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testMemoFailureRetainsAndRetriesExactGeneration() async throws {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         service.memoFailuresRemaining = 1
         let model = makeWritableModel(
             memoDebounce: .milliseconds(10),
@@ -428,7 +428,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testMemoSuccessClearsSubmittedGenerationDespiteConcurrentMergedText() async throws {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         service.suspendNextMemoMutation = true
         service.memoResultTexts = ["同時編集後の第三の値", "最終マージ値"]
         let model = makeWritableModel(memoDebounce: .milliseconds(10))
@@ -452,7 +452,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
 
     func testScalarConflictForwardsOnlyAnExactCurrentCandidate() async {
         let conflict = makeScalarConflict()
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot(conflicts: [conflict]))
+        let service = EditorServiceStub(snapshot: makeSnapshot(conflicts: [conflict]))
         let model = makeWritableModel()
         await model.load(using: service)
 
@@ -487,7 +487,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
             selectedParentID: Self.circleParentID,
             nestedCount: 2
         )
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot(
+        let service = EditorServiceStub(snapshot: makeSnapshot(
             conflicts: [inventory.parentConflict]
         ))
         service.circleParentInventory = inventory
@@ -539,7 +539,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
 
     func testLocalPrecommitLimitIsReadOnlyButKeepsRecoveryAndSourceProjection() async {
         let recovery = makeRecovery()
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot(
+        let service = EditorServiceStub(snapshot: makeSnapshot(
             pendingOperationCount: 1_000,
             localEditLimit: .syncBacklog(maximum: 1_000, pending: 1_000),
             recoveryDocument: recovery,
@@ -569,7 +569,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
 
     func testTerminalQuarantineRecoveryUsesExplicitDiscardOrRebase() async {
         let issue = SharedPlanSyncIssue.backlogLimit(maximum: 1_000, received: 1_001)
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot(
+        let service = EditorServiceStub(snapshot: makeSnapshot(
             syncStatus: .quarantined(issue),
             syncIssue: issue,
             recoveryDocument: makeRecovery(),
@@ -601,7 +601,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
 
     func testOpaqueRecoveryOffersDiscardWithoutAttemptingRebase() async {
         let issue = SharedPlanSyncIssue.unavailable("retained document is malformed")
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot(
+        let service = EditorServiceStub(snapshot: makeSnapshot(
             syncStatus: .quarantined(issue),
             syncIssue: issue,
             recoveryDocument: makeRecovery(),
@@ -624,7 +624,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testArchivedViewerAndWaitingForWritableSyncRemainDistinct() async {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot(
+        let service = EditorServiceStub(snapshot: makeSnapshot(
             plan: makePlan(lifecycle: .archived)
         ))
         let model = makeWritableModel()
@@ -801,7 +801,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testBackgroundFlushPersistsLatestUnicodeDraftWithoutStoppingSync() async {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel(memoDebounce: .seconds(30))
         await model.load(using: service)
         model.stageMemo("背景保存👨‍👩‍👧‍👦e\u{301}", circle: Self.circle, using: service)
@@ -816,7 +816,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testOlderSuspendedProjectionCannotOverwriteNewerRemoteAuthority() async throws {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()
         await model.load(using: service)
 
@@ -853,7 +853,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 
     func testProjectionSubscriptionAppliesRemoteChangesAndCancellationStopsOnce() async throws {
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()
         let run = Task { @MainActor in await model.run(using: service) }
         try await waitUntil { model.plan != nil }
@@ -884,7 +884,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
             ),
         ]
         for snapshot in snapshots {
-            let service = PhaseBEditorServiceStub(snapshot: snapshot)
+            let service = EditorServiceStub(snapshot: snapshot)
             await makeWritableModel().load(using: service)
             XCTAssertEqual(service.startSyncCount, 0)
         }
@@ -904,7 +904,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
             selectedParentOperationID: secondParentID,
             requiredNestedConflicts: first.requiredNestedConflicts
         )
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot(
+        let service = EditorServiceStub(snapshot: makeSnapshot(
             conflicts: [first.parentConflict]
         ))
         service.circleParentInventories = [
@@ -1002,7 +1002,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
         XCTAssertEqual(emptyProgress.fulfilledFraction, 0)
         XCTAssertEqual(emptyProgress.fulfilledPercentage, 0)
 
-        let service = PhaseBEditorServiceStub(snapshot: makeSnapshot())
+        let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()
         await model.load(using: service)
         await model.setMemberOutcome(
@@ -1032,7 +1032,7 @@ final class SharedPlanPhaseBPresentationTests: XCTestCase {
     }
 }
 
-private enum PhaseBEditorAction: Equatable {
+private enum EditorAction: Equatable {
     case circlePresence(SharedPlanPresenceState, SharedPlanCircleKey)
     case memo(String, SharedPlanCircleKey)
     case createNeed(SharedPlanPurchaseNeed, SharedPlanCircleKey)
@@ -1056,7 +1056,7 @@ private enum PhaseBEditorAction: Equatable {
     case rebase
 }
 
-private extension PhaseBEditorAction {
+private extension EditorAction {
     var isMemo: Bool {
         if case .memo = self { return true }
         return false
@@ -1064,10 +1064,10 @@ private extension PhaseBEditorAction {
 }
 
 @MainActor
-private final class PhaseBEditorServiceStub: SharedPlanEditorServicing {
+private final class EditorServiceStub: SharedPlanEditorServicing {
     var snapshot: SharedPlanEditorSnapshot
     var projectionGeneration: UInt64 = 1
-    var actions: [PhaseBEditorAction] = []
+    var actions: [EditorAction] = []
     var editorProjectionError: Error?
     var persistMemoDraftError: Error?
     var persistMemoDraftAttempts = 0
@@ -1341,7 +1341,7 @@ private final class PhaseBEditorServiceStub: SharedPlanEditorServicing {
         circle: SharedPlanCircleKey,
         selectedParentOperationID: UUID
     ) async throws -> SharedPlanParentResolutionInventory {
-        guard circle == SharedPlanPhaseBPresentationTests.circle,
+        guard circle == SharedPlanEditorPresentationTests.circle,
               let inventory = circleParentInventories[selectedParentOperationID]
                 ?? circleParentInventory,
               inventory.selectedParentOperationID == selectedParentOperationID
@@ -1376,8 +1376,8 @@ private final class PhaseBEditorServiceStub: SharedPlanEditorServicing {
         needID: UUID,
         selectedParentOperationID: UUID
     ) async throws -> SharedPlanParentResolutionInventory {
-        guard circle == SharedPlanPhaseBPresentationTests.circle,
-              needID == SharedPlanPhaseBPresentationTests.needID,
+        guard circle == SharedPlanEditorPresentationTests.circle,
+              needID == SharedPlanEditorPresentationTests.needID,
               needParentInventory?.selectedParentOperationID == selectedParentOperationID,
               let needParentInventory
         else { throw SharedPlanError.syncProtocolViolation }
@@ -1536,7 +1536,7 @@ private extension SharedPlanEditorSnapshot {
     }
 }
 
-private extension SharedPlanPhaseBPresentationTests {
+private extension SharedPlanEditorPresentationTests {
     static let planID = "11111111-1111-4111-8111-111111111111"
     static let userID = "00000000000000000000000000000001"
     static let buyerID = "00000000000000000000000000000002"
@@ -1764,7 +1764,7 @@ private extension SharedPlanPhaseBPresentationTests {
         conflict: SharedPlanDocumentConflict,
         parentID: UUID,
         model: SharedPlanEditorModel,
-        service: PhaseBEditorServiceStub
+        service: EditorServiceStub
     ) async {
         await model.prepareParentResolution(
             conflictID: conflict.id,
