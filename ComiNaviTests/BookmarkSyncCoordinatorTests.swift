@@ -3,6 +3,43 @@ import XCTest
 @testable import ComiNavi
 
 final class BookmarkSyncCoordinatorTests: XCTestCase {
+    func testUntouchedCanonicalFavoritesImportCirclemsColorsOnce() async throws {
+        let localStore = InMemoryUserPlanStore()
+        let service = IdempotentFavoriteService(initialRevision: 0)
+        let circlemsImport = CirclemsFavoriteImportStub(items: [
+            CirclemsFavoriteImportItem(
+                wcID: 9_902,
+                updateID: 9_902,
+                circleName: "Imported Circle",
+                color: BookmarkColor.green.rawValue,
+                memo: "buy new release"
+            ),
+        ])
+        let coordinator = BookmarkSyncCoordinator(
+            eventID: 3_248,
+            eventNumber: 108,
+            catalog: FixtureMapCatalog(),
+            localStore: localStore,
+            serviceFavoriteSync: service,
+            circlemsImport: circlemsImport
+        )
+
+        try await coordinator.sync()
+        try await coordinator.sync()
+
+        let stored = try await localStore.bookmark(
+            eventNumber: 108,
+            publicCircleID: 9_902
+        )
+        let importedPages = await circlemsImport.requestCount()
+        let snapshot = await service.currentSnapshot()
+        XCTAssertEqual(stored?.color, .green)
+        XCTAssertEqual(stored?.memo, "buy new release")
+        XCTAssertEqual(stored?.syncState, .synced)
+        XCTAssertEqual(snapshot.favorites.map(\.color), [.green])
+        XCTAssertEqual(importedPages, 1)
+    }
+
     func testConcurrentRequestsCoalesceIntoOneTrailingReconciliation() async throws {
         let localStore = InMemoryUserPlanStore()
         let serviceSync = BlockingCominaviFavoriteSync()
@@ -378,11 +415,7 @@ private actor IdempotentFavoriteService: CominaviFavoriteSyncing {
         let favorites: [CominaviFavorite]
     }
 
-    private var snapshot = CominaviFavoriteSnapshot(
-        eventNumber: 108,
-        revision: 1,
-        favorites: []
-    )
+    private var snapshot: CominaviFavoriteSnapshot
     private var receipts: [UUID: CominaviFavoriteSnapshot] = [:]
     private var requests: [RequestedMutation] = []
     private var operations: [String] = []
@@ -391,9 +424,15 @@ private actor IdempotentFavoriteService: CominaviFavoriteSyncing {
     private var shouldConflictFirstMutation: Bool
 
     init(
+        initialRevision: Int = 1,
         failAfterFirstCommit: Bool = false,
         conflictFirstMutation: Bool = false
     ) {
+        snapshot = CominaviFavoriteSnapshot(
+            eventNumber: 108,
+            revision: initialRevision,
+            favorites: []
+        )
         shouldLoseFirstResponse = failAfterFirstCommit
         shouldConflictFirstMutation = conflictFirstMutation
     }
@@ -458,7 +497,33 @@ private actor IdempotentFavoriteService: CominaviFavoriteSyncing {
     func requestedMutations() -> [RequestedMutation] { requests }
     func operationLog() -> [String] { operations }
     func commitCount() -> Int { commits }
+    func currentSnapshot() -> CominaviFavoriteSnapshot { snapshot }
     func resetOperationLog() { operations = [] }
+}
+
+private actor CirclemsFavoriteImportStub: CirclemsFavoriteImportServicing {
+    private let items: [CirclemsFavoriteImportItem]
+    private var requests = 0
+
+    init(items: [CirclemsFavoriteImportItem]) {
+        self.items = items
+    }
+
+    func circlemsFavoriteImportPage(
+        eventNumber: Int,
+        cursor: String?
+    ) async throws -> CirclemsFavoriteImportPage {
+        XCTAssertEqual(eventNumber, 108)
+        XCTAssertNil(cursor)
+        requests += 1
+        return CirclemsFavoriteImportPage(
+            eventNumber: eventNumber,
+            items: items,
+            nextCursor: nil
+        )
+    }
+
+    func requestCount() -> Int { requests }
 }
 
 private actor RecordingFavoriteRemoteStore: FavoriteRemoteStoring {

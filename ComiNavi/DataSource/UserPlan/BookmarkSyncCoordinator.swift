@@ -97,6 +97,7 @@ actor BookmarkSyncCoordinator {
     private let catalog: any MapCatalog
     private let localStore: any UserPlanStoring
     private let serviceFavoriteSync: any CominaviFavoriteSyncing
+    private let circlemsImport: (any CirclemsFavoriteImportServicing)?
     private let circlemsMirror: (any FavoriteRemoteStoring)?
     private var requestedRevision: UInt64 = 0
     private var completedRevision: UInt64 = 0
@@ -108,6 +109,7 @@ actor BookmarkSyncCoordinator {
         catalog: any MapCatalog,
         localStore: any UserPlanStoring,
         serviceFavoriteSync: any CominaviFavoriteSyncing,
+        circlemsImport: (any CirclemsFavoriteImportServicing)? = nil,
         circlemsMirror: (any FavoriteRemoteStoring)? = nil
     ) {
         self.eventID = eventID
@@ -115,6 +117,7 @@ actor BookmarkSyncCoordinator {
         self.catalog = catalog
         self.localStore = localStore
         self.serviceFavoriteSync = serviceFavoriteSync
+        self.circlemsImport = circlemsImport
         self.circlemsMirror = circlemsMirror
     }
 
@@ -190,6 +193,7 @@ actor BookmarkSyncCoordinator {
         guard canonical.eventNumber == eventNumber else {
             throw CominaviServiceError.invalidResponse
         }
+        await importInitialCirclemsFavoritesIfNeeded(canonicalRevision: canonical.revision)
         let remoteIDs = Set(canonical.favorites.map(\.publicCircleID))
         let existingLocal = try await localStore.allBookmarks(eventNumber: eventNumber)
         let pendingIDs = Set(existingLocal.filter { $0.syncState != .synced }.map(\.publicCircleID))
@@ -278,6 +282,76 @@ actor BookmarkSyncCoordinator {
                 // stranded behind this terminal request.
                 try await reconcileCanonicalFavorites(allowConflictRebase: allowConflictRebase)
             }
+        }
+    }
+
+    private func importInitialCirclemsFavoritesIfNeeded(canonicalRevision: Int) async {
+        guard canonicalRevision == 0, let circlemsImport else { return }
+        do {
+            let hasCompleted = try await localStore.hasCompletedInitialCirclemsFavoriteImport(
+                eventNumber: eventNumber
+            )
+            guard !hasCompleted else { return }
+
+            var itemsByPublicCircleID: [Int: CirclemsFavoriteImportItem] = [:]
+            var cursor: String?
+            var seenCursors: Set<String> = []
+            for _ in 0..<100 {
+                let page = try await circlemsImport.circlemsFavoriteImportPage(
+                    eventNumber: eventNumber,
+                    cursor: cursor
+                )
+                guard page.eventNumber == eventNumber else {
+                    throw CominaviServiceError.invalidResponse
+                }
+                for item in page.items {
+                    itemsByPublicCircleID[item.wcID] = item
+                }
+                guard let nextCursor = page.nextCursor else {
+                    cursor = nil
+                    break
+                }
+                guard seenCursors.insert(nextCursor).inserted else {
+                    throw CominaviServiceError.invalidResponse
+                }
+                cursor = nextCursor
+            }
+            guard cursor == nil else { throw CominaviServiceError.invalidResponse }
+
+            let locations = try await catalog.bookmarkLocations(
+                publicCircleIDs: Array(itemsByPublicCircleID.keys)
+            )
+            let locationByPublicID = Dictionary(
+                uniqueKeysWithValues: locations.map { ($0.publicCircleID, $0) }
+            )
+            let bookmarks = itemsByPublicCircleID.values.compactMap { item -> MapBookmark? in
+                guard let color = BookmarkColor(rawValue: item.color),
+                      let location = locationByPublicID[item.wcID]
+                else { return nil }
+                return MapBookmark(
+                    eventNumber: eventNumber,
+                    publicCircleID: item.wcID,
+                    catalogCircleID: location.catalogCircleID,
+                    updateID: location.updateID,
+                    day: location.day,
+                    mapID: location.mapID,
+                    tableID: location.tableID,
+                    subspace: location.subspace,
+                    color: color,
+                    memo: item.memo,
+                    modifiedAt: Date(),
+                    syncState: .pendingUpsert
+                )
+            }
+            _ = try await localStore.completeInitialCirclemsFavoriteImport(
+                eventNumber: eventNumber,
+                bookmarks: bookmarks,
+                completedAt: Date()
+            )
+        } catch {
+            // Provider import is a one-time compatibility convenience. A provider
+            // or network failure must not block ComiNavi's canonical favorites.
+            NSLog("Initial Circle.ms favorite import failed: \(error)")
         }
     }
 

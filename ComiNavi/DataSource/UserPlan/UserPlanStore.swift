@@ -101,6 +101,13 @@ protocol UserPlanStoring: Sendable {
         eventNumber: Int,
         mutationID: UUID
     ) async throws
+    func hasCompletedInitialCirclemsFavoriteImport(eventNumber: Int) async throws -> Bool
+    @discardableResult
+    func completeInitialCirclemsFavoriteImport(
+        eventNumber: Int,
+        bookmarks: [MapBookmark],
+        completedAt: Date
+    ) async throws -> Int
     func followingImportState(eventNumber: Int) async throws -> FollowingImportState?
     func importedCircleSources(eventNumber: Int) async throws -> [ImportedCircleSource]
     func mergeFollowingImport(
@@ -195,6 +202,14 @@ actor SQLiteUserPlanStore: UserPlanStoring {
                 table.column("affectedPublicCircleIDs", .blob).notNull()
                 table.column("rejectedAt", .datetime).notNull()
                 table.primaryKey(["eventNumber", "mutationID"])
+            }
+        }
+        migrator.registerMigration("track-initial-circlems-favorite-import") { database in
+            try database.create(
+                table: CirclemsFavoriteImportCompletionRecord.databaseTableName
+            ) { table in
+                table.column("eventNumber", .integer).primaryKey()
+                table.column("completedAt", .datetime).notNull()
             }
         }
         try migrator.migrate(database)
@@ -455,6 +470,47 @@ actor SQLiteUserPlanStore: UserPlanStoring {
         }
     }
 
+    func hasCompletedInitialCirclemsFavoriteImport(eventNumber: Int) async throws -> Bool {
+        try await database.read { database in
+            try CirclemsFavoriteImportCompletionRecord.fetchOne(
+                database,
+                key: eventNumber
+            ) != nil
+        }
+    }
+
+    @discardableResult
+    func completeInitialCirclemsFavoriteImport(
+        eventNumber: Int,
+        bookmarks: [MapBookmark],
+        completedAt: Date
+    ) async throws -> Int {
+        try await database.write { database in
+            if try CirclemsFavoriteImportCompletionRecord.fetchOne(
+                database,
+                key: eventNumber
+            ) != nil {
+                return 0
+            }
+
+            var importedCount = 0
+            for bookmark in bookmarks where bookmark.eventNumber == eventNumber {
+                let key: [String: DatabaseValueConvertible] = [
+                    "eventNumber": eventNumber,
+                    "publicCircleID": bookmark.publicCircleID,
+                ]
+                guard try BookmarkRecord.fetchOne(database, key: key) == nil else { continue }
+                try BookmarkRecord(bookmark).save(database)
+                importedCount += 1
+            }
+            try CirclemsFavoriteImportCompletionRecord(
+                eventNumber: eventNumber,
+                completedAt: completedAt
+            ).insert(database)
+            return importedCount
+        }
+    }
+
     func followingImportState(eventNumber: Int) async throws -> FollowingImportState? {
         try await database.read { database in
             try FollowingImportStateRecord.fetchOne(database, key: eventNumber)?.state
@@ -594,6 +650,15 @@ private struct CanonicalFavoriteQuarantineRecord: Codable, FetchableRecord,
     }
 }
 
+private struct CirclemsFavoriteImportCompletionRecord: Codable, FetchableRecord,
+    PersistableRecord
+{
+    static let databaseTableName = "circlemsFavoriteImportCompletion"
+
+    let eventNumber: Int
+    let completedAt: Date
+}
+
 private struct BookmarkRecord: Codable, FetchableRecord, PersistableRecord {
     static let databaseTableName = "bookmark"
 
@@ -727,6 +792,7 @@ actor InMemoryUserPlanStore: UserPlanStoring {
         [Int: [UUID: QuarantinedCanonicalFavoriteMutation]] = [:]
     private var followingStates: [Int: FollowingImportState] = [:]
     private var importedSources: [ImportedSourceKey: ImportedCircleSource] = [:]
+    private var completedInitialCirclemsFavoriteImports: Set<Int> = []
 
     func bookmark(eventNumber: Int, publicCircleID: Int) async throws -> MapBookmark? {
         guard let bookmark = storedBookmarks[publicCircleID],
@@ -883,6 +949,30 @@ actor InMemoryUserPlanStore: UserPlanStoring {
             storedBookmarks[publicCircleID] = nil
         }
         canonicalFavoriteQuarantines[eventNumber]?[mutationID] = nil
+    }
+
+    func hasCompletedInitialCirclemsFavoriteImport(eventNumber: Int) async throws -> Bool {
+        completedInitialCirclemsFavoriteImports.contains(eventNumber)
+    }
+
+    @discardableResult
+    func completeInitialCirclemsFavoriteImport(
+        eventNumber: Int,
+        bookmarks: [MapBookmark],
+        completedAt: Date
+    ) async throws -> Int {
+        guard completedInitialCirclemsFavoriteImports.insert(eventNumber).inserted else {
+            return 0
+        }
+        var importedCount = 0
+        for bookmark in bookmarks
+        where bookmark.eventNumber == eventNumber
+            && storedBookmarks[bookmark.publicCircleID] == nil
+        {
+            storedBookmarks[bookmark.publicCircleID] = bookmark
+            importedCount += 1
+        }
+        return importedCount
     }
 
     func followingImportState(eventNumber: Int) async throws -> FollowingImportState? {

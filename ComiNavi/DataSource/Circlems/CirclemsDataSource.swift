@@ -964,6 +964,7 @@ final class CirclemsDataSource {
                 catalog: mapCatalog,
                 localStore: userPlanStore,
                 serviceFavoriteSync: CominaviServiceClient.shared,
+                circlemsImport: CominaviServiceClient.shared,
                 circlemsMirror: allowsCirclemsFavoriteMirror
                     ? CirclemsFavoriteRemoteStore()
                     : nil
