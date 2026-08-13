@@ -87,6 +87,38 @@ struct ComiketToolboxSection: Identifiable, Sendable {
     var id: ComiketToolboxResource.Category { category }
 }
 
+struct ComiketToolboxNotice: Identifiable, Sendable {
+    let id: String
+    let text: LocalizedStringResource
+}
+
+enum C108ToolboxNoticeCatalog {
+    static let notices: [ComiketToolboxNotice] = [
+        ComiketToolboxNotice(
+            id: "station-crowding",
+            text:
+                "Expect severe crowding and possible entry controls at Kokusai-tenjijo and Tokyo Big Sight stations from about 13:00 to 18:00. Leave extra time."
+        ),
+        ComiketToolboxNotice(
+            id: "east-galleria",
+            text:
+                "Some passages on levels 1 and 2 of the East Exhibition Hall Galleria are narrowed. Watch your footing."
+        ),
+        ComiketToolboxNotice(
+            id: "closed-halls",
+            text: "East Halls 4–6 are closed for renovation."
+        ),
+        ComiketToolboxNotice(
+            id: "east-drinks",
+            text: "There is no convenience store in the East area. Get drinks before entering."
+        ),
+        ComiketToolboxNotice(
+            id: "admission",
+            text: "Admission requires a ticket or wristband. Only PM wristbands are sold on-site."
+        ),
+    ]
+}
+
 enum ComiketToolboxCatalog {
     static let venueMapsURL = makeURL(
         "https://maps.apple.com/?daddr=Tokyo+Big+Sight,+3-11-1+Ariake,+Koto+City,+Tokyo&dirflg=r"
@@ -102,6 +134,16 @@ enum ComiketToolboxCatalog {
             "radio-tower",
             "https://x.com/comiketofficial",
             "twitter sns 公式 当日 最新 comiketofficial"
+        ),
+        resource(
+            "c108-last-minute-roundup",
+            .live,
+            "C108 last-minute official roundup",
+            "The committee’s current pre-event guidance, including today’s revisions and international materials.",
+            .comiket,
+            "list-checks",
+            "https://posfie.com/@comiketofficial/p/KaBB6nx",
+            "直前 まとめ latest guidance beginner international Dr.P"
         ),
         resource(
             "international-x",
@@ -297,21 +339,31 @@ enum ComiketToolboxCatalog {
             "rinkai-line",
             .travel,
             "Rinkai Line schedules",
-            "Official service notices and schedules for Kokusai-tenjijo Station.",
+            "Expect severe crowding and possible entry controls at Kokusai-tenjijo Station around 13:00–18:00 on both days.",
             .transitOperator,
             "calendar-clock",
             "https://www.twr.co.jp/route/tabid/102/Default.aspx",
-            "rinkai twr 国際展示場 りんかい線 時刻表 臨時ダイヤ"
+            "rinkai twr 国際展示場 りんかい線 時刻表 臨時ダイヤ 混雑 入場規制 13時 18時"
         ),
         resource(
             "yurikamome-c108",
             .travel,
             "Yurikamome C108 timetable",
-            "The operator's special event timetable for August 15–16.",
+            "Expect severe crowding and possible entry controls at Tokyo Big Sight Station around 13:00–18:00 on both days.",
             .transitOperator,
             "calendar-clock",
             "https://www.yurikamome.co.jp/company/news/bbee2796dd59429f6aa22fb274f5ace8_1.pdf",
-            "yurikamome 東京ビッグサイト駅 ゆりかもめ 時刻表 臨時ダイヤ pdf"
+            "yurikamome 東京ビッグサイト駅 ゆりかもめ 時刻表 臨時ダイヤ pdf 混雑 入場規制 13時 18時"
+        ),
+        resource(
+            "haneda-airport-limousine-c108",
+            .travel,
+            "Haneda airport limousine bus",
+            "Extra service runs between Haneda Airport and Tokyo Big Sight on August 15–16.",
+            .bigSight,
+            "navigation",
+            "https://x.com/comiketofficial/status/2087798510016208907",
+            "haneda airport limousine bus 羽田空港 リムジンバス 臨時便"
         ),
         resource(
             "tokyo-brt-c108",

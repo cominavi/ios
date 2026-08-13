@@ -200,27 +200,6 @@ private struct ToolboxResourceSectionView: View {
 }
 
 private struct C108ToolboxNotice: View {
-    private struct Notice: Identifiable {
-        let id: String
-        let text: LocalizedStringResource
-    }
-
-    private let notices: [Notice] = [
-        Notice(id: "closed-halls", text: "East Halls 4–6 are closed for renovation."),
-        Notice(
-            id: "east-drinks",
-            text: "There is no convenience store in the East area. Get drinks before entering."
-        ),
-        Notice(
-            id: "admission",
-            text: "Admission requires a ticket or wristband. Only PM wristbands are sold on-site."
-        ),
-        Notice(
-            id: "live-guidance",
-            text: "Crowd access can change. Follow current signs and Comiket staff."
-        ),
-    ]
-
     var body: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
@@ -231,7 +210,7 @@ private struct C108ToolboxNotice: View {
                         .font(.headline)
                 }
 
-                ForEach(notices) { notice in
+                ForEach(C108ToolboxNoticeCatalog.notices) { notice in
                     HStack(alignment: .firstTextBaseline, spacing: 9) {
                         Circle()
                             .fill(.orange)
@@ -243,7 +222,7 @@ private struct C108ToolboxNotice: View {
                 }
 
                 Text(
-                    "Checked against official C108 guidance. Always recheck live notices before travel."
+                    "Checked against official posts through August 13. Always recheck live notices before travel."
                 )
                 .font(.caption)
                 .foregroundStyle(.tertiary)

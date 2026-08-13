@@ -4666,6 +4666,146 @@
         }
       }
     },
+    "C108 last-minute official roundup" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C108直前公式情報まとめ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C108 막바지 공식 안내 모음"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C108 临近开展官方信息汇总"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C108 開展前官方資訊彙整"
+          }
+        }
+      }
+    },
+    "Extra service runs between Haneda Airport and Tokyo Big Sight on August 15–16." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8月15日・16日は、羽田空港と東京ビッグサイト間で臨時便が運行されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8월 15일과 16일에는 하네다공항과 도쿄 빅사이트 사이에 임시편이 운행됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8月15日至16日，羽田机场与 Tokyo Big Sight 之间将加开临时班次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8月15日至16日，羽田機場與 Tokyo Big Sight 之間將加開臨時班次"
+          }
+        }
+      }
+    },
+    "Haneda airport limousine bus" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "羽田空港リムジンバス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하네다공항 리무진버스"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "羽田机场豪华巴士"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "羽田機場巴士"
+          }
+        }
+      }
+    },
+    "Some passages on levels 1 and 2 of the East Exhibition Hall Galleria are narrowed. Watch your footing." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東展示棟ガレリア1階・2階では、一部の通路が狭くなっています。足元に注意してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동 전시동 갤러리아 1층과 2층의 일부 통로가 좁아져 있습니다. 발밑을 조심해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "东展览馆连廊1层和2层的部分通道变窄，请注意脚下"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東展示館連廊1樓和2樓的部分通道變窄，請留意腳下"
+          }
+        }
+      }
+    },
+    "The committee’s current pre-event guidance, including today’s revisions and international materials." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備会による最新の開催直前案内。当日の更新や海外参加者向け資料も確認できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "준비회의 최신 행사 직전 안내입니다. 당일 업데이트와 해외 참가자용 자료도 확인할 수 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准备会最新的开展前指南，包括当天更新和面向海外参加者的资料"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備會最新的開展前指南，包括當天更新和面向海外參加者的資料"
+          }
+        }
+      }
+    },
     "Calculating…" : {
       "comment" : "Placeholder while download speed and remaining time are being estimated.",
       "localizations" : {
@@ -5261,30 +5401,30 @@
         }
       }
     },
-    "Checked against official C108 guidance. Always recheck live notices before travel." : {
+    "Checked against official posts through August 13. Always recheck live notices before travel." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "C108公式案内をもとに確認済みです。出発前に必ず最新のお知らせを再確認してください。"
+            "value" : "8月13日までの公式投稿を確認済みです。出発前に必ず最新のお知らせを再確認してください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "C108 공식 안내를 기반으로 확인되었습니다. 출발 전에 반드시 최신 공지를 다시 확인해 주세요."
+            "value" : "8월 13일까지의 공식 게시물을 확인했습니다. 출발 전에 반드시 최신 공지를 다시 확인해 주세요."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "根据C108官方指南已经确认。出发前请务必再次确认最新的通知"
+            "value" : "已核对截至8月13日的官方发布。出发前请务必再次查看最新通知"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "根據C108官方指南已經確認了。出發前請務必再次確認最新的通知"
+            "value" : "已核對截至8月13日的官方發布。出發前請務必再次查看最新通知"
           }
         }
       }
@@ -8885,30 +9025,30 @@
         }
       }
     },
-    "Crowd access can change. Follow current signs and Comiket staff." : {
+    "Expect severe crowding and possible entry controls at Kokusai-tenjijo and Tokyo Big Sight stations from about 13:00 to 18:00. Leave extra time." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "混雑時の入場・移動方法は変わることがあります。現地の案内と準備会スタッフの指示に従ってください。"
+            "value" : "国際展示場駅と東京ビッグサイト駅では、13時頃〜18時頃に大変な混雑と入場規制が予想されています。時間に余裕を持って移動してください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "혼잡 시 입장·이동 방법은 변경될 수 있습니다. 현지 안내와 준비회 직원의 지시에 따라 주세요."
+            "value" : "국제전시장역과 도쿄 빅사이트역은 13시경부터 18시경까지 극심한 혼잡과 입장 제한이 예상됩니다. 이동 시간을 넉넉히 잡아 주세요."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "拥挤时入场和移动路线可能变化，请遵循现场标识和 Comiket 工作人员的指示"
+            "value" : "国际展示场站和 Tokyo Big Sight 站预计在13:00至18:00左右严重拥挤，并可能实施进站管制。请预留充足时间"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "擁擠時入場和移動路線可能變化，請遵循現場標示和 Comiket 工作人員的指示"
+            "value" : "國際展示場站和 Tokyo Big Sight 站預計在13:00至18:00左右嚴重擁擠，並可能實施進站管制。請預留充足時間"
           }
         }
       }
@@ -18019,30 +18159,30 @@
         }
       }
     },
-    "Official service notices and schedules for Kokusai-tenjijo Station." : {
+    "Expect severe crowding and possible entry controls at Kokusai-tenjijo Station around 13:00–18:00 on both days." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "国際展示場駅の公式運行情報・時刻表。"
+            "value" : "両日とも13時頃〜18時頃、国際展示場駅では大変な混雑と入場規制が予想されています。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "국제전시장역의 공식 운행 정보·시간표."
+            "value" : "양일 모두 13시경부터 18시경까지 국제전시장역의 극심한 혼잡과 입장 제한이 예상됩니다."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "国际展示场站的官方运行信息、时刻表"
+            "value" : "两天的13:00至18:00左右，国际展示场站预计严重拥挤，并可能实施进站管制"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "國際展示場站的官方運行資訊與時刻表"
+            "value" : "兩天的13:00至18:00左右，國際展示場站預計嚴重擁擠，並可能實施進站管制"
           }
         }
       }
@@ -26363,30 +26503,30 @@
         }
       }
     },
-    "The operator's special event timetable for August 15–16." : {
+    "Expect severe crowding and possible entry controls at Tokyo Big Sight Station around 13:00–18:00 on both days." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "8月15日・16日のイベント対応ダイヤ。"
+            "value" : "両日とも13時頃〜18時頃、東京ビッグサイト駅では大変な混雑と入場規制が予想されています。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "8월 15일·16일 이벤트 대응 일정."
+            "value" : "양일 모두 13시경부터 18시경까지 도쿄 빅사이트역의 극심한 혼잡과 입장 제한이 예상됩니다."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "运营方8月15日至16日的活动特别时刻表"
+            "value" : "两天的13:00至18:00左右，Tokyo Big Sight 站预计严重拥挤，并可能实施进站管制"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "運輸業者 8 月 15–16 日的活動特別時刻表"
+            "value" : "兩天的13:00至18:00左右，Tokyo Big Sight 站預計嚴重擁擠，並可能實施進站管制"
           }
         }
       }
