@@ -104,6 +104,33 @@ if ! jq -e --arg catalog_digest "${catalog_source_digest}" '
     all(.[];
         (.tweet_id | type == "string" and length > 0) and
         (
+            .providerRelationships as $relationships |
+            ($relationships | type == "object") and
+            $relationships.decision == "eligible" and
+            $relationships.metadataComplete == true and
+            (($relationships | has("retweetedPostId")) | not) and
+            (
+                if (($relationships | has("quotedPostId")) or
+                    ($relationships | has("quotedAuthorId"))) then
+                    ($relationships.quotedPostId | type == "string" and length > 0) and
+                    ($relationships.quotedAuthorId | type == "string" and length > 0) and
+                    ($relationships.authorId | type == "string" and length > 0) and
+                    $relationships.authorId == $relationships.quotedAuthorId
+                else
+                    (($relationships | has("quotedPostId")) | not) and
+                    (($relationships | has("quotedAuthorId")) | not)
+                end
+            )
+        ) and
+        (
+            [.post_reasons[]?] |
+            all(.[];
+                . != "native_retweet" and
+                . != "cross_author_quote" and
+                . != "unverifiable_quote_author"
+            )
+        ) and
+        (
             (
                 .post_confidence == "high" and
                 .placement_confidence == "high" and

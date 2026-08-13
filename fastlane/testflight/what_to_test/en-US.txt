@@ -1,1 +1,1 @@
-Circle tags are now available. Curated work, character, and content tags derived from catalog descriptions, publications, posts, and Shinagaki can be viewed, searched, and filtered.
+Fixed Shinagaki attribution for quoted or reposted content. New backend publications now reliably replace older cached data.

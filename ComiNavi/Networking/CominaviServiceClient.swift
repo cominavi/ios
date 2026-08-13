@@ -111,6 +111,8 @@ struct CominaviRealtimeUpdate: Codable, Hashable, Sendable {
 }
 
 struct CominaviRealtimeUpdatePage: Equatable, Sendable {
+    static let absentPublicationRevision = "none"
+
     enum TagOverlayStatus: String, Codable, Sendable {
         case current
         case absent
@@ -120,17 +122,29 @@ struct CominaviRealtimeUpdatePage: Equatable, Sendable {
 
     let updates: [CominaviRealtimeUpdate]
     let hasMore: Bool
+    let publicationRevision: String
+    let publicationGeneration: Int
+    let publicationCursor: Int
+    let resetRequired: Bool
     let tagOverlay: CominaviCircleTagOverlay?
     let tagOverlayStatus: TagOverlayStatus?
 
     init(
         updates: [CominaviRealtimeUpdate],
         hasMore: Bool,
+        publicationRevision: String = Self.absentPublicationRevision,
+        publicationGeneration: Int = 0,
+        publicationCursor: Int = 0,
+        resetRequired: Bool = false,
         tagOverlay: CominaviCircleTagOverlay? = nil,
         tagOverlayStatus: TagOverlayStatus? = nil
     ) {
         self.updates = updates
         self.hasMore = hasMore
+        self.publicationRevision = publicationRevision
+        self.publicationGeneration = publicationGeneration
+        self.publicationCursor = publicationCursor
+        self.resetRequired = resetRequired
         self.tagOverlay = tagOverlay
         self.tagOverlayStatus = tagOverlayStatus
     }
@@ -173,11 +187,25 @@ protocol CominaviRealtimeFetching: Sendable {
     func realtimeUpdates(
         eventNumber: Int,
         afterCursor: Int,
+        publicationRevision: String,
         tagRevision: String?
     ) async throws -> CominaviRealtimeUpdatePage
 }
 
 extension CominaviRealtimeFetching {
+    func realtimeUpdates(
+        eventNumber: Int,
+        afterCursor: Int,
+        tagRevision: String?
+    ) async throws -> CominaviRealtimeUpdatePage {
+        try await realtimeUpdates(
+            eventNumber: eventNumber,
+            afterCursor: afterCursor,
+            publicationRevision: CominaviRealtimeUpdatePage.absentPublicationRevision,
+            tagRevision: tagRevision
+        )
+    }
+
     func realtimeUpdates(
         eventNumber: Int,
         afterCursor: Int
@@ -583,6 +611,10 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         let eventNumber: Int
         let hasMore: Bool
         let updates: [CominaviRealtimeUpdate]
+        let publicationRevision: String
+        let publicationGeneration: Int
+        let publicationCursor: Int
+        let resetRequired: Bool
         let tagOverlay: CominaviCircleTagOverlay?
         let tagOverlayStatus: CominaviRealtimeUpdatePage.TagOverlayStatus?
     }
@@ -1284,10 +1316,12 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
     func realtimeUpdates(
         eventNumber: Int,
         afterCursor: Int,
+        publicationRevision: String,
         tagRevision: String?
     ) async throws -> CominaviRealtimeUpdatePage {
         guard (1...10_000).contains(eventNumber),
               afterCursor >= 0,
+              Self.isValidRealtimePublicationRevision(publicationRevision),
               tagRevision.map(CominaviCircleTagOverlay.isValidRevisionToken) ?? true
         else {
             throw CominaviServiceError.invalidResponse
@@ -1300,6 +1334,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
                 path: .init(eventNumber: eventNumber),
                 query: .init(
                     afterCursor: afterCursor,
+                    publicationRevision: publicationRevision,
                     tagRevision: tagRevision.map { .init(value2: $0) }
                 )
             ))
@@ -1316,14 +1351,32 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         default:
             throw CominaviServiceError.invalidResponse
         }
-        let cursors = snapshot.updates.map(\.cursor)
         guard snapshot.eventNumber == eventNumber,
-              cursors == cursors.sorted(),
-              Set(cursors).count == cursors.count,
-              cursors.allSatisfy({ $0 > afterCursor }),
+              snapshot.updates == snapshot.updates.sorted(by: Self.isRealtimeUpdateOrdered),
+              Set(snapshot.updates.map(\.eventKey)).count == snapshot.updates.count,
+              Self.isValidRealtimePublicationRevision(snapshot.publicationRevision),
+              snapshot.publicationGeneration >= 0,
+              snapshot.publicationCursor >= 0,
+              (snapshot.publicationRevision == CominaviRealtimeUpdatePage.absentPublicationRevision)
+                == (snapshot.publicationGeneration == 0),
+              snapshot.resetRequired
+                ? (
+                    !snapshot.hasMore
+                        && snapshot.publicationRevision != publicationRevision
+                        && snapshot.updates.allSatisfy {
+                            $0.cursor >= snapshot.publicationCursor
+                        }
+                )
+                : (
+                    snapshot.publicationRevision == publicationRevision
+                        && snapshot.updates.allSatisfy { $0.cursor > afterCursor }
+                ),
               !snapshot.hasMore || !snapshot.updates.isEmpty,
               snapshot.updates.allSatisfy({ update in
-                  update.cursor > 0
+                  (update.cursor > 0
+                      || (snapshot.resetRequired
+                          && snapshot.publicationCursor == 0
+                          && update.cursor == 0))
                       && update.sourceRevision > 0
                       && !update.eventKey.isEmpty
                       && !update.updateKind.isEmpty
@@ -1343,9 +1396,27 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         return CominaviRealtimeUpdatePage(
             updates: snapshot.updates,
             hasMore: snapshot.hasMore,
+            publicationRevision: snapshot.publicationRevision,
+            publicationGeneration: snapshot.publicationGeneration,
+            publicationCursor: snapshot.publicationCursor,
+            resetRequired: snapshot.resetRequired,
             tagOverlay: snapshot.tagOverlay,
             tagOverlayStatus: snapshot.tagOverlayStatus
         )
+    }
+
+    private static func isValidRealtimePublicationRevision(_ value: String) -> Bool {
+        value == CominaviRealtimeUpdatePage.absentPublicationRevision
+            || (value.utf8.count == 64 && value.utf8.allSatisfy { byte in
+                (48...57).contains(byte) || (97...102).contains(byte)
+            })
+    }
+
+    private static func isRealtimeUpdateOrdered(
+        _ lhs: CominaviRealtimeUpdate,
+        _ rhs: CominaviRealtimeUpdate
+    ) -> Bool {
+        lhs.cursor != rhs.cursor ? lhs.cursor < rhs.cursor : lhs.eventKey < rhs.eventKey
     }
 
     private static func validateTagOverlayResponse(

@@ -78,6 +78,10 @@ SQL
                 tweet_id: "test-post",
                 post_confidence: "high",
                 placement_confidence: "high",
+                providerRelationships: {
+                    decision: "eligible",
+                    metadataComplete: true
+                },
                 media: [{kind: "photo", url: "https://example.test/menu.jpg"}],
                 provenance: [
                     {
@@ -198,6 +202,64 @@ run_confidence_failure_case() {
     echo "PASS: $1"
 }
 
+run_relationship_failure_case() {
+    prepare_case "$1" "${valid_circle}" "${valid_row}"
+    jq '.[0].post_reasons = [$reason]' --arg reason "$2" \
+        "${case_enrichment}" >"${case_enrichment}.tmp"
+    mv "${case_enrichment}.tmp" "${case_enrichment}"
+
+    if "${case_project}/Scripts/prepare-crawl-catalog.sh" \
+        "${case_collector}" \
+        "${case_enrichment}" \
+        >"${case_stdout}" 2>"${case_stderr}"; then
+        fail "$1 should have rejected relationship-derived media"
+    fi
+
+    if ! grep -F "${schema_error}" "${case_stderr}" >/dev/null; then
+        sed -n '1,120p' "${case_stderr}" >&2
+        fail "$1 emitted the wrong validation error"
+    fi
+    echo "PASS: $1"
+}
+
+run_relationship_metadata_failure_case() {
+    prepare_case "$1" "${valid_circle}" "${valid_row}"
+    jq "$2" "${case_enrichment}" >"${case_enrichment}.tmp"
+    mv "${case_enrichment}.tmp" "${case_enrichment}"
+
+    if "${case_project}/Scripts/prepare-crawl-catalog.sh" \
+        "${case_collector}" \
+        "${case_enrichment}" \
+        >"${case_stdout}" 2>"${case_stderr}"; then
+        fail "$1 should have rejected incomplete provider relationship metadata"
+    fi
+
+    if ! grep -F "${schema_error}" "${case_stderr}" >/dev/null; then
+        sed -n '1,120p' "${case_stderr}" >&2
+        fail "$1 emitted the wrong validation error"
+    fi
+    echo "PASS: $1"
+}
+
+run_same_author_quote_success_case() {
+    prepare_case "$1" "${valid_circle}" "${valid_row}"
+    jq '.[0].providerRelationships += {
+        quotedPostId: "quoted-post",
+        quotedAuthorId: "source-author",
+        authorId: "source-author"
+    }' "${case_enrichment}" >"${case_enrichment}.tmp"
+    mv "${case_enrichment}.tmp" "${case_enrichment}"
+
+    if ! "${case_project}/Scripts/prepare-crawl-catalog.sh" \
+        "${case_collector}" \
+        "${case_enrichment}" \
+        >"${case_stdout}" 2>"${case_stderr}"; then
+        sed -n '1,120p' "${case_stderr}" >&2
+        fail "$1 should have accepted a same-author quote"
+    fi
+    echo "PASS: $1"
+}
+
 valid_circle='{"comiket_no":108,"circle_id":10,"wc_id":1000}'
 valid_row='INSERT INTO ComiketCircleExtend (comiketNo, id, WCId) VALUES (108, 10, 1000);'
 schema_error='Crawl enrichment is missing publishable confidence, complete post, or authoritative Circle.ms provenance.'
@@ -216,6 +278,35 @@ run_success_case \
     '108:10:ComiketCircleExtend.twitterURL:test'
 run_confidence_failure_case \
     medium_shinagaki_confidence
+run_relationship_failure_case \
+    native_retweet \
+    native_retweet
+run_relationship_failure_case \
+    cross_author_quote \
+    cross_author_quote
+run_relationship_failure_case \
+    unverifiable_quote_author \
+    unverifiable_quote_author
+run_relationship_metadata_failure_case \
+    missing_provider_relationships \
+    'del(.[0].providerRelationships)'
+run_relationship_metadata_failure_case \
+    ineligible_provider_relationships \
+    '.[0].providerRelationships.decision = "native_retweet"'
+run_relationship_metadata_failure_case \
+    incomplete_provider_relationships \
+    '.[0].providerRelationships.metadataComplete = false'
+run_relationship_metadata_failure_case \
+    retweeted_post_relationship \
+    '.[0].providerRelationships.retweetedPostId = "source-post"'
+run_relationship_metadata_failure_case \
+    cross_author_quote_relationship \
+    '.[0].providerRelationships += {quotedPostId: "quoted-post", quotedAuthorId: "quoted-author", authorId: "source-author"}'
+run_relationship_metadata_failure_case \
+    partial_quote_relationship \
+    '.[0].providerRelationships += {quotedPostId: "quoted-post", authorId: "source-author"}'
+run_same_author_quote_success_case \
+    same_author_quote_relationship
 run_failure_case \
     missing_comiket_number \
     '{"circle_id":10,"wc_id":1000}' \

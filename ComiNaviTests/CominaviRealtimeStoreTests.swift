@@ -847,9 +847,230 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         )
         let cursors = await client.requestedCursors()
         let revisions = await client.requestedTagRevisions()
-        XCTAssertEqual(restored?.posts.map(\.id), ["legacy"])
-        XCTAssertEqual(cursors, [1])
+        XCTAssertNil(restored)
+        XCTAssertEqual(cursors, [0])
         XCTAssertEqual(revisions, [CominaviCircleTagOverlay.absentRevision])
+    }
+
+    func testPublicationResetDropsLegacyBlueCivetTargetBeforeRevalidationCompletes() async throws {
+        let postID = "2085317159560060995"
+        let blueCivetWCID = 23_011_889
+        let shiraLandWCID = 23_005_830
+        let cache = InMemoryRealtimeCacheStore()
+        let stale = try update(
+            cursor: 1_925,
+            stateKind: "shinagaki",
+            stateValue: postID,
+            occurredAt: "2026-08-08T19:11:24Z",
+            mediaURL: "https://pbs.twimg.com/media/stale.jpg",
+            wcID: blueCivetWCID
+        )
+        await cache.save(
+            try JSONEncoder().encode(LegacyRealtimeCacheSnapshot(
+                version: 2,
+                eventNumber: 108,
+                lastCursor: 3_406,
+                heads: [stale]
+            )),
+            eventNumber: 108
+        )
+
+        let publicationRevision = String(repeating: "a", count: 64)
+        let client = RealtimeFetchingStub(pages: [
+            CominaviRealtimeUpdatePage(
+                updates: [try update(
+                    cursor: 3_407,
+                    stateKind: "shinagaki",
+                    stateValue: postID,
+                    occurredAt: "2026-08-08T19:11:24Z",
+                    mediaURL: "https://pbs.twimg.com/media/current.jpg",
+                    wcID: shiraLandWCID
+                )],
+                hasMore: false,
+                publicationRevision: publicationRevision,
+                publicationGeneration: 1,
+                publicationCursor: 3_407,
+                resetRequired: true
+            ),
+        ])
+        let store = CominaviRealtimeStore(client: client, cacheStore: cache)
+
+        try await store.refresh(eventNumber: 108, minimumInterval: 0)
+
+        // A pre-v3 disk snapshot is never exposed while its full publication
+        // reset is in flight, so the old six-circle seed cannot flash onscreen.
+        let whileRevalidating = await store.enrichment(
+            eventNumber: 108,
+            publicCircleID: blueCivetWCID
+        )
+        XCTAssertNil(whileRevalidating)
+
+        await store.waitForRevalidation(eventNumber: 108)
+        let blueCivet = await store.enrichment(
+            eventNumber: 108,
+            publicCircleID: blueCivetWCID
+        )
+        let shiraLand = await store.enrichment(
+            eventNumber: 108,
+            publicCircleID: shiraLandWCID
+        )
+        let requestedCursors = await client.requestedCursors()
+        let requestedPublicationRevisions = await client.requestedPublicationRevisions()
+
+        XCTAssertNil(blueCivet)
+        XCTAssertEqual(shiraLand?.posts.map(\.id), [postID])
+        XCTAssertEqual(requestedCursors, [0])
+        XCTAssertEqual(
+            requestedPublicationRevisions,
+            [CominaviRealtimeUpdatePage.absentPublicationRevision]
+        )
+    }
+
+    func testPublicationResetPersistsBaselineAndResumesAfterPostFenceCursor()
+        async throws
+    {
+        let revision = String(repeating: "b", count: 64)
+        let cache = InMemoryRealtimeCacheStore()
+        let resetClient = RealtimeFetchingStub(pages: [
+            CominaviRealtimeUpdatePage(
+                updates: [
+                    try update(
+                        cursor: 10,
+                        stateKind: "attendance",
+                        stateValue: "absent",
+                        occurredAt: "2026-08-08T18:00:00Z"
+                    ),
+                    try update(
+                        cursor: 10,
+                        stateKind: "shinagaki",
+                        stateValue: "published-baseline",
+                        occurredAt: "2026-08-08T19:00:00Z",
+                        mediaURL: "https://pbs.twimg.com/media/baseline.jpg"
+                    ),
+                    try update(
+                        cursor: 11,
+                        stateKind: "presence",
+                        stateValue: "open",
+                        occurredAt: "2026-08-08T19:01:00Z"
+                    ),
+                ],
+                hasMore: false,
+                publicationRevision: revision,
+                publicationGeneration: 1,
+                publicationCursor: 10,
+                resetRequired: true
+            ),
+        ])
+        let store = CominaviRealtimeStore(client: resetClient, cacheStore: cache)
+
+        try await store.refresh(eventNumber: 108, minimumInterval: 0)
+        let baseline = await store.enrichment(
+            eventNumber: 108,
+            publicCircleID: 23_000_001
+        )
+        XCTAssertEqual(baseline?.posts.map(\.id), ["published-baseline"])
+        XCTAssertEqual(baseline?.attendanceClaims.map(\.status), [.withdrawn])
+
+        let incrementalClient = RealtimeFetchingStub(pages: [
+            CominaviRealtimeUpdatePage(
+                updates: [try update(
+                    cursor: 12,
+                    stateKind: "shinagaki",
+                    stateValue: "incremental",
+                    occurredAt: "2026-08-08T19:05:00Z",
+                    mediaURL: "https://pbs.twimg.com/media/incremental.jpg"
+                )],
+                hasMore: false,
+                publicationRevision: revision,
+                publicationGeneration: 1,
+                publicationCursor: 10,
+                resetRequired: false
+            ),
+        ])
+        let nextStore = CominaviRealtimeStore(client: incrementalClient, cacheStore: cache)
+
+        try await nextStore.refresh(eventNumber: 108, minimumInterval: 0)
+        await nextStore.waitForRevalidation(eventNumber: 108)
+
+        let current = await nextStore.enrichment(
+            eventNumber: 108,
+            publicCircleID: 23_000_001
+        )
+        let requestedCursors = await incrementalClient.requestedCursors()
+        let requestedRevisions = await incrementalClient.requestedPublicationRevisions()
+        XCTAssertEqual(current?.posts.map(\.id), ["incremental"])
+        XCTAssertEqual(current?.attendanceClaims.map(\.status), [.withdrawn])
+        XCTAssertEqual(requestedCursors, [11])
+        XCTAssertEqual(requestedRevisions, [revision])
+    }
+
+    func testFreshAppendLogResetAtCursorZeroPersistsBaselineAndResumesIncrementally()
+        async throws
+    {
+        let revision = String(repeating: "d", count: 64)
+        let cache = InMemoryRealtimeCacheStore()
+        let resetClient = RealtimeFetchingStub(pages: [
+            CominaviRealtimeUpdatePage(
+                updates: [try update(
+                    cursor: 0,
+                    stateKind: "shinagaki",
+                    stateValue: "published-at-fence",
+                    occurredAt: "2026-08-08T19:00:00Z",
+                    mediaURL: "https://pbs.twimg.com/media/fresh-baseline.jpg"
+                )],
+                hasMore: false,
+                publicationRevision: revision,
+                publicationGeneration: 1,
+                publicationCursor: 0,
+                resetRequired: true
+            ),
+        ])
+        let store = CominaviRealtimeStore(client: resetClient, cacheStore: cache)
+
+        try await store.refresh(eventNumber: 108, minimumInterval: 0)
+        let baseline = await store.enrichment(
+            eventNumber: 108,
+            publicCircleID: 23_000_001
+        )
+        XCTAssertEqual(baseline?.posts.map(\.id), ["published-at-fence"])
+
+        let incrementalClient = ControlledRealtimeFetchingStub()
+        let nextStore = CominaviRealtimeStore(client: incrementalClient, cacheStore: cache)
+
+        try await nextStore.refresh(eventNumber: 108, minimumInterval: 0)
+        await incrementalClient.waitUntilRequested()
+
+        let restoredBaseline = await nextStore.enrichment(
+            eventNumber: 108,
+            publicCircleID: 23_000_001
+        )
+        let requestedCursor = await incrementalClient.requestedCursor()
+        let requestedRevision = await incrementalClient.requestedPublicationRevision()
+        XCTAssertEqual(restoredBaseline?.posts.map(\.id), ["published-at-fence"])
+        XCTAssertEqual(requestedCursor, 0)
+        XCTAssertEqual(requestedRevision, revision)
+
+        await incrementalClient.resolve(CominaviRealtimeUpdatePage(
+            updates: [try update(
+                cursor: 1,
+                stateKind: "shinagaki",
+                stateValue: "incremental",
+                occurredAt: "2026-08-08T19:05:00Z",
+                mediaURL: "https://pbs.twimg.com/media/fresh-incremental.jpg"
+            )],
+            hasMore: false,
+            publicationRevision: revision,
+            publicationGeneration: 1,
+            publicationCursor: 0,
+            resetRequired: false
+        ))
+        await nextStore.waitForRevalidation(eventNumber: 108)
+
+        let current = await nextStore.enrichment(
+            eventNumber: 108,
+            publicCircleID: 23_000_001
+        )
+        XCTAssertEqual(current?.posts.map(\.id), ["incremental"])
     }
 
     func testInvalidOverlayDoesNotReplaceCurrentSnapshot() async throws {
@@ -1019,7 +1240,8 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         stateKind: String,
         stateValue: String,
         occurredAt: String,
-        mediaURL: String? = nil
+        mediaURL: String? = nil,
+        wcID: Int = 23_000_001
     ) throws -> CominaviRealtimeUpdate {
         let media: String
         if let mediaURL {
@@ -1038,7 +1260,7 @@ final class CominaviRealtimeStoreTests: XCTestCase {
             """
             {
               "cursor": \(cursor),
-              "eventKey": "twitterapi:\(cursor):\(updateKind):v1:test",
+              "eventKey": "twitterapi:\(cursor):\(updateKind):v1:\(stateValue)",
               "updateKind": "\(updateKind)",
               "stateKind": "\(stateKind)",
               "stateValue": "\(stateValue)",
@@ -1053,7 +1275,7 @@ final class CominaviRealtimeStoreTests: XCTestCase {
                 "media": \(media)
               },
               "circles": [{
-                "eventNumber":108,"wcID":23000001,"circleID":100,
+                "eventNumber":108,"wcID":\(wcID),"circleID":100,
                 "circleName":"Circle","day":1,"areaName":"西","blockName":"ア",
                 "spaceNo":1,"spaceNoSub":0,"location":"1日目 西 ア01a"
               }]
@@ -1069,6 +1291,7 @@ final class CominaviRealtimeStoreTests: XCTestCase {
 private actor RealtimeFetchingStub: CominaviRealtimeFetching {
     private var pages: [CominaviRealtimeUpdatePage]
     private var cursors: [Int] = []
+    private var publicationRevisions: [String] = []
     private var tagRevisions: [String?] = []
 
     init(pages: [CominaviRealtimeUpdatePage]) {
@@ -1078,8 +1301,22 @@ private actor RealtimeFetchingStub: CominaviRealtimeFetching {
     func realtimeUpdates(
         eventNumber: Int,
         afterCursor: Int,
+        publicationRevision: String,
         tagRevision: String?
     ) async throws -> CominaviRealtimeUpdatePage {
+        publicationRevisions.append(publicationRevision)
+        return try nextPage(
+            eventNumber: eventNumber,
+            afterCursor: afterCursor,
+            tagRevision: tagRevision
+        )
+    }
+
+    private func nextPage(
+        eventNumber: Int,
+        afterCursor: Int,
+        tagRevision: String?
+    ) throws -> CominaviRealtimeUpdatePage {
         XCTAssertEqual(eventNumber, 108)
         cursors.append(afterCursor)
         tagRevisions.append(tagRevision)
@@ -1098,10 +1335,15 @@ private actor RealtimeFetchingStub: CominaviRealtimeFetching {
     func requestedTagRevisions() -> [String?] {
         tagRevisions
     }
+
+    func requestedPublicationRevisions() -> [String] {
+        publicationRevisions
+    }
 }
 
 private actor ControlledRealtimeFetchingStub: CominaviRealtimeFetching {
     private var cursor: Int?
+    private var publicationRevision: String?
     private var tagRevision: String?
     private var responseContinuation:
         CheckedContinuation<CominaviRealtimeUpdatePage, Never>?
@@ -1110,10 +1352,12 @@ private actor ControlledRealtimeFetchingStub: CominaviRealtimeFetching {
     func realtimeUpdates(
         eventNumber: Int,
         afterCursor: Int,
+        publicationRevision: String,
         tagRevision: String?
     ) async throws -> CominaviRealtimeUpdatePage {
         XCTAssertEqual(eventNumber, 108)
         cursor = afterCursor
+        self.publicationRevision = publicationRevision
         self.tagRevision = tagRevision
         requestWaiters.forEach { $0.resume() }
         requestWaiters.removeAll()
@@ -1131,6 +1375,10 @@ private actor ControlledRealtimeFetchingStub: CominaviRealtimeFetching {
 
     func requestedCursor() -> Int? {
         cursor
+    }
+
+    func requestedPublicationRevision() -> String? {
+        publicationRevision
     }
 
     func requestedTagRevision() -> String? {
@@ -1158,6 +1406,7 @@ private actor PausedSecondPageRealtimeFetchingStub: CominaviRealtimeFetching {
     func realtimeUpdates(
         eventNumber: Int,
         afterCursor: Int,
+        publicationRevision: String,
         tagRevision: String?
     ) async throws -> CominaviRealtimeUpdatePage {
         XCTAssertEqual(eventNumber, 108)

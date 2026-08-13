@@ -137,7 +137,10 @@ final class CominaviServiceClientTests: XCTestCase {
         XCTAssertEqual(updatePage.updates.first?.stateValue, "sold_out")
         XCTAssertFalse(updatePage.hasMore)
         let requests = await transport.requests()
-        XCTAssertEqual(requests[2].url?.query, "afterCursor=40")
+        XCTAssertEqual(
+            requests[2].url?.query,
+            "afterCursor=40&publicationRevision=none"
+        )
         XCTAssertEqual(requests[2].cachePolicy, .useProtocolCachePolicy)
         XCTAssertEqual(requests.map { $0.url?.path }, [
             "/api/v2/me/favorites/108",
@@ -200,8 +203,137 @@ final class CominaviServiceClientTests: XCTestCase {
         let requests = await transport.requests
         XCTAssertEqual(
             requests.first?.url?.query,
-            "afterCursor=0&tagRevision=none"
+            "afterCursor=0&publicationRevision=none&tagRevision=none"
         )
+    }
+
+    func testRealtimeSnapshotAcceptsPublicationResetWithHistoricalBaselineCursors()
+        async throws
+    {
+        let revision = String(repeating: "b", count: 64)
+        let response = try realtimeResponse(
+            tagOverlay: nil,
+            publicationRevision: revision,
+            publicationGeneration: 2,
+            publicationCursor: 10,
+            resetRequired: true,
+            updates: [
+                realtimeUpdateObject(
+                    cursor: 10,
+                    stateKind: "attendance",
+                    stateValue: "absent"
+                ),
+                realtimeUpdateObject(
+                    cursor: 10,
+                    stateKind: "shinagaki",
+                    stateValue: "published"
+                ),
+            ]
+        )
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (200, response),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        let page = try await client.realtimeUpdates(
+            eventNumber: 108,
+            afterCursor: 0,
+            publicationRevision: CominaviRealtimeUpdatePage.absentPublicationRevision,
+            tagRevision: nil
+        )
+
+        XCTAssertTrue(page.resetRequired)
+        XCTAssertEqual(page.publicationRevision, revision)
+        XCTAssertEqual(page.updates.map(\.cursor), [10, 10])
+    }
+
+    func testRealtimeSnapshotAcceptsZeroCursorForFreshPublicationReset()
+        async throws
+    {
+        let revision = String(repeating: "d", count: 64)
+        let response = try realtimeResponse(
+            tagOverlay: nil,
+            publicationRevision: revision,
+            publicationGeneration: 1,
+            publicationCursor: 0,
+            resetRequired: true,
+            updates: [realtimeUpdateObject(
+                cursor: 0,
+                stateKind: "shinagaki",
+                stateValue: "published"
+            )]
+        )
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (200, response),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        let page = try await client.realtimeUpdates(
+            eventNumber: 108,
+            afterCursor: 0,
+            publicationRevision: CominaviRealtimeUpdatePage.absentPublicationRevision,
+            tagRevision: nil
+        )
+
+        XCTAssertTrue(page.resetRequired)
+        XCTAssertEqual(page.publicationCursor, 0)
+        XCTAssertEqual(page.updates.map(\.cursor), [0])
+    }
+
+    func testRealtimeSnapshotRejectsZeroCursorForIncrementalPage() async throws {
+        let response = try realtimeResponse(
+            tagOverlay: nil,
+            updates: [realtimeUpdateObject(
+                cursor: 0,
+                stateKind: "shinagaki",
+                stateValue: "published"
+            )]
+        )
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (200, response),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        do {
+            _ = try await client.realtimeUpdates(
+                eventNumber: 108,
+                afterCursor: 0,
+                publicationRevision: CominaviRealtimeUpdatePage.absentPublicationRevision,
+                tagRevision: nil
+            )
+            XCTFail("An incremental update must advance beyond the current cursor")
+        } catch CominaviServiceError.invalidResponse {}
+    }
+
+    func testRealtimeSnapshotRejectsResetBaselineThatDoesNotReachPublicationCursor()
+        async throws
+    {
+        let response = try realtimeResponse(
+            tagOverlay: nil,
+            publicationRevision: String(repeating: "c", count: 64),
+            publicationGeneration: 2,
+            publicationCursor: 10,
+            resetRequired: true,
+            updates: [realtimeUpdateObject(
+                cursor: 2,
+                stateKind: "attendance",
+                stateValue: "absent"
+            )]
+        )
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (200, response),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        do {
+            _ = try await client.realtimeUpdates(
+                eventNumber: 108,
+                afterCursor: 0,
+                publicationRevision: CominaviRealtimeUpdatePage.absentPublicationRevision,
+                tagRevision: nil
+            )
+            XCTFail("A reset response must not contain cursors before publicationCursor")
+        } catch CominaviServiceError.invalidResponse {}
     }
 
     func testRealtimeSnapshotRejectsSemanticallyInvalidTagOverlay() async throws {
@@ -278,7 +410,7 @@ final class CominaviServiceClientTests: XCTestCase {
         let requests = await transport.requests
         XCTAssertEqual(
             requests.first?.url?.query,
-            "afterCursor=40&tagRevision=\(revision)"
+            "afterCursor=40&publicationRevision=none&tagRevision=\(revision)"
         )
     }
 
@@ -456,12 +588,21 @@ final class CominaviServiceClientTests: XCTestCase {
 
     private func realtimeResponse(
         tagOverlay: CominaviCircleTagOverlay?,
-        tagOverlayStatus: CominaviRealtimeUpdatePage.TagOverlayStatus? = nil
+        tagOverlayStatus: CominaviRealtimeUpdatePage.TagOverlayStatus? = nil,
+        publicationRevision: String = CominaviRealtimeUpdatePage.absentPublicationRevision,
+        publicationGeneration: Int = 0,
+        publicationCursor: Int = 0,
+        resetRequired: Bool = false,
+        updates: [[String: Any]] = []
     ) throws -> Data {
         var object: [String: Any] = [
             "eventNumber": 108,
             "hasMore": false,
-            "updates": [],
+            "publicationRevision": publicationRevision,
+            "publicationGeneration": publicationGeneration,
+            "publicationCursor": publicationCursor,
+            "resetRequired": resetRequired,
+            "updates": updates,
         ]
         if let tagOverlay {
             object["tagOverlay"] = try JSONSerialization.jsonObject(
@@ -472,6 +613,49 @@ final class CominaviServiceClientTests: XCTestCase {
             object["tagOverlayStatus"] = tagOverlayStatus.rawValue
         }
         return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+
+    private func realtimeUpdateObject(
+        cursor: Int,
+        stateKind: String,
+        stateValue: String
+    ) -> [String: Any] {
+        [
+            "cursor": cursor,
+            "eventKey": "twitterapi:\(cursor):\(stateKind):\(stateValue)",
+            "updateKind": stateKind == "shinagaki"
+                ? "shinagaki_published"
+                : "attendance_absent",
+            "stateKind": stateKind,
+            "stateValue": stateValue,
+            "confidence": "high",
+            "occurredAt": "2026-08-15T03:00:00Z",
+            "sourceRevision": 1,
+            "post": [
+                "id": "post-\(cursor)",
+                "url": "https://x.com/circle/status/\(cursor)",
+                "text": "update \(stateValue)",
+                "author": [
+                    "xUserID": "9",
+                    "handle": "circle",
+                    "name": "Circle",
+                    "profileImageURL": NSNull(),
+                ],
+                "media": [],
+            ],
+            "circles": [[
+                "eventNumber": 108,
+                "wcID": 23_000_001,
+                "circleID": 100,
+                "circleName": "Circle",
+                "day": 1,
+                "areaName": "西",
+                "blockName": "ア",
+                "spaceNo": 1,
+                "spaceNoSub": 0,
+                "location": "1日目 西 ア01a",
+            ]],
+        ]
     }
 
     func testFrozenDirectProfileFixtureDecodesProviderContextAndRelativeAvatar() async throws {
@@ -4523,7 +4707,7 @@ private actor CominaviServiceTransportStub {
             body = #"{"eventNumber":108,"revision":3,"favorites":[{"wcID":23000001,"color":2,"notificationsEnabled":true}]}"#
             statusCode = 200
         case ("/api/v2/events/108/updates", "GET"):
-            body = #"{"eventNumber":108,"hasMore":false,"updates":[{"cursor":41,"eventKey":"twitterapi:1:inventory_sold_out","updateKind":"inventory_sold_out","stateKind":"inventory","stateValue":"sold_out","confidence":"high","occurredAt":"2026-08-15T03:00:00Z","sourceRevision":1,"post":{"id":"1","url":"https://x.com/circle/status/1","text":"完売しました","author":{"xUserID":"9","handle":"circle","name":"Circle","profileImageURL":null},"media":[]},"circles":[{"eventNumber":108,"wcID":23000001,"circleID":100,"circleName":"Circle","day":1,"areaName":"西","blockName":"ア","spaceNo":1,"spaceNoSub":0,"location":"1日目 西 ア01a"}]}]}"#
+            body = #"{"eventNumber":108,"hasMore":false,"publicationRevision":"none","publicationGeneration":0,"publicationCursor":0,"resetRequired":false,"updates":[{"cursor":41,"eventKey":"twitterapi:1:inventory_sold_out","updateKind":"inventory_sold_out","stateKind":"inventory","stateValue":"sold_out","confidence":"high","occurredAt":"2026-08-15T03:00:00Z","sourceRevision":1,"post":{"id":"1","url":"https://x.com/circle/status/1","text":"完売しました","author":{"xUserID":"9","handle":"circle","name":"Circle","profileImageURL":null},"media":[]},"circles":[{"eventNumber":108,"wcID":23000001,"circleID":100,"circleName":"Circle","day":1,"areaName":"西","blockName":"ア","spaceNo":1,"spaceNoSub":0,"location":"1日目 西 ア01a"}]}]}"#
             statusCode = 200
         case ("/api/v2/auth/logout", "POST"):
             let requestBody = try XCTUnwrap(request.httpBody)

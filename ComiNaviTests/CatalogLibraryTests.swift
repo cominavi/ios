@@ -270,12 +270,20 @@ final class CatalogLibraryTests: XCTestCase {
         // Guard against accidental truncation without pinning the test to one crawl run.
         XCTAssertGreaterThanOrEqual(index.selectedPostCount, 1_699)
         XCTAssertGreaterThanOrEqual(index.mappedPostCount, 1_483)
-        let retainedMapping = try XCTUnwrap(
-            index.enrichment(circleID: 10_186, publicCircleID: 23_000_046)
+        let correctedMapping = try XCTUnwrap(
+            index.enrichment(circleID: 22_000, publicCircleID: 23_005_830)
         )
         XCTAssertTrue(
-            retainedMapping.posts.contains { $0.id == "2062813325411660208" },
-            "A newer post may become primary, but the known high-confidence mapping must remain."
+            correctedMapping.posts.contains { $0.id == "2085317159560060995" },
+            "The quoted/reposted Shinagaki regression must remain attached to ShiraLand."
+        )
+        let staleTarget = index.enrichment(
+            circleID: 8_957,
+            publicCircleID: 23_011_889
+        )
+        XCTAssertFalse(
+            staleTarget?.posts.contains { $0.id == "2085317159560060995" } ?? false,
+            "The corrected publication must not restore the stale Blue civet target."
         )
     }
 
