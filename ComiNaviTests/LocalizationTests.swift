@@ -188,7 +188,7 @@ final class LocalizationTests: XCTestCase {
                 "Join": "加入",
                 "Plan information": "计划信息",
                 "Add member": "添加成员",
-                "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts.": "此 X 账号关注了超过 5,000 人，无法导入。ComiNavi 最多可导入 5,000 个账号。",
+                "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts.": "此 X 账号关注了超过 5,000 人，无法导入。ComiNavi 最多可导入 5,000 个账号",
             ],
             "zh-Hant": [
                 "Map": "地圖",
@@ -208,7 +208,7 @@ final class LocalizationTests: XCTestCase {
                 "Join": "加入",
                 "Plan information": "計畫資訊",
                 "Add member": "新增成員",
-                "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts.": "此 X 帳號關注了超過 5,000 人，無法匯入。ComiNavi 最多可匯入 5,000 個帳號。",
+                "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts.": "此 X 帳號關注了超過 5,000 人，無法匯入。ComiNavi 最多可匯入 5,000 個帳號",
             ],
             "ko": [
                 "Map": "지도",

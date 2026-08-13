@@ -2216,15 +2216,8 @@
         }
       }
     },
-    "Add to Favorites" : {
-      "comment" : "Gallery Preview Action: Add to Favorites",
+    "Add to favorites" : {
       "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add to Favorites"
-          }
-        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2251,8 +2244,15 @@
         }
       }
     },
-    "Add to favorites" : {
+    "Add to Favorites" : {
+      "comment" : "Gallery Preview Action: Add to Favorites",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add to Favorites"
+          }
+        },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2307,34 +2307,6 @@
         }
       }
     },
-    "Adds or removes this circle from your favorites" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このサークルをお気に入りに追加または削除します"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 서클을 즐겨찾기에 추가하거나 제거합니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将此社团添加到收藏或从收藏中移除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "將此社團新增至收藏或從收藏夾移除"
-          }
-        }
-      }
-    },
     "Additional structured details" : {
       "localizations" : {
         "ja" : {
@@ -2359,6 +2331,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "其他細節"
+          }
+        }
+      }
+    },
+    "Adds or removes this circle from your favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサークルをお気に入りに追加または削除します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 서클을 즐겨찾기에 추가하거나 제거합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将此社团添加到收藏或从收藏中移除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將此社團新增至收藏或從收藏夾移除"
           }
         }
       }
@@ -3574,6 +3574,7 @@
       }
     },
     "Available in %lld seconds" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -3653,6 +3654,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "B"
+          }
+        }
+      }
+    },
+    "Back" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "戻る"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "뒤로"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回"
           }
         }
       }
@@ -5714,6 +5743,34 @@
         }
       }
     },
+    "Circle details for %@" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@のサークル詳細"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 서클 상세 정보"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@的社团详情"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@的社團詳細資訊"
+          }
+        }
+      }
+    },
     "Circle gallery" : {
       "localizations" : {
         "ja" : {
@@ -6158,6 +6215,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Circle.ms · %@"
+          }
+        }
+      }
+    },
+    "Circle.ms account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msアカウント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms 계정"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms帳號"
           }
         }
       }
@@ -6954,6 +7039,62 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ComiNavi"
+          }
+        }
+      }
+    },
+    "ComiNavi account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviアカウント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 계정"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi帳號"
+          }
+        }
+      }
+    },
+    "ComiNavi and Circle.ms are separate accounts" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviとCircle.msは別のアカウントです"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi와 Circle.ms는 서로 다른 계정입니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi和Circle.ms是两个独立账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi與Circle.ms是兩個獨立帳號"
           }
         }
       }
@@ -8728,7 +8869,36 @@
         }
       }
     },
+    "Delete" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除"
+          }
+        }
+      }
+    },
     "Delete account" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -8812,170 +8982,30 @@
         }
       }
     },
-    "Back" : {
+    "Delete last digit" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "戻る"
+            "value" : "最後の数字を削除"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "뒤로"
+            "value" : "마지막 숫자를 삭제합니다"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "返回"
+            "value" : "删除最后一个数字"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "返回"
-          }
-        }
-      }
-    },
-    "ComiNavi and Circle.ms are separate accounts" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNaviとCircle.msは別のアカウントです"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi와 Circle.ms는 서로 다른 계정입니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi和Circle.ms是两个独立账户"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi與Circle.ms是兩個獨立帳號"
-          }
-        }
-      }
-    },
-    "ComiNavi account" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNaviアカウント"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi 계정"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi账户"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi帳號"
-          }
-        }
-      }
-    },
-    "Delete" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "削除"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "삭제"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刪除"
-          }
-        }
-      }
-    },
-    "Delete available in %lld seconds" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "あと%lld秒で「削除」を選べます"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld초 후 삭제할 수 있습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld秒后可选择“删除”"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld秒後可選擇「刪除」"
-          }
-        }
-      }
-    },
-    "Circle.ms account" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.msアカウント"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.ms 계정"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.ms账户"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.ms帳號"
+            "value" : "刪除最後一個數字"
           }
         }
       }
@@ -9004,6 +9034,63 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "只刪除ComiNavi帳號嗎？"
+          }
+        }
+      }
+    },
+    "Delete your ComiNavi account permanently?" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviアカウントを完全に削除しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 계정을 완전히 삭제하시겠습니까?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要完全删除ComiNavi账户吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要永久刪除 ComiNavi 帳號嗎？"
+          }
+        }
+      }
+    },
+    "Deleting your account" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウントを削除しています"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정을 삭제하고 있습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在删除账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在刪除帳號"
           }
         }
       }
@@ -9060,454 +9147,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除ComiNavi帳號不會刪除你的Circle.ms帳號。即使已連結Circle.ms，你仍可直接在Circle.ms繼續使用該帳號"
-          }
-        }
-      }
-    },
-    "Next" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次へ"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다음"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下一步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下一步"
-          }
-        }
-      }
-    },
-    "Next available in %lld seconds" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "あと%lld秒で「次へ」を選べます"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld초 후 다음으로 진행할 수 있습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld秒后可选择“下一步”"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld秒後可選擇「下一步」"
-          }
-        }
-      }
-    },
-    "Read this before continuing" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "続ける前にお読みください"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "계속하기 전에 읽어 주세요"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请先阅读以下内容"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "請先閱讀以下內容"
-          }
-        }
-      }
-    },
-    "Ready to continue" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次へ進めます"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다음으로 진행할 수 있습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可以进入下一步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可以進入下一步"
-          }
-        }
-      }
-    },
-    "Ready to delete" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "削除できます"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "삭제할 수 있습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可以删除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可以刪除"
-          }
-        }
-      }
-    },
-    "Review the consequences" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "削除による影響を確認してください"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "삭제 결과를 확인해 주세요"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请确认删除后的影响"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "請確認刪除後的影響"
-          }
-        }
-      }
-    },
-    "Step 1 of 2" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1/2"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "1/2단계"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第1步，共2步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第1步，共2步"
-          }
-        }
-      }
-    },
-    "Step 2 of 2" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2/2"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "2/2단계"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第2步，共2步"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第2步，共2步"
-          }
-        }
-      }
-    },
-    "Yes, Delete" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "はい、削除します"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "예, 삭제합니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确认删除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "確認刪除"
-          }
-        }
-      }
-    },
-    "This permanently deletes your ComiNavi account and its data. Your Circle.ms account will not be deleted, even if you connected it to ComiNavi." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNaviアカウントとそのデータは完全に削除されます。ComiNaviに連携している場合も、Circle.msアカウントは削除されません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi 계정과 데이터는 영구적으로 삭제됩니다. ComiNavi에 연동한 경우에도 Circle.ms 계정은 삭제되지 않습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这会永久删除你的ComiNavi账户及其数据。即使Circle.ms已连接到ComiNavi，你的Circle.ms账户也不会被删除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "這會永久刪除你的ComiNavi帳號及其資料。即使Circle.ms已連結至ComiNavi，你的Circle.ms帳號也不會被刪除"
-          }
-        }
-      }
-    },
-    "Will be deleted" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "削除されます"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "삭제됩니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "会被删除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "將被刪除"
-          }
-        }
-      }
-    },
-    "Will not be deleted" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "削除されません"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "삭제되지 않습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不会被删除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不會被刪除"
-          }
-        }
-      }
-    },
-    "Your Circle.ms account will not be deleted." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.msアカウントは削除されません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.ms 계정은 삭제되지 않습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的Circle.ms账户不会被删除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "你的Circle.ms帳號不會被刪除"
-          }
-        }
-      }
-    },
-    "Delete last digit" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最後の数字を削除"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "마지막 숫자를 삭제합니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "删除最后一个数字"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "刪除最後一個數字"
-          }
-        }
-      }
-    },
-    "Delete your ComiNavi account permanently?" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNaviアカウントを完全に削除しますか？"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi 계정을 완전히 삭제하시겠습니까?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要完全删除ComiNavi账户吗？"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "要永久刪除 ComiNavi 帳號嗎？"
-          }
-        }
-      }
-    },
-    "Deleting your account" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アカウントを削除しています"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "계정을 삭제하고 있습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在删除账户"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在刪除帳號"
           }
         }
       }
@@ -11920,34 +11559,6 @@
         }
       }
     },
-    "Favorite this circle" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このサークルをお気に入り登録"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 서클을 즐겨찾기에 등록"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "收藏这个社团"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "收藏這個社團"
-          }
-        }
-      }
-    },
     "Favorite settings" : {
       "localizations" : {
         "ja" : {
@@ -11972,6 +11583,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "收藏設定"
+          }
+        }
+      }
+    },
+    "Favorite this circle" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このサークルをお気に入り登録"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 서클을 즐겨찾기에 등록"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收藏这个社团"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收藏這個社團"
           }
         }
       }
@@ -12997,34 +12637,6 @@
         }
       }
     },
-    "GPS reference · about %lld m accuracy" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GPS参考値・精度約%lld m"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GPS 참고값·정밀도 약 %lld m"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GPS参考值・精度约%lld m"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GPS參考值・精度約%lld m"
-          }
-        }
-      }
-    },
     "Got it" : {
       "localizations" : {
         "ja" : {
@@ -13049,6 +12661,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "知道了"
+          }
+        }
+      }
+    },
+    "GPS reference · about %lld m accuracy" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS参考値・精度約%lld m"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS 참고값·정밀도 약 %lld m"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS参考值・精度约%lld m"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPS參考值・精度約%lld m"
           }
         }
       }
@@ -13675,34 +13315,6 @@
         }
       }
     },
-    "Information" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "案内所"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "안내소"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "咨询处"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "諮詢處"
-          }
-        }
-      }
-    },
     "In favorites" : {
       "localizations" : {
         "ja" : {
@@ -13756,6 +13368,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已加入收藏，標籤顏色：%@"
+          }
+        }
+      }
+    },
+    "Information" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "案内所"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "안내소"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "咨询处"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "諮詢處"
           }
         }
       }
@@ -16573,6 +16213,62 @@
         }
       }
     },
+    "Next" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次へ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一步"
+          }
+        }
+      }
+    },
+    "Next available in %lld seconds" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あと%lld秒で「次へ」を選べます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld초 후 다음으로 진행할 수 있습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld秒后可选择“下一步”"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld秒後可選擇「下一步」"
+          }
+        }
+      }
+    },
     "No" : {
       "localizations" : {
         "ja" : {
@@ -17139,34 +16835,6 @@
         }
       }
     },
-    "Not logged in" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未ログイン"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "로그인되지 않음"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未登录"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未登入"
-          }
-        }
-      }
-    },
     "Not in favorites" : {
       "localizations" : {
         "ja" : {
@@ -17191,6 +16859,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未加入收藏"
+          }
+        }
+      }
+    },
+    "Not logged in" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未ログイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그인되지 않음"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未登录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未登入"
           }
         }
       }
@@ -18343,6 +18039,34 @@
         }
       }
     },
+    "Opens the circle details page" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル詳細ページを開きます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서클 상세 페이지를 엽니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开社团详情页面"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟社團詳細資訊頁面"
+          }
+        }
+      }
+    },
     "Opens the full circle detail page" : {
       "localizations" : {
         "ja" : {
@@ -18792,6 +18516,7 @@
       }
     },
     "Permanently deletes your account" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -18920,13 +18645,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在图库中双指捏合，即可放大社团图片，或在屏幕上同时显示更多图片。"
+            "value" : "在图库中双指捏合，即可放大社团图片，或在屏幕上同时显示更多图片"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在圖庫中雙指捏合，即可放大社團圖片，或在畫面上同時顯示更多圖片。"
+            "value" : "在圖庫中雙指捏合，即可放大社團圖片，或在畫面上同時顯示更多圖片"
           }
         }
       }
@@ -19352,6 +19077,7 @@
       }
     },
     "Please wait before deleting your account." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -20673,6 +20399,90 @@
         }
       }
     },
+    "Read this before continuing" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "続ける前にお読みください"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계속하기 전에 읽어 주세요"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先阅读以下内容"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先閱讀以下內容"
+          }
+        }
+      }
+    },
+    "Ready to continue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次へ進めます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음으로 진행할 수 있습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以进入下一步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以進入下一步"
+          }
+        }
+      }
+    },
+    "Ready to delete" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除できます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제할 수 있습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以删除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可以刪除"
+          }
+        }
+      }
+    },
     "Recovery" : {
       "localizations" : {
         "ja" : {
@@ -21010,34 +20820,6 @@
         }
       }
     },
-    "Remove from favorites" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "お気に入りから削除"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "즐겨찾기에서 제거"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从收藏中移除"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "從收藏夾移除"
-          }
-        }
-      }
-    },
     "Remove circle from plan" : {
       "localizations" : {
         "ja" : {
@@ -21062,6 +20844,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "從計畫中刪除社團"
+          }
+        }
+      }
+    },
+    "Remove from favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りから削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기에서 제거"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从收藏中移除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從收藏夾移除"
           }
         }
       }
@@ -21946,6 +21756,34 @@
         }
       }
     },
+    "Review the consequences" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除による影響を確認してください"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제 결과를 확인해 주세요"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请确认删除后的影响"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請確認刪除後的影響"
+          }
+        }
+      }
+    },
     "Revoke invitation" : {
       "localizations" : {
         "ja" : {
@@ -22115,6 +21953,7 @@
       }
     },
     "Save circle" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -22227,6 +22066,7 @@
       }
     },
     "Saved circle" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -22244,34 +22084,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已收藏社团"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已加入收藏"
-          }
-        }
-      }
-    },
-    "Saved to favorites" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "お気に入り登録済み"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "즐겨찾기 등록 완료"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已收藏"
           }
         },
         "zh-Hant" : {
@@ -22334,6 +22146,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法開啟儲存的計畫資料"
+          }
+        }
+      }
+    },
+    "Saved to favorites" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入り登録済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기 등록 완료"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已收藏"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加入收藏"
           }
         }
       }
@@ -24206,6 +24046,34 @@
         }
       }
     },
+    "Sources" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "情報源"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "출처"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来源"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "來源"
+          }
+        }
+      }
+    },
     "South %@" : {
       "localizations" : {
         "ja" : {
@@ -24521,6 +24389,34 @@
         }
       }
     },
+    "Step 1 of 2" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1/2"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1/2단계"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第1步，共2步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第1步，共2步"
+          }
+        }
+      }
+    },
     "Step 1/3" : {
       "localizations" : {
         "ja" : {
@@ -24545,6 +24441,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "步驟1/3"
+          }
+        }
+      }
+    },
+    "Step 2 of 2" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2/2"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2/2단계"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第2步，共2步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第2步，共2步"
           }
         }
       }
@@ -25675,34 +25599,6 @@
         }
       }
     },
-    "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このXアカウントは5,000人を超えるユーザーをフォローしているため、インポートできません。ComiNaviでインポートできるのは5,000アカウントまでです。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "이 X 계정은 5,000명 넘게 팔로우하고 있어 가져올 수 없습니다. ComiNavi에서는 최대 5,000개의 계정만 가져올 수 있습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此 X 账号关注了超过 5,000 人，无法导入。ComiNavi 最多可导入 5,000 个账号。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此 X 帳號關注了超過 5,000 人，無法匯入。ComiNavi 最多可匯入 5,000 個帳號。"
-          }
-        }
-      }
-    },
     "The installed catalog could not be verified. Please try downloading it again." : {
       "localizations" : {
         "ja" : {
@@ -26431,6 +26327,34 @@
         }
       }
     },
+    "This permanently deletes your ComiNavi account and its data. Your Circle.ms account will not be deleted, even if you connected it to ComiNavi." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviアカウントとそのデータは完全に削除されます。ComiNaviに連携している場合も、Circle.msアカウントは削除されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 계정과 데이터는 영구적으로 삭제됩니다. ComiNavi에 연동한 경우에도 Circle.ms 계정은 삭제되지 않습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这会永久删除你的ComiNavi账户及其数据。即使Circle.ms已连接到ComiNavi，你的Circle.ms账户也不会被删除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這會永久刪除你的ComiNavi帳號及其資料。即使Circle.ms已連結至ComiNavi，你的Circle.ms帳號也不會被刪除"
+          }
+        }
+      }
+    },
     "This physical table has no public circle for the selected day." : {
       "localizations" : {
         "ja" : {
@@ -26763,6 +26687,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法開啟已儲存的計畫，請下載副本或將其重設"
+          }
+        }
+      }
+    },
+    "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このXアカウントは5,000人を超えるユーザーをフォローしているため、インポートできません。ComiNaviでインポートできるのは5,000アカウントまでです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 X 계정은 5,000명 넘게 팔로우하고 있어 가져올 수 없습니다. ComiNavi에서는 최대 5,000개의 계정만 가져올 수 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 X 账号关注了超过 5,000 人，无法导入。ComiNavi 最多可导入 5,000 个账号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此 X 帳號關注了超過 5,000 人，無法匯入。ComiNavi 最多可匯入 5,000 個帳號"
           }
         }
       }
@@ -28146,6 +28098,7 @@
       }
     },
     "View and copy your current location" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -29377,6 +29330,62 @@
         }
       }
     },
+    "Will be deleted" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除されます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제됩니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会被删除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將被刪除"
+          }
+        }
+      }
+    },
+    "Will not be deleted" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除されません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "삭제되지 않습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不会被删除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不會被刪除"
+          }
+        }
+      }
+    },
     "Withdrawal report" : {
       "localizations" : {
         "ja" : {
@@ -29601,6 +29610,34 @@
         }
       }
     },
+    "Yes, Delete" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "はい、削除します"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "예, 삭제합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认删除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確認刪除"
+          }
+        }
+      }
+    },
     "You are near %@" : {
       "localizations" : {
         "ja" : {
@@ -29658,6 +29695,7 @@
       }
     },
     "You can delete your account now." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -29933,6 +29971,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的選擇已儲存，通知傳送方式仍依 iOS 通知設定"
+          }
+        }
+      }
+    },
+    "Your Circle.ms account will not be deleted." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msアカウントは削除されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms 계정은 삭제되지 않습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的Circle.ms账户不会被删除"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你的Circle.ms帳號不會被刪除"
           }
         }
       }
@@ -31842,6 +31908,7 @@
       }
     },
     "共有プランを更新できませんでした" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
