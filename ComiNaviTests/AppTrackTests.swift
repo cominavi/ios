@@ -55,4 +55,28 @@ final class AppTrackTests: XCTestCase {
     func testEmptyIntentDataIsNotAttached() {
         XCTAssertNil(AppTrack.userIntentBreadcrumb(.sharedPlanArchived).data)
     }
+
+    func testUserIntentPostHogEventUsesStableNameAndSafeContext() {
+        let event = AppTrack.userIntentPostHogEvent(
+            .sharedPlanMemoUpdated,
+            data: [
+                "plan_id": "plan-1",
+                "wc_id": 42,
+            ]
+        )
+
+        XCTAssertEqual(event.name, "shared_plan.memo_update")
+        XCTAssertEqual(event.properties["intent_category"] as? String, "user.shared_plan")
+        XCTAssertEqual(event.properties["plan_id"] as? String, "plan-1")
+        XCTAssertEqual(event.properties["wc_id"] as? Int, 42)
+    }
+
+    func testEveryIntentProducesStablePostHogEventNameAndCategory() {
+        for intent in AppTrack.UserIntent.allCases {
+            let event = AppTrack.userIntentPostHogEvent(intent)
+
+            XCTAssertEqual(event.name, intent.rawValue)
+            XCTAssertEqual(event.properties["intent_category"] as? String, intent.category)
+        }
+    }
 }

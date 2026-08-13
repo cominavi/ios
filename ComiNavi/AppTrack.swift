@@ -101,6 +101,9 @@ enum AppTrack {
 
     static func userIntent(_ intent: UserIntent, data: [String: Any] = [:]) {
         SentrySDK.addBreadcrumb(userIntentBreadcrumb(intent, data: data))
+
+        let event = userIntentPostHogEvent(intent, data: data)
+        PostHogSDK.shared.capture(event.name, properties: event.properties)
     }
 
     static func userIntentBreadcrumb(
@@ -116,6 +119,15 @@ enum AppTrack {
             breadcrumb.data = data
         }
         return breadcrumb
+    }
+
+    static func userIntentPostHogEvent(
+        _ intent: UserIntent,
+        data: [String: Any] = [:]
+    ) -> (name: String, properties: [String: Any]) {
+        var properties = data
+        properties["intent_category"] = intent.category
+        return (intent.rawValue, properties)
     }
 
     static func user(_ user: User?) {
