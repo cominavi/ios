@@ -1788,13 +1788,14 @@ final class UnifiedBigSightScene: SKScene {
         let bounds = UnifiedMapProjection.sceneBounds(fromCampus: campus.bounds)
         let scale = max(maximumCameraScale, min(minimumCameraScale, mapCamera.xScale))
         if scale != mapCamera.xScale { mapCamera.setScale(scale) }
-        let halfWidth = size.width * scale * 0.5
-        let halfHeight = size.height * scale * 0.5
+        // Keep the camera center within the map boundary rather than keeping
+        // the entire viewport inside it. Edge tables and circles must still be
+        // able to reach the center of the screen at any zoom level.
         let margin = min(size.width, size.height) * scale * 0.08
-        let minX = bounds.minX - margin + halfWidth
-        let maxX = bounds.maxX + margin - halfWidth
-        let minY = bounds.minY - margin + halfHeight
-        let maxY = bounds.maxY + margin - halfHeight
+        let minX = bounds.minX - margin
+        let maxX = bounds.maxX + margin
+        let minY = bounds.minY - margin
+        let maxY = bounds.maxY + margin
         mapCamera.position.x =
             minX <= maxX
             ? max(minX, min(maxX, mapCamera.position.x))
