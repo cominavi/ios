@@ -3,10 +3,10 @@ import { createRequire } from "node:module";
 import {
   applyPlanOperation,
   type PlanOperation,
-} from "../../../homepage/src/lib/server/plan-document";
+} from "../../../server/src/lib/server/plan-document";
 
 const require = createRequire(
-  new URL("../../../homepage/package.json", import.meta.url),
+  new URL("../../../server/package.json", import.meta.url),
 );
 const Automerge = require("@automerge/automerge");
 

@@ -6,7 +6,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 ios_root="$(cd "$script_dir/.." && pwd -P)"
 workspace_root="$(cd "$ios_root/.." && pwd -P)"
 
-server_contract="${1:-$workspace_root/homepage/openapi/cominavi-openapi.json}"
+server_contract="${1:-$workspace_root/server/openapi/cominavi-openapi.json}"
 client_contract="${2:-$ios_root/Packages/CominaviAPIClient/Sources/CominaviAPIClient/openapi.json}"
 
 if [[ $# -gt 2 ]]; then

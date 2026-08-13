@@ -15,7 +15,7 @@ final class CominaviAPIClientTests: XCTestCase {
         let clientContract = packageRoot
             .appendingPathComponent("Sources/CominaviAPIClient/openapi.json")
         let serverContract = packageRoot
-            .appendingPathComponent("../../../homepage/openapi/cominavi-openapi.json")
+            .appendingPathComponent("../../../server/openapi/cominavi-openapi.json")
             .standardizedFileURL
 
         let clientData = try Data(contentsOf: clientContract)
