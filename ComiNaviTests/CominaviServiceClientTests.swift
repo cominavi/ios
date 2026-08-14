@@ -1317,6 +1317,42 @@ final class CominaviServiceClientTests: XCTestCase {
         )
     }
 
+    func testManualCirclemsFavoriteSyncUsesProtectedServerEndpoint() async throws {
+        let body = try jsonData([
+            "eventNumber": 108,
+            "revision": 7,
+            "favoriteCount": 3,
+            "addedCount": 1,
+            "updatedCount": 1,
+            "unchangedCount": 1,
+            "skippedMemoOnlyCount": 0,
+        ])
+        let transport = StaticCominaviTransport(responses: [
+            "POST /api/v2/me/circlems-favorites/108/sync": (200, body),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+
+        let result = try await client.syncCirclemsFavorites(eventNumber: 108)
+
+        XCTAssertEqual(result.eventNumber, 108)
+        XCTAssertEqual(result.revision, 7)
+        XCTAssertEqual(result.favoriteCount, 3)
+        XCTAssertEqual(result.addedCount, 1)
+        XCTAssertEqual(result.updatedCount, 1)
+        XCTAssertEqual(result.unchangedCount, 1)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(
+            requests.first?.url?.path,
+            "/api/v2/me/circlems-favorites/108/sync"
+        )
+        XCTAssertEqual(requests.first?.httpMethod, "POST")
+        XCTAssertEqual(
+            requests.first?.value(forHTTPHeaderField: "Authorization"),
+            "Bearer fixture-access"
+        )
+    }
+
     func testGeneratedXFollowingImportUsesServiceSessionAndMapsDomainPayload() async throws {
         let response = Data(
             #"{"twitterUserName":"cominavi","importedAt":"2026-08-11T08:00:00Z","nextAllowedAt":"2026-08-11T09:00:00Z","followings":[{"id":"42","userName":"circle","name":"Circle","url":"https://x.com/circle","profilePicture":null}],"source":"cache"}"#.utf8

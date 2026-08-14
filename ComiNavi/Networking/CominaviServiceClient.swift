@@ -38,8 +38,15 @@ enum CominaviServiceError: LocalizedError, Sendable {
             String(localized: "Circle.ms sign-in is still being completed. Please try again shortly.")
         case .invalidResponse:
             String(localized: "The ComiNavi service returned an invalid response.")
-        case .server(_, let message, _):
-            message
+        case .server(let code, let message, _):
+            switch code {
+            case "circlems_favorite_sync_unavailable":
+                String(localized: "Link a Circle.ms account before syncing favorites.")
+            case "circlems_favorite_sync_failed":
+                String(localized: "Circle.ms favorites could not be synced. Please try again.")
+            default:
+                message
+            }
         case .favoriteMutationRejected(_, let message, _):
             message
         case .planOwnerRequired(_, let message):
@@ -183,6 +190,20 @@ protocol CirclemsFavoriteImportServicing: Sendable {
     ) async throws -> CirclemsFavoriteImportPage
 }
 
+struct CirclemsFavoriteSyncResult: Equatable, Sendable {
+    let eventNumber: Int
+    let revision: Int
+    let favoriteCount: Int
+    let addedCount: Int
+    let updatedCount: Int
+    let unchangedCount: Int
+    let skippedMemoOnlyCount: Int
+}
+
+protocol CirclemsFavoriteSyncServicing: Sendable {
+    func syncCirclemsFavorites(eventNumber: Int) async throws -> CirclemsFavoriteSyncResult
+}
+
 protocol CominaviRealtimeFetching: Sendable {
     func realtimeUpdates(
         eventNumber: Int,
@@ -248,6 +269,7 @@ struct AppleAuthenticationPublication: Sendable {
 }
 
 actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServicing,
+    CirclemsFavoriteSyncServicing,
     CominaviRealtimeFetching,
     CominaviProfileServicing, CominaviAvatarLoading, SharedPlanRemoteServicing,
     CominaviCatalogServicing, CominaviCatalogRequestAuthorizing,
@@ -957,6 +979,83 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
               })
         else { throw CominaviServiceError.invalidResponse }
         return page
+    }
+
+    func syncCirclemsFavorites(
+        eventNumber: Int
+    ) async throws -> CirclemsFavoriteSyncResult {
+        guard eventNumber > 0 else { throw CominaviServiceError.invalidResponse }
+        let output = try await generatedAuthorizedRequest(
+            operation: { client in
+                try await client.syncCirclemsFavorites(.init(
+                    path: .init(eventNumber: eventNumber)
+                ))
+            },
+            isUnauthorized: { output in
+                if case .unauthorized = output { true } else { false }
+            }
+        )
+        let payload: Operations.SyncCirclemsFavorites.Output.Ok.Body.JsonPayload
+        switch output {
+        case .ok(let response):
+            payload = try response.body.json
+        case .badRequest(let response):
+            throw generatedServiceError(try response.body.json, status: 400)
+        case .unauthorized(let response):
+            throw generatedServiceError(try response.body.json, status: 401)
+        case .forbidden(let response):
+            throw generatedServiceError(try response.body.json, status: 403)
+        case .notFound(let response):
+            throw generatedServiceError(try response.body.json, status: 404)
+        case .conflict(let response):
+            throw generatedServiceError(try response.body.json, status: 409)
+        case .gone(let response):
+            throw generatedServiceError(try response.body.json, status: 410)
+        case .preconditionFailed(let response):
+            throw generatedServiceError(try response.body.json, status: 412)
+        case .contentTooLarge(let response):
+            throw generatedServiceError(try response.body.json, status: 413)
+        case .unsupportedMediaType(let response):
+            throw generatedServiceError(try response.body.json, status: 415)
+        case .unprocessableContent(let response):
+            throw generatedServiceError(try response.body.json, status: 422)
+        case .preconditionRequired(let response):
+            throw generatedServiceError(try response.body.json, status: 428)
+        case .tooManyRequests(let response):
+            throw generatedServiceError(try response.body.json, status: 429)
+        case .internalServerError(let response):
+            throw generatedServiceError(try response.body.json, status: 500)
+        case .badGateway(let response):
+            throw generatedServiceError(try response.body.json, status: 502)
+        case .serviceUnavailable(let response):
+            throw generatedServiceError(try response.body.json, status: 503)
+        case .undocumented(let statusCode, _):
+            throw CominaviServiceError.server(
+                code: "undocumented_response",
+                message: "The ComiNavi service returned an undocumented response.",
+                status: statusCode
+            )
+        }
+        let result = CirclemsFavoriteSyncResult(
+            eventNumber: payload.eventNumber,
+            revision: payload.revision,
+            favoriteCount: payload.favoriteCount,
+            addedCount: payload.addedCount,
+            updatedCount: payload.updatedCount,
+            unchangedCount: payload.unchangedCount,
+            skippedMemoOnlyCount: payload.skippedMemoOnlyCount
+        )
+        guard result.eventNumber == eventNumber,
+              result.revision >= 0,
+              result.favoriteCount >= 0,
+              result.addedCount >= 0,
+              result.updatedCount >= 0,
+              result.unchangedCount >= 0,
+              result.skippedMemoOnlyCount >= 0,
+              result.addedCount + result.updatedCount + result.unchangedCount
+                  == result.favoriteCount
+        else { throw CominaviServiceError.invalidResponse }
+        return result
     }
 
     func importXFollowings(userName: String) async throws -> FollowingImportPayload {

@@ -38,6 +38,13 @@ struct ProfileScreen: View {
         }
     }
 
+    private enum FavoriteSyncState: Equatable {
+        case idle
+        case syncing
+        case succeeded
+        case failed(message: String)
+    }
+
     @AppStorage(SharedLocationClipboardImporter.enabledDefaultsKey)
     private var automaticallyReadsSharedLocations = false
     @State private var isShowingLogoutConfirmation = false
@@ -53,6 +60,7 @@ struct ProfileScreen: View {
     @State private var favoriteRecoveries: [QuarantinedCanonicalFavoriteMutation] = []
     @State private var favoriteRecoveryIssue: String?
     @State private var favoriteRecoveryPendingDiscard: QuarantinedCanonicalFavoriteMutation?
+    @State private var favoriteSyncState = FavoriteSyncState.idle
     @StateObject private var circlemsLinkViewModel = SignInViewModel()
     let catalogLibrary: CatalogLibrary
 
@@ -227,6 +235,53 @@ struct ProfileScreen: View {
                 }
             }
 
+            if hasLinkedCirclemsIdentity, let dataSource = catalogLibrary.dataSource {
+                Section {
+                    Button {
+                        syncFavoritesToCirclems(dataSource)
+                    } label: {
+                        HStack {
+                            if favoriteSyncState == .syncing {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                            }
+                            Text("Sync ComiNavi favorites to Circle.ms")
+                        }
+                    }
+                    .disabled(
+                        favoriteSyncState == .syncing
+                            || !profileStore.isIdentityVerified
+                    )
+                    .accessibilityIdentifier("profile-sync-circlems-favorites")
+
+                    switch favoriteSyncState {
+                    case .idle, .syncing:
+                        EmptyView()
+                    case .succeeded:
+                        Label {
+                            Text("ComiNavi favorites were synced to Circle.ms.")
+                        } icon: {
+                            Image(systemName: "checkmark.circle.fill")
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.green)
+                        .accessibilityIdentifier("profile-sync-circlems-favorites-success")
+                    case .failed(let message):
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                            .accessibilityIdentifier("profile-sync-circlems-favorites-error")
+                    }
+                } header: {
+                    Text("Circle.ms")
+                } footer: {
+                    Text(
+                        "Adds or updates your ComiNavi favorites in Circle.ms. Existing Circle.ms memos and unrelated favorites are kept."
+                    )
+                }
+            }
+
             if let dataSource = catalogLibrary.dataSource {
                 Section("X followed circles") {
                     NavigationLink {
@@ -333,6 +388,7 @@ struct ProfileScreen: View {
             await linkCirclemsIdentityAndWait(userID)
         }
         .task(id: catalogLibrary.dataSource?.comiket.number) {
+            favoriteSyncState = .idle
             await loadFavoriteRecoveries()
         }
         .confirmationDialog(
@@ -391,6 +447,10 @@ struct ProfileScreen: View {
 
     private var nonCirclemsIdentities: [CominaviProfileIdentity] {
         profileStore.profile?.identities.filter { $0.provider != "circlems" } ?? []
+    }
+
+    private var hasLinkedCirclemsIdentity: Bool {
+        profileStore.profile?.identities.contains { $0.provider == "circlems" } == true
     }
 
     private func returnToAuthentication() {
@@ -481,6 +541,26 @@ struct ProfileScreen: View {
             favoriteRecoveryIssue = nil
         } catch {
             favoriteRecoveryIssue = error.localizedDescription
+        }
+    }
+
+    private func syncFavoritesToCirclems(_ dataSource: CirclemsDataSource) {
+        guard favoriteSyncState != .syncing else { return }
+        favoriteSyncState = .syncing
+        Task {
+            do {
+                // Flush the durable local outbox first so the server mirrors the
+                // canonical revision that includes this device's latest edits.
+                try await dataSource.bookmarkSyncCoordinator?.sync()
+                let result = try await CominaviServiceClient.shared
+                    .syncCirclemsFavorites(eventNumber: dataSource.comiket.number)
+                guard result.eventNumber == dataSource.comiket.number else {
+                    throw CominaviServiceError.invalidResponse
+                }
+                favoriteSyncState = .succeeded
+            } catch {
+                favoriteSyncState = .failed(message: error.localizedDescription)
+            }
         }
     }
 

@@ -6774,6 +6774,146 @@
         }
       }
     },
+    "Adds or updates your ComiNavi favorites in Circle.ms. Existing Circle.ms memos and unrelated favorites are kept." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviのお気に入りをCircle.msに追加または更新します。Circle.msの既存メモと関係のないお気に入りは保持されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 즐겨찾기를 Circle.ms에 추가하거나 업데이트합니다. 기존 Circle.ms 메모와 관련 없는 즐겨찾기는 유지됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 ComiNavi 收藏添加或更新到 Circle.ms。Circle.ms 中现有的备注和无关收藏都会保留。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將 ComiNavi 收藏新增或更新至 Circle.ms。Circle.ms 中現有的備註與不相關的收藏都會保留。"
+          }
+        }
+      }
+    },
+    "Circle.ms favorites could not be synced. Please try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msのお気に入りを同期できませんでした。もう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms 즐겨찾기를 동기화하지 못했습니다. 다시 시도해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法同步 Circle.ms 收藏。请重试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法同步 Circle.ms 收藏。請再試一次。"
+          }
+        }
+      }
+    },
+    "ComiNavi favorites were synced to Circle.ms." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviのお気に入りをCircle.msに同期しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 즐겨찾기를 Circle.ms에 동기화했습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将 ComiNavi 收藏同步到 Circle.ms。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已將 ComiNavi 收藏同步至 Circle.ms。"
+          }
+        }
+      }
+    },
+    "Link a Circle.ms account before syncing favorites." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お気に入りを同期するには、Circle.msアカウントを連携してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "즐겨찾기를 동기화하려면 Circle.ms 계정을 연결해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先关联 Circle.ms 账号，再同步收藏。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先連結 Circle.ms 帳號，再同步收藏。"
+          }
+        }
+      }
+    },
+    "Sync ComiNavi favorites to Circle.ms" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviのお気に入りをCircle.msに同期"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 즐겨찾기를 Circle.ms에 동기화"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将 ComiNavi 收藏同步到 Circle.ms"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將 ComiNavi 收藏同步至 Circle.ms"
+          }
+        }
+      }
+    },
     "Circle.ms" : {
       "localizations" : {
         "ja" : {
