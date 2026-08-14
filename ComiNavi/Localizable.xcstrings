@@ -421,6 +421,7 @@
       }
     },
     "%@ table spaces" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -444,76 +445,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@攤位"
-          }
-        }
-      }
-    },
-    "%lld table spaces" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld table space"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld table spaces"
-                }
-              }
-            }
-          }
-        },
-        "ja" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lldスペース"
-                }
-              }
-            }
-          }
-        },
-        "ko" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld부스"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hans" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld摊位"
-                }
-              }
-            }
-          }
-        },
-        "zh-Hant" : {
-          "variations" : {
-            "plural" : {
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld攤位"
-                }
-              }
-            }
           }
         }
       }
@@ -1515,6 +1446,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "剩餘%lld個"
+          }
+        }
+      }
+    },
+    "%lld table spaces" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld table space"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld table spaces"
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lldスペース"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld부스"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld摊位"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld攤位"
+                }
+              }
+            }
           }
         }
       }
@@ -3365,6 +3366,62 @@
         }
       }
     },
+    "App installation ID" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリのインストールID"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 설치 ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用安装 ID"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 安裝 ID"
+          }
+        }
+      }
+    },
+    "App version, device model, and operating system" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アプリのバージョン、端末モデル、OS"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱 버전, 기기 모델 및 운영 체제"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用版本、设备型号和操作系统"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 版本、裝置型號和作業系統"
+          }
+        }
+      }
+    },
     "Archive" : {
       "localizations" : {
         "ja" : {
@@ -4638,34 +4695,6 @@
         }
       }
     },
-    "C108 right now" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C108の重要情報"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C108의 중요한 정보"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C108的重要信息"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C108 即時資訊"
-          }
-        }
-      }
-    },
     "C108 last-minute official roundup" : {
       "localizations" : {
         "ja" : {
@@ -4694,114 +4723,30 @@
         }
       }
     },
-    "Extra service runs between Haneda Airport and Tokyo Big Sight on August 15–16." : {
+    "C108 right now" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "8月15日・16日は、羽田空港と東京ビッグサイト間で臨時便が運行されます。"
+            "value" : "C108の重要情報"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "8월 15일과 16일에는 하네다공항과 도쿄 빅사이트 사이에 임시편이 운행됩니다."
+            "value" : "C108의 중요한 정보"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "8月15日至16日，羽田机场与 Tokyo Big Sight 之间将加开临时班次"
+            "value" : "C108的重要信息"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "8月15日至16日，羽田機場與 Tokyo Big Sight 之間將加開臨時班次"
-          }
-        }
-      }
-    },
-    "Haneda airport limousine bus" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "羽田空港リムジンバス"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "하네다공항 리무진버스"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "羽田机场豪华巴士"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "羽田機場巴士"
-          }
-        }
-      }
-    },
-    "Some passages on levels 1 and 2 of the East Exhibition Hall Galleria are narrowed. Watch your footing." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "東展示棟ガレリア1階・2階では、一部の通路が狭くなっています。足元に注意してください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "동 전시동 갤러리아 1층과 2층의 일부 통로가 좁아져 있습니다. 발밑을 조심해 주세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "东展览馆连廊1层和2层的部分通道变窄，请注意脚下"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "東展示館連廊1樓和2樓的部分通道變窄，請留意腳下"
-          }
-        }
-      }
-    },
-    "The committee’s current pre-event guidance, including today’s revisions and international materials." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "準備会による最新の開催直前案内。当日の更新や海外参加者向け資料も確認できます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "준비회의 최신 행사 직전 안내입니다. 당일 업데이트와 해외 참가자용 자료도 확인할 수 있습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "准备会最新的开展前指南，包括当天更新和面向海外参加者的资料"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "準備會最新的開展前指南，包括當天更新和面向海外參加者的資料"
+            "value" : "C108 即時資訊"
           }
         }
       }
@@ -5625,6 +5570,34 @@
         }
       }
     },
+    "Choose another screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "別のスクリーンショットを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 스크린샷 선택"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择其他截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選擇其他螢幕截圖"
+          }
+        }
+      }
+    },
     "Choose one value" : {
       "localizations" : {
         "ja" : {
@@ -5705,6 +5678,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "選擇移除項目或保留較晚的編輯"
+          }
+        }
+      }
+    },
+    "Choose screenshot from Photos" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真からスクリーンショットを選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사진에서 스크린샷 선택"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从照片中选择截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "從照片中選擇螢幕截圖"
           }
         }
       }
@@ -7653,6 +7654,34 @@
         }
       }
     },
+    "ComiNavi account ID" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviアカウントID"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 계정 ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 账号 ID"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 帳號 ID"
+          }
+        }
+      }
+    },
     "ComiNavi and Circle.ms are separate accounts" : {
       "localizations" : {
         "ja" : {
@@ -7677,6 +7706,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ComiNavi與Circle.ms是兩個獨立帳號"
+          }
+        }
+      }
+    },
+    "ComiNavi can access only the screenshot you choose." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNaviがアクセスできるのは、選択したスクリーンショットだけです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi는 사용자가 선택한 스크린샷에만 접근할 수 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 只能访问您所选择的截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ComiNavi 只能存取您所選擇的螢幕截圖"
           }
         }
       }
@@ -8153,6 +8210,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "連接橋"
+          }
+        }
+      }
+    },
+    "Contact email (optional)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "連絡先メールアドレス（任意）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연락받을 이메일(선택 사항)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "联系邮箱（可选）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "聯絡信箱（選填）"
           }
         }
       }
@@ -9021,34 +9106,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "建立選項"
-          }
-        }
-      }
-    },
-    "Expect severe crowding and possible entry controls at Kokusai-tenjijo and Tokyo Big Sight stations from about 13:00 to 18:00. Leave extra time." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "国際展示場駅と東京ビッグサイト駅では、13時頃〜18時頃に大変な混雑と入場規制が予想されています。時間に余裕を持って移動してください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "국제전시장역과 도쿄 빅사이트역은 13시경부터 18시경까지 극심한 혼잡과 입장 제한이 예상됩니다. 이동 시간을 넉넉히 잡아 주세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "国际展示场站和 Tokyo Big Sight 站预计在13:00至18:00左右严重拥挤，并可能实施进站管制。请预留充足时间"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "國際展示場站和 Tokyo Big Sight 站預計在13:00至18:00左右嚴重擁擠，並可能實施進站管制。請預留充足時間"
           }
         }
       }
@@ -11847,6 +11904,90 @@
         }
       }
     },
+    "Expect severe crowding and possible entry controls at Kokusai-tenjijo and Tokyo Big Sight stations from about 13:00 to 18:00. Leave extra time." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国際展示場駅と東京ビッグサイト駅では、13時頃〜18時頃に大変な混雑と入場規制が予想されています。時間に余裕を持って移動してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "국제전시장역과 도쿄 빅사이트역은 13시경부터 18시경까지 극심한 혼잡과 입장 제한이 예상됩니다. 이동 시간을 넉넉히 잡아 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国际展示场站和 Tokyo Big Sight 站预计在13:00至18:00左右严重拥挤，并可能实施进站管制。请预留充足时间"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "國際展示場站和 Tokyo Big Sight 站預計在13:00至18:00左右嚴重擁擠，並可能實施進站管制。請預留充足時間"
+          }
+        }
+      }
+    },
+    "Expect severe crowding and possible entry controls at Kokusai-tenjijo Station around 13:00–18:00 on both days." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "両日とも13時頃〜18時頃、国際展示場駅では大変な混雑と入場規制が予想されています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "양일 모두 13시경부터 18시경까지 국제전시장역의 극심한 혼잡과 입장 제한이 예상됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两天的13:00至18:00左右，国际展示场站预计严重拥挤，并可能实施进站管制"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兩天的13:00至18:00左右，國際展示場站預計嚴重擁擠，並可能實施進站管制"
+          }
+        }
+      }
+    },
+    "Expect severe crowding and possible entry controls at Tokyo Big Sight Station around 13:00–18:00 on both days." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "両日とも13時頃〜18時頃、東京ビッグサイト駅では大変な混雑と入場規制が予想されています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "양일 모두 13시경부터 18시경까지 도쿄 빅사이트역의 극심한 혼잡과 입장 제한이 예상됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "两天的13:00至18:00左右，Tokyo Big Sight 站预计严重拥挤，并可能实施进站管制"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "兩天的13:00至18:00左右，Tokyo Big Sight 站預計嚴重擁擠，並可能實施進站管制"
+          }
+        }
+      }
+    },
     "Expiration" : {
       "localizations" : {
         "ja" : {
@@ -12011,6 +12152,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "來自外部的更新"
+          }
+        }
+      }
+    },
+    "Extra service runs between Haneda Airport and Tokyo Big Sight on August 15–16." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8月15日・16日は、羽田空港と東京ビッグサイト間で臨時便が運行されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8월 15일과 16일에는 하네다공항과 도쿄 빅사이트 사이에 임시편이 운행됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8月15日至16日，羽田机场与 Tokyo Big Sight 之间将加开临时班次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "8月15日至16日，羽田機場與 Tokyo Big Sight 之間將加開臨時班次"
           }
         }
       }
@@ -13345,6 +13514,34 @@
         }
       }
     },
+    "Haneda airport limousine bus" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "羽田空港リムジンバス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하네다공항 리무진버스"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "羽田机场豪华巴士"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "羽田機場巴士"
+          }
+        }
+      }
+    },
     "Has shinagaki" : {
       "localizations" : {
         "ja" : {
@@ -14038,6 +14235,34 @@
         }
       }
     },
+    "Included diagnostics" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "送信される診断情報"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "포함되는 진단 정보"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将包含的诊断信息"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將包含的診斷資訊"
+          }
+        }
+      }
+    },
     "Information" : {
       "localizations" : {
         "ja" : {
@@ -14622,6 +14847,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "邀請連結過期或計畫封存後將無法使用"
+          }
+        }
+      }
+    },
+    "Issue reporting is unavailable right now." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在、問題を報告できません。しばらくしてからもう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지금은 문제를 신고할 수 없습니다. 잠시 후 다시 시도해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前无法报告问题，请稍后再试"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目前無法回報問題，請稍後再試"
           }
         }
       }
@@ -18159,34 +18412,6 @@
         }
       }
     },
-    "Expect severe crowding and possible entry controls at Kokusai-tenjijo Station around 13:00–18:00 on both days." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "両日とも13時頃〜18時頃、国際展示場駅では大変な混雑と入場規制が予想されています。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "양일 모두 13시경부터 18시경까지 국제전시장역의 극심한 혼잡과 입장 제한이 예상됩니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "两天的13:00至18:00左右，国际展示场站预计严重拥挤，并可能实施进站管制"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兩天的13:00至18:00左右，國際展示場站預計嚴重擁擠，並可能實施進站管制"
-          }
-        }
-      }
-    },
     "Offline circle list and maps" : {
       "localizations" : {
         "ja" : {
@@ -19167,6 +19392,63 @@
         }
       }
     },
+    "Passwords, authentication tokens, and catalog contents are not included. A screenshot is attached only when you choose one." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パスワード、認証トークン、カタログの内容は送信されません。スクリーンショットは、選択した場合にのみ添付されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "비밀번호, 인증 토큰 및 카탈로그 내용은 포함되지 않습니다. 스크린샷은 직접 선택한 경우에만 첨부됩니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不会包含密码、身份验证令牌和目录内容。仅当您主动选择截图时才会附加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不會包含密碼、驗證權杖和場刊內容。只有在您主動選擇時才會附加螢幕截圖"
+          }
+        }
+      }
+    },
+    "Passwords, authentication tokens, catalog contents, and screenshots are not included." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "パスワード、認証トークン、カタログの内容、スクリーンショットは送信されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "비밀번호, 인증 토큰, 카탈로그 내용 및 스크린샷은 포함되지 않습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不会包含密码、身份验证令牌、目录内容和屏幕截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不會包含密碼、驗證權杖、場刊內容和螢幕截圖"
+          }
+        }
+      }
+    },
     "Pedestrian walkway" : {
       "localizations" : {
         "ja" : {
@@ -19728,6 +20010,34 @@
         }
       }
     },
+    "Please describe the issue before sending." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問題の内容を入力してから送信してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "문제를 설명한 후 보내 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先描述问题，再发送报告"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請先描述問題，再傳送回報"
+          }
+        }
+      }
+    },
     "Please sign in again before opening the catalog." : {
       "localizations" : {
         "ja" : {
@@ -20089,6 +20399,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在準備地圖…"
+          }
+        }
+      }
+    },
+    "Preparing screenshot…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショットを準備中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크린샷 준비 중…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备截图…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在準備螢幕截圖…"
           }
         }
       }
@@ -21191,6 +21529,34 @@
         }
       }
     },
+    "Recent app actions and network breadcrumbs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近のアプリ操作とネットワーク通信の記録"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최근 앱 동작 및 네트워크 기록"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近的应用操作和网络记录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近的 App 操作與網路記錄"
+          }
+        }
+      }
+    },
     "Recovery" : {
       "localizations" : {
         "ja" : {
@@ -21271,6 +21637,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "紅色"
+          }
+        }
+      }
+    },
+    "Reference ID" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参照ID"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "참조 ID"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参考 ID"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "參考 ID"
           }
         }
       }
@@ -21696,6 +22090,34 @@
         }
       }
     },
+    "Remove screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショットを削除"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크린샷 삭제"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除螢幕截圖"
+          }
+        }
+      }
+    },
     "Remove this circle from the plan?" : {
       "localizations" : {
         "ja" : {
@@ -22000,6 +22422,90 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修復會保留可復原的更改，並從最新計畫開始"
+          }
+        }
+      }
+    },
+    "Report an issue" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問題を報告"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "문제 신고"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告问题"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回報問題"
+          }
+        }
+      }
+    },
+    "Report could not be sent" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "報告を送信できませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신고를 보내지 못했습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法发送报告"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法傳送回報"
+          }
+        }
+      }
+    },
+    "Report queued" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "報告を受け付けました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신고가 전송 대기 중입니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "报告已加入发送队列"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回報已加入傳送佇列"
           }
         }
       }
@@ -22942,6 +23448,34 @@
         }
       }
     },
+    "Screenshot (optional)" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スクリーンショット（任意）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스크린샷(선택 사항)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "截图（可选）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "螢幕截圖（選填）"
+          }
+        }
+      }
+    },
     "SE" : {
       "localizations" : {
         "ja" : {
@@ -23291,6 +23825,34 @@
         }
       }
     },
+    "Selected screenshot" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したスクリーンショット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 스크린샷"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已选择的截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已選擇的螢幕截圖"
+          }
+        }
+      }
+    },
     "Send changes before editing again" : {
       "localizations" : {
         "ja" : {
@@ -23315,6 +23877,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請先傳送更改，再繼續編輯"
+          }
+        }
+      }
+    },
+    "Send report" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "報告を送信"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신고 보내기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送报告"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "傳送回報"
           }
         }
       }
@@ -24642,6 +25232,34 @@
         }
       }
     },
+    "Some passages on levels 1 and 2 of the East Exhibition Hall Galleria are narrowed. Watch your footing." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東展示棟ガレリア1階・2階では、一部の通路が狭くなっています。足元に注意してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동 전시동 갤러리아 1층과 2층의 일부 통로가 좁아져 있습니다. 발밑을 조심해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "东展览馆连廊1层和2层的部分通道变窄，请注意脚下"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "東展示館連廊1樓和2樓的部分通道變窄，請留意腳下"
+          }
+        }
+      }
+    },
     "Some saved changes need recovery" : {
       "localizations" : {
         "ja" : {
@@ -25321,6 +25939,34 @@
         }
       }
     },
+    "Support" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サポート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지원"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支援"
+          }
+        }
+      }
+    },
     "SW" : {
       "localizations" : {
         "ja" : {
@@ -25607,6 +26253,34 @@
         }
       }
     },
+    "Tell us what happened" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "発生した問題"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "발생한 문제를 알려 주세요"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请告诉我们发生了什么"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請告訴我們發生了什麼"
+          }
+        }
+      }
+    },
     "Temporarily away" : {
       "localizations" : {
         "ja" : {
@@ -25771,6 +26445,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "TFT西館2樓"
+          }
+        }
+      }
+    },
+    "Thanks. Your report and diagnostics have been queued for delivery." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ご報告ありがとうございます。診断情報とともに送信待ちに追加しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "신고해 주셔서 감사합니다. 진단 정보와 함께 전송 대기열에 추가했습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "感谢您的报告。报告和诊断信息已加入发送队列"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "感謝您的回報。回報和診斷資訊已加入傳送佇列"
           }
         }
       }
@@ -26079,6 +26781,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ComiNavi 服務傳回無效回應"
+          }
+        }
+      }
+    },
+    "The committee’s current pre-event guidance, including today’s revisions and international materials." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備会による最新の開催直前案内。当日の更新や海外参加者向け資料も確認できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "준비회의 최신 행사 직전 안내입니다. 당일 업데이트와 해외 참가자용 자료도 확인할 수 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准备会最新的开展前指南，包括当天更新和面向海外参加者的资料"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備會最新的開展前指南，包括當天更新和面向海外參加者的資料"
           }
         }
       }
@@ -26503,34 +27233,6 @@
         }
       }
     },
-    "Expect severe crowding and possible entry controls at Tokyo Big Sight Station around 13:00–18:00 on both days." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "両日とも13時頃〜18時頃、東京ビッグサイト駅では大変な混雑と入場規制が予想されています。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "양일 모두 13시경부터 18시경까지 도쿄 빅사이트역의 극심한 혼잡과 입장 제한이 예상됩니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "两天的13:00至18:00左右，Tokyo Big Sight 站预计严重拥挤，并可能实施进站管制"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兩天的13:00至18:00左右，Tokyo Big Sight 站預計嚴重擁擠，並可能實施進站管制"
-          }
-        }
-      }
-    },
     "The person creating this request can add an estimated whole-yen price." : {
       "localizations" : {
         "ja" : {
@@ -26555,6 +27257,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "建立此請求的人可以整數日圓輸入預估價格"
+          }
+        }
+      }
+    },
+    "The selected screenshot could not be attached. Please choose another screenshot." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択したスクリーンショットを添付できませんでした。別のスクリーンショットを選択してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택한 스크린샷을 첨부할 수 없습니다. 다른 스크린샷을 선택해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法附加所选截图，请选择其他截图"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法附加所選螢幕截圖，請選擇其他螢幕截圖"
           }
         }
       }
@@ -29698,6 +30428,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "西等候地點 洗手間"
+          }
+        }
+      }
+    },
+    "What happened, and what did you expect?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "何が起きたか、どのような動作を期待していたかを入力してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "어떤 문제가 발생했고 어떤 동작을 기대했는지 입력해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请说明发生了什么，以及您原本期待的结果"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請說明發生了什麼，以及您原本預期的結果"
           }
         }
       }
@@ -33872,762 +34630,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "關閉"
-          }
-        }
-      }
-    },
-    "App installation ID" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリのインストールID"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "앱 설치 ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "应用安装 ID"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App 安裝 ID"
-          }
-        }
-      }
-    },
-    "App version, device model, and operating system" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリのバージョン、端末モデル、OS"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "앱 버전, 기기 모델 및 운영 체제"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "应用版本、设备型号和操作系统"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App 版本、裝置型號和作業系統"
-          }
-        }
-      }
-    },
-    "ComiNavi account ID" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNaviアカウントID"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi 계정 ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi 账号 ID"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi 帳號 ID"
-          }
-        }
-      }
-    },
-    "Contact email (optional)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "連絡先メールアドレス（任意）"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "연락받을 이메일(선택 사항)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "联系邮箱（可选）"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "聯絡信箱（選填）"
-          }
-        }
-      }
-    },
-    "Included diagnostics" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "送信される診断情報"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "포함되는 진단 정보"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "将包含的诊断信息"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "將包含的診斷資訊"
-          }
-        }
-      }
-    },
-    "Issue reporting is unavailable right now." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "現在、問題を報告できません。しばらくしてからもう一度お試しください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "지금은 문제를 신고할 수 없습니다. 잠시 후 다시 시도해 주세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前无法报告问题，请稍后再试"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "目前無法回報問題，請稍後再試"
-          }
-        }
-      }
-    },
-    "Passwords, authentication tokens, catalog contents, and screenshots are not included." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "パスワード、認証トークン、カタログの内容、スクリーンショットは送信されません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "비밀번호, 인증 토큰, 카탈로그 내용 및 스크린샷은 포함되지 않습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不会包含密码、身份验证令牌、目录内容和屏幕截图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不會包含密碼、驗證權杖、場刊內容和螢幕截圖"
-          }
-        }
-      }
-    },
-    "Please describe the issue before sending." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "問題の内容を入力してから送信してください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "문제를 설명한 후 보내 주세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请先描述问题，再发送报告"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "請先描述問題，再傳送回報"
-          }
-        }
-      }
-    },
-    "Recent app actions and network breadcrumbs" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最近のアプリ操作とネットワーク通信の記録"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "최근 앱 동작 및 네트워크 기록"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最近的应用操作和网络记录"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最近的 App 操作與網路記錄"
-          }
-        }
-      }
-    },
-    "Reference ID" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "参照ID"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "참조 ID"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "参考 ID"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "參考 ID"
-          }
-        }
-      }
-    },
-    "Report an issue" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "問題を報告"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "문제 신고"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "报告问题"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "回報問題"
-          }
-        }
-      }
-    },
-    "Report could not be sent" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "報告を送信できませんでした"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "신고를 보내지 못했습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法发送报告"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無法傳送回報"
-          }
-        }
-      }
-    },
-    "Report queued" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "報告を受け付けました"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "신고가 전송 대기 중입니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "报告已加入发送队列"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "回報已加入傳送佇列"
-          }
-        }
-      }
-    },
-    "Send report" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "報告を送信"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "신고 보내기"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发送报告"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "傳送回報"
-          }
-        }
-      }
-    },
-    "Support" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サポート"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "지원"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "支持"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "支援"
-          }
-        }
-      }
-    },
-    "Tell us what happened" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "発生した問題"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "발생한 문제를 알려 주세요"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请告诉我们发生了什么"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "請告訴我們發生了什麼"
-          }
-        }
-      }
-    },
-    "Thanks. Your report and diagnostics have been queued for delivery." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ご報告ありがとうございます。診断情報とともに送信待ちに追加しました。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "신고해 주셔서 감사합니다. 진단 정보와 함께 전송 대기열에 추가했습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "感谢您的报告。报告和诊断信息已加入发送队列"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "感謝您的回報。回報和診斷資訊已加入傳送佇列"
-          }
-        }
-      }
-    },
-    "What happened, and what did you expect?" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "何が起きたか、どのような動作を期待していたかを入力してください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "어떤 문제가 발생했고 어떤 동작을 기대했는지 입력해 주세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "请说明发生了什么，以及您原本期待的结果"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "請說明發生了什麼，以及您原本預期的結果"
-          }
-        }
-      }
-    },
-    "Choose another screenshot" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "別のスクリーンショットを選択"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다른 스크린샷 선택"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择其他截图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選擇其他螢幕截圖"
-          }
-        }
-      }
-    },
-    "Choose screenshot from Photos" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "写真からスクリーンショットを選択"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "사진에서 스크린샷 선택"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从照片中选择截图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "從照片中選擇螢幕截圖"
-          }
-        }
-      }
-    },
-    "ComiNavi can access only the screenshot you choose." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNaviがアクセスできるのは、選択したスクリーンショットだけです。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi는 사용자가 선택한 스크린샷에만 접근할 수 있습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi 只能访问您所选择的截图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNavi 只能存取您所選擇的螢幕截圖"
-          }
-        }
-      }
-    },
-    "Passwords, authentication tokens, and catalog contents are not included. A screenshot is attached only when you choose one." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "パスワード、認証トークン、カタログの内容は送信されません。スクリーンショットは、選択した場合にのみ添付されます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "비밀번호, 인증 토큰 및 카탈로그 내용은 포함되지 않습니다. 스크린샷은 직접 선택한 경우에만 첨부됩니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不会包含密码、身份验证令牌和目录内容。仅当您主动选择截图时才会附加"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "不會包含密碼、驗證權杖和場刊內容。只有在您主動選擇時才會附加螢幕截圖"
-          }
-        }
-      }
-    },
-    "Preparing screenshot…" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スクリーンショットを準備中…"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "스크린샷 준비 중…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在准备截图…"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在準備螢幕截圖…"
-          }
-        }
-      }
-    },
-    "Remove screenshot" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スクリーンショットを削除"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "스크린샷 삭제"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除截图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "移除螢幕截圖"
-          }
-        }
-      }
-    },
-    "Screenshot (optional)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "スクリーンショット（任意）"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "스크린샷(선택 사항)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "截图（可选）"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "螢幕截圖（選填）"
-          }
-        }
-      }
-    },
-    "Selected screenshot" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選択したスクリーンショット"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "선택한 스크린샷"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已选择的截图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已選擇的螢幕截圖"
-          }
-        }
-      }
-    },
-    "The selected screenshot could not be attached. Please choose another screenshot." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選択したスクリーンショットを添付できませんでした。別のスクリーンショットを選択してください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "선택한 스크린샷을 첨부할 수 없습니다. 다른 스크린샷을 선택해 주세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法附加所选截图，请选择其他截图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無法附加所選螢幕截圖，請選擇其他螢幕截圖"
           }
         }
       }
