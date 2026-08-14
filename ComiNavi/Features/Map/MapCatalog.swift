@@ -529,7 +529,7 @@ struct SQLiteMapCatalog: MapCatalog {
     func search(day: Int, query: String) async throws -> [CatalogMapSearchMatch] {
         let terms = JapaneseSearchNormalizer.normalizedTerms(in: query)
         guard !terms.isEmpty else { return [] }
-        if let index, terms.allSatisfy({ $0.unicodeScalars.count >= 3 }) {
+        if let index {
             return try await index.search(
                 day: day,
                 normalizedTerms: terms

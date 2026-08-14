@@ -613,7 +613,7 @@ final class MapScreenModel {
         let day = selectedDay
         searchTask = Task { [weak self, catalog] in
             do {
-                try await Task.sleep(for: .milliseconds(260))
+                try await Task.sleep(for: .milliseconds(80))
                 let matches = try await catalog.search(day: day, query: normalizedQuery)
                 try Task.checkCancellation()
                 guard let self,

@@ -69,6 +69,38 @@ final class MapCatalogSearchTests: XCTestCase {
         XCTAssertEqual(otherDayMatches.map(\.mapID), [2])
     }
 
+    func testIndexedSearchHandlesShortQueriesWithoutScanningSourceCatalog() async throws {
+        let database = try makeCatalogDatabase()
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("map-catalog-search-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let index = try MapCatalogIndex(
+            sourceDatabase: database,
+            cacheDatabasePath: directory.appendingPathComponent("index.sqlite").path,
+            catalogDigest: "short-query-fixture"
+        )
+        let catalog = SQLiteMapCatalog(
+            mainDatabase: database,
+            imageDatabase: database,
+            index: index
+        )
+
+        _ = try await catalog.search(day: 1, query: oppositeScriptQueries[0])
+        try await database.write { database in
+            try database.drop(table: "ComiketCircleWC")
+        }
+
+        let matches = try await catalog.search(day: 1, query: "アイ")
+        XCTAssertEqual(matches.map(\.id), [1, 3])
+        XCTAssertEqual(matches.map(\.mapID), [1, 2])
+        let percentMatches = try await catalog.search(day: 1, query: "%")
+        let underscoreMatches = try await catalog.search(day: 1, query: "_")
+        XCTAssertTrue(percentMatches.isEmpty)
+        XCTAssertTrue(underscoreMatches.isEmpty)
+    }
+
     private func makeCatalogDatabase() throws -> DatabaseQueue {
         let database = try DatabaseQueue()
         try database.write { database in

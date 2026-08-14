@@ -1340,6 +1340,22 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
+    func testGlobalSearchRespondsWithinInteractiveBudget() async throws {
+        let model = MapScreenModel.previewCampusFixture()
+        model.load()
+        try await waitUntilReady(model)
+
+        let clock = ContinuousClock()
+        let startedAt = clock.now
+        model.updateSearchQuery("Fixture")
+        try await waitUntil(timeout: .milliseconds(250)) {
+            !model.isSearching && !model.searchMatches.isEmpty
+        }
+
+        XCTAssertLessThan(clock.now - startedAt, .milliseconds(250))
+    }
+
+    @MainActor
     func testSelectingSecondCircleTargetsBookmarkAction() async throws {
         let model = MapScreenModel.fixture()
         model.load()

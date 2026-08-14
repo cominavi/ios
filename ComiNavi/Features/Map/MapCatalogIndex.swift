@@ -123,6 +123,13 @@ actor MapCatalogIndex {
         guard !normalizedTerms.isEmpty else { return [] }
         try await prepareIfNeeded()
 
+        if normalizedTerms.contains(where: { $0.unicodeScalars.count < 3 }) {
+            return try await searchIncludingShortTerms(
+                day: day,
+                normalizedTerms: normalizedTerms
+            )
+        }
+
         let matchExpression = normalizedTerms
             .map { "\"\($0.replacingOccurrences(of: "\"", with: "\"\""))\"" }
             .joined(separator: " AND ")
@@ -149,24 +156,71 @@ actor MapCatalogIndex {
                     LIMIT 1000
                     """,
                 arguments: [matchExpression, day]
-            ).compactMap { row -> CatalogMapSearchMatch? in
-                guard let id: Int = row["circleID"],
-                      let mapID: Int = row["mapID"],
-                      let blockID: Int = row["blockID"],
-                      let spaceNumber: Int = row["spaceNumber"]
-                else {
-                    return nil
-                }
-                return CatalogMapSearchMatch(
-                    id: id,
-                    mapID: mapID,
-                    tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
-                    subspace: row["subspace"] ?? 0,
-                    circleName: row["circleName"] ?? "",
-                    penName: row["penName"] ?? ""
-                )
-            }
+            ).compactMap(Self.searchMatch(from:))
         }
+    }
+
+    private func searchIncludingShortTerms(
+        day: Int,
+        normalizedTerms: [String]
+    ) async throws -> [CatalogMapSearchMatch] {
+        let predicates = normalizedTerms
+            .map { _ in "description LIKE ? ESCAPE '\\'" }
+            .joined(separator: " AND ")
+        var arguments: [(any DatabaseValueConvertible)?] = normalizedTerms.map {
+            "%\(Self.escapeLikePattern($0))%"
+        }
+        arguments.append(day)
+        let statementArguments = StatementArguments(arguments)
+
+        return try await database.read { database in
+            try Row.fetchAll(
+                database,
+                sql: """
+                    SELECT CAST(circleID AS INTEGER) AS circleID,
+                           CAST(mapID AS INTEGER) AS mapID,
+                           CAST(blockID AS INTEGER) AS blockID,
+                           CAST(spaceNumber AS INTEGER) AS spaceNumber,
+                           CAST(subspace AS INTEGER) AS subspace,
+                           circleName,
+                           penName
+                    FROM circle_search
+                    WHERE \(predicates)
+                      AND CAST(day AS INTEGER) = ?
+                    ORDER BY CAST(mapID AS INTEGER),
+                             CAST(blockID AS INTEGER),
+                             CAST(spaceNumber AS INTEGER),
+                             CAST(subspace AS INTEGER)
+                    LIMIT 1000
+                    """,
+                arguments: statementArguments
+            ).compactMap(Self.searchMatch(from:))
+        }
+    }
+
+    nonisolated private static func escapeLikePattern(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%")
+            .replacingOccurrences(of: "_", with: "\\_")
+    }
+
+    nonisolated private static func searchMatch(from row: Row) -> CatalogMapSearchMatch? {
+        guard let id: Int = row["circleID"],
+              let mapID: Int = row["mapID"],
+              let blockID: Int = row["blockID"],
+              let spaceNumber: Int = row["spaceNumber"]
+        else {
+            return nil
+        }
+        return CatalogMapSearchMatch(
+            id: id,
+            mapID: mapID,
+            tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
+            subspace: row["subspace"] ?? 0,
+            circleName: row["circleName"] ?? "",
+            penName: row["penName"] ?? ""
+        )
     }
 
     private func prepareIfNeeded() async throws {
