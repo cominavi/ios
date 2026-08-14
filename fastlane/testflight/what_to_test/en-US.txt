@@ -1,1 +1,1 @@
-Fixed Shinagaki attribution for quoted or reposted content. New backend publications now reliably replace older cached data.
+Expanded map search across the selected day and improved navigation to edge circles. Fixed favorite updates and Shinagaki markers, and extended the X following import timeout.
