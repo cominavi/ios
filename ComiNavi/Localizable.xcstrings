@@ -7211,13 +7211,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将 ComiNavi 收藏添加或更新到 Circle.ms。Circle.ms 中现有的备注和无关收藏都会保留。"
+            "value" : "将 ComiNavi 收藏添加或更新到 Circle.ms。Circle.ms 中现有的备注和无关收藏都会保留"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "將 ComiNavi 收藏新增或更新至 Circle.ms。Circle.ms 中現有的備註與不相關的收藏都會保留。"
+            "value" : "將 ComiNavi 收藏新增或更新至 Circle.ms。Circle.ms 中現有的備註與不相關的收藏都會保留"
           }
         }
       }
@@ -7239,13 +7239,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法同步 Circle.ms 收藏。请重试。"
+            "value" : "无法同步 Circle.ms 收藏。请重试"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "無法同步 Circle.ms 收藏。請再試一次。"
+            "value" : "無法同步 Circle.ms 收藏。請再試一次"
           }
         }
       }
@@ -7267,13 +7267,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已将 ComiNavi 收藏同步到 Circle.ms。"
+            "value" : "已将 ComiNavi 收藏同步到 Circle.ms"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已將 ComiNavi 收藏同步至 Circle.ms。"
+            "value" : "已將 ComiNavi 收藏同步至 Circle.ms"
           }
         }
       }
@@ -7295,13 +7295,13 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请先关联 Circle.ms 账号，再同步收藏。"
+            "value" : "请先关联 Circle.ms 账号，再同步收藏"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請先連結 Circle.ms 帳號，再同步收藏。"
+            "value" : "請先連結 Circle.ms 帳號，再同步收藏"
           }
         }
       }
