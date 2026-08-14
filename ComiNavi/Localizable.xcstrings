@@ -31875,30 +31875,30 @@
         }
       }
     },
-    "Zoom %@ times, %lld circle images, %lld favorites" : {
+    "Zoom %@ times, %lld circle images, %lld favorites, %lld primary plan circles" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ズーム%1$@倍、サークル画像%2$lld件、お気に入り%3$lld件"
+            "value" : "ズーム%1$@倍、サークル画像%2$lld件、お気に入り%3$lld件、メインプランのサークル%4$lld件"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@배 확대, 서클 이미지 %2$lld개, 즐겨찾기 %3$lld개"
+            "value" : "%1$@배 확대, 서클 이미지 %2$lld개, 즐겨찾기 %3$lld개, 기본 플랜 서클 %4$lld개"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "缩放%1$@倍，%2$lld张社团图片，%3$lld个收藏"
+            "value" : "缩放%1$@倍，%2$lld张社团图片，%3$lld个收藏，主要计划社团%4$lld个"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "縮放%1$@倍，%2$lld張社團圖片，%3$lld個收藏"
+            "value" : "縮放%1$@倍，%2$lld張社團圖片，%3$lld個收藏，主要計畫社團%4$lld個"
           }
         }
       }

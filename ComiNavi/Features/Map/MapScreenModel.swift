@@ -4,6 +4,52 @@ import OSLog
 import Observation
 
 @MainActor
+protocol PrimarySharedPlanCircleProviding {
+    func publicCircleIDs(eventNumber: Int) async -> Set<Int>
+}
+
+@MainActor
+final class SharedPlanPrimaryMapCircleProvider: PrimarySharedPlanCircleProviding {
+    private let store: SharedPlanStore
+    private let currentUserID: String?
+    private let preference: SharedPlanPrimaryPlanPreference
+
+    init(
+        store: SharedPlanStore,
+        currentUserID: String?,
+        defaults: UserDefaults = .standard
+    ) {
+        self.store = store
+        self.currentUserID = currentUserID
+        preference = SharedPlanPrimaryPlanPreference(defaults: defaults)
+    }
+
+    func publicCircleIDs(eventNumber: Int) async -> Set<Int> {
+        if !store.isLoaded {
+            await store.load()
+        }
+        let activePlans = store.plans.filter {
+            $0.comiketNo == eventNumber && $0.lifecycle == .active
+        }
+        let storedPlanID = preference.planID(
+            userID: currentUserID,
+            comiketNo: eventNumber
+        )
+        guard let primaryPlanID = SharedPlanPrimaryPlanPreference.validPlanID(
+            storedPlanID,
+            among: activePlans
+        ),
+            let primaryPlan = activePlans.first(where: { $0.id == primaryPlanID })
+        else {
+            return []
+        }
+        return Set(primaryPlan.circleKeys.lazy.filter {
+            $0.comiketNo == eventNumber
+        }.map(\.wcID))
+    }
+}
+
+@MainActor
 @Observable
 final class MapScreenModel {
     private static let logger = Logger(
@@ -69,6 +115,7 @@ final class MapScreenModel {
     private(set) var showsGenreOverlay = false
     private(set) var genrePlacements: [CatalogMapGenrePlacement] = []
     private(set) var bookmarks: [Int: MapBookmark] = [:]
+    private(set) var primarySharedPlanCircles: [CatalogBookmarkLocation] = []
     private(set) var bookmarkError: String?
     private(set) var sceneError: String?
     private(set) var locatedUser: LocatedMapUser?
@@ -79,6 +126,8 @@ final class MapScreenModel {
     @ObservationIgnored private let detailArtworkLoader: (any CircleDetailArtworkLoading)?
     @ObservationIgnored private let userPlanStore: any UserPlanStoring
     @ObservationIgnored private let bookmarkSyncCoordinator: BookmarkSyncCoordinator?
+    @ObservationIgnored private let primarySharedPlanProvider:
+        (any PrimarySharedPlanCircleProviding)?
     @ObservationIgnored let eventNumber: Int
     @ObservationIgnored private let artworkCache = NSCache<NSNumber, CGImage>()
     @ObservationIgnored private var sceneCache: [CatalogMapScene.ID: CatalogMapScene] = [:]
@@ -89,6 +138,7 @@ final class MapScreenModel {
     @ObservationIgnored private var genreTask: Task<Void, Never>?
     @ObservationIgnored private var bookmarkTask: Task<Void, Never>?
     @ObservationIgnored private var bookmarkSyncTask: Task<Void, Never>?
+    @ObservationIgnored private var primarySharedPlanTask: Task<Void, Never>?
     @ObservationIgnored private var hasAttemptedInitialBookmarkSync = false
 
     var halls: [UFDSchema.DayHall] {
@@ -108,7 +158,8 @@ final class MapScreenModel {
         catalog: any MapCatalog,
         detailArtworkLoader: (any CircleDetailArtworkLoading)? = nil,
         userPlanStore: any UserPlanStoring,
-        bookmarkSyncCoordinator: BookmarkSyncCoordinator? = nil
+        bookmarkSyncCoordinator: BookmarkSyncCoordinator? = nil,
+        primarySharedPlanProvider: (any PrimarySharedPlanCircleProviding)? = nil
     ) {
         self.days = days
         self.eventNumber = eventNumber
@@ -123,6 +174,7 @@ final class MapScreenModel {
         self.detailArtworkLoader = detailArtworkLoader
         self.userPlanStore = userPlanStore
         self.bookmarkSyncCoordinator = bookmarkSyncCoordinator
+        self.primarySharedPlanProvider = primarySharedPlanProvider
         artworkCache.totalCostLimit = 24 * 1_024 * 1_024
     }
 
@@ -134,6 +186,7 @@ final class MapScreenModel {
         genreTask?.cancel()
         bookmarkTask?.cancel()
         bookmarkSyncTask?.cancel()
+        primarySharedPlanTask?.cancel()
     }
 
     func load() {
@@ -150,6 +203,7 @@ final class MapScreenModel {
         isSearching = false
         genrePlacements = []
         bookmarks = [:]
+        primarySharedPlanCircles = []
         sceneError = nil
         if locatedUser?.sceneID.day != selectedDay {
             locatedUser = nil
@@ -158,6 +212,7 @@ final class MapScreenModel {
             destination = nil
         }
         phase = .loading
+        refreshPrimarySharedPlanCircles()
 
         let day = selectedDay
         let mapID = selectedMapID
@@ -274,6 +329,7 @@ final class MapScreenModel {
 
     func showCampus() {
         guard scope != .campus else { return }
+        primarySharedPlanTask?.cancel()
         scope = .campus
         if showsGenreOverlay {
             toggleGenreOverlay()
@@ -283,6 +339,7 @@ final class MapScreenModel {
         visibleCircleArtwork = [:]
         genrePlacements = []
         bookmarks = [:]
+        primarySharedPlanCircles = []
         if campusScene != nil {
             phase = .ready
         } else {
@@ -363,17 +420,20 @@ final class MapScreenModel {
         viewportTask?.cancel()
         genreTask?.cancel()
         bookmarkTask?.cancel()
+        primarySharedPlanTask?.cancel()
         selection = nil
         scene = cachedScene
         visibleCirclePlacements = []
         visibleCircleArtwork = [:]
         genrePlacements = []
         bookmarks = [:]
+        primarySharedPlanCircles = []
         phase = .ready
         if showsGenreOverlay {
             loadGenrePlacements()
         }
         loadBookmarks()
+        refreshPrimarySharedPlanCircles()
     }
 
     @discardableResult
@@ -747,6 +807,51 @@ final class MapScreenModel {
         }
     }
 
+    func refreshPrimarySharedPlanCircles() {
+        primarySharedPlanTask?.cancel()
+        guard let primarySharedPlanProvider else {
+            primarySharedPlanCircles = []
+            return
+        }
+
+        let eventNumber = eventNumber
+        let day = selectedDay
+        let mapID = selectedMapID
+        primarySharedPlanTask = Task { [weak self, catalog, primarySharedPlanProvider] in
+            let publicCircleIDs = await primarySharedPlanProvider.publicCircleIDs(
+                eventNumber: eventNumber
+            )
+            guard !Task.isCancelled else { return }
+            guard !publicCircleIDs.isEmpty else {
+                guard let self, self.selectedDay == day, self.selectedMapID == mapID else {
+                    return
+                }
+                self.primarySharedPlanCircles = []
+                return
+            }
+
+            do {
+                let locations = try await catalog.bookmarkLocations(
+                    publicCircleIDs: Array(publicCircleIDs)
+                )
+                try Task.checkCancellation()
+                guard let self, self.selectedDay == day, self.selectedMapID == mapID else {
+                    return
+                }
+                self.primarySharedPlanCircles = locations.filter {
+                    $0.day == day && $0.mapID == mapID
+                }.sorted { $0.publicCircleID < $1.publicCircleID }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self, self.selectedDay == day, self.selectedMapID == mapID else {
+                    return
+                }
+                self.primarySharedPlanCircles = []
+            }
+        }
+    }
+
     private func scheduleBookmarkSync(delay: Duration = .milliseconds(350)) {
         guard let bookmarkSyncCoordinator else { return }
         bookmarkSyncTask?.cancel()
@@ -886,7 +991,9 @@ final class MapScreenModel {
     }
 
     #if DEBUG
-        static func fixture() -> MapScreenModel {
+        static func fixture(
+            primarySharedPlanProvider: (any PrimarySharedPlanCircleProviding)? = nil
+        ) -> MapScreenModel {
             MapScreenModel(
                 days: [
                     UFDSchema.Day(
@@ -908,7 +1015,8 @@ final class MapScreenModel {
                 eventNumber: 104,
                 initialScope: .venue,
                 catalog: FixtureMapCatalog(),
-                userPlanStore: InMemoryUserPlanStore()
+                userPlanStore: InMemoryUserPlanStore(),
+                primarySharedPlanProvider: primarySharedPlanProvider
             )
         }
 

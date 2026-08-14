@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UIKit
 
@@ -17,6 +18,7 @@ struct MapView: View {
     private let dataSource: CirclemsDataSource?
     private let eventDaySelector: CatalogEventDayBanner?
     private let sharedLocationInbox: SharedLocationInbox?
+    private let sharedPlanStore: SharedPlanStore?
 
     private var currentLocationMapBottomInset: CGFloat {
         showsCurrentLocation ? Self.currentLocationSheetHeight : 0
@@ -29,6 +31,8 @@ struct MapView: View {
         eventDaySelector: CatalogEventDayBanner? = nil,
         sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox
     ) {
+        let sharedPlanStore = AppData.sharedPlanStore
+        let currentUserID = AppData.profileStore.profile?.id
         let model = MapScreenModel(
             days: dataSource.comiket.days,
             eventNumber: dataSource.comiket.number,
@@ -39,13 +43,18 @@ struct MapView: View {
                 eventNumber: dataSource.comiket.number
             ),
             userPlanStore: dataSource.userPlanStore,
-            bookmarkSyncCoordinator: dataSource.bookmarkSyncCoordinator
+            bookmarkSyncCoordinator: dataSource.bookmarkSyncCoordinator,
+            primarySharedPlanProvider: SharedPlanPrimaryMapCircleProvider(
+                store: sharedPlanStore,
+                currentUserID: currentUserID
+            )
         )
         _model = State(initialValue: model)
         _selectedDay = selectedDay
         self.dataSource = dataSource
         self.eventDaySelector = eventDaySelector
         self.sharedLocationInbox = sharedLocationInbox
+        self.sharedPlanStore = sharedPlanStore
     }
 
     @MainActor
@@ -55,6 +64,7 @@ struct MapView: View {
         dataSource = nil
         eventDaySelector = nil
         sharedLocationInbox = nil
+        sharedPlanStore = nil
     }
 
     var body: some View {
@@ -112,6 +122,14 @@ struct MapView: View {
             if model.scene == nil, model.campusScene == nil {
                 model.load()
             }
+        }
+        .task(id: sharedPlanCircleSignature) {
+            model.refreshPrimarySharedPlanCircles()
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .sharedPlanPrimaryPlanDidChange)
+        ) { _ in
+            model.refreshPrimarySharedPlanCircles()
         }
         .task(id: sharedLocationInbox?.pending?.id) {
             await openPendingSharedLocation()
@@ -277,6 +295,7 @@ struct MapView: View {
                     searchActive: !model.searchQuery.isEmpty,
                     genrePlacements: model.genrePlacements,
                     bookmarks: Array(model.favoriteBookmarks.values),
+                    primarySharedPlanCircles: model.primarySharedPlanCircles,
                     locatedUser: model.locatedUser,
                     destination: model.destination,
                     visibleMapLayers: visibleMapLayers,
@@ -310,6 +329,7 @@ struct MapView: View {
                     searchActive: !model.searchQuery.isEmpty,
                     genrePlacements: model.genrePlacements,
                     bookmarks: Array(model.favoriteBookmarks.values),
+                    primarySharedPlanCircles: model.primarySharedPlanCircles,
                     locatedUser: model.locatedUser,
                     locationFocusBottomInset: currentLocationMapBottomInset,
                     onViewportChange: model.updateViewport,
@@ -349,6 +369,17 @@ struct MapView: View {
             }
 
         }
+    }
+
+    private var sharedPlanCircleSignature: String {
+        guard let sharedPlanStore else { return "" }
+        return sharedPlanStore.plans.lazy.filter {
+            $0.comiketNo == model.eventNumber && $0.lifecycle == .active
+        }.map { plan in
+            let circleIDs = plan.circleKeys.lazy.map(\.wcID).sorted().map(String.init)
+                .joined(separator: ",")
+            return "\(plan.id):\(plan.revision):\(circleIDs)"
+        }.sorted().joined(separator: "|")
     }
 
     @MainActor
@@ -834,6 +865,7 @@ private struct InteractiveMapCanvas: View {
     let searchActive: Bool
     let genrePlacements: [CatalogMapGenrePlacement]
     let bookmarks: [MapBookmark]
+    let primarySharedPlanCircles: [CatalogBookmarkLocation]
     let locatedUser: LocatedMapUser?
     let locationFocusBottomInset: CGFloat
     let onViewportChange: (CatalogMapViewport) -> Void
@@ -844,6 +876,8 @@ private struct InteractiveMapCanvas: View {
     private let searchMatchesByTable: [CatalogMapTable.ID: [CatalogMapSearchMatch]]
     private let genresByTable: [CatalogMapTable.ID: [CatalogMapGenrePlacement]]
     private let bookmarksByTable: [CatalogMapTable.ID: [MapBookmark]]
+    private let primarySharedPlanCirclesByTable:
+        [CatalogMapTable.ID: [CatalogBookmarkLocation]]
 
     @State private var camera = MapCamera()
     @State private var hasAppliedInitialCamera = false
@@ -865,6 +899,7 @@ private struct InteractiveMapCanvas: View {
         searchActive: Bool,
         genrePlacements: [CatalogMapGenrePlacement],
         bookmarks: [MapBookmark],
+        primarySharedPlanCircles: [CatalogBookmarkLocation],
         locatedUser: LocatedMapUser?,
         locationFocusBottomInset: CGFloat,
         onViewportChange: @escaping (CatalogMapViewport) -> Void,
@@ -880,6 +915,7 @@ private struct InteractiveMapCanvas: View {
         self.searchActive = searchActive
         self.genrePlacements = genrePlacements
         self.bookmarks = bookmarks
+        self.primarySharedPlanCircles = primarySharedPlanCircles
         self.locatedUser = locatedUser
         self.locationFocusBottomInset = locationFocusBottomInset
         self.onViewportChange = onViewportChange
@@ -890,6 +926,10 @@ private struct InteractiveMapCanvas: View {
         searchMatchesByTable = Dictionary(grouping: searchMatches, by: \.tableID)
         genresByTable = Dictionary(grouping: genrePlacements, by: \.tableID)
         bookmarksByTable = Dictionary(grouping: bookmarks, by: \.tableID)
+        primarySharedPlanCirclesByTable = Dictionary(
+            grouping: primarySharedPlanCircles,
+            by: \.tableID
+        )
     }
 
     var body: some View {
@@ -954,6 +994,7 @@ private struct InteractiveMapCanvas: View {
                         searchMatches: searchMatchesByTable[table.id] ?? [],
                         genres: genresByTable[table.id] ?? [],
                         bookmarks: bookmarksByTable[table.id] ?? [],
+                        primarySharedPlanCircles: primarySharedPlanCirclesByTable[table.id] ?? [],
                         in: &context,
                         renderedScale: renderedScale,
                         usesAuthoredMap: scene.artwork != nil
@@ -1080,7 +1121,7 @@ private struct InteractiveMapCanvas: View {
         }
         return Text(
             accessibilityCameraValue(
-                "Zoom \(camera.zoom) times, \(circleArtwork.count) circle images, \(bookmarks.count) favorites"
+                    "Zoom \(camera.zoom) times, \(circleArtwork.count) circle images, \(bookmarks.count) favorites, \(primarySharedPlanCircles.count) primary plan circles"
             ))
     }
 
@@ -1276,6 +1317,7 @@ private struct InteractiveMapCanvas: View {
         searchMatches: [CatalogMapSearchMatch],
         genres: [CatalogMapGenrePlacement],
         bookmarks: [MapBookmark],
+        primarySharedPlanCircles: [CatalogBookmarkLocation],
         in context: inout GraphicsContext,
         renderedScale: CGFloat,
         usesAuthoredMap: Bool
@@ -1302,6 +1344,20 @@ private struct InteractiveMapCanvas: View {
                     subspaceRect(
                         tableRect: rect, orientation: table.orientation, subspace: genre.subspace)),
                 with: .color(genreColor(genre.genreID).opacity(searchActive ? 0.10 : 0.42))
+            )
+        }
+
+        for circle in primarySharedPlanCircles {
+            let planRect = subspaceRect(
+                tableRect: rect,
+                orientation: table.orientation,
+                subspace: circle.subspace
+            )
+            context.fill(Path(planRect), with: .color(Color.accentColor.opacity(0.48)))
+            context.stroke(
+                Path(planRect.insetBy(dx: 1.2, dy: 1.2)),
+                with: .color(Color.accentColor),
+                lineWidth: max(1.2 / renderedScale, 2)
             )
         }
 
@@ -1357,14 +1413,18 @@ private struct InteractiveMapCanvas: View {
                         Image(decorative: image, scale: 1),
                         in: imageRect
                     )
-                    if let bookmark = bookmarks.first(where: {
+                    let favoriteColor = bookmarks.first(where: {
                         $0.catalogCircleID == placement.circleID
-                    }) {
+                    })?.color.swiftUIColor
+                    let planColor = primarySharedPlanCircles.contains(where: {
+                        $0.catalogCircleID == placement.circleID
+                    }) ? Color.accentColor : nil
+                    if let markColor = favoriteColor ?? planColor {
                         let mark = CircleFavoriteMarkGeometry.rect(in: geometry.imageSize)
                             .offsetBy(dx: imageRect.minX, dy: imageRect.minY)
                         layer.fill(
                             Path(mark),
-                            with: .color(bookmark.color.swiftUIColor)
+                            with: .color(markColor)
                         )
                     }
                 }

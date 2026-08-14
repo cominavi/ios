@@ -6,6 +6,42 @@ import XCTest
 
 final class UnifiedBigSightMapTests: XCTestCase {
     @MainActor
+    func testPrimarySharedPlanCircleOverlayRendersWithoutFavorite() throws {
+        let campus = makeSingleVenueCampus()
+        let venue = try XCTUnwrap(campus.venues.first)
+        let table = try XCTUnwrap(venue.scene.tables.first)
+        let renderer = UnifiedBigSightScene(campus: campus)
+        renderer.reduceMotion = true
+        let planCircle = CatalogBookmarkLocation(
+            publicCircleID: 100,
+            catalogCircleID: 7,
+            updateID: 70,
+            day: 1,
+            mapID: venue.id,
+            tableID: table.id,
+            subspace: 0
+        )
+
+        renderer.update(
+            campus: campus,
+            scope: .venue,
+            selectedMapID: venue.id,
+            selectedTableID: nil,
+            circlePlacements: [],
+            circleArtwork: [:],
+            searchMatches: [],
+            searchActive: false,
+            genrePlacements: [],
+            bookmarks: [],
+            primarySharedPlanCircles: [planCircle],
+            locatedUser: nil
+        )
+
+        XCTAssertTrue(renderer.isPersistentOverlayVisible)
+        XCTAssertEqual(renderer.persistentOverlayShapeCount, 1)
+    }
+
+    @MainActor
     func testSelectionFavoriteAndSearchOverlaysStayVisibleAtOverviewZoom() throws {
         let campus = makeSingleVenueCampus()
         let venue = try XCTUnwrap(campus.venues.first)
@@ -1327,6 +1363,56 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertEqual(bookmark.catalogCircleID, circleB.id)
         XCTAssertEqual(bookmark.subspace, circleB.subspace)
         XCTAssertNil(model.bookmark(for: circleA))
+    }
+
+    @MainActor
+    func testMapLoadsPrimarySharedPlanCircleWithoutFavorite() async throws {
+        let suiteName = "MapPrimarySharedPlanTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let userID = "map-user"
+        let planID = "11111111-1111-4111-8111-111111111111"
+        let publicCircleID = 9_902
+        let persistence = InMemorySharedPlanPersistence()
+        try await persistence.savePlan(
+            SharedPlan(
+                id: planID,
+                name: "Map Plan",
+                comiketNo: 104,
+                ownership: .owned,
+                role: .owner,
+                lifecycle: .active,
+                revision: 1,
+                circleKeys: [
+                    try XCTUnwrap(SharedPlanCircleKey(comiketNo: 104, wcID: publicCircleID))
+                ],
+                createdAt: .now,
+                updatedAt: .now
+            ),
+            write: nil
+        )
+        SharedPlanPrimaryPlanPreference(defaults: defaults).setPlanID(
+            planID,
+            userID: userID,
+            comiketNo: 104
+        )
+        let store = SharedPlanStore(
+            persistence: persistence,
+            actorUserID: { userID }
+        )
+        let provider = SharedPlanPrimaryMapCircleProvider(
+            store: store,
+            currentUserID: userID,
+            defaults: defaults
+        )
+        let model = MapScreenModel.fixture(primarySharedPlanProvider: provider)
+
+        model.load()
+        try await waitUntilReady(model)
+        try await waitUntil { model.primarySharedPlanCircles.count == 1 }
+
+        XCTAssertTrue(model.favoriteBookmarks.isEmpty)
+        XCTAssertEqual(model.primarySharedPlanCircles.first?.publicCircleID, publicCircleID)
     }
 
     @MainActor

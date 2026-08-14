@@ -116,6 +116,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     let searchActive: Bool
     let genrePlacements: [CatalogMapGenrePlacement]
     let bookmarks: [MapBookmark]
+    let primarySharedPlanCircles: [CatalogBookmarkLocation]
     let locatedUser: LocatedMapUser?
     let destination: MapDestination?
     let visibleMapLayers: Set<BigSightMapLayer>
@@ -184,6 +185,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             searchActive: searchActive,
             genrePlacements: genrePlacements,
             bookmarks: bookmarks,
+            primarySharedPlanCircles: primarySharedPlanCircles,
             locatedUser: locatedUser,
             destination: destination,
             visibleMapLayers: visibleMapLayers,
@@ -935,6 +937,7 @@ final class UnifiedBigSightScene: SKScene {
     private var lastDynamicFingerprint: Int?
     private var artworkCount = 0
     private var favoriteCount = 0
+    private var primarySharedPlanCircleCount = 0
     private var locatedUserSummary: String?
     private var destinationSummary: String?
     private var lastLocatedUserPlacedAt: Date?
@@ -1045,7 +1048,7 @@ final class UnifiedBigSightScene: SKScene {
         } else {
             summary = String(
                 localized:
-                    "Zoom \(zoom) times, \(artworkCount) circle images, \(favoriteCount) favorites"
+                    "Zoom \(zoom) times, \(artworkCount) circle images, \(favoriteCount) favorites, \(primarySharedPlanCircleCount) primary plan circles"
             )
         }
         if let locatedUserSummary {
@@ -1130,6 +1133,7 @@ final class UnifiedBigSightScene: SKScene {
         searchActive: Bool,
         genrePlacements: [CatalogMapGenrePlacement],
         bookmarks: [MapBookmark],
+        primarySharedPlanCircles: [CatalogBookmarkLocation] = [],
         locatedUser: LocatedMapUser?,
         destination: MapDestination? = nil,
         visibleMapLayers: Set<BigSightMapLayer> = BigSightMapLayer.defaultVisible,
@@ -1160,6 +1164,7 @@ final class UnifiedBigSightScene: SKScene {
         applyLevelOfDetail()
         artworkCount = circleArtwork.count
         favoriteCount = bookmarks.count
+        primarySharedPlanCircleCount = primarySharedPlanCircles.count
         locatedUserSummary = locatedUser?.spaceCode
         destinationSummary = destination?.spaceCode
 
@@ -1181,6 +1186,7 @@ final class UnifiedBigSightScene: SKScene {
             searchActive: searchActive,
             genres: genrePlacements,
             bookmarks: bookmarks,
+            primarySharedPlanCircles: primarySharedPlanCircles,
             locatedUser: locatedUser,
             destination: destination
         )
@@ -1194,6 +1200,7 @@ final class UnifiedBigSightScene: SKScene {
                 searchActive: searchActive,
                 genrePlacements: genrePlacements,
                 bookmarks: bookmarks,
+                primarySharedPlanCircles: primarySharedPlanCircles,
                 locatedUser: locatedUser,
                 destination: destination
             )
@@ -1906,6 +1913,7 @@ final class UnifiedBigSightScene: SKScene {
         searchActive: Bool,
         genrePlacements: [CatalogMapGenrePlacement],
         bookmarks: [MapBookmark],
+        primarySharedPlanCircles: [CatalogBookmarkLocation],
         locatedUser: LocatedMapUser?,
         destination: MapDestination?
     ) {
@@ -1952,6 +1960,17 @@ final class UnifiedBigSightScene: SKScene {
 
         addGenreOverlays(genrePlacements, scene: scene, venue: venue)
 
+        for circle in primarySharedPlanCircles {
+            guard let table = scene.tableByID[circle.tableID] else { continue }
+            addRectOverlay(
+                subspaceRect(table: table, subspace: circle.subspace, scene: scene),
+                venue: venue,
+                fill: UIColor.systemGreen.withAlphaComponent(0.48),
+                stroke: .systemGreen,
+                zPosition: 42
+            )
+        }
+
         for bookmark in bookmarks {
             guard let table = scene.tableByID[bookmark.tableID] else { continue }
             addRectOverlay(
@@ -1986,15 +2005,19 @@ final class UnifiedBigSightScene: SKScene {
                 )
                 sprite.zRotation = -venue.rotation - geometry.rotation
                 sprite.zPosition = 46
-                if let bookmark = bookmarks.first(where: {
+                let favoriteColor = bookmarks.first(where: {
                     $0.catalogCircleID == placement.circleID
-                }) {
+                })?.color.uiColor
+                let planColor = primarySharedPlanCircles.contains(where: {
+                    $0.catalogCircleID == placement.circleID
+                }) ? UIColor.systemGreen : nil
+                if let markColor = favoriteColor ?? planColor {
                     let markRect = CircleFavoriteMarkGeometry.rect(in: sprite.size)
                     let mark = SKShapeNode(
                         rectOf: markRect.size,
                         cornerRadius: 0
                     )
-                    mark.fillColor = bookmark.color.uiColor
+                    mark.fillColor = markColor
                     mark.strokeColor = .clear
                     mark.position = CGPoint(
                         x: -sprite.size.width / 2 + markRect.midX,
@@ -2192,6 +2215,7 @@ final class UnifiedBigSightScene: SKScene {
         searchActive: Bool,
         genres: [CatalogMapGenrePlacement],
         bookmarks: [MapBookmark],
+        primarySharedPlanCircles: [CatalogBookmarkLocation],
         locatedUser: LocatedMapUser?,
         destination: MapDestination?
     ) -> Int {
@@ -2219,6 +2243,13 @@ final class UnifiedBigSightScene: SKScene {
         bookmarks.forEach {
             hasher.combine($0.publicCircleID)
             hasher.combine($0.color.rawValue)
+        }
+        hasher.combine(primarySharedPlanCircles.count)
+        primarySharedPlanCircles.forEach {
+            hasher.combine($0.publicCircleID)
+            hasher.combine($0.catalogCircleID)
+            hasher.combine($0.tableID)
+            hasher.combine($0.subspace)
         }
         hasher.combine(locatedUser?.placedAt)
         hasher.combine(destination?.selectedAt)

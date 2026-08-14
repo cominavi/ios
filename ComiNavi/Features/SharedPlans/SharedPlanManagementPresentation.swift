@@ -1,6 +1,12 @@
 import Foundation
 import Observation
 
+extension Notification.Name {
+    static let sharedPlanPrimaryPlanDidChange = Notification.Name(
+        "llc.mikunet.cominavi.shared-plan-primary-plan-did-change"
+    )
+}
+
 struct SharedPlanPresentationFeatures: Equatable, Sendable {
     /// Keep coordinated with the backend mutation flag. Tests inject a disabled
     /// value to preserve the fail-closed rollback path.
@@ -30,11 +36,14 @@ struct SharedPlanPrimaryPlanPreference {
 
     func setPlanID(_ planID: String?, userID: String?, comiketNo: Int?) {
         let key = Self.storageKey(userID: userID, comiketNo: comiketNo)
+        let previousPlanID = defaults.string(forKey: key)
         if let planID {
             defaults.set(planID, forKey: key)
         } else {
             defaults.removeObject(forKey: key)
         }
+        guard planID != previousPlanID else { return }
+        NotificationCenter.default.post(name: .sharedPlanPrimaryPlanDidChange, object: nil)
     }
 
     static func validPlanID(
