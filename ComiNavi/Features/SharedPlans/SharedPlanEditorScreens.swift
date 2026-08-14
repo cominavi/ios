@@ -1022,7 +1022,7 @@ private struct SharedPlanCircleGroupHeader: View {
     }
 }
 
-private struct SharedPlanPurchaseSummaryRow: View {
+struct SharedPlanPurchaseSummaryRow: View {
     let need: SharedPlanPurchaseNeed
     let hasConflict: Bool
 

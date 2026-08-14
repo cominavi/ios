@@ -125,6 +125,76 @@ final class SharedPlanEditorPresentationTests: XCTestCase {
         XCTAssertTrue(SharedPlanPurchaseItemPreset.allCases.allSatisfy { !$0.itemName.isEmpty })
     }
 
+    func testCirclePurchasePreviewKeepsEmptyStateWithoutNeeds() {
+        XCTAssertNil(SharedPlanCirclePurchaseGroup(
+            snapshot: makeSnapshot(circles: [SharedPlanCircleContent(
+                key: Self.circle,
+                presence: .present,
+                memo: "",
+                needs: [],
+                communicationState: [:]
+            )]),
+            circle: Self.circle
+        ))
+    }
+
+    func testCirclePurchasePreviewTracksSharedPlanProjectionUpdates() async throws {
+        let initialNeed = SharedPlanPurchaseNeed(
+            id: Self.needID,
+            requesterUserID: Self.userID,
+            itemName: "新刊セット",
+            unitPrice: 2_000,
+            wantedQuantity: 2
+        )
+        let service = EditorServiceStub(snapshot: makeSnapshot(
+            circles: [SharedPlanCircleContent(
+                key: Self.circle,
+                presence: .present,
+                memo: "",
+                needs: [initialNeed],
+                communicationState: [:]
+            )],
+            conflicts: [makeScalarConflict()]
+        ))
+        let model = SharedPlanCirclePurchasePreviewModel()
+        let observation = Task { @MainActor in
+            await model.run(
+                circle: Self.circle,
+                planIDs: [Self.planID],
+                using: service
+            )
+        }
+
+        try await waitUntil { model.groups.first?.purchases.count == 1 }
+        XCTAssertEqual(model.groups.first?.planName, "共同購入")
+        XCTAssertEqual(model.groups.first?.purchases.first?.need, initialNeed)
+        XCTAssertEqual(model.groups.first?.purchases.first?.hasConflict, true)
+
+        let anotherNeed = SharedPlanPurchaseNeed(
+            id: UUID(uuidString: "88888888-8888-4888-8888-888888888888")!,
+            requesterUserID: Self.userID,
+            itemName: "アクリルスタンド",
+            wantedQuantity: 1
+        )
+        service.publish(makeSnapshot(
+            circles: [SharedPlanCircleContent(
+                key: Self.circle,
+                presence: .present,
+                memo: "",
+                needs: [initialNeed, anotherNeed],
+                communicationState: [:]
+            )],
+            conflicts: [makeScalarConflict()]
+        ))
+
+        try await waitUntil { model.groups.first?.purchases.count == 2 }
+        XCTAssertEqual(model.groups.first?.purchases.map(\.need), [initialNeed, anotherNeed])
+        XCTAssertEqual(model.groups.first?.purchases.map(\.hasConflict), [true, false])
+
+        observation.cancel()
+        await observation.value
+    }
+
     func testPurchaseProgressUpdateRoutesRequestedAndBoughtTogether() async {
         let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()

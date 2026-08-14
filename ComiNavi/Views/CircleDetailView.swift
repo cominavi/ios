@@ -61,8 +61,17 @@ struct CircleDetailView: View {
                     xProfile: xProfile
                 )
 
-                if details?.extensionRecord?.WCId != nil {
-                    sharedPlanSection
+                if AppData.profileStore.isIdentityVerified,
+                   let currentUserID = AppData.profileStore.profile?.id,
+                   let sharedPlanCircleKey
+                {
+                    CircleDetailSharedPlanSection(
+                        store: AppData.sharedPlanStore,
+                        currentUserID: currentUserID,
+                        circle: sharedPlanCircleKey,
+                        dataSource: dataSource,
+                        isShowingRequest: $isShowingSharedPlanRequest
+                    )
                 }
 
                 if !combinedTags.isEmpty {
@@ -218,38 +227,6 @@ struct CircleDetailView: View {
         circle.bookName.nonBlank != nil
             || circle.description.nonBlank != nil
             || circle.memo.nonBlank != nil
-    }
-
-    @ViewBuilder
-    private var sharedPlanSection: some View {
-        if AppData.profileStore.isIdentityVerified,
-           AppData.profileStore.profile?.id != nil
-        {
-            CircleDetailSection("Shared Plans", contentInsets: EdgeInsets()) {
-                Button {
-                    isShowingSharedPlanRequest = true
-                } label: {
-                    HStack(spacing: 12) {
-                        LucideIcon("shopping-cart", size: 22)
-                            .foregroundStyle(.accent)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Add a purchase request")
-                                .font(.body.weight(.semibold))
-                            Text("Choose a plan, name the item, and set how many you need.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer(minLength: 8)
-                        LucideIcon("chevron-right", size: 17)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(16)
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("circle-add-shared-plan-request")
-            }
-        }
     }
 
     private var sharedPlanCircleKey: SharedPlanCircleKey? {
@@ -1168,6 +1145,149 @@ private struct CircleDetailSection<Content: View>: View {
                             lineWidth: 0.5
                         )
                 }
+        }
+    }
+}
+
+private struct CircleDetailSharedPlanSection: View {
+    let store: SharedPlanStore
+    let currentUserID: String
+    let circle: SharedPlanCircleKey
+    let dataSource: CirclemsDataSource
+    @Binding var isShowingRequest: Bool
+
+    @State private var model = SharedPlanCirclePurchasePreviewModel()
+
+    var body: some View {
+        CircleDetailSection("Shared Plans", contentInsets: EdgeInsets()) {
+            if model.groups.isEmpty {
+                emptyPurchaseButton
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(model.groups) { group in
+                        CircleDetailSharedPlanPurchaseGroup(
+                            store: store,
+                            group: group,
+                            currentUserID: currentUserID,
+                            circle: circle,
+                            dataSource: dataSource
+                        )
+                    }
+
+                    Divider()
+                        .padding(.leading, 16)
+
+                    Button {
+                        isShowingRequest = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            LucideIcon("plus", size: 20)
+                                .foregroundStyle(.accent)
+                                .accessibilityHidden(true)
+                            Text("Add purchase request")
+                                .font(.body.weight(.semibold))
+                            Spacer(minLength: 8)
+                            LucideIcon("chevron-right", size: 17)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                        .padding(16)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("circle-add-another-shared-plan-request")
+                }
+            }
+        }
+        .task {
+            await store.load()
+        }
+        .task(id: observationID) {
+            await model.run(
+                circle: circle,
+                planIDs: activePlanIDs,
+                using: store
+            )
+        }
+    }
+
+    private var activePlanIDs: [String] {
+        store.activePlans(comiketNo: circle.comiketNo).map(\.id)
+    }
+
+    private var observationID: String {
+        "\(circle.id):\(activePlanIDs.joined(separator: ","))"
+    }
+
+    private var emptyPurchaseButton: some View {
+        Button {
+            isShowingRequest = true
+        } label: {
+            HStack(spacing: 12) {
+                LucideIcon("shopping-cart", size: 22)
+                    .foregroundStyle(.accent)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Add a purchase request")
+                        .font(.body.weight(.semibold))
+                    Text("Choose a plan, name the item, and set how many you need.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                LucideIcon("chevron-right", size: 17)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(16)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("circle-add-shared-plan-request")
+    }
+}
+
+private struct CircleDetailSharedPlanPurchaseGroup: View {
+    let store: SharedPlanStore
+    let group: SharedPlanCirclePurchaseGroup
+    let currentUserID: String
+    let circle: SharedPlanCircleKey
+    let dataSource: CirclemsDataSource
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(group.planName)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+
+            ForEach(group.purchases) { purchase in
+                VStack(spacing: 0) {
+                    if purchase.id != group.purchases.first?.id {
+                        Divider()
+                            .padding(.leading, 16)
+                    }
+
+                    NavigationLink {
+                        SharedPlanEditorScreen(
+                            store: store,
+                            planID: group.planID,
+                            currentUserID: currentUserID,
+                            catalogDataSource: dataSource,
+                            initialPublicCircleID: circle.wcID
+                        )
+                    } label: {
+                        SharedPlanPurchaseSummaryRow(
+                            need: purchase.need,
+                            hasConflict: purchase.hasConflict
+                        )
+                        .padding(16)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier(
+                        "circle-shared-plan-purchase-\(purchase.need.id.uuidString.lowercased())"
+                    )
+                }
+            }
         }
     }
 }
