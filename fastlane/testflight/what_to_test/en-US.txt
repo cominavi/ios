@@ -1,1 +1,1 @@
-Expanded map search across the selected day and improved navigation to edge circles. Fixed favorite updates and Shinagaki markers, and extended the X following import timeout.
+Expanded map search across the selected day and improved navigation to edge circles. Fixed favorite updates and Shinagaki markers, extended the X following import timeout, and added live fetched and matched counters while importing X followings.
