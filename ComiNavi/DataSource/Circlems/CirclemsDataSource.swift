@@ -1144,6 +1144,46 @@ final class CirclemsDataSource {
         }
     }
 
+    func getCircles(
+        publicCircleIDs: [Int]
+    ) async -> [Int: CirclemsDataSchema.ComiketCircleWC] {
+        let uniqueIDs = Array(Set(publicCircleIDs.filter { $0 > 0 })).sorted()
+        guard !uniqueIDs.isEmpty else { return [:] }
+        var circles: [Int: CirclemsDataSchema.ComiketCircleWC] = [:]
+
+        for start in stride(from: 0, to: uniqueIDs.count, by: 400) {
+            let end = min(start + 400, uniqueIDs.count)
+            let batch = Array(uniqueIDs[start ..< end])
+            let placeholders = Array(repeating: "?", count: batch.count).joined(separator: ",")
+            let arguments = StatementArguments([Int(comiketId) ?? 0] + batch)
+            let fetched: [Int: CirclemsDataSchema.ComiketCircleWC] =
+                (try? await sqliteMain.read { database in
+                    try Row.fetchAll(
+                        database,
+                        sql: """
+                            SELECT extension.WCId AS requestedPublicCircleID,
+                                   circle.*
+                            FROM ComiketCircleWC AS circle
+                            JOIN ComiketCircleExtend AS extension
+                              ON extension.comiketNo = circle.comiketNo
+                             AND extension.id = circle.id
+                            WHERE circle.comiketNo = ?
+                              AND extension.WCId IN (\(placeholders))
+                            """,
+                        arguments: arguments
+                    ).reduce(into: [Int: CirclemsDataSchema.ComiketCircleWC]()) { result, row in
+                        guard let publicCircleID: Int = row["requestedPublicCircleID"] else {
+                            return
+                        }
+                        result[publicCircleID] = try CirclemsDataSchema.ComiketCircleWC(row: row)
+                    }
+                }) ?? [:]
+            circles.merge(fetched) { _, replacement in replacement }
+        }
+
+        return circles
+    }
+
     func notificationCircle(publicCircleID: Int) async -> CatalogNotificationCircle? {
         let circle = await getCircle(publicCircleID: publicCircleID)
         guard let circle else { return nil }

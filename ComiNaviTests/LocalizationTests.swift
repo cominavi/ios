@@ -3,6 +3,52 @@ import Foundation
 import XCTest
 
 final class LocalizationTests: XCTestCase {
+    func testFavoriteMapCopyHasCompleteReviewedTranslations() throws {
+        let data = try Data(contentsOf: sourceCatalogURL)
+        let root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let strings = try XCTUnwrap(root["strings"] as? [String: Any])
+        let keys = [
+            "Add favorites to create a printable map.",
+            "Circle list",
+            "Color labels",
+            "Couldn’t create the favorite map",
+            "Event",
+            "Favorite circles",
+            "Favorite map",
+            "Favorites",
+            "Label",
+            "Labels are shown in the PDF legend and circle list.",
+            "Map pages",
+            "No favorite circles",
+            "Page %lld of %lld",
+            "Printable favorite map",
+            "Share PDF",
+        ]
+        let languages = ["ja", "ko", "zh-Hans", "zh-Hant"]
+
+        for key in keys {
+            let entry = try XCTUnwrap(strings[key] as? [String: Any], "Missing \(key)")
+            let localizations = try XCTUnwrap(
+                entry["localizations"] as? [String: Any],
+                "Missing localizations for \(key)"
+            )
+            for language in languages {
+                let localization = try XCTUnwrap(
+                    localizations[language] as? [String: Any],
+                    "Missing \(language) localization for \(key)"
+                )
+                let unit = try XCTUnwrap(
+                    localization["stringUnit"] as? [String: Any],
+                    "Missing string unit for \(key) in \(language)"
+                )
+                XCTAssertEqual(unit["state"] as? String, "translated")
+                XCTAssertFalse((unit["value"] as? String ?? "").isEmpty)
+            }
+        }
+    }
+
     func testJapaneseLocalizationResolvesRepresentativeInterfaceCopy() throws {
         let bundles = [Bundle.main] + Bundle.allBundles
         let appBundle = try XCTUnwrap(bundles.first { bundle in

@@ -61,6 +61,7 @@ struct ProfileScreen: View {
     @State private var favoriteRecoveryIssue: String?
     @State private var favoriteRecoveryPendingDiscard: QuarantinedCanonicalFavoriteMutation?
     @State private var favoriteSyncState = FavoriteSyncState.idle
+    @State private var favoriteColorLabelStore = FavoriteColorLabelStore()
     @StateObject private var circlemsLinkViewModel = SignInViewModel()
     let catalogLibrary: CatalogLibrary
 
@@ -283,6 +284,25 @@ struct ProfileScreen: View {
             }
 
             if let dataSource = catalogLibrary.dataSource {
+                Section("Favorites") {
+                    NavigationLink {
+                        FavoriteMapPDFScreen(
+                            dataSource: dataSource,
+                            colorLabelStore: favoriteColorLabelStore
+                        )
+                    } label: {
+                        Label("Printable favorite map", systemImage: "map")
+                    }
+                    .accessibilityIdentifier("profile-favorite-map")
+
+                    NavigationLink {
+                        FavoriteColorLabelsScreen(store: favoriteColorLabelStore)
+                    } label: {
+                        Label("Color labels", systemImage: "tag")
+                    }
+                    .accessibilityIdentifier("profile-favorite-color-labels")
+                }
+
                 Section("X followed circles") {
                     NavigationLink {
                         FollowingImportView(dataSource: dataSource)
