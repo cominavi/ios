@@ -12,7 +12,10 @@ TESTFLIGHT_EXPORT_OPTIONS = File.expand_path(
   "../Configuration/FastlaneExportOptions.plist",
   __dir__
 )
-FASTLANE_BUILD_DIRECTORY = File.expand_path("../build/fastlane", __dir__)
+FASTLANE_BUILD_DIRECTORY = File.expand_path(
+  ENV.fetch("COMINAVI_FASTLANE_BUILD_DIRECTORY", "../build/fastlane"),
+  __dir__
+)
 DEFAULT_IPA_PATH = File.join(FASTLANE_BUILD_DIRECTORY, "ComiNavi.ipa")
 TESTFLIGHT_EXTERNAL_GROUP = "External Beta"
 TESTFLIGHT_NOTES_DIRECTORY = File.expand_path("testflight/what_to_test", __dir__)

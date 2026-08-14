@@ -70,12 +70,22 @@ Before external distribution, update both localized release-note files:
 - `fastlane/testflight/what_to_test/ja.txt`
 - `fastlane/testflight/what_to_test/en-US.txt`
 
-Build, upload, submit to the `External Beta` group, notify testers, and verify
-the resulting App Store Connect state:
+Build the committed `main` snapshot in an isolated worktree, upload it, submit
+it to the `External Beta` group, notify testers, and verify the resulting App
+Store Connect state with the one-command publisher:
 
 ```sh
-FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios external_beta
+Scripts/publish-external-testflight.sh
 ```
+
+Uncommitted files in the primary checkout are deliberately excluded. The
+signed archive, IPA, and dSYM remain under `build/fastlane`. Set
+`COMINAVI_ALLOW_NON_MAIN_RELEASE=1` only when intentionally releasing a
+different branch. Lane options such as `group:"Another Group"` can be passed
+after the script name.
+
+The underlying Fastlane lane remains available directly as
+`bundle exec fastlane ios external_beta`.
 
 Submit an existing IPA with the same external workflow:
 
