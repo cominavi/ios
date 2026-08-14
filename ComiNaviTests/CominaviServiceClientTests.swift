@@ -1333,6 +1333,7 @@ final class CominaviServiceClientTests: XCTestCase {
         XCTAssertEqual(payload.followings.first?.url.absoluteString, "https://x.com/circle")
         let requests = await transport.requests
         XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests[0].timeoutInterval, 10 * 60)
         XCTAssertEqual(
             requests[0].value(forHTTPHeaderField: "Authorization"),
             "Bearer fixture-access"

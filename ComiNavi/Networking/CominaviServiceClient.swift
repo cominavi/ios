@@ -945,7 +945,8 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
             },
             isUnauthorized: { output in
                 if case .unauthorized = output { true } else { false }
-            }
+            },
+            timeoutInterval: 10 * 60
         )
         switch output {
         case .ok(let response):
@@ -3499,13 +3500,15 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
     private func generatedAuthorizedRequest<Output: Sendable>(
         operation: @escaping @Sendable (Client) async throws -> Output,
         isUnauthorized: @escaping @Sendable (Output) -> Bool,
-        validatesErrorResponses: Bool = false
+        validatesErrorResponses: Bool = false,
+        timeoutInterval: TimeInterval = 30
     ) async throws -> Output {
         var currentSession = try await serviceSession()
         var output = try await performGeneratedOperation {
             try await operation(generatedClient(
                 accessToken: currentSession.accessToken,
-                validatesErrorResponses: validatesErrorResponses
+                validatesErrorResponses: validatesErrorResponses,
+                timeoutInterval: timeoutInterval
             ))
         }
         if isUnauthorized(output) {
@@ -3516,7 +3519,8 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
             output = try await performGeneratedOperation {
                 try await operation(generatedClient(
                     accessToken: currentSession.accessToken,
-                    validatesErrorResponses: validatesErrorResponses
+                    validatesErrorResponses: validatesErrorResponses,
+                    timeoutInterval: timeoutInterval
                 ))
             }
         }
@@ -3527,7 +3531,8 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         accessToken: String? = nil,
         exactRequestBody: Data? = nil,
         validatesErrorResponses: Bool = false,
-        cachePolicy: URLRequest.CachePolicy = .reloadIgnoringLocalCacheData
+        cachePolicy: URLRequest.CachePolicy = .reloadIgnoringLocalCacheData,
+        timeoutInterval: TimeInterval = 30
     ) -> Client {
         let requestTransport = transport
         return CominaviAPIClientFactory.makeClient(
@@ -3535,7 +3540,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
             transport: { request in
                 var request = request
                 request.cachePolicy = cachePolicy
-                request.timeoutInterval = 30
+                request.timeoutInterval = timeoutInterval
                 if let exactRequestBody {
                     request.httpBody = exactRequestBody
                 }
