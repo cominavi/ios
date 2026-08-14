@@ -127,9 +127,12 @@ struct SharedPlanEditorReadOnlyPresentation: Equatable, Sendable {
             systemImage = "calendar-clock"
         case .localLimit(let limit):
             switch limit {
-            case .syncBacklog:
+            case .syncBacklog(let maximum, let pending):
                 title = String(localized: "Send changes before editing again")
-                detail = String(localized: "Some changes are waiting to be saved. Let them finish before editing again.")
+                detail = String(
+                    localized:
+                    "Some changes are waiting to be saved (\(pending) of \(maximum)). Let them finish before editing again."
+                )
                 systemImage = "refresh-cw"
             case .compactionRequired:
                 title = String(localized: "This plan needs recovery")
@@ -155,8 +158,10 @@ struct SharedPlanEditorReadOnlyPresentation: Equatable, Sendable {
             String(localized: "Saved plan data cannot be opened")
         case .rejectedLocalChanges:
             String(localized: "Some saved changes need recovery")
-        case .compactionRequired, .serverCompactionRequired:
+        case .compactionRequired:
             String(localized: "This plan needs recovery")
+        case .serverCompactionRequired:
+            String(localized: "This plan could not finish syncing")
         case .backlogLimit:
             String(localized: "This plan has too many pending changes")
         }
@@ -180,8 +185,11 @@ struct SharedPlanEditorReadOnlyPresentation: Equatable, Sendable {
             }
         case .compactionRequired, .serverCompactionRequired:
             String(localized: "Download a copy, then choose how to repair or reset this plan.")
-        case .backlogLimit:
-            String(localized: "There are too many pending changes. Download a copy, then repair or reset the plan.")
+        case .backlogLimit(let maximum, let received):
+            String(
+                localized:
+                "This plan has \(received) pending changes, over the \(maximum) limit. Download a copy, then repair or reset the plan."
+            )
         }
     }
 }

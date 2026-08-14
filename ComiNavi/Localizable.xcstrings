@@ -25120,7 +25120,42 @@
         }
       }
     },
+    "Some changes are waiting to be saved (%lld of %lld). Let them finish before editing again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some changes are waiting to be saved (%1$lld of %2$lld). Let them finish before editing again."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存待ちの変更が%1$lld件あります（上限%2$lld件）。もう一度編集する前に完了するまでお待ちください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장 대기 중인 변경 사항이 %1$lld개 있습니다(한도 %2$lld개). 다시 편집하기 전에 완료될 때까지 기다려 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有%1$lld项更改正在等待保存（上限%2$lld项）。请等待完成后再继续编辑"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有%1$lld項變更正在等待儲存（上限%2$lld項）。請等待完成後再繼續編輯"
+          }
+        }
+      }
+    },
     "Some changes are waiting to be saved. Let them finish before editing again." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -27402,6 +27437,7 @@
       }
     },
     "There are too many pending changes. Download a copy, then repair or reset the plan." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -27817,6 +27853,68 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在選定的日期，這個攤位上沒有設定公開社團"
+          }
+        }
+      }
+    },
+    "This plan could not finish syncing" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このプランの同期を完了できませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 플랜의 동기화를 완료하지 못했습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此计划无法完成同步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此計畫無法完成同步"
+          }
+        }
+      }
+    },
+    "This plan has %lld pending changes, over the %lld limit. Download a copy, then repair or reset the plan." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This plan has %1$lld pending changes, over the %2$lld limit. Download a copy, then repair or reset the plan."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このプランには保留中の変更が%1$lld件あり、上限の%2$lld件を超えています。コピーをダウンロードしてから、プランを修復またはリセットしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 플랜에는 대기 중인 변경 사항이 %1$lld개 있어 %2$lld개 한도를 초과했습니다. 사본을 다운로드한 다음 플랜을 복구하거나 재설정하세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此计划有%1$lld项待处理更改，超过%2$lld项上限。请下载副本，然后修复或重置计划"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此計畫有%1$lld項待處理變更，超過%2$lld項上限。請下載副本，然後修復或重設計畫"
           }
         }
       }
