@@ -86,7 +86,7 @@ final class CatalogLibraryTests: XCTestCase {
         )
     }
 
-    func testAuthenticatedUserWaitsForCatalogPreparationBeforeShowingAppShell() {
+    func testAuthenticatedUserEntersAppWhileCatalogPrepares() {
         XCTAssertEqual(
             EntryContentRoute.resolve(
                 accountDeletionPending: false,
@@ -94,7 +94,7 @@ final class CatalogLibraryTests: XCTestCase {
                 catalogIsPreparing: true,
                 hasCatalog: false
             ),
-            .catalogLoading
+            .catalogIndependent
         )
     }
 

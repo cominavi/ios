@@ -32,12 +32,32 @@ protocol CominaviRealtimeCachePersisting: Sendable {
 
 struct FileCominaviRealtimeCacheStore: CominaviRealtimeCachePersisting {
     let directory: URL
+    let legacyDirectory: URL?
+
+    init(directory: URL, legacyDirectory: URL? = nil) {
+        self.directory = directory
+        self.legacyDirectory = legacyDirectory
+    }
 
     func load(eventNumber: Int) async throws -> Data? {
         let url = fileURL(eventNumber: eventNumber)
+        let legacyURL = legacyDirectory?.appendingPathComponent(
+            "event-\(eventNumber)-heads.json"
+        )
         return try await Task.detached(priority: .utility) {
-            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-            return try Data(contentsOf: url)
+            let fileManager = FileManager.default
+            if fileManager.fileExists(atPath: url.path) {
+                return try Data(contentsOf: url)
+            }
+            guard let legacyURL,
+                  fileManager.fileExists(atPath: legacyURL.path)
+            else { return nil }
+
+            let data = try Data(contentsOf: legacyURL)
+            // The legacy snapshot remains usable even if migration cannot be
+            // completed yet (for example, while storage is temporarily full).
+            try? Self.write(data, to: url, in: directory, fileManager: fileManager)
+            return data
         }.value
     }
 
@@ -45,24 +65,38 @@ struct FileCominaviRealtimeCacheStore: CominaviRealtimeCachePersisting {
         let directory = directory
         let url = fileURL(eventNumber: eventNumber)
         try await Task.detached(priority: .utility) {
-            try FileManager.default.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true
-            )
-            try data.write(to: url, options: .atomic)
-            try FileManager.default.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
-                ofItemAtPath: url.path
-            )
+            try Self.write(data, to: url, in: directory)
         }.value
     }
 
     private func fileURL(eventNumber: Int) -> URL {
         directory.appendingPathComponent("event-\(eventNumber)-heads.json")
     }
+
+    private static func write(
+        _ data: Data,
+        to url: URL,
+        in directory: URL,
+        fileManager: FileManager = .default
+    ) throws {
+        try fileManager.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        try data.write(to: url, options: .atomic)
+        try fileManager.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: url.path
+        )
+    }
 }
 
 actor CominaviRealtimeStore {
+    enum RefreshBehavior: Equatable, Sendable {
+        case waitForInitialValue
+        case staleWhileRevalidate
+    }
+
     private enum RefreshAuthority: Equatable {
         case legacy
         case tagCatalog(String)
@@ -100,7 +134,9 @@ actor CominaviRealtimeStore {
     init(
         client: any CominaviRealtimeFetching = CominaviServiceClient.shared,
         cacheStore: any CominaviRealtimeCachePersisting = FileCominaviRealtimeCacheStore(
-            directory: DirectoryManager.shared.environmentCachesDirectory
+            directory: DirectoryManager.shared.environmentApplicationSupportDirectory
+                .appendingPathComponent("RealtimeUpdates", isDirectory: true),
+            legacyDirectory: DirectoryManager.shared.environmentCachesDirectory
                 .appendingPathComponent("RealtimeUpdates", isDirectory: true)
         )
     ) {
@@ -111,7 +147,8 @@ actor CominaviRealtimeStore {
     func refresh(
         eventNumber: Int,
         expectedTagCatalogPayloadSHA256: String? = nil,
-        minimumInterval: TimeInterval = 60
+        minimumInterval: TimeInterval = 60,
+        behavior: RefreshBehavior = .waitForInitialValue
     ) async throws {
         guard (1...10_000).contains(eventNumber),
               expectedTagCatalogPayloadSHA256.map(Self.isDigest) ?? true
@@ -134,11 +171,13 @@ actor CominaviRealtimeStore {
         }
         if let revalidationTask = revalidationTasks[eventNumber] {
             guard revalidationAuthorityByEvent[eventNumber] != authority else { return }
+            guard behavior == .waitForInitialValue else { return }
             await revalidationTask.value
             try await refresh(
                 eventNumber: eventNumber,
                 expectedTagCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256,
-                minimumInterval: minimumInterval
+                minimumInterval: minimumInterval,
+                behavior: behavior
             )
             return
         }
@@ -149,10 +188,17 @@ actor CominaviRealtimeStore {
             )
             return
         }
-        try await revalidate(
-            eventNumber: eventNumber,
-            expectedCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256
-        )
+        if behavior == .waitForInitialValue {
+            try await revalidate(
+                eventNumber: eventNumber,
+                expectedCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256
+            )
+        } else {
+            startRevalidation(
+                eventNumber: eventNumber,
+                expectedCatalogPayloadSHA256: expectedTagCatalogPayloadSHA256
+            )
+        }
     }
 
     func waitForRevalidation(eventNumber: Int) async {

@@ -2677,6 +2677,34 @@ final class CominaviServiceClientTests: XCTestCase {
     }
 
     @MainActor
+    func testCachedBoundProfileRemainsVerifiedWhenOfflineRevalidationFails() async throws {
+        let suite = "profile-offline-\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let cached = fixtureProfile(
+            id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            name: "オフライン利用者"
+        )
+        defaults.set(try JSONEncoder().encode(cached), forKey: "profile")
+        let store = CominaviProfileStore(
+            service: ProfileMutationServiceStub(
+                profile: cached,
+                fetchError: URLError(.notConnectedToInternet)
+            ),
+            defaults: defaults,
+            storageKey: "profile",
+            expectedUserID: cached.id
+        )
+
+        await store.load()
+
+        XCTAssertEqual(store.profile, cached)
+        XCTAssertTrue(store.isIdentityVerified)
+        XCTAssertFalse(store.requiresReauthentication)
+        XCTAssertNil(store.issueMessage)
+    }
+
+    @MainActor
     func testProfileRevisionConflictReconcilesAuthorityAndNextEditUsesFreshRevision() async throws {
         let suite = "profile-conflict-\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -4240,17 +4268,23 @@ private actor ProfileMutationServiceStub: CominaviProfileServicing {
 
     private var profile: CominaviUserProfile
     private let firstUpdateFailure: FirstUpdateFailure
+    private let fetchError: URLError?
     private(set) var updateAttempts: [UpdateAttempt] = []
 
     init(
         profile: CominaviUserProfile,
-        firstUpdateFailure: FirstUpdateFailure = .none
+        firstUpdateFailure: FirstUpdateFailure = .none,
+        fetchError: URLError? = nil
     ) {
         self.profile = profile
         self.firstUpdateFailure = firstUpdateFailure
+        self.fetchError = fetchError
     }
 
-    func fetchProfile() async throws -> CominaviUserProfile { profile }
+    func fetchProfile() async throws -> CominaviUserProfile {
+        if let fetchError { throw fetchError }
+        return profile
+    }
 
     func setProfile(_ profile: CominaviUserProfile) {
         self.profile = profile

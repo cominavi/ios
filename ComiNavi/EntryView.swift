@@ -19,13 +19,15 @@ enum EntryContentRoute: Equatable {
     static func resolve(
         accountDeletionPending: Bool,
         shouldShowSignIn: Bool,
-        catalogIsPreparing: Bool,
+        catalogIsPreparing _: Bool,
         hasCatalog: Bool
     ) -> Self {
         if accountDeletionPending { return .accountDeletion }
         if shouldShowSignIn { return .signIn }
         if hasCatalog { return .catalog }
-        if catalogIsPreparing { return .catalogLoading }
+        // CatalogIndependentContentView keeps plans and profile usable while
+        // the catalog tab discovers or revalidates its last installed data.
+        // An authenticated launch must never be held behind network work.
         return .catalogIndependent
     }
 }

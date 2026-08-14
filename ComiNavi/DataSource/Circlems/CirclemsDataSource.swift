@@ -1193,9 +1193,9 @@ final class CirclemsDataSource {
         if let realtimeStore, let publicCircleID = extensionRecord?.WCId {
             try? await realtimeStore.refresh(
                 eventNumber: comiketNumber,
-                expectedTagCatalogPayloadSHA256: tagCatalogPayloadSHA256
+                expectedTagCatalogPayloadSHA256: tagCatalogPayloadSHA256,
+                behavior: .staleWhileRevalidate
             )
-            await realtimeStore.waitForRevalidation(eventNumber: comiketNumber)
             realtimeEnrichment = await realtimeStore.enrichment(
                 eventNumber: comiketNumber,
                 publicCircleID: publicCircleID,
@@ -1228,9 +1228,9 @@ final class CirclemsDataSource {
             let eventNumber = Int(comiketId) ?? 0
             try? await realtimeStore.refresh(
                 eventNumber: eventNumber,
-                expectedTagCatalogPayloadSHA256: tagCatalogPayloadSHA256
+                expectedTagCatalogPayloadSHA256: tagCatalogPayloadSHA256,
+                behavior: .staleWhileRevalidate
             )
-            await realtimeStore.waitForRevalidation(eventNumber: eventNumber)
             let realtimeByPublicID = await realtimeStore.enrichments(
                 eventNumber: eventNumber,
                 expectedTagCatalogPayloadSHA256: tagCatalogPayloadSHA256

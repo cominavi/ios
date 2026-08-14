@@ -20,6 +20,51 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         XCTAssertEqual(restored, payload)
     }
 
+    func testFileCacheMigratesFromPurgeableCacheToApplicationSupport() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let durableDirectory = root.appendingPathComponent("Application Support")
+        let legacyDirectory = root.appendingPathComponent("Caches")
+        let payload = Data("last usable realtime snapshot".utf8)
+        try await FileCominaviRealtimeCacheStore(directory: legacyDirectory).save(
+            payload,
+            eventNumber: 108
+        )
+
+        let store = FileCominaviRealtimeCacheStore(
+            directory: durableDirectory,
+            legacyDirectory: legacyDirectory
+        )
+        let migrated = try await store.load(eventNumber: 108)
+        XCTAssertEqual(migrated, payload)
+
+        try FileManager.default.removeItem(at: legacyDirectory)
+        let restored = try await store.load(eventNumber: 108)
+        XCTAssertEqual(restored, payload)
+    }
+
+    func testLegacyFileCacheRemainsUsableWhenMigrationCannotWrite() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let legacyDirectory = root.appendingPathComponent("Caches")
+        let blockedDirectory = root.appendingPathComponent("Blocked")
+        let payload = Data("usable even without migration".utf8)
+        try await FileCominaviRealtimeCacheStore(directory: legacyDirectory).save(
+            payload,
+            eventNumber: 108
+        )
+        try Data("not a directory".utf8).write(to: blockedDirectory)
+
+        let restored = try await FileCominaviRealtimeCacheStore(
+            directory: blockedDirectory,
+            legacyDirectory: legacyDirectory
+        ).load(eventNumber: 108)
+
+        XCTAssertEqual(restored, payload)
+    }
+
     func testKeepsNewestHeadAndConvertsRealtimeArtworkAndAttendance() async throws {
         let client = RealtimeFetchingStub(pages: [
             CominaviRealtimeUpdatePage(updates: [
@@ -209,6 +254,43 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         await liveStore.waitForRevalidation(eventNumber: 108)
 
         let fresh = await liveStore.enrichment(
+            eventNumber: 108,
+            publicCircleID: 23_000_001
+        )
+        XCTAssertEqual(fresh?.posts.map(\.id), ["fresh"])
+    }
+
+    func testBackgroundRefreshDoesNotWaitForNetworkWithoutDiskSnapshot() async throws {
+        let client = ControlledRealtimeFetchingStub()
+        let store = CominaviRealtimeStore(
+            client: client,
+            cacheStore: InMemoryRealtimeCacheStore()
+        )
+
+        try await store.refresh(
+            eventNumber: 108,
+            minimumInterval: 0,
+            behavior: .staleWhileRevalidate
+        )
+        await client.waitUntilRequested()
+        let whileRevalidating = await store.enrichment(
+            eventNumber: 108,
+            publicCircleID: 23_000_001
+        )
+        XCTAssertNil(whileRevalidating)
+
+        await client.resolve(CominaviRealtimeUpdatePage(updates: [
+            try update(
+                cursor: 1,
+                stateKind: "shinagaki",
+                stateValue: "fresh",
+                occurredAt: "2026-08-15T03:05:00Z",
+                mediaURL: "https://pbs.twimg.com/media/fresh.jpg"
+            ),
+        ], hasMore: false))
+        await store.waitForRevalidation(eventNumber: 108)
+
+        let fresh = await store.enrichment(
             eventNumber: 108,
             publicCircleID: 23_000_001
         )
