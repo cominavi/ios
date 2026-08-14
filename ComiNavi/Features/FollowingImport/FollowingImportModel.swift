@@ -1,6 +1,24 @@
 import Foundation
 import Observation
 
+struct FollowingImportProgressPreview: Equatable, Sendable {
+    enum Phase: Equatable, Sendable {
+        case fetching
+        case finalizing
+    }
+
+    var phase: Phase = .fetching
+    var page = 0
+    var fetchedCount = 0
+    var matchedCircleCount = 0
+    var maximumCount = FollowingImportProgress.maximumFollowingCount
+
+    var capacityFraction: Double {
+        guard maximumCount > 0 else { return 0 }
+        return min(max(Double(fetchedCount) / Double(maximumCount), 0), 1)
+    }
+}
+
 @MainActor
 @Observable
 final class FollowingImportModel {
@@ -16,12 +34,14 @@ final class FollowingImportModel {
     private(set) var favoriteColorsByPublicID: [Int: BookmarkColor] = [:]
     private(set) var activity: Activity = .loading
     private(set) var errorMessage: String?
+    private(set) var progressPreview = FollowingImportProgressPreview()
     var twitterUserName = ""
     var selectedColor: BookmarkColor = .orange
 
     @ObservationIgnored private let dataSource: CirclemsDataSource
     @ObservationIgnored private let client: FollowingImportAPIClient
     @ObservationIgnored private var activityTask: Task<Void, Never>?
+    @ObservationIgnored private var previewMatchedCircleIDs: Set<Int> = []
 
     init(
         dataSource: CirclemsDataSource,
@@ -70,6 +90,8 @@ final class FollowingImportModel {
         )
         activity = .importing
         errorMessage = nil
+        progressPreview = FollowingImportProgressPreview()
+        previewMatchedCircleIDs.removeAll(keepingCapacity: true)
         activityTask = Task { [weak self] in
             await Task.yield()
             await self?.performImport(userName: userName)
@@ -80,12 +102,27 @@ final class FollowingImportModel {
         defer { activity = .idle }
 
         do {
-            let payload = try await client.importFollowings(
-                twitterUserName: userName
-            )
             async let circles = dataSource.getCircles()
             async let extensions = dataSource.getCircleExtensions()
             let (catalogCircles, catalogExtensions) = await (circles, extensions)
+            let payload = try await client.importFollowings(
+                twitterUserName: userName,
+                onProgress: { [weak self] progress in
+                    let matches = await Task.detached(priority: .userInitiated) {
+                        FollowingCircleMatcher.match(
+                            accounts: progress.followings,
+                            circles: catalogCircles,
+                            extensions: catalogExtensions
+                        )
+                    }.value
+                    await self?.updateProgressPreview(
+                        progress,
+                        matches: matches
+                    )
+                }
+            )
+            progressPreview.phase = .finalizing
+            progressPreview.fetchedCount = payload.followings.count
             let matches = await Task.detached(priority: .userInitiated) {
                 FollowingCircleMatcher.match(
                     accounts: payload.followings,
@@ -93,6 +130,7 @@ final class FollowingImportModel {
                     extensions: catalogExtensions
                 )
             }.value
+            progressPreview.matchedCircleCount = Set(matches.map(\.publicCircleID)).count
             let eventNumber = dataSource.comiket.number
             let sources = matches.map { match in
                 ImportedCircleSource(
@@ -141,6 +179,20 @@ final class FollowingImportModel {
             }
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func updateProgressPreview(
+        _ progress: FollowingImportProgress,
+        matches: [FollowingCircleMatch]
+    ) {
+        previewMatchedCircleIDs.formUnion(matches.map(\.publicCircleID))
+        progressPreview = FollowingImportProgressPreview(
+            phase: .fetching,
+            page: progress.page,
+            fetchedCount: progress.fetchedCount,
+            matchedCircleCount: previewMatchedCircleIDs.count,
+            maximumCount: progress.maximumCount
+        )
     }
 
     func favorite(_ importedCircle: FollowingImportedCircle) {

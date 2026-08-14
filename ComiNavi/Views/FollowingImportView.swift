@@ -81,7 +81,16 @@ struct FollowingImportView: View {
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
                 .fixedSize(horizontal: false, vertical: true)
 
-            CatalogActivityIndicator(accessibilityLabel: "Import followed circles")
+            Text(
+                model.progressPreview.phase == .finalizing
+                    ? "Preparing matched circles…"
+                    : "Scanning up to 5,000 followed accounts…"
+            )
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 12)
+
+            FollowingImportProgressPreviewView(progress: model.progressPreview)
                 .padding(.top, 30)
         }
         .accessibilityIdentifier("following-import-progress")
@@ -331,6 +340,85 @@ struct FollowingImportView: View {
 
     private func showImportForm() {
         isShowingImportForm = true
+    }
+}
+
+private struct FollowingImportProgressPreviewView: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    let progress: FollowingImportProgressPreview
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 36) {
+                    fetchedMetric
+                    matchedMetric
+                }
+
+                VStack(alignment: .leading, spacing: 18) {
+                    fetchedMetric
+                    matchedMetric
+                }
+            }
+
+            ProgressView(value: progress.capacityFraction, total: 1)
+                .progressViewStyle(.linear)
+                .tint(Color.accentColor)
+                .scaleEffect(y: 2, anchor: .center)
+                .animation(
+                    accessibilityReduceMotion ? nil : .easeOut(duration: 0.24),
+                    value: progress.capacityFraction
+                )
+                .accessibilityLabel(Text("Import capacity used"))
+                .accessibilityValue(
+                    Text(
+                        progress.capacityFraction,
+                        format: .percent.precision(.fractionLength(0))
+                    )
+                )
+        }
+    }
+
+    private var fetchedMetric: some View {
+        FollowingImportMetric(
+            value: progress.fetchedCount,
+            label: "Accounts fetched"
+        )
+    }
+
+    private var matchedMetric: some View {
+        FollowingImportMetric(
+            value: progress.matchedCircleCount,
+            label: "Circles matched"
+        )
+    }
+}
+
+private struct FollowingImportMetric: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    let value: Int
+    let label: LocalizedStringKey
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(value, format: .number.grouping(.automatic))
+                .font(.system(.title, design: .rounded, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(Color.accentColor)
+                .contentTransition(.numericText(value: Double(value)))
+                .animation(
+                    accessibilityReduceMotion ? nil : .easeOut(duration: 0.24),
+                    value: value
+                )
+
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(label))
+        .accessibilityValue(Text(value, format: .number.grouping(.automatic)))
     }
 }
 

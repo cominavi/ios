@@ -2246,6 +2246,34 @@
         }
       }
     },
+    "Accounts fetched" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取得したフォロー中アカウント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가져온 팔로우 계정"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已获取账号"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已取得帳號"
+          }
+        }
+      }
+    },
     "Accuracy about %lld meters. You always confirm the venue." : {
       "localizations" : {
         "ja" : {
@@ -7190,6 +7218,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "社團與購買項目"
+          }
+        }
+      }
+    },
+    "Circles matched" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一致したサークル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일치한 서클"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匹配到的社团"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配對到的社團"
           }
         }
       }
@@ -14080,6 +14136,34 @@
         }
       }
     },
+    "Import capacity used" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "インポート上限の使用率"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가져오기 한도 사용률"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导入上限使用率"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "匯入上限使用率"
+          }
+        }
+      }
+    },
     "Import followed circles" : {
       "localizations" : {
         "ja" : {
@@ -20375,6 +20459,34 @@
         }
       }
     },
+    "Preparing matched circles…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一致したサークルを準備中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일치한 서클을 준비 중입니다..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在整理匹配到的社团…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在整理配對到的社團…"
+          }
+        }
+      }
+    },
     "Preparing map…" : {
       "localizations" : {
         "ja" : {
@@ -23444,6 +23556,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "儲存中…"
+          }
+        }
+      }
+    },
+    "Scanning up to 5,000 followed accounts…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大5,000件のフォロー中アカウントを確認しています…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최대 5,000개의 팔로우 계정을 확인하는 중입니다..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在扫描最多 5,000 个关注账号…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在掃描最多 5,000 個關注帳號…"
           }
         }
       }

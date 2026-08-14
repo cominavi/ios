@@ -254,6 +254,9 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
     SharedPlanSyncRequestAuthorizing
 {
     typealias Transport = @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    typealias StreamingTransport = @Sendable (
+        URLRequest
+    ) async throws -> (AsyncThrowingStream<UInt8, Error>, URLResponse)
     typealias CirclemsEnvironmentProvider = @Sendable () -> CirclemsServiceEnvironment
     typealias AuthenticationInvalidationHandler = @Sendable (
         _ error: CominaviServiceError?
@@ -621,6 +624,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
 
     private let baseURL: URL
     private let transport: Transport
+    private let streamingTransport: StreamingTransport
     private let circlemsEnvironmentProvider: CirclemsEnvironmentProvider
     private let sessionStore: any CominaviAuthenticationSessionPersisting
     private let circlemsAuthorizationFlowStorage:
@@ -656,6 +660,24 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         transport: @escaping Transport = { request in
             try await URLSession.shared.data(for: request)
         },
+        streamingTransport: @escaping StreamingTransport = { request in
+            let (bytes, response) = try await URLSession.shared.bytes(for: request)
+            let stream = AsyncThrowingStream<UInt8, Error> { continuation in
+                let task = Task {
+                    do {
+                        for try await byte in bytes {
+                            try Task.checkCancellation()
+                            continuation.yield(byte)
+                        }
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+                continuation.onTermination = { _ in task.cancel() }
+            }
+            return (stream, response)
+        },
         circlemsEnvironmentProvider: @escaping CirclemsEnvironmentProvider = {
             AppEnvironment.current.circlems
         },
@@ -676,6 +698,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
     ) {
         self.baseURL = baseURL
         self.transport = transport
+        self.streamingTransport = streamingTransport
         self.circlemsEnvironmentProvider = circlemsEnvironmentProvider
         self.sessionStore = sessionStore
         self.circlemsAuthorizationFlowStorage = circlemsAuthorizationFlowStorage
@@ -987,6 +1010,217 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         case .undocumented:
             throw FollowingImportAPIError.invalidResponse
         }
+    }
+
+    func importXFollowings(
+        userName: String,
+        onProgress: @escaping FollowingImportProgressHandler
+    ) async throws -> FollowingImportPayload {
+        var currentSession = try await serviceSession()
+        var result = try await followingImportStreamResponse(
+            userName: userName,
+            accessToken: currentSession.accessToken
+        )
+        if (result.response as? HTTPURLResponse)?.statusCode == 401 {
+            _ = try? await collectedFollowingImportBytes(result.bytes)
+            currentSession = try await serviceSession(
+                forceRefresh: true,
+                invalidatedAccessToken: currentSession.accessToken
+            )
+            result = try await followingImportStreamResponse(
+                userName: userName,
+                accessToken: currentSession.accessToken
+            )
+        }
+
+        guard let response = result.response as? HTTPURLResponse else {
+            throw FollowingImportAPIError.invalidResponse
+        }
+        guard response.statusCode == 200 else {
+            if response.statusCode == 401 {
+                throw FollowingImportAPIError.notLoggedIn
+            }
+            let data = try await collectedFollowingImportBytes(result.bytes)
+            throw followingImportError(from: data)
+        }
+        guard response.value(forHTTPHeaderField: "Content-Type")?
+            .lowercased()
+            .contains("text/event-stream") == true
+        else { throw FollowingImportAPIError.invalidResponse }
+
+        return try await consumeFollowingImportEvents(
+            result.bytes,
+            onProgress: onProgress
+        )
+    }
+
+    private func followingImportStreamResponse(
+        userName: String,
+        accessToken: String
+    ) async throws -> (
+        bytes: AsyncThrowingStream<UInt8, Error>,
+        response: URLResponse
+    ) {
+        guard let url = URL(
+            string: "/api/v2/imports/x-followings/stream",
+            relativeTo: baseURL
+        )?.absoluteURL,
+              url.scheme?.lowercased() == baseURL.scheme?.lowercased(),
+              url.host?.lowercased() == baseURL.host?.lowercased(),
+              url.port == baseURL.port
+        else { throw FollowingImportAPIError.invalidResponse }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = try JSONEncoder().encode(["userName": userName])
+        request.timeoutInterval = 10 * 60
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        request.setValue(
+            "Bearer \(accessToken)",
+            forHTTPHeaderField: "Authorization"
+        )
+        return try await streamingTransport(request)
+    }
+
+    private func consumeFollowingImportEvents(
+        _ bytes: AsyncThrowingStream<UInt8, Error>,
+        onProgress: @escaping FollowingImportProgressHandler
+    ) async throws -> FollowingImportPayload {
+        var eventName = ""
+        var dataLines: [String] = []
+        var lineBytes: [UInt8] = []
+
+        for try await byte in bytes {
+            if byte != 0x0A {
+                lineBytes.append(byte)
+                guard lineBytes.count <= 16 * 1_024 * 1_024 else {
+                    throw FollowingImportAPIError.invalidResponse
+                }
+                continue
+            }
+
+            if lineBytes.last == 0x0D { lineBytes.removeLast() }
+            guard let line = String(bytes: lineBytes, encoding: .utf8) else {
+                throw FollowingImportAPIError.invalidResponse
+            }
+            lineBytes.removeAll(keepingCapacity: true)
+
+            if line.isEmpty {
+                let pendingEventName = eventName
+                let pendingDataLines = dataLines
+                eventName = ""
+                dataLines.removeAll(keepingCapacity: true)
+                if let payload = try await consumeFollowingImportEvent(
+                    eventName: pendingEventName,
+                    dataLines: pendingDataLines,
+                    onProgress: onProgress
+                ) {
+                    return payload
+                }
+            } else if !line.hasPrefix(":") {
+                let parts = line.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+                let value = parts.count == 2
+                    ? parts[1].drop(while: { $0 == " " }).description
+                    : ""
+                switch parts[0] {
+                case "event": eventName = value
+                case "data": dataLines.append(value)
+                default: break
+                }
+            }
+        }
+
+        if !lineBytes.isEmpty {
+            if lineBytes.last == 0x0D { lineBytes.removeLast() }
+            guard let line = String(bytes: lineBytes, encoding: .utf8) else {
+                throw FollowingImportAPIError.invalidResponse
+            }
+            if line.hasPrefix("data:") {
+                dataLines.append(String(line.dropFirst(5)).drop(while: { $0 == " " }).description)
+            } else if line.hasPrefix("event:") {
+                eventName = String(line.dropFirst(6)).drop(while: { $0 == " " }).description
+            }
+        }
+        if let payload = try await consumeFollowingImportEvent(
+            eventName: eventName,
+            dataLines: dataLines,
+            onProgress: onProgress
+        ) {
+            return payload
+        }
+        throw FollowingImportAPIError.invalidResponse
+    }
+
+    private func consumeFollowingImportEvent(
+        eventName: String,
+        dataLines: [String],
+        onProgress: @escaping FollowingImportProgressHandler
+    ) async throws -> FollowingImportPayload? {
+        guard !eventName.isEmpty || !dataLines.isEmpty else { return nil }
+        let data = Data(dataLines.joined(separator: "\n").utf8)
+        switch eventName.isEmpty ? "message" : eventName {
+        case "message":
+            let progress = try followingImportDecoder().decode(
+                FollowingImportProgress.self,
+                from: data
+            )
+            guard (1...25).contains(progress.page),
+                  progress.maximumCount == FollowingImportProgress.maximumFollowingCount,
+                  (0...progress.maximumCount).contains(progress.fetchedCount),
+                  progress.followings.count <= progress.fetchedCount
+            else { throw FollowingImportAPIError.invalidResponse }
+            await onProgress(progress)
+            return nil
+        case "done":
+            return try followingImportDecoder().decode(
+                FollowingImportPayload.self,
+                from: data
+            )
+        case "error":
+            throw followingImportError(from: data)
+        default:
+            return nil
+        }
+    }
+
+    private func collectedFollowingImportBytes(
+        _ bytes: AsyncThrowingStream<UInt8, Error>
+    ) async throws -> Data {
+        var data = Data()
+        for try await byte in bytes {
+            guard data.count < 64 * 1_024 else {
+                throw FollowingImportAPIError.invalidResponse
+            }
+            data.append(byte)
+        }
+        return data
+    }
+
+    private nonisolated func followingImportDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
+    private nonisolated func followingImportError(from data: Data) -> FollowingImportAPIError {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return .invalidResponse }
+        let details = root["data"] as? [String: Any]
+        guard let code = (details?["error"] ?? root["error"]) as? String,
+              let message = root["message"] as? String
+        else { return .invalidResponse }
+        let nextAllowedAtValue = (details?["nextAllowedAt"] ?? root["nextAllowedAt"]) as? String
+        let nextAllowedAt = nextAllowedAtValue.flatMap {
+            ISO8601DateFormatter().date(from: $0)
+        }
+        return .server(
+            code: code,
+            message: message,
+            nextAllowedAt: nextAllowedAt
+        )
     }
 
     func catalogs() async throws -> [CominaviCatalog] {

@@ -21,6 +21,17 @@ struct FollowingImportPayload: Codable, Equatable, Sendable {
   let source: Source
 }
 
+struct FollowingImportProgress: Codable, Equatable, Sendable {
+  static let maximumFollowingCount = 5_000
+
+  let page: Int
+  let fetchedCount: Int
+  let maximumCount: Int
+  let followings: [FollowingAccount]
+}
+
+typealias FollowingImportProgressHandler = @Sendable (FollowingImportProgress) async -> Void
+
 enum FollowingImportAPIError: LocalizedError {
   case notLoggedIn
   case invalidResponse
@@ -47,6 +58,26 @@ enum FollowingImportAPIError: LocalizedError {
 
 protocol FollowingImportServicing: Sendable {
   func importXFollowings(userName: String) async throws -> FollowingImportPayload
+  func importXFollowings(
+    userName: String,
+    onProgress: @escaping FollowingImportProgressHandler
+  ) async throws -> FollowingImportPayload
+}
+
+extension FollowingImportServicing {
+  func importXFollowings(
+    userName: String,
+    onProgress: @escaping FollowingImportProgressHandler
+  ) async throws -> FollowingImportPayload {
+    let payload = try await importXFollowings(userName: userName)
+    await onProgress(FollowingImportProgress(
+      page: payload.followings.isEmpty ? 0 : 1,
+      fetchedCount: payload.followings.count,
+      maximumCount: FollowingImportProgress.maximumFollowingCount,
+      followings: payload.followings
+    ))
+    return payload
+  }
 }
 
 extension CominaviServiceClient: FollowingImportServicing {}
@@ -60,5 +91,15 @@ struct FollowingImportAPIClient: Sendable {
 
   func importFollowings(twitterUserName: String) async throws -> FollowingImportPayload {
     try await service.importXFollowings(userName: twitterUserName)
+  }
+
+  func importFollowings(
+    twitterUserName: String,
+    onProgress: @escaping FollowingImportProgressHandler
+  ) async throws -> FollowingImportPayload {
+    try await service.importXFollowings(
+      userName: twitterUserName,
+      onProgress: onProgress
+    )
   }
 }

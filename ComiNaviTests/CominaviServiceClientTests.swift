@@ -1345,6 +1345,100 @@ final class CominaviServiceClientTests: XCTestCase {
         XCTAssertEqual(object["userName"] as? String, "cominavi")
     }
 
+    func testStreamingXFollowingImportConsumesProgressAndCompletionEvents() async throws {
+        let streamBody = Data(
+            """
+            :
+
+            event: message
+            data: {"page":1,"fetchedCount":1,"maximumCount":5000,"followings":[{"id":"x-1","userName":"circle","name":"Circle","url":"https://x.com/circle"}]}
+
+            event: done
+            data: {"twitterUserName":"cominavi","importedAt":"2026-08-11T08:00:00Z","nextAllowedAt":"2026-08-11T14:00:00Z","followings":[{"id":"x-1","userName":"circle","name":"Circle","url":"https://x.com/circle"}],"source":"twitterapi.io"}
+
+            """.utf8
+        )
+        let streamingTransport = StaticCominaviStreamingTransport(
+            status: 200,
+            data: streamBody,
+            contentType: "text/event-stream"
+        )
+        let client = try CominaviServiceClient(
+            baseURL: XCTUnwrap(URL(string: "https://cominavi.net")),
+            transport: { _ in throw URLError(.unsupportedURL) },
+            streamingTransport: { request in
+                try await streamingTransport.response(for: request)
+            },
+            sessionStore: FixedCominaviSessionStore(session: CominaviAuthenticationSession(
+                accessToken: "fixture-access",
+                expiresAt: Date(timeIntervalSinceNow: 3_600),
+                refreshToken: "fixture-refresh",
+                refreshExpiresAt: Date(timeIntervalSinceNow: 86_400)
+            ))
+        )
+        let recorder = StreamingFollowingProgressRecorder()
+
+        let payload = try await client.importXFollowings(
+            userName: "cominavi",
+            onProgress: { progress in
+                await recorder.append(progress)
+            }
+        )
+
+        XCTAssertEqual(payload.twitterUserName, "cominavi")
+        XCTAssertEqual(payload.source, .twitterAPI)
+        XCTAssertEqual(payload.followings.map(\.id), ["x-1"])
+        let progressValues = await recorder.values()
+        XCTAssertEqual(progressValues.map(\.fetchedCount), [1])
+        XCTAssertEqual(progressValues.first?.followings.map(\.id), ["x-1"])
+        let requests = await streamingTransport.requests
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests[0].url?.path, "/api/v2/imports/x-followings/stream")
+        XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Accept"), "text/event-stream")
+        XCTAssertEqual(
+            requests[0].value(forHTTPHeaderField: "Authorization"),
+            "Bearer fixture-access"
+        )
+        XCTAssertEqual(requests[0].timeoutInterval, 10 * 60)
+    }
+
+    func testStreamingXFollowingImportPreservesTypedEventError() async throws {
+        let streamBody = Data(
+            """
+            event: error
+            data: {"defined":true,"code":"UNPROCESSABLE_CONTENT","status":422,"message":"Too many followings.","data":{"error":"twitter_following_limit_exceeded"}}
+
+            """.utf8
+        )
+        let streamingTransport = StaticCominaviStreamingTransport(
+            status: 200,
+            data: streamBody,
+            contentType: "text/event-stream"
+        )
+        let client = try CominaviServiceClient(
+            baseURL: XCTUnwrap(URL(string: "https://cominavi.net")),
+            transport: { _ in throw URLError(.unsupportedURL) },
+            streamingTransport: { request in
+                try await streamingTransport.response(for: request)
+            },
+            sessionStore: FixedCominaviSessionStore(session: CominaviAuthenticationSession(
+                accessToken: "fixture-access",
+                expiresAt: Date(timeIntervalSinceNow: 3_600),
+                refreshToken: "fixture-refresh",
+                refreshExpiresAt: Date(timeIntervalSinceNow: 86_400)
+            ))
+        )
+
+        do {
+            _ = try await client.importXFollowings(userName: "cominavi") { _ in }
+            XCTFail("Expected a typed streaming import error")
+        } catch FollowingImportAPIError.server(let code, let message, let nextAllowedAt) {
+            XCTAssertEqual(code, "twitter_following_limit_exceeded")
+            XCTAssertEqual(message, "Too many followings.")
+            XCTAssertNil(nextAllowedAt)
+        }
+    }
+
     func testGeneratedXFollowingImportPreservesCooldownError() async throws {
         let nextAllowedAt = "2026-08-11T09:00:00Z"
         let response = Data(
@@ -4267,6 +4361,49 @@ private actor StaticCominaviTransport {
             headerFields: ["Content-Type": "application/json"]
         ))
         return (configured.data, response)
+    }
+}
+
+private actor StaticCominaviStreamingTransport {
+    private let status: Int
+    private let data: Data
+    private let contentType: String
+    private(set) var requests: [URLRequest] = []
+
+    init(status: Int, data: Data, contentType: String) {
+        self.status = status
+        self.data = data
+        self.contentType = contentType
+    }
+
+    func response(
+        for request: URLRequest
+    ) throws -> (AsyncThrowingStream<UInt8, Error>, URLResponse) {
+        requests.append(request)
+        let response = try XCTUnwrap(HTTPURLResponse(
+            url: XCTUnwrap(request.url),
+            statusCode: status,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": contentType]
+        ))
+        let body = data
+        let stream = AsyncThrowingStream<UInt8, Error> { continuation in
+            for byte in body { continuation.yield(byte) }
+            continuation.finish()
+        }
+        return (stream, response)
+    }
+}
+
+private actor StreamingFollowingProgressRecorder {
+    private var recorded: [FollowingImportProgress] = []
+
+    func append(_ progress: FollowingImportProgress) {
+        recorded.append(progress)
+    }
+
+    func values() -> [FollowingImportProgress] {
+        recorded
     }
 }
 

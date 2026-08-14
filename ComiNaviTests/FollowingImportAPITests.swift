@@ -48,6 +48,52 @@ final class FollowingImportAPITests: XCTestCase {
         }
     }
 
+    func testProgressOverloadFallsBackToCurrentEndpointForExistingServices() async throws {
+        let payload = FollowingImportPayload(
+            twitterUserName: "owner",
+            importedAt: Date(timeIntervalSince1970: 1_754_697_600),
+            nextAllowedAt: Date(timeIntervalSince1970: 1_754_719_200),
+            followings: [FollowingAccount(
+                id: "x-1",
+                userName: "circle_a",
+                name: "Circle A",
+                url: URL(string: "https://x.com/circle_a")!,
+                profilePicture: nil
+            )],
+            source: .cache
+        )
+        let service = FollowingImportServiceStub(result: .success(payload))
+        let client = FollowingImportAPIClient(service: service)
+        let recorder = FollowingImportProgressRecorder()
+
+        let result = try await client.importFollowings(
+            twitterUserName: "owner",
+            onProgress: { progress in
+                await recorder.append(progress)
+            }
+        )
+
+        XCTAssertEqual(result, payload)
+        let progressValues = await recorder.values()
+        XCTAssertEqual(progressValues, [FollowingImportProgress(
+            page: 1,
+            fetchedCount: 1,
+            maximumCount: 5_000,
+            followings: payload.followings
+        )])
+    }
+
+    func testProgressPreviewKeepsRepresentingCapacityWhileFinalizing() {
+        var preview = FollowingImportProgressPreview(
+            fetchedCount: 1_250,
+            matchedCircleCount: 42
+        )
+
+        XCTAssertEqual(preview.capacityFraction, 0.25)
+        preview.phase = .finalizing
+        XCTAssertEqual(preview.capacityFraction, 0.25)
+    }
+
     func testFollowingLimitErrorUsesLocalizedUserMessage() {
         let error = FollowingImportAPIError.server(
             code: "twitter_following_limit_exceeded",
@@ -59,6 +105,18 @@ final class FollowingImportAPITests: XCTestCase {
             error.localizedDescription,
             "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts."
         )
+    }
+}
+
+private actor FollowingImportProgressRecorder {
+    private var recorded: [FollowingImportProgress] = []
+
+    func append(_ progress: FollowingImportProgress) {
+        recorded.append(progress)
+    }
+
+    func values() -> [FollowingImportProgress] {
+        recorded
     }
 }
 
