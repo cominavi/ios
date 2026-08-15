@@ -1,1 +1,1 @@
-Fixes map layer alignment while zooming and keeps circle details visible when removing a favorite from Saved Only Explore results.
+Rolls back last night's venue-map rendering changes while retaining the compass, compact map markers, and Saved Only detail fix.
