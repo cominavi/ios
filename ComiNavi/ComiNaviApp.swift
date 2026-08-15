@@ -53,6 +53,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         if !ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-hide-debugger") {
             DebugSwift.show()
         }
+        if ProcessInfo.processInfo.arguments.contains(
+            "-cominavi-ui-testing-show-gps-location-warning"
+        ) {
+            FeatureOnboardingStore().reset(.gpsLocationModeWarning)
+        }
         #endif
 
         if !isCominaviE2ESessionBridgeActive {

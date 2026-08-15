@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreLocation
 import XCTest
 
 @testable import ComiNavi
@@ -137,6 +138,122 @@ final class WhereAmITests: XCTestCase {
         XCTAssertNil(WhereAmIResolver.nearestVenue(to: distant, venues: [west, east]))
     }
 
+    func testGPSLocationProjectsExactPointAndPrefersContainingVenue() throws {
+        let targetTable = CatalogMapTable(
+            id: .init(blockID: 2, spaceNumber: 34),
+            blockName: "い",
+            origin: CGPoint(x: 260, y: 180),
+            orientation: .aTop
+        )
+        let targetScene = CatalogMapScene(
+            id: .init(day: 1, mapID: 1),
+            name: "East 1–3",
+            size: CGSize(width: 400, height: 400),
+            tableSize: CGSize(width: 40, height: 40),
+            tables: [
+                CatalogMapTable(
+                    id: .init(blockID: 1, spaceNumber: 12),
+                    blockName: "あ",
+                    origin: CGPoint(x: 80, y: 80),
+                    orientation: .aLeft
+                ),
+                targetTable,
+            ]
+        )
+        let targetPlacement = BigSightVenuePlacement(
+            kind: .east123,
+            scene: targetScene,
+            coordinate: BigSightCampusLayout.eastBuilding,
+            center: BigSightCampusLayout.project(BigSightCampusLayout.eastBuilding),
+            rotation: .pi / 6,
+            metersPerMapPoint: 0.05,
+            verticalMetersPerMapPoint: 0.06
+        )
+        let targetVenue = WhereAmIVenueOption(
+            displayName: "East 1–3",
+            placement: targetPlacement
+        )
+        let exactLocalPoint = CGPoint(x: 287.25, y: 189.5)
+        let campusPoint = exactLocalPoint.applying(targetPlacement.transform)
+        let reading = WhereAmILocationReading(
+            coordinate: BigSightCampusLayout.coordinate(from: campusPoint),
+            horizontalAccuracy: 7,
+            timestamp: Date(timeIntervalSince1970: 100)
+        )
+
+        let decoyScene = CatalogMapScene(
+            id: .init(day: 1, mapID: 2),
+            name: "Decoy",
+            size: CGSize(width: 400, height: 400),
+            tableSize: CGSize(width: 40, height: 40),
+            tables: [targetTable]
+        )
+        let decoyVenue = WhereAmIVenueOption(
+            displayName: "Decoy",
+            placement: BigSightVenuePlacement(
+                kind: .west,
+                scene: decoyScene,
+                coordinate: reading.coordinate,
+                center: CGPoint(x: campusPoint.x + 1_000, y: campusPoint.y + 1_000),
+                rotation: 0,
+                metersPerMapPoint: 0.05
+            )
+        )
+        let placedAt = Date(timeIntervalSince1970: 200)
+        let user = try XCTUnwrap(
+            WhereAmIResolver.gpsLocatedUser(
+                from: reading,
+                headingDegrees: 123,
+                venues: [decoyVenue, targetVenue],
+                placedAt: placedAt
+            )
+        )
+
+        XCTAssertEqual(user.sceneID, targetScene.id)
+        XCTAssertEqual(user.tableID, targetTable.id)
+        XCTAssertEqual(user.subspace, 0)
+        XCTAssertEqual(user.point.x, exactLocalPoint.x, accuracy: 0.000_001)
+        XCTAssertEqual(user.point.y, exactLocalPoint.y, accuracy: 0.000_001)
+        XCTAssertEqual(user.headingDegrees, 123)
+        XCTAssertEqual(user.locationReading, reading)
+        XCTAssertEqual(user.source, .gps)
+        XCTAssertEqual(user.placedAt, placedAt)
+    }
+
+    func testGPSLocationRejectsInvalidAndDistantReadings() {
+        let venue = venue(
+            id: 1,
+            name: "East 1–3",
+            kind: .east123,
+            coordinate: BigSightCampusLayout.eastBuilding
+        )
+        let invalid = WhereAmILocationReading(
+            coordinate: BigSightCampusLayout.eastBuilding,
+            horizontalAccuracy: -1,
+            timestamp: .now
+        )
+        let distant = WhereAmILocationReading(
+            coordinate: GeographicCoordinate(latitude: 35.6762, longitude: 139.6503),
+            horizontalAccuracy: 20,
+            timestamp: .now
+        )
+
+        XCTAssertNil(
+            WhereAmIResolver.gpsLocatedUser(
+                from: invalid,
+                headingDegrees: nil,
+                venues: [venue]
+            )
+        )
+        XCTAssertNil(
+            WhereAmIResolver.gpsLocatedUser(
+                from: distant,
+                headingDegrees: nil,
+                venues: [venue]
+            )
+        )
+    }
+
     func testTableResolutionAndLocatedUserPreserveHeadingAndGPSReading() throws {
         let venue = venue(
             id: 4,
@@ -272,6 +389,93 @@ final class WhereAmITests: XCTestCase {
 
         XCTAssertTrue(reading.isLive(at: now))
         XCTAssertFalse(reading.isLive(at: now.addingTimeInterval(6)))
+    }
+
+    @MainActor
+    func testLocationServiceTracksRequestedChannelsIndependently() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let reading = WhereAmILocationReading(
+            coordinate: BigSightCampusLayout.entrancePlaza,
+            horizontalAccuracy: 12,
+            timestamp: now
+        )
+        let service = WhereAmILocationService(
+            simulatedReading: reading,
+            simulatedHeading: 72
+        )
+
+        service.start(locationUpdates: false, headingUpdates: true)
+
+        XCTAssertFalse(service.isUpdatingLocation)
+        XCTAssertTrue(service.isUpdatingHeading)
+
+        service.start(locationUpdates: true, headingUpdates: false)
+
+        XCTAssertTrue(service.isUpdatingLocation)
+        XCTAssertFalse(service.isUpdatingHeading)
+
+        service.stop()
+
+        XCTAssertFalse(service.isUpdatingLocation)
+        XCTAssertFalse(service.isUpdatingHeading)
+        XCTAssertEqual(service.latestReading, reading)
+        XCTAssertEqual(service.headingDegrees, 72)
+    }
+
+    @MainActor
+    func testHeadingOnlyServiceIgnoresQueuedLocationCallbacks() async {
+        let service = WhereAmILocationService(simulatedHeading: 72)
+        service.start(locationUpdates: false, headingUpdates: true)
+        let queuedLocation = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 35.63, longitude: 139.79),
+            altitude: 0,
+            horizontalAccuracy: 5,
+            verticalAccuracy: 5,
+            timestamp: .now
+        )
+
+        service.locationManager(CLLocationManager(), didUpdateLocations: [queuedLocation])
+        await Task.yield()
+
+        XCTAssertNil(service.latestReading)
+    }
+
+    @MainActor
+    func testDeniedSimulationDoesNotStartLocationUpdates() {
+        let service = WhereAmILocationService(
+            simulatedHeading: 72,
+            simulatedAuthorizationStatus: .denied
+        )
+
+        service.start(locationUpdates: true, headingUpdates: true)
+
+        XCTAssertEqual(service.authorizationStatus, .denied)
+        XCTAssertFalse(service.isUpdatingLocation)
+        XCTAssertTrue(service.isUpdatingHeading)
+    }
+
+    @MainActor
+    func testSimulationPublishesSubsequentRequestedSensorValues() {
+        let initial = WhereAmILocationReading(
+            coordinate: BigSightCampusLayout.eastBuilding,
+            horizontalAccuracy: 12,
+            timestamp: Date(timeIntervalSince1970: 100)
+        )
+        let updated = WhereAmILocationReading(
+            coordinate: BigSightCampusLayout.westBuilding,
+            horizontalAccuracy: 8,
+            timestamp: Date(timeIntervalSince1970: 200)
+        )
+        let service = WhereAmILocationService(
+            simulatedReading: initial,
+            simulatedHeading: 72
+        )
+        service.start(locationUpdates: true, headingUpdates: true)
+
+        service.updateSimulation(reading: updated, headingDegrees: 144)
+
+        XCTAssertEqual(service.latestReading, updated)
+        XCTAssertEqual(service.headingDegrees, 144)
     }
 
     func testVenueNamesAreReadableAcrossCatalogGenerations() {

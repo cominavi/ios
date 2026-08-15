@@ -55,6 +55,10 @@ final class ComiNaviAppStoreScreenshotTests: XCTestCase {
         XCTAssertTrue(entryButton.waitForExistence(timeout: 30))
         entryButton.tap()
 
+        let manualMode = app.buttons["location-mode-manual"]
+        XCTAssertTrue(manualMode.waitForExistence(timeout: 5))
+        manualMode.tap()
+
         XCTAssertTrue(app.buttons["where-am-i-venue-1"].waitForExistence(timeout: 10))
         waitForRenderingToSettle()
 

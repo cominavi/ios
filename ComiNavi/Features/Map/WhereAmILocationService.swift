@@ -5,36 +5,36 @@ import UIKit
 @MainActor
 @Observable
 final class WhereAmILocationService: NSObject {
-    enum LocationState: Equatable {
-        case waiting
-        case live(WhereAmILocationReading)
-        case cached(WhereAmILocationReading)
-        case unavailable
-    }
-
     private(set) var authorizationStatus: CLAuthorizationStatus
     private(set) var latestReading: WhereAmILocationReading?
     private(set) var headingDegrees: Double?
-    private(set) var headingAccuracy: Double?
-    private(set) var errorMessage: String?
-    private(set) var isUpdating = false
+    private(set) var isUpdatingLocation = false
+    private(set) var isUpdatingHeading = false
 
     @ObservationIgnored private let manager: CLLocationManager
     @ObservationIgnored private let simulated: Bool
+    @ObservationIgnored private var wantsLocationUpdates = false
+    @ObservationIgnored private var wantsHeadingUpdates = false
 
     init(
         simulatedReading: WhereAmILocationReading? = nil,
-        simulatedHeading: Double? = nil
+        simulatedHeading: Double? = nil,
+        simulatedAuthorizationStatus: CLAuthorizationStatus? = nil
     ) {
         manager = CLLocationManager()
-        simulated = simulatedReading != nil || simulatedHeading != nil
-        authorizationStatus = simulated ? .authorizedWhenInUse : manager.authorizationStatus
+        simulated =
+            simulatedReading != nil || simulatedHeading != nil
+            || simulatedAuthorizationStatus != nil
+        authorizationStatus =
+            simulatedAuthorizationStatus
+            ?? (simulated ? .authorizedWhenInUse : manager.authorizationStatus)
         latestReading = simulatedReading
         headingDegrees = simulatedHeading
-        headingAccuracy = simulatedHeading == nil ? nil : 4
         super.init()
 
-        manager.delegate = self
+        if !simulated {
+            manager.delegate = self
+        }
         manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.distanceFilter = 4
         manager.headingFilter = 2
@@ -42,99 +42,167 @@ final class WhereAmILocationService: NSObject {
         manager.pausesLocationUpdatesAutomatically = true
     }
 
-    func start() {
-        errorMessage = nil
+    func start(
+        locationUpdates: Bool,
+        headingUpdates: Bool
+    ) {
+        wantsLocationUpdates = locationUpdates
+        wantsHeadingUpdates = headingUpdates
+
         if simulated {
-            isUpdating = true
+            isUpdatingLocation =
+                locationUpdates
+                && (authorizationStatus == .authorizedAlways
+                    || authorizationStatus == .authorizedWhenInUse)
+            isUpdatingHeading = headingUpdates
             return
         }
 
-        if let cached = manager.location, cached.horizontalAccuracy >= 0 {
+        authorizationStatus = manager.authorizationStatus
+
+        if !locationUpdates {
+            stopLocationUpdates()
+        } else if let cached = manager.location, cached.horizontalAccuracy >= 0 {
             latestReading = Self.reading(from: cached)
         }
 
-        authorizationStatus = manager.authorizationStatus
-        switch authorizationStatus {
-        case .notDetermined:
-            manager.requestWhenInUseAuthorization()
-        case .authorizedAlways, .authorizedWhenInUse:
-            beginUpdates()
-        case .denied, .restricted:
-            isUpdating = false
-        @unknown default:
-            isUpdating = false
+        if headingUpdates {
+            beginHeadingUpdates()
+        } else {
+            stopHeadingUpdates()
+        }
+
+        if locationUpdates {
+            switch authorizationStatus {
+            case .notDetermined:
+                stopLocationUpdates()
+                manager.requestWhenInUseAuthorization()
+            case .authorizedAlways, .authorizedWhenInUse:
+                beginLocationUpdates()
+            case .denied, .restricted:
+                stopLocationUpdates()
+            @unknown default:
+                stopLocationUpdates()
+            }
         }
     }
 
     func stop() {
+        wantsLocationUpdates = false
+        wantsHeadingUpdates = false
         guard !simulated else {
-            isUpdating = false
+            isUpdatingLocation = false
+            isUpdatingHeading = false
             return
         }
-        manager.stopUpdatingLocation()
-        manager.stopUpdatingHeading()
-        isUpdating = false
+        stopLocationUpdates()
+        stopHeadingUpdates()
     }
 
-    func locationState(at date: Date = .now) -> LocationState {
-        guard let latestReading else {
-            return authorizationStatus == .denied || authorizationStatus == .restricted
-                ? .unavailable
-                : .waiting
-        }
-        return isUpdating && latestReading.isLive(at: date)
-            ? .live(latestReading)
-            : .cached(latestReading)
-    }
-
-    private func beginUpdates() {
-        guard !isUpdating else { return }
-        isUpdating = true
+    private func beginLocationUpdates() {
+        guard wantsLocationUpdates, !isUpdatingLocation else { return }
+        isUpdatingLocation = true
         manager.startUpdatingLocation()
-        if CLLocationManager.headingAvailable() {
-            refreshHeadingOrientation()
-            manager.startUpdatingHeading()
+    }
+
+    private func stopLocationUpdates() {
+        manager.stopUpdatingLocation()
+        isUpdatingLocation = false
+    }
+
+    private func beginHeadingUpdates() {
+        guard wantsHeadingUpdates, CLLocationManager.headingAvailable() else {
+            isUpdatingHeading = false
+            return
         }
+        refreshHeadingOrientation()
+        guard !isUpdatingHeading else { return }
+        isUpdatingHeading = true
+        manager.startUpdatingHeading()
+    }
+
+    private func stopHeadingUpdates() {
+        manager.stopUpdatingHeading()
+        isUpdatingHeading = false
     }
 
     private func acceptAuthorization(_ status: CLAuthorizationStatus) {
         authorizationStatus = status
         switch status {
         case .authorizedAlways, .authorizedWhenInUse:
-            beginUpdates()
+            beginLocationUpdates()
         case .denied, .restricted:
-            stop()
+            stopLocationUpdates()
         case .notDetermined:
-            break
+            stopLocationUpdates()
         @unknown default:
-            stop()
+            stopLocationUpdates()
         }
     }
 
     private func acceptLocation(_ reading: WhereAmILocationReading) {
+        guard wantsLocationUpdates, isUpdatingLocation else { return }
         latestReading = reading
-        errorMessage = nil
     }
 
-    private func acceptHeading(degrees: Double, accuracy: Double) {
-        refreshHeadingOrientation()
+    private func acceptHeading(degrees: Double) {
+        guard wantsHeadingUpdates, isUpdatingHeading else { return }
+        guard !refreshHeadingOrientation() else { return }
         headingDegrees = degrees
-        headingAccuracy = accuracy
     }
 
-    private func acceptError(code: CLError.Code) {
-        guard code != .locationUnknown else { return }
-        errorMessage = String(localized: "Location is temporarily unavailable. Choose your venue manually.")
-    }
+    @discardableResult
+    private func refreshHeadingOrientation() -> Bool {
+        let windowScenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let interfaceOrientation =
+            windowScenes.first(where: { $0.activationState == .foregroundActive })?
+            .interfaceOrientation
+            ?? windowScenes.first(where: { $0.activationState == .foregroundInactive })?
+            .interfaceOrientation
 
-    private func refreshHeadingOrientation() {
-        switch UIDevice.current.orientation {
-        case .portraitUpsideDown: manager.headingOrientation = .portraitUpsideDown
-        case .landscapeLeft: manager.headingOrientation = .landscapeLeft
-        case .landscapeRight: manager.headingOrientation = .landscapeRight
-        default: manager.headingOrientation = .portrait
+        let resolvedOrientation: CLDeviceOrientation?
+        if let interfaceOrientation {
+            resolvedOrientation = switch interfaceOrientation {
+            case .portrait: .portrait
+            case .portraitUpsideDown: .portraitUpsideDown
+            case .landscapeLeft: .landscapeLeft
+            case .landscapeRight: .landscapeRight
+            case .unknown: nil
+            @unknown default: nil
+            }
+        } else {
+            resolvedOrientation = nil
         }
+
+        let fallbackOrientation: CLDeviceOrientation? = switch UIDevice.current.orientation {
+        case .portrait: .portrait
+        case .portraitUpsideDown: .portraitUpsideDown
+        case .landscapeLeft: .landscapeLeft
+        case .landscapeRight: .landscapeRight
+        case .unknown, .faceUp, .faceDown: nil
+        @unknown default: nil
+        }
+        guard let orientation = resolvedOrientation ?? fallbackOrientation,
+            manager.headingOrientation != orientation
+        else { return false }
+        manager.headingOrientation = orientation
+        return true
     }
+
+    #if DEBUG
+        func updateSimulation(
+            reading: WhereAmILocationReading? = nil,
+            headingDegrees: Double? = nil
+        ) {
+            guard simulated else { return }
+            if let reading, wantsLocationUpdates, isUpdatingLocation {
+                latestReading = reading
+            }
+            if let headingDegrees, wantsHeadingUpdates, isUpdatingHeading {
+                self.headingDegrees = headingDegrees
+            }
+        }
+    #endif
 
     nonisolated private static func reading(from location: CLLocation) -> WhereAmILocationReading {
         WhereAmILocationReading(
@@ -170,17 +238,8 @@ extension WhereAmILocationService: CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         guard newHeading.headingAccuracy >= 0 else { return }
         let degrees = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
-        let accuracy = newHeading.headingAccuracy
         Task { @MainActor [weak self] in
-            self?.acceptHeading(degrees: degrees, accuracy: accuracy)
-        }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {
-        guard let locationError = error as? CLError else { return }
-        let code = locationError.code
-        Task { @MainActor [weak self] in
-            self?.acceptError(code: code)
+            self?.acceptHeading(degrees: degrees)
         }
     }
 }

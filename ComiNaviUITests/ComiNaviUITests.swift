@@ -1569,7 +1569,116 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testWhereAmIPlacesAHeadingAwareUserMarker() throws {
+    func testLocationModeMenuOffersManualCompassAndWarnsBeforeGPS() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-demo-data",
+            "-cominavi-ui-testing-where-am-i",
+            "-cominavi-ui-testing-show-gps-location-warning",
+            "-cominavi-ui-testing-live-gps-update",
+        ]
+        app.launch()
+
+        let entryButton = app.buttons["where-am-i-button"]
+        XCTAssertTrue(entryButton.waitForExistence(timeout: 30))
+        entryButton.tap()
+
+        XCTAssertTrue(app.buttons["location-mode-manual"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["location-mode-gps"].exists)
+        let compassToggle = app.buttons["manual-compass-overlay-toggle"]
+        XCTAssertTrue(compassToggle.exists)
+        compassToggle.tap()
+
+        let overlay = app.otherElements["manual-compass-overlay"]
+        XCTAssertTrue(overlay.waitForExistence(timeout: 3))
+        XCTAssertEqual(overlay.value as? String, "72°")
+
+        entryButton.tap()
+        let gpsMode = app.buttons["location-mode-gps"]
+        XCTAssertTrue(gpsMode.waitForExistence(timeout: 3))
+        gpsMode.tap()
+
+        let warning = app.alerts["GPS works best outdoors"]
+        XCTAssertTrue(warning.waitForExistence(timeout: 3))
+        XCTAssertTrue(
+            warning.staticTexts[
+                "GPS locations may be inaccurate inside the venue, but can help you orient yourself outdoors."
+            ].exists
+        )
+        warning.buttons["Cancel"].firstMatch.tap()
+
+        entryButton.tap()
+        XCTAssertTrue(gpsMode.waitForExistence(timeout: 3))
+        gpsMode.tap()
+        XCTAssertTrue(warning.waitForExistence(timeout: 3))
+        warning.buttons["Use GPS Mode"].firstMatch.tap()
+
+        XCTAssertFalse(overlay.exists)
+        let currentLocationButton = app.buttons["current-location-button"]
+        XCTAssertTrue(currentLocationButton.waitForExistence(timeout: 10))
+        let initialLocationLabel = currentLocationButton.label
+        XCTAssertTrue(initialLocationLabel.contains("You are near"))
+        let map = app.otherElements["unified-map-canvas"]
+        let userPositioned = NSPredicate(format: "value CONTAINS %@", "user location")
+        expectation(for: userPositioned, evaluatedWith: map)
+        waitForExpectations(timeout: 10)
+        let initialHeading = NSPredicate(format: "value CONTAINS %@", "user heading 72 degrees")
+        expectation(for: initialHeading, evaluatedWith: map)
+        waitForExpectations(timeout: 3)
+        let updatedHeading = NSPredicate(format: "value CONTAINS %@", "user heading 144 degrees")
+        expectation(for: updatedHeading, evaluatedWith: map)
+        waitForExpectations(timeout: 8)
+        let updatedLocation = NSPredicate(format: "label != %@", initialLocationLabel)
+        expectation(for: updatedLocation, evaluatedWith: currentLocationButton)
+        waitForExpectations(timeout: 3)
+
+        currentLocationButton.tap()
+        let manualMode = app.buttons["location-mode-manual"]
+        XCTAssertTrue(manualMode.waitForExistence(timeout: 3))
+        manualMode.tap()
+        let closeManualPicker = app.buttons["where-am-i-close"]
+        XCTAssertTrue(closeManualPicker.waitForExistence(timeout: 3))
+        closeManualPicker.tap()
+
+        XCTAssertTrue(currentLocationButton.waitForExistence(timeout: 3))
+        currentLocationButton.tap()
+        XCTAssertTrue(gpsMode.waitForExistence(timeout: 3))
+        gpsMode.tap()
+        XCTAssertFalse(warning.waitForExistence(timeout: 1))
+    }
+
+    @MainActor
+    func testDeniedGPSPermissionOffersManualRecovery() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-demo-data",
+            "-cominavi-ui-testing-location-denied",
+            "-cominavi-ui-testing-show-gps-location-warning",
+        ]
+        app.launch()
+
+        let entryButton = app.buttons["where-am-i-button"]
+        XCTAssertTrue(entryButton.waitForExistence(timeout: 30))
+        entryButton.tap()
+        let gpsMode = app.buttons["location-mode-gps"]
+        XCTAssertTrue(gpsMode.waitForExistence(timeout: 3))
+        gpsMode.tap()
+        let warning = app.alerts["GPS works best outdoors"]
+        XCTAssertTrue(warning.waitForExistence(timeout: 3))
+        warning.buttons["Use GPS Mode"].firstMatch.tap()
+
+        let permissionTitle = app.staticTexts["Location Access Is Off"]
+        let openSettings = app.buttons["gps-location-permission-settings"]
+        let manualRecovery = app.buttons["gps-location-permission-manual"]
+        XCTAssertTrue(permissionTitle.waitForExistence(timeout: 3))
+        XCTAssertTrue(openSettings.exists)
+        XCTAssertTrue(manualRecovery.exists)
+        manualRecovery.tap()
+        XCTAssertTrue(app.buttons["where-am-i-venue-1"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testManualWhereAmIPlacesAUserMarkerWithoutSensorHeading() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")
         app.launchArguments.append("-cominavi-ui-testing-where-am-i")
@@ -1578,6 +1687,10 @@ final class ComiNaviUITests: XCTestCase {
         let entryButton = app.buttons["where-am-i-button"]
         XCTAssertTrue(entryButton.waitForExistence(timeout: 30))
         entryButton.tap()
+
+        let manualMode = app.buttons["location-mode-manual"]
+        XCTAssertTrue(manualMode.waitForExistence(timeout: 3))
+        manualMode.tap()
 
         let eastVenue = app.buttons["where-am-i-venue-1"]
         XCTAssertTrue(eastVenue.waitForExistence(timeout: 5))
@@ -1636,6 +1749,7 @@ final class ComiNaviUITests: XCTestCase {
         let userPositioned = NSPredicate(format: "value CONTAINS %@", "user location シ01")
         expectation(for: userPositioned, evaluatedWith: map)
         waitForExpectations(timeout: 5)
+        XCTAssertFalse((map.value as? String)?.contains("user heading") == true)
         let currentLocationButton = app.buttons["current-location-button"]
         XCTAssertTrue(currentLocationButton.exists)
         XCTAssertFalse(app.buttons["banner-update-location"].exists)

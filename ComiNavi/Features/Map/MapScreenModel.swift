@@ -404,6 +404,21 @@ final class MapScreenModel {
         select(mapID: user.sceneID.mapID)
     }
 
+    func updateGPSLocatedUser(_ user: LocatedMapUser) {
+        guard user.source == .gps else {
+            assertionFailure("GPS updates require a GPS-sourced user")
+            return
+        }
+        guard let current = locatedUser,
+            current.source == .gps,
+            current.sceneID == user.sceneID
+        else {
+            locateUser(user)
+            return
+        }
+        locatedUser = user
+    }
+
     func show(_ destination: MapDestination) {
         self.destination = destination
         selection = nil
@@ -460,14 +475,13 @@ final class MapScreenModel {
             displayName: WhereAmIResolver.venueDisplayName(for: hallName),
             placement: placement
         )
-        let previous = locatedUser
         let user = WhereAmIResolver.locatedUser(
             at: table,
             in: venue,
             subspace: subspace,
             point: point,
-            headingDegrees: previous?.headingDegrees,
-            locationReading: previous?.locationReading,
+            headingDegrees: nil,
+            locationReading: nil,
             source: .mapLongPress
         )
         locateUser(user)

@@ -2,15 +2,55 @@ import Combine
 import SwiftUI
 import UIKit
 
+private enum MapLocationMode: Equatable {
+    case manual
+    case gps
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .manual: "Manual Mode"
+        case .gps: "GPS Mode"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .manual: "hand.tap.fill"
+        case .gps: "location.fill"
+        }
+    }
+}
+
+private struct GPSLocationTaskID: Equatable {
+    let mode: MapLocationMode
+    let day: Int
+    let sessionID: UUID?
+}
+
+private struct GPSLocationSession {
+    let id = UUID()
+    let startedAt: Date
+    var venueDay: Int?
+    var venues: [WhereAmIVenueOption] = []
+    var hasAcceptedReading = false
+}
+
 struct MapView: View {
     private static let currentLocationSheetHeight: CGFloat = 430
 
+    @Environment(\.openURL) private var openURL
     @State private var model: MapScreenModel
     @State private var showsWhereAmI = false
     @State private var showsDestinationPicker = false
     @State private var showsCircleSearch = false
     @State private var showsCurrentLocation = false
     @State private var opensWhereAmIAfterSheet = false
+    @State private var locationMode: MapLocationMode = .manual
+    @State private var locationService: WhereAmILocationService
+    @State private var showsGPSLocationWarning = false
+    @State private var isManualCompassEnabled = false
+    @State private var gpsSession: GPSLocationSession?
+    @State private var locationBeforeManualPicker: LocatedMapUser?
     @State private var isMapLegendExpanded = true
     @State private var visibleMapLayers = BigSightMapLayer.defaultVisible
     @State private var circleSheetDetent: PresentationDetent = .fraction(0.62)
@@ -19,6 +59,7 @@ struct MapView: View {
     private let eventDaySelector: CatalogEventDayBanner?
     private let sharedLocationInbox: SharedLocationInbox?
     private let sharedPlanStore: SharedPlanStore?
+    private let onboardingStore: FeatureOnboardingStore
 
     private var currentLocationMapBottomInset: CGFloat {
         showsCurrentLocation ? Self.currentLocationSheetHeight : 0
@@ -29,7 +70,8 @@ struct MapView: View {
         dataSource: CirclemsDataSource,
         selectedDay: Binding<Int>,
         eventDaySelector: CatalogEventDayBanner? = nil,
-        sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox
+        sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox,
+        onboardingDefaults: UserDefaults = .standard
     ) {
         let sharedPlanStore = AppData.sharedPlanStore
         let currentUserID = AppData.profileStore.profile?.id
@@ -50,21 +92,28 @@ struct MapView: View {
             )
         )
         _model = State(initialValue: model)
+        _locationService = State(initialValue: Self.makeLocationService())
         _selectedDay = selectedDay
         self.dataSource = dataSource
         self.eventDaySelector = eventDaySelector
         self.sharedLocationInbox = sharedLocationInbox
         self.sharedPlanStore = sharedPlanStore
+        onboardingStore = FeatureOnboardingStore(defaults: onboardingDefaults)
     }
 
     @MainActor
-    init(model: MapScreenModel) {
+    init(
+        model: MapScreenModel,
+        onboardingDefaults: UserDefaults = .standard
+    ) {
         _model = State(initialValue: model)
+        _locationService = State(initialValue: Self.makeLocationService())
         _selectedDay = .constant(model.selectedDay)
         dataSource = nil
         eventDaySelector = nil
         sharedLocationInbox = nil
         sharedPlanStore = nil
+        onboardingStore = FeatureOnboardingStore(defaults: onboardingDefaults)
     }
 
     var body: some View {
@@ -73,6 +122,12 @@ struct MapView: View {
         ZStack(alignment: .topLeading) {
             mapContent
                 .ignoresSafeArea()
+
+            if locationMode == .manual, isManualCompassEnabled {
+                ManualCompassOverlay(headingDegrees: locationService.headingDegrees)
+                    .frame(maxWidth: 280, maxHeight: 280)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            }
 
             MapControlPanel(
                 model: model,
@@ -97,12 +152,12 @@ struct MapView: View {
                     location: model.locatedUser,
                     destination: model.destination,
                     eventNumber: model.eventNumber,
-                    onWhereAmI: {
-                        if model.locatedUser != nil {
-                            showsCurrentLocation = true
-                        } else {
-                            showsWhereAmI = true
-                        }
+                    mode: locationMode,
+                    isManualCompassEnabled: isManualCompassEnabled,
+                    onSelectManualMode: selectManualLocationMode,
+                    onSelectGPSMode: requestGPSLocationMode,
+                    onToggleManualCompass: {
+                        isManualCompassEnabled.toggle()
                     },
                     onFindTable: {
                         showsDestinationPicker = true
@@ -115,6 +170,19 @@ struct MapView: View {
             .padding(.trailing, MapChromeLayout.edgeInset)
             .safeAreaPadding(.bottom, MapChromeLayout.edgeInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+
+            if requiresLocationPermissionRecovery {
+                LocationPermissionRecoveryOverlay(
+                    onOpenSettings: {
+                        openURL(URL(string: UIApplication.openSettingsURLString)!)
+                    },
+                    onUseManualMode: {
+                        presentManualLocationPicker()
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                .zIndex(10)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(uiColor: .secondarySystemBackground))
@@ -122,6 +190,36 @@ struct MapView: View {
             if model.scene == nil, model.campusScene == nil {
                 model.load()
             }
+        }
+        .onAppear {
+            configureLocationService()
+        }
+        .onDisappear {
+            locationService.stop()
+        }
+        .onChange(of: locationMode) {
+            configureLocationService()
+            if locationMode == .manual {
+                gpsSession = nil
+            }
+        }
+        .onChange(of: isManualCompassEnabled) {
+            configureLocationService()
+        }
+        .task(
+            id: GPSLocationTaskID(
+                mode: locationMode,
+                day: model.selectedDay,
+                sessionID: gpsSession?.id
+            )
+        ) {
+            await loadGPSVenuesIfNeeded()
+        }
+        .onChange(of: locationService.latestReading, initial: true) {
+            updateGPSLocation()
+        }
+        .onChange(of: locationService.headingDegrees, initial: true) {
+            updateGPSLocation()
         }
         .task(id: sharedPlanCircleSignature) {
             model.refreshPrimarySharedPlanCircles()
@@ -140,6 +238,8 @@ struct MapView: View {
             }
         }
         .onChange(of: model.selectedDay) { _, day in
+            gpsSession?.venues = []
+            gpsSession?.venueDay = nil
             if selectedDay != day {
                 selectedDay = day
             }
@@ -159,6 +259,19 @@ struct MapView: View {
                 subtitle: message
             )
             model.dismissSceneError()
+        }
+        .alert("GPS works best outdoors", isPresented: $showsGPSLocationWarning) {
+            Button("Use GPS Mode") {
+                onboardingStore.markCompleted(.gpsLocationModeWarning)
+                activateGPSLocationMode()
+            }
+            .accessibilityIdentifier("gps-location-warning-confirm")
+
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "GPS locations may be inaccurate inside the venue, but can help you orient yourself outdoors."
+            )
         }
         .sheet(item: $model.selection) { selection in
             CircleMapDetailSheet(
@@ -190,7 +303,7 @@ struct MapView: View {
             onDismiss: {
                 guard opensWhereAmIAfterSheet else { return }
                 opensWhereAmIAfterSheet = false
-                showsWhereAmI = true
+                presentManualLocationPicker()
             }
         ) {
             if let location = model.locatedUser {
@@ -198,6 +311,7 @@ struct MapView: View {
                     location: location,
                     eventNumber: model.eventNumber
                 ) {
+                    locationMode = .manual
                     opensWhereAmIAfterSheet = true
                 }
                 .presentationDetents([.medium])
@@ -207,15 +321,15 @@ struct MapView: View {
         .sheet(
             isPresented: $showsWhereAmI,
             onDismiss: {
-                if model.locatedUser != nil {
+                defer { locationBeforeManualPicker = nil }
+                if let locatedUser = model.locatedUser,
+                    locatedUser != locationBeforeManualPicker
+                {
                     showsCurrentLocation = true
                 }
             }
         ) {
-            WhereAmIView(
-                mapModel: model,
-                locationService: makeWhereAmILocationService()
-            )
+            WhereAmIView(mapModel: model)
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
@@ -308,6 +422,7 @@ struct MapView: View {
                         showsCurrentLocation = true
                     },
                     onLocate: { mapID, point, table, subspace in
+                        activateManualLocationModeForMapPress()
                         if model.locateUser(
                             at: point,
                             nearest: table,
@@ -338,6 +453,7 @@ struct MapView: View {
                         showsCurrentLocation = true
                     },
                     onLocate: { point, table, subspace in
+                        activateManualLocationModeForMapPress()
                         if model.locateUser(
                             at: point,
                             nearest: table,
@@ -382,9 +498,131 @@ struct MapView: View {
         }.sorted().joined(separator: "|")
     }
 
+    private func selectManualLocationMode() {
+        presentManualLocationPicker()
+    }
+
+    private func presentManualLocationPicker() {
+        locationMode = .manual
+        locationBeforeManualPicker = model.locatedUser
+        showsWhereAmI = true
+    }
+
+    private func activateManualLocationModeForMapPress() {
+        locationMode = .manual
+    }
+
+    private func requestGPSLocationMode() {
+        guard locationMode != .gps else { return }
+        if onboardingStore.shouldPresent(.gpsLocationModeWarning) {
+            showsGPSLocationWarning = true
+        } else {
+            activateGPSLocationMode()
+        }
+    }
+
+    private func activateGPSLocationMode() {
+        gpsSession = GPSLocationSession(startedAt: .now)
+        locationMode = .gps
+        updateGPSLocation()
+    }
+
+    private var requiresLocationPermissionRecovery: Bool {
+        guard locationMode == .gps else { return false }
+        return switch locationService.authorizationStatus {
+        case .denied, .restricted:
+            true
+        case .authorizedAlways, .authorizedWhenInUse, .notDetermined:
+            false
+        @unknown default:
+            false
+        }
+    }
+
+    private func configureLocationService() {
+        switch locationMode {
+        case .manual:
+            locationService.start(
+                locationUpdates: false,
+                headingUpdates: isManualCompassEnabled
+            )
+        case .gps:
+            locationService.start(locationUpdates: true, headingUpdates: true)
+        }
+    }
+
     @MainActor
-    private func makeWhereAmILocationService() -> WhereAmILocationService {
+    private func loadGPSVenuesIfNeeded() async {
+        guard locationMode == .gps, let sessionID = gpsSession?.id else { return }
+        let day = model.selectedDay
+        gpsSession?.venues = []
+        gpsSession?.venueDay = nil
+        do {
+            let venues = try await model.whereAmIVenues()
+            try Task.checkCancellation()
+            guard locationMode == .gps,
+                model.selectedDay == day,
+                gpsSession?.id == sessionID
+            else { return }
+            gpsSession?.venues = venues
+            gpsSession?.venueDay = day
+            updateGPSLocation()
+            #if DEBUG
+                scheduleSimulatedGPSUpdateIfNeeded(
+                    sessionID: sessionID,
+                    venues: venues
+                )
+            #endif
+        } catch is CancellationError {
+            return
+        } catch {
+            guard locationMode == .gps,
+                model.selectedDay == day,
+                gpsSession?.id == sessionID
+            else { return }
+            AppToast.showError(
+                String(localized: "Could not update map"),
+                subtitle: error.localizedDescription
+            )
+        }
+    }
+
+    private func updateGPSLocation() {
+        guard locationMode == .gps,
+            var session = gpsSession,
+            let reading = locationService.latestReading
+        else { return }
+
+        guard session.hasAcceptedReading || reading.isLive() else { return }
+        if !session.hasAcceptedReading {
+            session.hasAcceptedReading = true
+            gpsSession = session
+        }
+
+        guard session.venueDay == model.selectedDay,
+            let user = WhereAmIResolver.gpsLocatedUser(
+                from: reading,
+                headingDegrees: locationService.headingDegrees,
+                venues: session.venues,
+                placedAt: session.startedAt
+            )
+        else { return }
+
+        guard user.sceneID.day == model.selectedDay else { return }
+        model.updateGPSLocatedUser(user)
+    }
+
+    @MainActor
+    private static func makeLocationService() -> WhereAmILocationService {
         #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-location-denied"
+            ) {
+                return WhereAmILocationService(
+                    simulatedHeading: 72,
+                    simulatedAuthorizationStatus: .denied
+                )
+            }
             if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-where-am-i") {
                 return WhereAmILocationService(
                     simulatedReading: WhereAmILocationReading(
@@ -398,6 +636,41 @@ struct MapView: View {
         #endif
         return WhereAmILocationService()
     }
+
+    #if DEBUG
+        private func scheduleSimulatedGPSUpdateIfNeeded(
+            sessionID: UUID,
+            venues: [WhereAmIVenueOption]
+        ) {
+            guard ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-live-gps-update"
+            ),
+                let placement = venues.first?.placement,
+                let table = placement.scene.tables.last
+            else { return }
+
+            let point = CGPoint(
+                x: table.origin.x + placement.scene.tableSize.width / 2,
+                y: table.origin.y + placement.scene.tableSize.height / 2
+            )
+            let coordinate = BigSightCampusLayout.coordinate(
+                from: point.applying(placement.transform)
+            )
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(4))
+                guard locationMode == .gps, gpsSession?.id == sessionID else { return }
+                locationService.updateSimulation(
+                    reading: WhereAmILocationReading(
+                        coordinate: coordinate,
+                        horizontalAccuracy: 8,
+                        timestamp: .now
+                    ),
+                    headingDegrees: 144
+                )
+            }
+        }
+    #endif
+
 }
 
 private struct MapControlPanel: View {
@@ -440,79 +713,150 @@ private struct MapLocationControls: View {
     let location: LocatedMapUser?
     let destination: MapDestination?
     let eventNumber: Int
-    let onWhereAmI: () -> Void
+    let mode: MapLocationMode
+    let isManualCompassEnabled: Bool
+    let onSelectManualMode: () -> Void
+    let onSelectGPSMode: () -> Void
+    let onToggleManualCompass: () -> Void
     let onFindTable: () -> Void
     let onClearDestination: () -> Void
 
     @State private var copiedDestination = false
+    @State private var showsLocationModes = false
     @State private var showsDestinationActions = false
     @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
-        HStack(spacing: MapChromeLayout.controlSpacing) {
-            Button(action: onWhereAmI) {
-                MapLocationControlIcon(
-                    icon: "location.viewfinder",
-                    isActive: location != nil
-                )
+        VStack(alignment: .trailing, spacing: 8) {
+            if showsLocationModes {
+                locationModeMenu
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(whereAmILabel)
-            .accessibilityHint(
-                location == nil
-                    ? "Open the venue locator. You can also press and hold the map."
-                    : "View, copy, or update your current location"
-            )
-            .accessibilityIdentifier(
-                location == nil ? "where-am-i-button" : "current-location-button"
-            )
 
-            Button {
-                if destination == nil {
-                    onFindTable()
-                } else {
-                    showsDestinationActions = true
+            HStack(spacing: MapChromeLayout.controlSpacing) {
+                Button {
+                    showsLocationModes.toggle()
+                } label: {
+                    MapLocationControlIcon(
+                        icon: showsLocationModes ? "xmark" : "location.viewfinder",
+                        isActive: location != nil || mode == .gps
+                    )
                 }
-            } label: {
-                destinationIcon
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(destinationLabel)
-            .accessibilityHint(destinationHint)
-            .accessibilityIdentifier("find-table-button")
-            .confirmationDialog(
-                destinationLabel,
-                isPresented: $showsDestinationActions,
-                titleVisibility: .visible
-            ) {
-                if let destination {
-                    Button {
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    showsLocationModes ? "Close location modes" : whereAmILabel
+                )
+                .accessibilityValue(Text(mode.title))
+                .accessibilityHint("Choose how ComiNavi determines your location")
+                .accessibilityIdentifier(
+                    location == nil ? "where-am-i-button" : "current-location-button"
+                )
+
+                Button {
+                    if destination == nil {
                         onFindTable()
-                    } label: {
-                        LucideLabel("Find a Circle", icon: "mappin.and.ellipse")
+                    } else {
+                        showsDestinationActions = true
                     }
+                } label: {
+                    destinationIcon
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(destinationLabel)
+                .accessibilityHint(destinationHint)
+                .accessibilityIdentifier("find-table-button")
+                .confirmationDialog(
+                    destinationLabel,
+                    isPresented: $showsDestinationActions,
+                    titleVisibility: .visible
+                ) {
+                    if let destination {
+                        Button {
+                            onFindTable()
+                        } label: {
+                            LucideLabel("Find a Circle", icon: "mappin.and.ellipse")
+                        }
 
-                    Divider()
+                        Divider()
 
-                    Button {
-                        copy(destination)
-                    } label: {
-                        LucideLabel("Copy circle location", icon: "doc.on.doc")
+                        Button {
+                            copy(destination)
+                        } label: {
+                            LucideLabel("Copy circle location", icon: "doc.on.doc")
+                        }
+                        .accessibilityIdentifier("copy-destination-button")
+
+                        Button(role: .destructive) {
+                            onClearDestination()
+                        } label: {
+                            LucideLabel("Clear destination", icon: "xmark")
+                        }
+                        .accessibilityIdentifier("clear-destination-button")
                     }
-                    .accessibilityIdentifier("copy-destination-button")
-
-                    Button(role: .destructive) {
-                        onClearDestination()
-                    } label: {
-                        LucideLabel("Clear destination", icon: "xmark")
-                    }
-                    .accessibilityIdentifier("clear-destination-button")
                 }
             }
         }
         .onChange(of: destination?.selectedAt) {
             copiedDestination = false
         }
+    }
+
+    private var locationModeMenu: some View {
+        VStack(spacing: 8) {
+            MapLocationModeOptionButton(
+                mode: .manual,
+                isSelected: mode == .manual,
+                accessibilityIdentifier: "location-mode-manual"
+            ) {
+                showsLocationModes = false
+                onSelectManualMode()
+            }
+
+            MapLocationModeOptionButton(
+                mode: .gps,
+                isSelected: mode == .gps,
+                accessibilityIdentifier: "location-mode-gps"
+            ) {
+                showsLocationModes = false
+                onSelectGPSMode()
+            }
+
+            if mode == .manual {
+                Button {
+                    showsLocationModes = false
+                    onToggleManualCompass()
+                } label: {
+                    HStack(spacing: 10) {
+                        LucideLabel(
+                            resource:
+                                isManualCompassEnabled
+                                ? LocalizedStringResource("Hide Compass Overlay")
+                                : LocalizedStringResource("Show Compass Overlay"),
+                            icon: "safari"
+                        )
+                        Spacer(minLength: 12)
+                        if isManualCompassEnabled {
+                            LucideIcon("checkmark")
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+                .buttonStyle(.bordered)
+                .tint(isManualCompassEnabled ? .accentColor : .primary)
+                .accessibilityAddTraits(isManualCompassEnabled ? .isSelected : [])
+                .accessibilityIdentifier("manual-compass-overlay-toggle")
+            }
+        }
+        .padding(8)
+        .frame(width: 264)
+        .background(.regularMaterial, in: .rect(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(.white.opacity(0.55), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Location Mode")
+        .accessibilityIdentifier("location-mode-menu")
     }
 
     private var whereAmILabel: String {
@@ -549,6 +893,116 @@ private struct MapLocationControls: View {
             ) ?? destination.canonicalLocationText
         copiedDestination = true
         hapticFeedback?.play(.copyConfirmation)
+    }
+}
+
+private struct MapLocationModeOptionButton: View {
+    let mode: MapLocationMode
+    let isSelected: Bool
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                LucideLabel(resource: mode.title, icon: mode.icon)
+                Spacer(minLength: 12)
+                if isSelected {
+                    LucideIcon("checkmark")
+                }
+            }
+            .font(.subheadline.weight(.semibold))
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        }
+        .buttonStyle(.bordered)
+        .tint(isSelected ? .accentColor : .primary)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+}
+
+private struct ManualCompassOverlay: View {
+    let headingDegrees: Double?
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.blue.opacity(0.34), lineWidth: 8)
+
+            LucideIcon("location.north.fill", size: 104)
+                .foregroundStyle(Color.blue.opacity(0.48))
+                .rotationEffect(.degrees(headingDegrees ?? 0))
+                .opacity(headingDegrees == nil ? 0.18 : 1)
+        }
+        .padding(8)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Compass overlay")
+        .accessibilityValue(accessibilityValue)
+        .accessibilityIdentifier("manual-compass-overlay")
+    }
+
+    private var accessibilityValue: String {
+        guard let headingDegrees else {
+            return String(localized: "Waiting for compass heading")
+        }
+        return "\(Int(headingDegrees.rounded()))°"
+    }
+}
+
+private struct LocationPermissionRecoveryOverlay: View {
+    let onOpenSettings: () -> Void
+    let onUseManualMode: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.22)
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
+
+            VStack(spacing: 16) {
+                Image(systemName: "location.slash.fill")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .accessibilityHidden(true)
+
+                VStack(spacing: 8) {
+                    Text("Location Access Is Off")
+                        .font(.headline)
+
+                    Text(
+                        "Turn on location access in Settings to use GPS Mode, or continue in Manual Mode."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                }
+
+                VStack(spacing: 8) {
+                    Button("Open Settings", action: onOpenSettings)
+                        .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("gps-location-permission-settings")
+
+                    Button("Manual Mode", action: onUseManualMode)
+                        .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("gps-location-permission-manual")
+                }
+            }
+            .padding(22)
+            .frame(maxWidth: 340)
+            .background(.regularMaterial, in: .rect(cornerRadius: 20))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color(uiColor: .separator).opacity(0.3), lineWidth: 0.5)
+            }
+            .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+            .padding(24)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("gps-location-permission-recovery")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

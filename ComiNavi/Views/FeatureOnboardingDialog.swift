@@ -11,6 +11,10 @@ struct FeatureOnboardingID: Hashable, RawRepresentable, Sendable {
     static let exploreGalleryZoom = FeatureOnboardingID(
         rawValue: "explore-gallery-zoom-v1"
     )
+
+    static let gpsLocationModeWarning = FeatureOnboardingID(
+        rawValue: "gps-location-mode-warning-v1"
+    )
 }
 
 struct FeatureOnboardingStore {
@@ -28,6 +32,10 @@ struct FeatureOnboardingStore {
 
     func markCompleted(_ onboarding: FeatureOnboardingID) {
         defaults.set(true, forKey: storageKey(for: onboarding))
+    }
+
+    func reset(_ onboarding: FeatureOnboardingID) {
+        defaults.removeObject(forKey: storageKey(for: onboarding))
     }
 
     private func storageKey(for onboarding: FeatureOnboardingID) -> String {

@@ -90,9 +90,10 @@ struct ComiketSpaceAddress: Equatable, Sendable {
 }
 
 struct LocatedMapUser: Identifiable, Equatable, Sendable {
-    enum Source: Equatable, Sendable {
+    enum Source: Hashable, Sendable {
         case guidedLocator
         case mapLongPress
+        case gps
     }
 
     let sceneID: CatalogMapScene.ID
@@ -304,9 +305,7 @@ enum WhereAmIResolver {
         to reading: WhereAmILocationReading,
         venues: [WhereAmIVenueOption]
     ) -> WhereAmIVenueOption? {
-        guard reading.horizontalAccuracy >= 0, reading.horizontalAccuracy < 2_000 else {
-            return nil
-        }
+        guard isUsable(reading) else { return nil }
 
         let nearest = venues.min { lhs, rhs in
             distance(from: reading.coordinate, to: lhs.placement.coordinate)
@@ -319,6 +318,40 @@ enum WhereAmIResolver {
             <= maximumUsefulDistance
             ? nearest
             : nil
+    }
+
+    static func gpsLocatedUser(
+        from reading: WhereAmILocationReading,
+        headingDegrees: Double?,
+        venues: [WhereAmIVenueOption],
+        placedAt: Date = .now
+    ) -> LocatedMapUser? {
+        guard isUsable(reading) else { return nil }
+
+        let campusPoint = BigSightCampusLayout.project(reading.coordinate)
+        let venue = venues.first(where: { $0.placement.contains(campusPoint: campusPoint) })
+            ?? nearestVenue(to: reading, venues: venues)
+        guard let venue else { return nil }
+
+        let localPoint = campusPoint.applying(venue.placement.transform.inverted())
+        guard let table = nearestTable(to: localPoint, in: venue.placement.scene) else {
+            return nil
+        }
+        let subspace = subspace(
+            at: localPoint,
+            in: table,
+            scene: venue.placement.scene
+        )
+        return locatedUser(
+            at: table,
+            in: venue,
+            subspace: subspace,
+            point: localPoint,
+            headingDegrees: headingDegrees,
+            locationReading: reading,
+            source: .gps,
+            placedAt: placedAt
+        )
     }
 
     static func table(
@@ -498,6 +531,15 @@ enum WhereAmIResolver {
             + cos(lhsLatitude) * cos(rhsLatitude)
             * sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
         return earthRadius * 2 * atan2(sqrt(haversine), sqrt(1 - haversine))
+    }
+
+    private static func isUsable(_ reading: WhereAmILocationReading) -> Bool {
+        reading.coordinate.latitude.isFinite
+            && reading.coordinate.longitude.isFinite
+            && (-90...90).contains(reading.coordinate.latitude)
+            && (-180...180).contains(reading.coordinate.longitude)
+            && reading.horizontalAccuracy >= 0
+            && reading.horizontalAccuracy < 2_000
     }
 
     private static func tableRect(

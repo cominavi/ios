@@ -682,6 +682,91 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
+    func testSamePlacementHeadingUpdateRedrawsArrowWithoutRefocusingCamera() async throws {
+        let campus = makeSingleVenueCampus()
+        let venue = try XCTUnwrap(campus.venues.first)
+        let table = try XCTUnwrap(venue.scene.tables.first)
+        let venueOption = WhereAmIVenueOption(displayName: "Test Hall", placement: venue)
+        let renderer = UnifiedBigSightScene(campus: campus)
+        renderer.reduceMotion = true
+        let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        view.presentScene(renderer)
+        try await Task.sleep(for: .milliseconds(30))
+        let placedAt = Date(timeIntervalSince1970: 100)
+        let point = CGPoint(
+            x: venue.scene.size.width / 2,
+            y: venue.scene.size.height / 2
+        )
+        let initialUser = WhereAmIResolver.locatedUser(
+            at: table,
+            in: venueOption,
+            subspace: 0,
+            point: point,
+            headingDegrees: 72,
+            locationReading: nil,
+            source: .gps,
+            placedAt: placedAt
+        )
+
+        renderer.update(
+            campus: campus,
+            scope: .venue,
+            selectedMapID: venue.id,
+            selectedTableID: nil,
+            circlePlacements: [],
+            circleArtwork: [:],
+            searchMatches: [],
+            searchActive: false,
+            genrePlacements: [],
+            bookmarks: [],
+            locatedUser: initialUser
+        )
+        renderer.didFinishUpdate()
+
+        let initialArrowRotation = try XCTUnwrap(renderer.userHeadingIndicatorRotation)
+        let initialOverlayRebuildCount = renderer.dynamicOverlayRebuildCount
+        let focusedCamera = renderer.basemapCamera
+        let focusedCenter = renderer.cameraCampusCenter
+        let focusedScale = renderer.cameraMetersPerPoint
+        let focusedRotation = renderer.cameraRotation
+        let updatedUser = WhereAmIResolver.locatedUser(
+            at: table,
+            in: venueOption,
+            subspace: 0,
+            point: point,
+            headingDegrees: 144,
+            locationReading: nil,
+            source: .gps,
+            placedAt: placedAt
+        )
+
+        renderer.update(
+            campus: campus,
+            scope: .venue,
+            selectedMapID: venue.id,
+            selectedTableID: nil,
+            circlePlacements: [],
+            circleArtwork: [:],
+            searchMatches: [],
+            searchActive: false,
+            genrePlacements: [],
+            bookmarks: [],
+            locatedUser: updatedUser
+        )
+
+        let updatedArrowRotation = try XCTUnwrap(renderer.userHeadingIndicatorRotation)
+        XCTAssertEqual(initialArrowRotation, -CGFloat(72 * Double.pi / 180), accuracy: 0.000_001)
+        XCTAssertEqual(updatedArrowRotation, -CGFloat(144 * Double.pi / 180), accuracy: 0.000_001)
+        XCTAssertNotEqual(updatedArrowRotation, initialArrowRotation)
+        XCTAssertEqual(renderer.dynamicOverlayRebuildCount, initialOverlayRebuildCount)
+        XCTAssertEqual(renderer.basemapCamera, focusedCamera)
+        XCTAssertEqual(renderer.cameraCampusCenter.x, focusedCenter.x, accuracy: 0.000_001)
+        XCTAssertEqual(renderer.cameraCampusCenter.y, focusedCenter.y, accuracy: 0.000_001)
+        XCTAssertEqual(renderer.cameraMetersPerPoint, focusedScale, accuracy: 0.000_001)
+        XCTAssertEqual(renderer.cameraRotation, focusedRotation, accuracy: 0.000_001)
+    }
+
+    @MainActor
     func testZoomKeepsGestureOriginOverSameWorldPoint() async throws {
         let campus = makeSingleVenueCampus()
         let renderer = UnifiedBigSightScene(campus: campus)
@@ -1337,6 +1422,84 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertTrue(model.isSearchPresented)
         XCTAssertEqual(model.searchQuery, "Fixture")
         XCTAssertEqual(model.searchMatches, matches)
+    }
+
+    @MainActor
+    func testMapLongPressDropsPreviousSensorMetadata() async throws {
+        let model = MapScreenModel.previewCampusFixture()
+        model.load()
+        try await waitUntilReady(model)
+        let venue = try XCTUnwrap(model.campusScene?.venues.first)
+        let table = try XCTUnwrap(venue.scene.tables.first)
+        let reading = WhereAmILocationReading(
+            coordinate: venue.coordinate,
+            horizontalAccuracy: 8,
+            timestamp: Date(timeIntervalSince1970: 100)
+        )
+        let sensorUser = WhereAmIResolver.locatedUser(
+            at: table,
+            in: WhereAmIVenueOption(displayName: venue.kind.displayName, placement: venue),
+            subspace: 0,
+            headingDegrees: 88,
+            locationReading: reading,
+            source: .gps,
+            placedAt: Date(timeIntervalSince1970: 200)
+        )
+        model.locateUser(sensorUser)
+        let exactPoint = CGPoint(x: table.origin.x + 3, y: table.origin.y + 5)
+
+        let manualUser = try XCTUnwrap(
+            model.locateUser(
+                at: exactPoint,
+                nearest: table,
+                subspace: 1,
+                mapID: venue.id
+            )
+        )
+
+        XCTAssertEqual(manualUser.source, .mapLongPress)
+        XCTAssertEqual(manualUser.point, exactPoint)
+        XCTAssertNil(manualUser.headingDegrees)
+        XCTAssertNil(manualUser.locationReading)
+    }
+
+    @MainActor
+    func testLiveGPSRefreshPreservesActiveMapSearch() async throws {
+        let model = MapScreenModel.previewCampusFixture()
+        model.load()
+        try await waitUntilReady(model)
+        let venue = try XCTUnwrap(model.campusScene?.venues.first)
+        let table = try XCTUnwrap(venue.scene.tables.first)
+        let venueOption = WhereAmIVenueOption(
+            displayName: venue.kind.displayName,
+            placement: venue
+        )
+        let placedAt = Date(timeIntervalSince1970: 200)
+        let initialUser = WhereAmIResolver.locatedUser(
+            at: table,
+            in: venueOption,
+            subspace: 0,
+            headingDegrees: 45,
+            locationReading: nil,
+            source: .gps,
+            placedAt: placedAt
+        )
+        model.updateGPSLocatedUser(initialUser)
+        model.setSearchPresented(true)
+
+        let updatedUser = WhereAmIResolver.locatedUser(
+            at: table,
+            in: venueOption,
+            subspace: 0,
+            headingDegrees: 135,
+            locationReading: nil,
+            source: .gps,
+            placedAt: placedAt
+        )
+        model.updateGPSLocatedUser(updatedUser)
+
+        XCTAssertTrue(model.isSearchPresented)
+        XCTAssertEqual(model.locatedUser, updatedUser)
     }
 
     @MainActor

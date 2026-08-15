@@ -58,16 +58,24 @@ struct CurrentLocationSheet: View {
                 .foregroundStyle(.secondary)
 
             LucideLabel(
-                resource:
-                location.source == .mapLongPress
-                    ? LocalizedStringResource("Positioned from your map press")
-                    : LocalizedStringResource("Positioned with Where Am I"),
-                icon: location.source == .mapLongPress ? "hand.tap.fill" : "location.fill"
+                resource: sourcePresentation.title,
+                icon: sourcePresentation.icon
             )
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var sourcePresentation: (title: LocalizedStringResource, icon: String) {
+        switch location.source {
+        case .guidedLocator:
+            ("Positioned with Where Am I", "location.viewfinder")
+        case .mapLongPress:
+            ("Positioned from your map press", "hand.tap.fill")
+        case .gps:
+            ("Updated automatically with GPS", "location.fill")
+        }
     }
 
     private var canonicalLocation: some View {

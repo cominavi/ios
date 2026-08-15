@@ -935,10 +935,12 @@ final class UnifiedBigSightScene: SKScene {
     private var viewportWorkItem: DispatchWorkItem?
     private var requestedScopeInternally = false
     private var lastDynamicFingerprint: Int?
+    private var lastRenderedLocatedUser: LocatedMapUser?
     private var artworkCount = 0
     private var favoriteCount = 0
     private var primarySharedPlanCircleCount = 0
     private var locatedUserSummary: String?
+    private var locatedUserHeading: Double?
     private var destinationSummary: String?
     private var lastLocatedUserPlacedAt: Date?
     private var lastDestinationSelectedAt: Date?
@@ -1026,6 +1028,7 @@ final class UnifiedBigSightScene: SKScene {
         genreOverlayNodeCount > 0 && !genreRoot.isHidden && genreRoot.alpha > 0
     }
     var userMarkerCount: Int { userRoot.children.count }
+    private(set) var dynamicOverlayRebuildCount = 0
     var destinationMarkerCount: Int {
         destinationRoot.children.filter { $0.name == "map-destination-marker" }.count
     }
@@ -1033,6 +1036,11 @@ final class UnifiedBigSightScene: SKScene {
         userRoot.children.filter {
             $0.childNode(withName: "located-user-heading") != nil
         }.count
+    }
+    var userHeadingIndicatorRotation: CGFloat? {
+        userRoot.childNode(withName: "located-user-marker")?
+            .childNode(withName: "located-user-heading")?
+            .zRotation
     }
 
     var accessibilitySummary: String {
@@ -1058,10 +1066,14 @@ final class UnifiedBigSightScene: SKScene {
             summary = String(localized: "\(summary), destination \(destinationSummary)")
         }
         #if DEBUG
-            return String(
+            var debugSummary = String(
                 localized:
                     "\(summary), camera offset \(mapCamera.position.x) \(mapCamera.position.y), bearing \(bearing) degrees"
             )
+            if let locatedUserHeading {
+                debugSummary += ", user heading \(Int(locatedUserHeading.rounded())) degrees"
+            }
+            return debugSummary
         #else
             return summary
         #endif
@@ -1141,6 +1153,8 @@ final class UnifiedBigSightScene: SKScene {
     ) {
         if self.campus.id != campus.id {
             self.campus = campus
+            lastDynamicFingerprint = nil
+            lastRenderedLocatedUser = nil
             buildStaticScene()
             hasFittedInitialCamera = false
             fitCameraIfNeeded(force: true)
@@ -1166,6 +1180,7 @@ final class UnifiedBigSightScene: SKScene {
         favoriteCount = bookmarks.count
         primarySharedPlanCircleCount = primarySharedPlanCircles.count
         locatedUserSummary = locatedUser?.spaceCode
+        locatedUserHeading = locatedUser?.headingDegrees
         destinationSummary = destination?.spaceCode
 
         if requestedScopeInternally {
@@ -1204,6 +1219,10 @@ final class UnifiedBigSightScene: SKScene {
                 locatedUser: locatedUser,
                 destination: destination
             )
+            lastRenderedLocatedUser = locatedUser
+        } else if locatedUser != lastRenderedLocatedUser {
+            rebuildUserOverlay(locatedUser)
+            lastRenderedLocatedUser = locatedUser
         }
         lastLocatedUserPlacedAt = locatedUser?.placedAt
         lastDestinationSelectedAt = destination?.selectedAt
@@ -1917,19 +1936,15 @@ final class UnifiedBigSightScene: SKScene {
         locatedUser: LocatedMapUser?,
         destination: MapDestination?
     ) {
+        dynamicOverlayRebuildCount += 1
         genreRoot.removeAllChildren()
         dynamicRoot.removeAllChildren()
         destinationRoot.removeAllChildren()
-        userRoot.removeAllChildren()
 
         if let destination {
             addDestinationMarker(destination)
         }
-        if let user = locatedUser,
-            let venue = campus.venues.first(where: { $0.id == user.sceneID.mapID })
-        {
-            addUser(user, venue: venue)
-        }
+        rebuildUserOverlay(locatedUser)
 
         let venuesByMapID = Dictionary(uniqueKeysWithValues: campus.venues.map { ($0.id, $0) })
         for match in searchMatches {
@@ -2254,6 +2269,14 @@ final class UnifiedBigSightScene: SKScene {
         hasher.combine(locatedUser?.placedAt)
         hasher.combine(destination?.selectedAt)
         return hasher.finalize()
+    }
+
+    private func rebuildUserOverlay(_ locatedUser: LocatedMapUser?) {
+        userRoot.removeAllChildren()
+        guard let locatedUser,
+            let venue = campus.venues.first(where: { $0.id == locatedUser.sceneID.mapID })
+        else { return }
+        addUser(locatedUser, venue: venue)
     }
 
     private func labelNode(

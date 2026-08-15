@@ -1,4 +1,3 @@
-import CoreLocation
 import SwiftUI
 import UIKit
 
@@ -26,7 +25,7 @@ private enum ComiketLocationPickerPurpose: Equatable {
     var venueMessage: LocalizedStringResource {
         switch self {
         case .currentLocation:
-            "Choose the venue you are standing in. Location is only used to suggest an answer."
+            "Choose your venue manually."
         case .destination:
             "Choose the venue containing the circle you want to visit."
         case .circleSearch:
@@ -127,22 +126,11 @@ private enum ComiketLocationPickerPurpose: Equatable {
 
 struct WhereAmIView: View {
     let mapModel: MapScreenModel
-    let locationService: WhereAmILocationService
-
-    @MainActor
-    init(
-        mapModel: MapScreenModel,
-        locationService: WhereAmILocationService = WhereAmILocationService()
-    ) {
-        self.mapModel = mapModel
-        self.locationService = locationService
-    }
 
     var body: some View {
         ComiketLocationPickerView(
             mapModel: mapModel,
-            purpose: .currentLocation,
-            locationService: locationService
+            purpose: .currentLocation
         )
     }
 }
@@ -153,8 +141,7 @@ struct DestinationPickerView: View {
     var body: some View {
         ComiketLocationPickerView(
             mapModel: mapModel,
-            purpose: .destination,
-            locationService: WhereAmILocationService()
+            purpose: .destination
         )
     }
 }
@@ -167,8 +154,7 @@ struct CircleSearchPickerView: View {
         ComiketLocationPickerView(
             mapModel: mapModel,
             purpose: .circleSearch,
-            days: days,
-            locationService: WhereAmILocationService()
+            days: days
         )
     }
 }
@@ -184,7 +170,6 @@ private struct ComiketLocationPickerView: View {
     let mapModel: MapScreenModel
     let purpose: ComiketLocationPickerPurpose
     let days: [UFDSchema.Day]
-    @State private var locationService: WhereAmILocationService
     @State private var path: [Step] = []
     @State private var selectedSearchDay: Int?
     @State private var venues: [WhereAmIVenueOption] = []
@@ -196,17 +181,14 @@ private struct ComiketLocationPickerView: View {
     @State private var selectionFeedback = 0
     @State private var completionFeedback = 0
 
-    @MainActor
     init(
         mapModel: MapScreenModel,
         purpose: ComiketLocationPickerPurpose,
-        days: [UFDSchema.Day] = [],
-        locationService: WhereAmILocationService = WhereAmILocationService()
+        days: [UFDSchema.Day] = []
     ) {
         self.mapModel = mapModel
         self.purpose = purpose
         self.days = days
-        _locationService = State(initialValue: locationService)
     }
 
     var body: some View {
@@ -223,7 +205,6 @@ private struct ComiketLocationPickerView: View {
                     VenueSelectionScreen(
                         venues: venues,
                         purpose: purpose,
-                        locationService: locationService,
                         isLoading: isLoadingVenues,
                         errorMessage: venueError,
                         onSelect: selectVenue
@@ -269,16 +250,8 @@ private struct ComiketLocationPickerView: View {
         .sensoryFeedback(.selection, trigger: selectionFeedback)
         .sensoryFeedback(.success, trigger: completionFeedback)
         .task {
-            if purpose == .currentLocation {
-                locationService.start()
-            }
             if !purpose.includesDayStep {
                 await loadVenues()
-            }
-        }
-        .onDisappear {
-            if purpose == .currentLocation {
-                locationService.stop()
             }
         }
         .accessibilityIdentifier("\(purpose.accessibilityPrefix)-flow")
@@ -340,8 +313,8 @@ private struct ComiketLocationPickerView: View {
                 at: table,
                 in: selectedVenue,
                 subspace: nil,
-                headingDegrees: locationService.headingDegrees,
-                locationReading: locationService.latestReading
+                headingDegrees: nil,
+                locationReading: nil
             )
             mapModel.locateUser(user)
         case .destination:
@@ -454,7 +427,6 @@ private struct DaySelectionScreen: View {
 private struct VenueSelectionScreen: View {
     let venues: [WhereAmIVenueOption]
     let purpose: ComiketLocationPickerPurpose
-    let locationService: WhereAmILocationService
     let isLoading: Bool
     let errorMessage: String?
     let onSelect: (WhereAmIVenueOption) -> Void
@@ -468,10 +440,6 @@ private struct VenueSelectionScreen: View {
                     title: purpose.venueTitle,
                     message: purpose.venueMessage
                 )
-
-                if purpose == .currentLocation {
-                    LocationStatusView(service: locationService)
-                }
 
                 if isLoading {
                     ProgressView("Loading venue maps…")
@@ -498,56 +466,22 @@ private struct VenueSelectionScreen: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    @ViewBuilder
     private var venueButtons: some View {
-        TimelineView(.periodic(from: .now, by: 5)) { context in
-            let state = locationService.locationState(at: context.date)
-            let suggested = purpose == .currentLocation ? suggestion(for: state) : nil
-
-            VStack(spacing: 12) {
-                ForEach(venues) { venue in
-                    LargeVenueButton(
-                        venue: venue,
-                        accessibilityPrefix: purpose.accessibilityPrefix,
-                        suggestion: suggested?.venue.id == venue.id ? suggested?.source : nil,
-                        action: { onSelect(venue) }
-                    )
-                }
+        VStack(spacing: 12) {
+            ForEach(venues) { venue in
+                LargeVenueButton(
+                    venue: venue,
+                    accessibilityPrefix: purpose.accessibilityPrefix,
+                    action: { onSelect(venue) }
+                )
             }
         }
     }
-
-    private func suggestion(
-        for state: WhereAmILocationService.LocationState
-    ) -> (venue: WhereAmIVenueOption, source: VenueSuggestionSource)? {
-        let reading: WhereAmILocationReading
-        let source: VenueSuggestionSource
-        switch state {
-        case .live(let value):
-            reading = value
-            source = .live
-        case .cached(let value):
-            reading = value
-            source = .cached
-        case .waiting, .unavailable:
-            return nil
-        }
-        guard let venue = WhereAmIResolver.nearestVenue(to: reading, venues: venues) else {
-            return nil
-        }
-        return (venue, source)
-    }
-}
-
-private enum VenueSuggestionSource {
-    case live
-    case cached
 }
 
 private struct LargeVenueButton: View {
     let venue: WhereAmIVenueOption
     let accessibilityPrefix: String
-    let suggestion: VenueSuggestionSource?
     let action: () -> Void
 
     @ScaledMetric(relativeTo: .title2) private var minimumHeight = 88.0
@@ -559,24 +493,10 @@ private struct LargeVenueButton: View {
                     .frame(width: 40, height: 40)
                     .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(venue.displayName)
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if let suggestion {
-                        LucideLabel(
-                            resource:
-                                suggestion == .live
-                                ? LocalizedStringResource("Suggested by live location")
-                                : LocalizedStringResource("Suggested by last location"),
-                            icon: suggestion == .live ? "location.fill" : "location"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(suggestion == .live ? Color.blue : Color.secondary)
-                    }
-                }
+                Text(venue.displayName)
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 LucideIcon("chevron.forward")
                     .font(.headline.weight(.semibold))
@@ -596,90 +516,8 @@ private struct LargeVenueButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(venue.displayName)
-        .accessibilityHint(
-            suggestion == nil
-                ? "Select this venue"
-                : "Location suggests this venue. Double tap to select it."
-        )
+        .accessibilityHint("Select this venue")
         .accessibilityIdentifier("\(accessibilityPrefix)-venue-\(venue.id)")
-    }
-}
-
-private struct LocationStatusView: View {
-    let service: WhereAmILocationService
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 5)) { context in
-            let state = service.locationState(at: context.date)
-            HStack(spacing: 14) {
-                statusIcon(state)
-                    .font(.title2)
-                    .frame(width: 34)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(statusTitle(state))
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text(statusMessage(state))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(uiColor: .secondarySystemBackground))
-            .clipShape(.rect(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(uiColor: .separator).opacity(0.32), lineWidth: 0.5)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("where-am-i-location-status")
-        }
-    }
-
-    @ViewBuilder
-    private func statusIcon(_ state: WhereAmILocationService.LocationState) -> some View {
-        switch state {
-        case .live:
-            LucideIcon("location.fill")
-                .foregroundStyle(.blue)
-        case .cached:
-            LucideIcon("location")
-                .foregroundStyle(.secondary)
-        case .waiting:
-            ProgressView()
-        case .unavailable:
-            LucideIcon("location.slash")
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func statusTitle(_ state: WhereAmILocationService.LocationState)
-        -> LocalizedStringResource
-    {
-        switch state {
-        case .live: "Using live location"
-        case .cached: "Using last received location"
-        case .waiting: "Finding your location"
-        case .unavailable: "Location unavailable"
-        }
-    }
-
-    private func statusMessage(_ state: WhereAmILocationService.LocationState) -> String {
-        switch state {
-        case .live(let reading), .cached(let reading):
-            return String(
-                localized:
-                    "Accuracy about \(Int(reading.horizontalAccuracy.rounded())) meters. You always confirm the venue."
-            )
-        case .waiting:
-            return String(localized: "You can choose a venue while this updates.")
-        case .unavailable:
-            return service.errorMessage ?? String(localized: "Choose your venue manually.")
-        }
     }
 }
 
@@ -1293,16 +1131,6 @@ private struct WhereAmIHeader: View {
 
 #if DEBUG
     #Preview {
-        WhereAmIView(
-            mapModel: .previewCampusFixture(),
-            locationService: WhereAmILocationService(
-                simulatedReading: WhereAmILocationReading(
-                    coordinate: BigSightCampusLayout.eastBuilding,
-                    horizontalAccuracy: 12,
-                    timestamp: .now
-                ),
-                simulatedHeading: 72
-            )
-        )
+        WhereAmIView(mapModel: .previewCampusFixture())
     }
 #endif
