@@ -20,6 +20,53 @@ final class ExploreModelTests: XCTestCase {
         ])
     }
 
+    func testDaySelectionReusesSearchDocumentsAndActiveScores() async {
+        let model = ExploreModel(circles: fixtures, selectedDay: 1)
+        await model.load()
+        XCTAssertEqual(model.searchDocumentBuildCount, 1)
+
+        model.searchQuery = "Action"
+        await model.waitForSearch()
+        XCTAssertEqual(model.visibleCircles.map(\.id), [1])
+        let searchRevision = model.searchRevision
+
+        model.select(day: 2)
+
+        XCTAssertEqual(model.visibleCircles.map(\.id), [4])
+        XCTAssertEqual(model.searchDocumentBuildCount, 1)
+        XCTAssertEqual(model.searchRevision, searchRevision)
+    }
+
+    func testDaySelectionAtC108ScaleStaysWithinInteractiveBudget() async {
+        let circles = (0..<22_854).map { index in
+            makeExploreCircle(
+                id: index + 1,
+                day: (index % 2) + 1,
+                genreID: index.isMultiple(of: 3) ? 10 : 20,
+                name: "Circle \(index)",
+                penName: "Artist \(index % 500)",
+                description: "C108 catalog description with searchable Japanese text お品書き",
+                tags: ["Tag \(index % 24)"]
+            )
+        }
+        let model = ExploreModel(circles: circles, selectedDay: 1)
+        await model.load()
+        await model.waitForDiscoveryIndex()
+
+        let clock = ContinuousClock()
+        let start = clock.now
+        model.select(day: 2)
+        let elapsed = start.duration(to: clock.now)
+
+        XCTAssertEqual(model.selectedDayCircleCount, 11_427)
+        XCTAssertEqual(model.visibleCircles.count, 11_427)
+        XCTAssertLessThan(
+            elapsed,
+            .milliseconds(250),
+            "Selecting another day took \(elapsed)"
+        )
+    }
+
     func testGenreAndTagFiltersIntersect() async {
         let model = ExploreModel(circles: fixtures, selectedDay: 1)
         await model.load()

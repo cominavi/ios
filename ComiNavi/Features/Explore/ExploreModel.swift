@@ -396,9 +396,10 @@ final class ExploreModel {
     @ObservationIgnored private var discoveryRevision = 0
     @ObservationIgnored private var discoveryTask: Task<Void, Never>?
     @ObservationIgnored private var searchDocuments: [ExploreSearchDocument] = []
+    @ObservationIgnored private(set) var searchDocumentBuildCount = 0
     @ObservationIgnored private var searchScoresByCircleID: [Int: Int] = [:]
     @ObservationIgnored private var hasActiveSearch = false
-    @ObservationIgnored private var searchRevision = 0
+    @ObservationIgnored private(set) var searchRevision = 0
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var loadRevision = 0
     @ObservationIgnored private let artworkLoader: CircleDetailArtworkLoader?
@@ -504,6 +505,7 @@ final class ExploreModel {
                 )
                 return circle
             })
+            rebuildSearchDocuments()
             if let userPlanStore, let eventNumber {
                 applyBookmarks(
                     (try? await userPlanStore.allBookmarks(eventNumber: eventNumber)) ?? []
@@ -511,6 +513,7 @@ final class ExploreModel {
             }
             tagState = .ready
             recomputeFacetsAndCircles()
+            scheduleSearch()
             hasLoaded = true
             return
         }
@@ -567,8 +570,10 @@ final class ExploreModel {
                 enrichment: enrichment
             )
         })
+        rebuildSearchDocuments()
         applyBookmarks(bookmarks ?? [])
         recomputeFacetsAndCircles()
+        scheduleSearch()
         hasLoaded = true
         isLoading = false
         tagState = .ready
@@ -945,13 +950,6 @@ final class ExploreModel {
     }
 
     private func recomputeFacetsAndCircles() {
-        searchDocuments = allCircles.map { circle in
-            ExploreSearchDocument(
-                circleID: circle.id,
-                primaryText: JapaneseSearchNormalizer.normalize(circle.searchableText),
-                ocrText: JapaneseSearchNormalizer.normalize(circle.ocrSearchableText)
-            )
-        }
         let circlesForDay = allCircles.filter { $0.day == selectedDay }
         selectedDayCircleCount = circlesForDay.count
         shinagakiCircleCount = circlesForDay.count { $0.hasShinagaki }
@@ -990,8 +988,19 @@ final class ExploreModel {
         {
             self.selectedTag = nil
         }
-        scheduleSearch()
+        recomputeVisibleCircles()
         scheduleDiscoveryRebuild(for: circlesForDay)
+    }
+
+    private func rebuildSearchDocuments() {
+        searchDocuments = allCircles.map { circle in
+            ExploreSearchDocument(
+                circleID: circle.id,
+                primaryText: JapaneseSearchNormalizer.normalize(circle.searchableText),
+                ocrText: JapaneseSearchNormalizer.normalize(circle.ocrSearchableText)
+            )
+        }
+        searchDocumentBuildCount += 1
     }
 
     private func recomputeVisibleCircles() {
