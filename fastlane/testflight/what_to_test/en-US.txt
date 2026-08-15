@@ -1,1 +1,1 @@
-Shared plans can now be exported as ZIP archives, and the plan editor shows the total amount.
+The map compass now rotates with the venue grid, and shared-plan locations show their hall names.
