@@ -29745,6 +29745,35 @@
         }
       }
     },
+    "Total amount" : {
+      "comment" : "Total estimated cost of all purchase requests in the shared plan.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合計金額"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "총액"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "总金额"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "總金額"
+          }
+        }
+      }
+    },
     "Toolbox" : {
       "localizations" : {
         "ja" : {

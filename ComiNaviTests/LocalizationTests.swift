@@ -181,6 +181,14 @@ final class LocalizationTests: XCTestCase {
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
+                forKey: "Total amount",
+                value: nil,
+                table: nil
+            ),
+            "合計金額"
+        )
+        XCTAssertEqual(
+            japaneseBundle.localizedString(
                 forKey: "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts.",
                 value: nil,
                 table: nil
@@ -234,6 +242,7 @@ final class LocalizationTests: XCTestCase {
                 "Join": "加入",
                 "Plan information": "计划信息",
                 "Add member": "添加成员",
+                "Total amount": "总金额",
                 "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts.": "此 X 账号关注了超过 5,000 人，无法导入。ComiNavi 最多可导入 5,000 个账号",
             ],
             "zh-Hant": [
@@ -254,6 +263,7 @@ final class LocalizationTests: XCTestCase {
                 "Join": "加入",
                 "Plan information": "計畫資訊",
                 "Add member": "新增成員",
+                "Total amount": "總金額",
                 "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts.": "此 X 帳號關注了超過 5,000 人，無法匯入。ComiNavi 最多可匯入 5,000 個帳號",
             ],
             "ko": [
@@ -274,6 +284,7 @@ final class LocalizationTests: XCTestCase {
                 "Join": "참여",
                 "Plan information": "플랜 정보",
                 "Add member": "멤버 추가",
+                "Total amount": "총액",
                 "This X account follows more than 5,000 people. ComiNavi can import up to 5,000 accounts.": "이 X 계정은 5,000명 넘게 팔로우하고 있어 가져올 수 없습니다. ComiNavi에서는 최대 5,000개의 계정만 가져올 수 있습니다.",
             ],
         ]

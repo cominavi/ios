@@ -1066,11 +1066,13 @@ final class SharedPlanEditorPresentationTests: XCTestCase {
         XCTAssertEqual(progress.assignedFraction, 0.875)
         XCTAssertEqual(progress.fulfilledFraction, 0.625)
         XCTAssertEqual(progress.fulfilledPercentage, 63)
+        XCTAssertNil(progress.totalAmount)
 
         let emptyProgress = SharedPlanProgressSummary(circles: [], conflictCount: 0)
         XCTAssertEqual(emptyProgress.assignedFraction, 0)
         XCTAssertEqual(emptyProgress.fulfilledFraction, 0)
         XCTAssertEqual(emptyProgress.fulfilledPercentage, 0)
+        XCTAssertEqual(emptyProgress.totalAmount, 0)
 
         let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = makeWritableModel()
@@ -1099,6 +1101,67 @@ final class SharedPlanEditorPresentationTests: XCTestCase {
                 Self.circle
             ),
         ])
+    }
+
+    func testProgressTotalAmountUsesRequestedQuantitiesAndActiveCircles() {
+        let pricedCircle = SharedPlanCircleContent(
+            key: Self.circle,
+            presence: .present,
+            memo: "",
+            needs: [
+                SharedPlanPurchaseNeed(
+                    id: Self.needID,
+                    requesterUserID: Self.userID,
+                    unitPrice: 2_500,
+                    wantedQuantity: 2
+                ),
+                SharedPlanPurchaseNeed(
+                    id: UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!,
+                    requesterUserID: Self.buyerID,
+                    unitPrice: 300,
+                    wantedQuantity: 3
+                ),
+            ],
+            communicationState: [:]
+        )
+        let removedCircle = SharedPlanCircleContent(
+            key: SharedPlanCircleKey(comiketNo: 108, wcID: 102)!,
+            presence: .removed,
+            memo: "",
+            needs: [
+                SharedPlanPurchaseNeed(
+                    id: UUID(uuidString: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")!,
+                    requesterUserID: Self.userID,
+                    unitPrice: 9_999_999,
+                    wantedQuantity: 99
+                ),
+            ],
+            communicationState: [:]
+        )
+
+        XCTAssertEqual(
+            SharedPlanProgressSummary(
+                circles: [pricedCircle, removedCircle],
+                conflictCount: 0
+            ).totalAmount,
+            5_900
+        )
+
+        var incompleteNeed = pricedCircle.needs[1]
+        incompleteNeed.unitPrice = nil
+        let incompleteCircle = SharedPlanCircleContent(
+            key: pricedCircle.key,
+            presence: pricedCircle.presence,
+            memo: pricedCircle.memo,
+            needs: [pricedCircle.needs[0], incompleteNeed],
+            communicationState: pricedCircle.communicationState
+        )
+        XCTAssertNil(
+            SharedPlanProgressSummary(
+                circles: [incompleteCircle],
+                conflictCount: 0
+            ).totalAmount
+        )
     }
 }
 

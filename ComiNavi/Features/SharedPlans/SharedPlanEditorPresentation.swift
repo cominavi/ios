@@ -145,29 +145,36 @@ struct SharedPlanProgressSummary: Equatable, Sendable {
     let overAssigned: Int
     let conflicted: Int
     let terminalOutcomeCircles: Int
+    let totalAmount: Int?
 
     init(circles: [SharedPlanCircleContent], conflictCount: Int) {
         let active = circles.filter { $0.presence != .removed }
-        wanted = active.flatMap(\.needs).reduce(0) { $0 + $1.wantedQuantity }
-        assigned = active.flatMap(\.needs).reduce(0) {
+        let needs = active.flatMap(\.needs)
+        wanted = needs.reduce(0) { $0 + $1.wantedQuantity }
+        assigned = needs.reduce(0) {
             $0 + $1.buyerAllocations.values.reduce(0, +)
         }
-        covered = active.flatMap(\.needs).reduce(0) {
+        covered = needs.reduce(0) {
             $0 + min($1.wantedQuantity, $1.buyerAllocations.values.reduce(0, +))
         }
-        fulfilled = active.flatMap(\.needs).reduce(0) {
+        fulfilled = needs.reduce(0) {
             $0 + min($1.wantedQuantity, $1.fulfilledQuantity)
         }
-        outstanding = active.flatMap(\.needs).reduce(0) {
+        outstanding = needs.reduce(0) {
             $0 + max(0, $1.wantedQuantity - $1.fulfilledQuantity)
         }
-        overAssigned = active.flatMap(\.needs).reduce(0) {
+        overAssigned = needs.reduce(0) {
             $0 + max(0, $1.buyerAllocations.values.reduce(0, +) - $1.wantedQuantity)
         }
         conflicted = conflictCount
         terminalOutcomeCircles = active.filter {
             SharedPlanMemberOutcome.value(in: $0) != nil
         }.count
+        totalAmount = needs.allSatisfy { $0.unitPrice != nil }
+            ? needs.reduce(0) { total, need in
+                total + (need.unitPrice ?? 0) * need.wantedQuantity
+            }
+            : nil
     }
 
     var assignedFraction: Double {

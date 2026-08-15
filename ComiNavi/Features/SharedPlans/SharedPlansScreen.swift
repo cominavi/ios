@@ -832,8 +832,12 @@ struct SharedPlanListUITestSurface: View {
 
     private func planDetail(_ plan: SharedPlan) -> some View {
         List {
-            Section("Plan progress") {
+            Section {
                 SharedPlanProgressOverview(progress: progress)
+            } header: {
+                Text("Plan progress")
+            } footer: {
+                SharedPlanTotalAmountFooter(totalAmount: progress.totalAmount)
             }
             Section("Circles and purchases") {
                 SharedPlanEmptyCirclesView(canEdit: true)

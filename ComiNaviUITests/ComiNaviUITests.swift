@@ -53,7 +53,6 @@ final class ComiNaviUITests: XCTestCase {
             app.descendants(matching: .any)["shared-plan-empty-circles"].exists,
             "An empty plan should show the designed empty-state card"
         )
-
         for _ in 0 ..< 3 {
             let switcher = app.buttons["shared-plan-switcher-button"]
             XCTAssertTrue(switcher.waitForExistence(timeout: 5))
@@ -100,6 +99,33 @@ final class ComiNaviUITests: XCTestCase {
             firstPlan.tap()
             XCTAssertTrue(app.navigationBars["買い物リスト"].waitForExistence(timeout: 5))
         }
+    }
+
+    @MainActor
+    func testSharedPlanOverviewShowsTotalRequestedAmount() {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-ui-testing-hide-debugger",
+            "-cominavi-ui-testing-shared-plan-list",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+        ]
+        app.launch()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["shared-plan-test-detail"]
+                .waitForExistence(timeout: 5)
+        )
+        let totalAmount = app.descendants(matching: .any)[
+            "shared-plan-editor-total-amount"
+        ]
+        XCTAssertTrue(totalAmount.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            totalAmount.label.contains("14,000")
+                || (totalAmount.value as? String)?.contains("14,000") == true,
+            "The plan footer must total unit prices across requested quantities"
+        )
+        takeScreenshot(named: "Shared-Plan-Total-Amount")
     }
 
     @MainActor

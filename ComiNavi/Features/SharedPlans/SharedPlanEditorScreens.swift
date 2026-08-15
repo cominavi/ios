@@ -2,6 +2,7 @@ import SwiftUI
 
 enum SharedPlanEditorAccessibilityID {
     static let screen = "shared-plan-editor"
+    static let totalAmount = "shared-plan-editor-total-amount"
     static let readOnly = "shared-plan-editor-read-only"
     static let recovery = "shared-plan-editor-recovery"
     static let recoveryRebase = "shared-plan-editor-recovery-rebase"
@@ -781,7 +782,7 @@ struct SharedPlanEditorScreen: View {
 
     private var progressSection: some View {
         let progress = model.progress
-        return Section("Plan progress") {
+        return Section {
             SharedPlanProgressOverview(progress: progress)
 
             if progress.overAssigned > 0 {
@@ -801,6 +802,12 @@ struct SharedPlanEditorScreen: View {
             if progress.terminalOutcomeCircles > 0 {
                 Text("\(progress.terminalOutcomeCircles) circles have a recorded result")
                 .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Plan progress")
+        } footer: {
+            if progress.wanted > 0 {
+                SharedPlanTotalAmountFooter(totalAmount: progress.totalAmount)
             }
         }
     }
@@ -945,6 +952,33 @@ struct SharedPlanProgressOverview: View {
                 "Requested \(progress.wanted), assigned \(progress.assigned), bought \(progress.fulfilled), \(progress.outstanding) remaining"
             )
         }
+    }
+}
+
+struct SharedPlanTotalAmountFooter: View {
+    let totalAmount: Int?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text("Total amount")
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            if let totalAmount {
+                Text(
+                    totalAmount,
+                    format: .currency(code: "JPY").precision(.fractionLength(0))
+                )
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+            } else {
+                Text("Unavailable")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .font(.subheadline.weight(.semibold))
+        .textCase(nil)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(SharedPlanEditorAccessibilityID.totalAmount)
     }
 }
 
