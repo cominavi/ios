@@ -24,6 +24,11 @@ final class CatalogEnrichmentTests: XCTestCase {
                     "kind": "photo",
                     "url": "https://pbs.twimg.com/media/menu.jpg",
                     "preview_url": "https://pbs.twimg.com/media/menu-small.jpg"
+                  },
+                  {
+                    "kind": "photo",
+                    "url": "https://pbs.twimg.com/media/map.jpg",
+                    "preview_url": "https://pbs.twimg.com/media/map-small.jpg"
                   }
                 ],
                 "post_confidence": "high",
@@ -119,7 +124,13 @@ final class CatalogEnrichmentTests: XCTestCase {
         XCTAssertEqual(strongest.id, "100")
         XCTAssertEqual(strongest.authorHandle, "test_circle")
         XCTAssertEqual(strongest.ocrSearchText, "画像だけにある頒布物名")
-        XCTAssertEqual(strongest.media.first?.displayURL.absoluteString, "https://pbs.twimg.com/media/menu-small.jpg")
+        XCTAssertEqual(
+            strongest.media.map { $0.displayURL.absoluteString },
+            [
+                "https://pbs.twimg.com/media/menu-small.jpg",
+                "https://pbs.twimg.com/media/map-small.jpg",
+            ]
+        )
         XCTAssertTrue(strongest.isHighConfidence)
         XCTAssertEqual(strongest.matchingPolicyID, "c108-shinagaki-placement-v2")
         XCTAssertEqual(strongest.postReasons, ["shinagaki_keyword", "media"])

@@ -397,8 +397,19 @@ struct EntryView: View {
                 "-cominavi-ui-testing-shinagaki-lightbox"
             ) {
                 ShinagakiLightbox(
-                    image: Self.shinagakiTestImage,
-                    accessibilityLabel: "Test Shinagaki"
+                    pages: [
+                        ShinagakiLightboxPage(
+                            id: "test-page-1",
+                            image: Self.shinagakiTestImage,
+                            accessibilityLabel: "Test Shinagaki page 1"
+                        ),
+                        ShinagakiLightboxPage(
+                            id: "test-page-2",
+                            image: Self.shinagakiWideTestImage,
+                            accessibilityLabel: "Test Shinagaki page 2"
+                        ),
+                    ],
+                    selectedPageID: "test-page-1"
                 )
             } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-no-catalog-shell"
@@ -499,6 +510,26 @@ struct EntryView: View {
             ]
             NSString(string: "SHINAGAKI")
                 .draw(at: CGPoint(x: 150, y: 500), withAttributes: attributes)
+        }
+
+        private static let shinagakiWideTestImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 1_188, height: 600)
+        ).image { context in
+            UIColor.systemBackground.setFill()
+            context.cgContext.fill(CGRect(x: 0, y: 0, width: 1_188, height: 600))
+
+            UIColor.systemRed.setStroke()
+            context.cgContext.setLineWidth(12)
+            context.cgContext.stroke(
+                CGRect(x: 80, y: 80, width: 1_028, height: 440)
+            )
+
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 72, weight: .bold),
+                .foregroundColor: UIColor.label,
+            ]
+            NSString(string: "PAGE 2")
+                .draw(at: CGPoint(x: 450, y: 250), withAttributes: attributes)
         }
     #endif
 

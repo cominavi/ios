@@ -3,6 +3,84 @@ import UIKit
 @testable import ComiNavi
 
 final class ShinagakiArtworkLayoutTests: XCTestCase {
+    func testLightboxPagesPreserveMediaOrderAndUseStableUniqueIDs() throws {
+        let firstOriginal = try XCTUnwrap(
+            URL(string: "https://example.com/poster-original.jpg")
+        )
+        let firstPreview = try XCTUnwrap(
+            URL(string: "https://example.com/poster-preview.jpg")
+        )
+        let secondOriginal = try XCTUnwrap(
+            URL(string: "https://example.com/menu-original.jpg")
+        )
+        let media = [
+            CatalogShinagakiMedia(
+                kind: .photo,
+                url: firstOriginal,
+                previewURL: firstPreview
+            ),
+            CatalogShinagakiMedia(
+                kind: .photo,
+                url: secondOriginal,
+                previewURL: nil
+            ),
+        ]
+
+        let pages = ShinagakiLightboxPage.pages(
+            postID: "tweet-123",
+            media: media,
+            accessibilityLabel: "Shinagaki"
+        )
+
+        XCTAssertEqual(
+            pages.map(\.id),
+            ["tweet-123-media-0", "tweet-123-media-1"]
+        )
+        XCTAssertEqual(
+            pages.compactMap(\.originalURL),
+            [firstOriginal, secondOriginal]
+        )
+        XCTAssertEqual(
+            pages.compactMap(\.displayURL),
+            [firstPreview, secondOriginal]
+        )
+        XCTAssertNotEqual(
+            pages[0].accessibilityLabel,
+            pages[1].accessibilityLabel
+        )
+    }
+
+    func testLightboxPresentationStartsOnTappedPage() throws {
+        let firstImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 20, height: 20)
+        ).image { _ in }
+        let secondImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 40, height: 20)
+        ).image { _ in }
+        let pages = [
+            ShinagakiLightboxPage(
+                id: "first",
+                image: firstImage,
+                accessibilityLabel: "First"
+            ),
+            ShinagakiLightboxPage(
+                id: "second",
+                image: secondImage,
+                accessibilityLabel: "Second"
+            ),
+        ]
+
+        let presentation = try XCTUnwrap(
+            ShinagakiLightboxPresentation(
+                pages: pages,
+                selectedPageID: "second"
+            )
+        )
+
+        XCTAssertEqual(presentation.pages.map(\.id), ["first", "second"])
+        XCTAssertEqual(presentation.selectedPageID, "second")
+    }
+
     func testDefaultPreviewAspectRatioMatchesPortraitA4() {
         XCTAssertEqual(
             ShinagakiArtworkLayout.a4PortraitAspectRatio,
@@ -177,6 +255,7 @@ final class ShinagakiArtworkLayoutTests: XCTestCase {
         let fittedScale = 390.0 / 210.0
         XCTAssertEqual(scrollView.minimumZoomScale, fittedScale, accuracy: 0.000_001)
         XCTAssertEqual(scrollView.zoomScale, fittedScale, accuracy: 0.000_001)
+        XCTAssertFalse(scrollView.panGestureRecognizer.isEnabled)
         let zoomImageView = try XCTUnwrap(scrollView.subviews.first(where: {
             $0.accessibilityIdentifier == "shinagaki-zoom-image"
         }))
@@ -206,6 +285,7 @@ final class ShinagakiArtworkLayoutTests: XCTestCase {
             accuracy: 0.000_001
         )
         XCTAssertGreaterThan(scrollView.contentOffset.x, 0)
+        XCTAssertTrue(scrollView.panGestureRecognizer.isEnabled)
         XCTAssertNotEqual(
             zoomImageView.accessibilityValue,
             fittedAccessibilityValue
@@ -222,6 +302,7 @@ final class ShinagakiArtworkLayoutTests: XCTestCase {
             animated: false
         )
         XCTAssertEqual(scrollView.zoomScale, fittedScale, accuracy: 0.000_001)
+        XCTAssertFalse(scrollView.panGestureRecognizer.isEnabled)
         XCTAssertEqual(
             zoomImageView.accessibilityValue,
             fittedAccessibilityValue

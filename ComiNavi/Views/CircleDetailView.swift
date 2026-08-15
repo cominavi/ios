@@ -1440,6 +1440,7 @@ private struct ShinagakiPostCard: View {
 
             if !displayableMedia.isEmpty {
                 ShinagakiMediaGallery(
+                    postID: post.id,
                     media: displayableMedia,
                     accessibilityLabel: String(
                         localized: "Shinagaki image by \(post.authorHandle)"
@@ -1703,18 +1704,17 @@ private extension CatalogConfidence {
 }
 
 private struct ShinagakiRemoteImage: View {
-    let media: CatalogShinagakiMedia
-    let accessibilityLabel: String
+    let page: ShinagakiLightboxPage
+    let onOpen: (ShinagakiLightboxPage, UIImage) -> Void
 
     @State private var image: UIImage?
     @State private var didFail = false
-    @State private var isShowingLightbox = false
 
     var body: some View {
         Group {
             if let image {
                 Button {
-                    isShowingLightbox = true
+                    onOpen(page, image)
                 } label: {
                     ZStack(alignment: .bottomTrailing) {
                         FittedArtworkImage(image: Image(uiImage: image))
@@ -1730,9 +1730,9 @@ private struct ShinagakiRemoteImage: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(accessibilityLabel)
+                .accessibilityLabel(page.accessibilityLabel)
                 .accessibilityHint("Opens the image viewer")
-                .accessibilityIdentifier("shinagaki-image-preview")
+                .accessibilityIdentifier("shinagaki-image-preview-\(page.id)")
             } else if didFail {
                 LucideContentUnavailableView(
                     "Image unavailable",
@@ -1756,19 +1756,8 @@ private struct ShinagakiRemoteImage: View {
             ShinagakiArtworkLayout.previewAspectRatio(for: image?.size ?? .zero),
             contentMode: .fit
         )
-        .task(id: media.displayURL) {
+        .task(id: page.displayURL) {
             await loadImage()
-        }
-        .sheet(isPresented: $isShowingLightbox) {
-            if let image {
-                ShinagakiLightbox(
-                    image: image,
-                    accessibilityLabel: accessibilityLabel
-                )
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.black)
-            }
         }
     }
 
@@ -1776,8 +1765,12 @@ private struct ShinagakiRemoteImage: View {
         image = nil
         didFail = false
 
+        guard let displayURL = page.displayURL else {
+            didFail = true
+            return
+        }
         guard let decodedImage = await RemoteImagePipeline.image(
-            for: media.displayURL,
+            for: displayURL,
             category: .shinagaki
         ),
               !Task.isCancelled
@@ -1792,19 +1785,57 @@ private struct ShinagakiRemoteImage: View {
 }
 
 private struct ShinagakiMediaGallery: View {
+    let postID: String
     let media: [CatalogShinagakiMedia]
     let accessibilityLabel: String
 
+    @State private var presentation: ShinagakiLightboxPresentation?
+
     var body: some View {
-        VStack(spacing: 12) {
-            ForEach(media, id: \.self) { item in
-                ShinagakiRemoteImage(
-                    media: item,
-                    accessibilityLabel: accessibilityLabel
-                )
-                .frame(maxWidth: .infinity)
+        ScrollView(.horizontal) {
+            LazyHStack(alignment: .top, spacing: 12) {
+                ForEach(pages) { page in
+                    ShinagakiRemoteImage(
+                        page: page,
+                        onOpen: open
+                    )
+                    .containerRelativeFrame(.horizontal)
+                }
             }
+            .scrollTargetLayout()
         }
+        .scrollTargetBehavior(.viewAligned)
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .scrollIndicators(.hidden)
+        .sheet(item: $presentation) { presentation in
+            ShinagakiLightbox(presentation: presentation)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.black)
+        }
+    }
+
+    private var pages: [ShinagakiLightboxPage] {
+        ShinagakiLightboxPage.pages(
+            postID: postID,
+            media: media,
+            accessibilityLabel: accessibilityLabel
+        )
+    }
+
+    private func open(
+        page: ShinagakiLightboxPage,
+        image: UIImage
+    ) {
+        let lightboxPages = pages.map { candidate in
+            candidate.id == page.id
+                ? candidate.withInitialImage(image)
+                : candidate
+        }
+        presentation = ShinagakiLightboxPresentation(
+            pages: lightboxPages,
+            selectedPageID: page.id
+        )
     }
 }
 

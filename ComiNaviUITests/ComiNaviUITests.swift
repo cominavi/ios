@@ -398,7 +398,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-ui-testing-shinagaki-lightbox")
         app.launch()
 
-        let zoomImage = app.descendants(matching: .any)["shinagaki-zoom-image"]
+        let zoomImage = app.images["Test Shinagaki page 1"]
         XCTAssertTrue(zoomImage.waitForExistence(timeout: 5))
         let fittedZoomValue = try XCTUnwrap(zoomImage.value as? String)
 
@@ -416,6 +416,35 @@ final class ComiNaviUITests: XCTestCase {
         expectation(
             for: NSPredicate(format: "value == %@", fittedZoomValue),
             evaluatedWith: zoomImage
+        )
+        waitForExpectations(timeout: 3)
+    }
+
+    @MainActor
+    func testShinagakiLightboxBrowsesPagesInSourceOrder() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-ui-testing-shinagaki-lightbox")
+        app.launch()
+
+        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let firstPage = app.images["Test Shinagaki page 1"]
+        let secondPage = app.images["Test Shinagaki page 2"]
+        XCTAssertTrue(lightbox.waitForExistence(timeout: 5))
+        XCTAssertTrue(firstPage.waitForExistence(timeout: 5))
+        XCTAssertTrue(firstPage.isHittable)
+
+        lightbox.swipeLeft()
+
+        expectation(
+            for: NSPredicate(format: "hittable == true"),
+            evaluatedWith: secondPage
+        )
+        waitForExpectations(timeout: 3)
+
+        lightbox.swipeRight()
+        expectation(
+            for: NSPredicate(format: "hittable == true"),
+            evaluatedWith: firstPage
         )
         waitForExpectations(timeout: 3)
     }

@@ -48,11 +48,142 @@ enum ShinagakiArtworkLayout {
 
 }
 
-struct ShinagakiLightbox: View {
-    let image: UIImage
+struct ShinagakiLightboxPage: Identifiable {
+    let id: String
     let accessibilityLabel: String
+    let image: UIImage?
+    let originalURL: URL?
+    let previewURL: URL?
+
+    var displayURL: URL? {
+        previewURL ?? originalURL
+    }
+
+    init(
+        id: String,
+        image: UIImage,
+        accessibilityLabel: String
+    ) {
+        self.init(
+            id: id,
+            accessibilityLabel: accessibilityLabel,
+            image: image,
+            originalURL: nil,
+            previewURL: nil
+        )
+    }
+
+    init(
+        id: String,
+        media: CatalogShinagakiMedia,
+        accessibilityLabel: String,
+        image: UIImage? = nil
+    ) {
+        self.init(
+            id: id,
+            accessibilityLabel: accessibilityLabel,
+            image: image,
+            originalURL: media.url,
+            previewURL: media.previewURL
+        )
+    }
+
+    private init(
+        id: String,
+        accessibilityLabel: String,
+        image: UIImage?,
+        originalURL: URL?,
+        previewURL: URL?
+    ) {
+        self.id = id
+        self.accessibilityLabel = accessibilityLabel
+        self.image = image
+        self.originalURL = originalURL
+        self.previewURL = previewURL
+    }
+
+    func withInitialImage(_ image: UIImage) -> Self {
+        return Self(
+            id: id,
+            accessibilityLabel: accessibilityLabel,
+            image: image,
+            originalURL: originalURL,
+            previewURL: previewURL
+        )
+    }
+
+    static func pages(
+        postID: String,
+        media: [CatalogShinagakiMedia],
+        accessibilityLabel: String
+    ) -> [Self] {
+        media.enumerated().map { index, item in
+            let pageAccessibilityLabel = String(
+                localized: "Image \(index + 1) of \(media.count): \(accessibilityLabel)",
+                comment: "Accessibility label for one image in a multi-image Shinagaki post."
+            )
+            return Self(
+                id: "\(postID)-media-\(index)",
+                media: item,
+                accessibilityLabel: pageAccessibilityLabel
+            )
+        }
+    }
+}
+
+struct ShinagakiLightboxPresentation: Identifiable {
+    let id = UUID()
+    let pages: [ShinagakiLightboxPage]
+    let selectedPageID: ShinagakiLightboxPage.ID
+
+    init?(
+        pages: [ShinagakiLightboxPage],
+        selectedPageID: ShinagakiLightboxPage.ID
+    ) {
+        guard !pages.isEmpty,
+              pages.contains(where: { $0.id == selectedPageID })
+        else { return nil }
+        self.pages = pages
+        self.selectedPageID = selectedPageID
+    }
+}
+
+struct ShinagakiLightbox: View {
+    let pages: [ShinagakiLightboxPage]
 
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedPageID: ShinagakiLightboxPage.ID
+
+    init(
+        image: UIImage,
+        accessibilityLabel: String
+    ) {
+        let page = ShinagakiLightboxPage(
+            id: "single-image",
+            image: image,
+            accessibilityLabel: accessibilityLabel
+        )
+        pages = [page]
+        _selectedPageID = State(initialValue: page.id)
+    }
+
+    init(presentation: ShinagakiLightboxPresentation) {
+        pages = presentation.pages
+        _selectedPageID = State(initialValue: presentation.selectedPageID)
+    }
+
+    init(
+        pages: [ShinagakiLightboxPage],
+        selectedPageID: ShinagakiLightboxPage.ID
+    ) {
+        precondition(!pages.isEmpty)
+        self.pages = pages
+        _selectedPageID = State(
+            initialValue: pages.contains(where: { $0.id == selectedPageID })
+                ? selectedPageID
+                : pages[0].id
+        )
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -60,10 +191,17 @@ struct ShinagakiLightbox: View {
                 Color.black
                     .ignoresSafeArea()
 
-                ZoomableShinagakiImage(
-                    image: image,
-                    accessibilityLabel: accessibilityLabel
-                )
+                TabView(selection: $selectedPageID) {
+                    ForEach(pages) { page in
+                        ShinagakiLightboxPageView(page: page)
+                            .tag(page.id)
+                            .accessibilityIdentifier(
+                                "shinagaki-lightbox-page-\(page.id)"
+                            )
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .accessibilityIdentifier("shinagaki-lightbox")
                 .ignoresSafeArea()
 
                 Button {
@@ -81,6 +219,34 @@ struct ShinagakiLightbox: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 .padding(.top, proxy.safeAreaInsets.top + 8)
                 .padding(.trailing, 16)
+
+                if pages.count > 1 {
+                    Text("Page \(selectedPageIndex + 1) of \(pages.count)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                        .background(.ultraThinMaterial, in: .capsule)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(
+                            "Page \(selectedPageIndex + 1) of \(pages.count)"
+                        )
+                        .accessibilityValue(
+                            "\(selectedPageIndex + 1)/\(pages.count)"
+                        )
+                        .accessibilityAdjustableAction { direction in
+                            movePage(direction)
+                        }
+                        .accessibilityIdentifier(
+                            "shinagaki-lightbox-page-indicator"
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .bottom
+                        )
+                        .padding(.bottom, proxy.safeAreaInsets.bottom + 16)
+                }
             }
         }
         .background(Color.black)
@@ -91,7 +257,76 @@ struct ShinagakiLightbox: View {
         .accessibilityAction(.escape) {
             dismiss()
         }
-        .accessibilityIdentifier("shinagaki-lightbox")
+    }
+
+    private var selectedPageIndex: Int {
+        pages.firstIndex(where: { $0.id == selectedPageID }) ?? 0
+    }
+
+    private func movePage(_ direction: AccessibilityAdjustmentDirection) {
+        let targetIndex: Int
+        switch direction {
+        case .increment:
+            targetIndex = min(selectedPageIndex + 1, pages.count - 1)
+        case .decrement:
+            targetIndex = max(selectedPageIndex - 1, 0)
+        @unknown default:
+            return
+        }
+        selectedPageID = pages[targetIndex].id
+    }
+}
+
+private struct ShinagakiLightboxPageView: View {
+    let page: ShinagakiLightboxPage
+
+    @State private var image: UIImage?
+    @State private var didFail = false
+
+    init(page: ShinagakiLightboxPage) {
+        self.page = page
+        _image = State(initialValue: page.image)
+    }
+
+    var body: some View {
+        Group {
+            if let image {
+                ZoomableShinagakiImage(
+                    image: image,
+                    accessibilityLabel: page.accessibilityLabel
+                )
+            } else if didFail {
+                LucideContentUnavailableView(
+                    "Image unavailable",
+                    icon: "photo.badge.exclamationmark"
+                )
+                .foregroundStyle(.white)
+            } else {
+                ProgressView()
+                    .tint(.white)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: page.displayURL) {
+            await loadImageIfNeeded()
+        }
+    }
+
+    private func loadImageIfNeeded() async {
+        guard image == nil, let displayURL = page.displayURL else { return }
+        didFail = false
+        guard let decodedImage = await RemoteImagePipeline.image(
+            for: displayURL,
+            category: .shinagaki
+        ),
+              !Task.isCancelled
+        else {
+            if !Task.isCancelled {
+                didFail = true
+            }
+            return
+        }
+        image = decodedImage
     }
 }
 
@@ -237,6 +472,7 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
 
         centerImageIfNeeded()
         updateAccessibilityZoomValue()
+        updatePanGestureAvailability()
     }
 
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
@@ -252,6 +488,7 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
             }
         }
         updateAccessibilityZoomValue()
+        updatePanGestureAvailability()
     }
 
     func scrollViewWillBeginZooming(
@@ -438,6 +675,10 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
         zoomImageView.accessibilityValue = zoomPercentFormatter.string(
             from: NSNumber(value: zoomScale / minimumZoomScale)
         )
+    }
+
+    private func updatePanGestureAvailability() {
+        panGestureRecognizer.isEnabled = zoomScale > minimumZoomScale + 0.01
     }
 
     private static func displaySize(for image: UIImage) -> CGSize {

@@ -14730,6 +14730,35 @@
         }
       }
     },
+    "Image %lld of %lld: %@" : {
+      "comment" : "Accessibility label for one image in a multi-image Shinagaki post.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%3$@（%2$lld枚中%1$lld枚目）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%3$@ (이미지 %1$lld/%2$lld)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%3$@（第 %1$lld 张，共 %2$lld 张）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%3$@（第 %1$lld 張，共 %2$lld 張）"
+          }
+        }
+      }
+    },
     "Image unavailable" : {
       "localizations" : {
         "ja" : {
