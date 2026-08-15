@@ -17,9 +17,44 @@ enum ExploreLayoutMetrics {
     }
 }
 
+private struct ExploreCircleNavigationDestination<Destination: View>: ViewModifier {
+    @Binding var selection: ExploreCircle?
+    let destination: (ExploreCircle) -> Destination
+
+    func body(content: Content) -> some View {
+        content.navigationDestination(isPresented: Binding(
+            get: { selection != nil },
+            set: { isPresented in
+                if !isPresented {
+                    selection = nil
+                }
+            }
+        )) {
+            if let selection {
+                destination(selection)
+            }
+        }
+    }
+}
+
+extension View {
+    func exploreCircleDestination<Destination: View>(
+        selection: Binding<ExploreCircle?>,
+        @ViewBuilder destination: @escaping (ExploreCircle) -> Destination
+    ) -> some View {
+        modifier(
+            ExploreCircleNavigationDestination(
+                selection: selection,
+                destination: destination
+            )
+        )
+    }
+}
+
 struct ExploreView<EventDayHeader: View>: View {
     @Binding private var selectedDay: Int
     @State private var model: ExploreModel
+    @State private var selectedCircle: ExploreCircle?
     @State private var showsFilters = false
     @State private var showsGalleryZoomOnboarding = false
     private let eventDayHeader: EventDayHeader
@@ -114,6 +149,15 @@ struct ExploreView<EventDayHeader: View>: View {
             .sheet(isPresented: $showsFilters) {
                 ExploreFilterSheet(model: model)
             }
+            .exploreCircleDestination(selection: $selectedCircle) { circle in
+                if let dataSource = model.catalogDataSource {
+                    CircleDetailView(
+                        circles: circle.circles,
+                        dataSource: dataSource,
+                        tags: circle.tags
+                    )
+                }
+            }
         }
         .task {
             model.select(day: selectedDay)
@@ -151,13 +195,18 @@ struct ExploreView<EventDayHeader: View>: View {
             ExploreGallery(
                 circles: model.visibleCircles,
                 model: model,
-                headerLayoutVersion: galleryHeaderLayoutVersion
+                headerLayoutVersion: galleryHeaderLayoutVersion,
+                onSelect: { selectedCircle = $0 }
             ) {
                 scrollingHeader(horizontalPadding: ExploreLayoutMetrics.horizontalContentInset)
             }
             .ignoresSafeArea(.container, edges: .bottom)
         case .list:
-            ExploreList(circles: model.visibleCircles, model: model) {
+            ExploreList(
+                circles: model.visibleCircles,
+                model: model,
+                onSelect: { selectedCircle = $0 }
+            ) {
                 scrollingHeader(horizontalPadding: ExploreLayoutMetrics.horizontalContentInset)
             }
             .ignoresSafeArea(.container, edges: .bottom)
@@ -642,15 +691,16 @@ private struct FilterChip: View {
 
         @State private var selectedSurface = Surface.gallery
         @State private var model: ExploreModel
-        private let circle: ExploreCircle
+        @State private var visibleCircles: [ExploreCircle]
+        @State private var selectedCircle: ExploreCircle?
 
         init() {
             let circle = Self.makeCircle()
-            self.circle = circle
             _model = State(initialValue: ExploreModel(
                 circles: [circle],
                 selectedDay: 2
             ))
+            _visibleCircles = State(initialValue: [circle])
         }
 
         var body: some View {
@@ -684,25 +734,47 @@ private struct FilterChip: View {
                     switch selectedSurface {
                     case .gallery:
                         ExploreGallery(
-                            circles: [circle],
+                            circles: visibleCircles,
                             model: model,
-                            headerLayoutVersion: 0
+                            headerLayoutVersion: 0,
+                            onSelect: { selectedCircle = $0 }
                         ) {
                             EmptyView()
                         }
                     case .list:
-                        ExploreList(circles: [circle], model: model) {
+                        ExploreList(
+                            circles: visibleCircles,
+                            model: model,
+                            onSelect: { selectedCircle = $0 }
+                        ) {
                             EmptyView()
                         }
                     case .tag:
-                        ExploreTagLongPressUITestSurface(
-                            circle: circle,
-                            model: model
-                        )
+                        if let visibleCircle = visibleCircles.first {
+                            ExploreTagLongPressUITestSurface(
+                                circle: visibleCircle,
+                                model: model,
+                                onSelect: { selectedCircle = $0 }
+                            )
+                        }
                     }
                 }
                 .navigationTitle("Long-press fixture")
                 .navigationBarTitleDisplayMode(.inline)
+                .exploreCircleDestination(selection: $selectedCircle) { circle in
+                    VStack(spacing: 20) {
+                        Text(circle.displayName)
+                            .font(.title2.weight(.semibold))
+                            .accessibilityIdentifier("explore-filtered-detail")
+
+                        Button("Remove from Saved Only results") {
+                            visibleCircles.removeAll()
+                        }
+                        .accessibilityIdentifier("explore-filtered-detail-remove-result")
+                    }
+                    .navigationTitle(circle.displayName)
+                    .navigationBarTitleDisplayMode(.inline)
+                }
             }
         }
 
@@ -790,19 +862,21 @@ private struct ExploreGallery<Header: View>: View {
     let circles: [ExploreCircle]
     let model: ExploreModel
     let headerLayoutVersion: Int
+    let onSelect: (ExploreCircle) -> Void
     let header: Header
-    @State private var selectedCircleID: Int?
     @State private var lightboxController = ExploreArtworkLightboxController()
 
     init(
         circles: [ExploreCircle],
         model: ExploreModel,
         headerLayoutVersion: Int,
+        onSelect: @escaping (ExploreCircle) -> Void,
         @ViewBuilder header: () -> Header
     ) {
         self.circles = circles
         self.model = model
         self.headerLayoutVersion = headerLayoutVersion
+        self.onSelect = onSelect
         self.header = header()
     }
 
@@ -812,27 +886,14 @@ private struct ExploreGallery<Header: View>: View {
         ExploreGalleryCollection(
             circles: circles,
             model: model,
-            onSelect: { selectedCircleID = $0 },
+            onSelect: { circleID in
+                guard let circle = circles.first(where: { $0.id == circleID }) else { return }
+                onSelect(circle)
+            },
             onLongPress: { circleID in openLightbox(circleID: circleID) },
             headerLayoutVersion: headerLayoutVersion,
             header: { header }
         )
-        .navigationDestination(isPresented: Binding(
-            get: { selectedCircleID != nil },
-            set: { isPresented in
-                if !isPresented {
-                    selectedCircleID = nil
-                }
-            }
-        )) {
-            if let selectedCircle, let dataSource = model.catalogDataSource {
-                CircleDetailView(
-                    circles: selectedCircle.circles,
-                    dataSource: dataSource,
-                    tags: selectedCircle.tags
-                )
-            }
-        }
         .sheet(item: $lightboxController.presentation) { presentation in
             ShinagakiLightbox(presentation: presentation)
             .presentationDetents([.large])
@@ -842,11 +903,6 @@ private struct ExploreGallery<Header: View>: View {
         .onDisappear {
             lightboxController.cancelPendingLoad()
         }
-    }
-
-    private var selectedCircle: ExploreCircle? {
-        guard let selectedCircleID else { return nil }
-        return circles.first { $0.id == selectedCircleID }
     }
 
     private func openLightbox(circleID: Int) {
@@ -1000,16 +1056,19 @@ struct ExploreGalleryCard: View {
 private struct ExploreList<Header: View>: View {
     let circles: [ExploreCircle]
     let model: ExploreModel
+    let onSelect: (ExploreCircle) -> Void
     let header: Header
     @State private var lightboxController = ExploreArtworkLightboxController()
 
     init(
         circles: [ExploreCircle],
         model: ExploreModel,
+        onSelect: @escaping (ExploreCircle) -> Void,
         @ViewBuilder header: () -> Header
     ) {
         self.circles = circles
         self.model = model
+        self.onSelect = onSelect
         self.header = header()
     }
 
@@ -1021,14 +1080,8 @@ private struct ExploreList<Header: View>: View {
                 header
 
                 ForEach(circles) { circle in
-                    NavigationLink {
-                        if let dataSource = model.catalogDataSource {
-                            CircleDetailView(
-                                circles: circle.circles,
-                                dataSource: dataSource,
-                                tags: circle.tags
-                            )
-                        }
+                    Button {
+                        onSelect(circle)
                     } label: {
                         HStack(spacing: 12) {
                             ExploreCircleRow(circle: circle, model: model)

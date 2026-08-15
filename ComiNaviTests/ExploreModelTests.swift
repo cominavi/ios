@@ -108,6 +108,29 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertTrue(model.visibleCircles.isEmpty)
     }
 
+    func testRemovingFavoriteClearsSavedOnlyResults() async throws {
+        let store = InMemoryUserPlanStore()
+        try await store.upsert(makeBookmark(color: .blue))
+        let model = ExploreModel(
+            circles: [fixtures[0]],
+            selectedDay: 1,
+            userPlanStore: store,
+            eventNumber: 108
+        )
+        await model.load()
+        model.favoriteFilter = .saved
+        XCTAssertEqual(model.visibleCircles.map(\.id), [fixtures[0].id])
+
+        try await store.remove(
+            eventNumber: 108,
+            publicCircleID: 1_001
+        )
+
+        try await waitUntil {
+            model.visibleCircles.isEmpty
+        }
+    }
+
     func testSwitchingDaysClearsEveryFilterThatIsNoLongerAvailable() async {
         let model = ExploreModel(circles: fixtures, selectedDay: 1)
         await model.load()

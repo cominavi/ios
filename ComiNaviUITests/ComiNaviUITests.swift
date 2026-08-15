@@ -1391,6 +1391,42 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testExploreDetailSurvivesRemovalFromSavedOnlyResults() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-ui-testing-explore-multi-post-longpress",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+        ]
+        app.launch()
+
+        let fixtureTitle = app.staticTexts["explore-longpress-fixture-title"]
+        XCTAssertTrue(fixtureTitle.waitForExistence(timeout: 10))
+        app.buttons["explore-longpress-surface-list"].tap()
+
+        let result = app.descendants(matching: .any)["explore-list-circle-10802055"]
+        XCTAssertTrue(result.waitForExistence(timeout: 5))
+        result.tap()
+
+        let detail = app.staticTexts["explore-filtered-detail"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 5))
+        let remove = app.buttons["explore-filtered-detail-remove-result"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5))
+        remove.tap()
+
+        XCTAssertTrue(
+            detail.waitForExistence(timeout: 5),
+            "Filtering out the selected circle replaced its detail with an empty page"
+        )
+        XCTAssertTrue(detail.isHittable)
+        XCTAssertTrue(result.waitForNonExistence(timeout: 5))
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(fixtureTitle.waitForExistence(timeout: 5))
+        XCTAssertFalse(result.exists)
+    }
+
+    @MainActor
     func testDemoExploreGalleryLongPressOpensLightboxWithoutNavigating() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")

@@ -6,6 +6,7 @@ struct ExploreTagPage: View {
 
     @State private var model: ExploreModel
     @State private var lightboxController = ExploreArtworkLightboxController()
+    @State private var selectedCircle: ExploreCircle?
     @State private var showsFilters = false
 
     init(tag: String, day: Int, dataSource: CirclemsDataSource) {
@@ -37,14 +38,9 @@ struct ExploreTagPage: View {
                             ExploreTagCircleLink(
                                 circle: circle,
                                 model: model,
+                                onSelect: { selectedCircle = circle },
                                 onLongPress: { openLightbox(circle) }
-                            ) {
-                                CircleDetailView(
-                                    circles: circle.circles,
-                                    dataSource: dataSource,
-                                    tags: circle.tags
-                                )
-                            }
+                            )
 
                             Divider()
                                 .padding(.leading, 104)
@@ -55,6 +51,13 @@ struct ExploreTagPage: View {
         }
         .navigationTitle("#\(tag)")
         .navigationBarTitleDisplayMode(.inline)
+        .exploreCircleDestination(selection: $selectedCircle) { circle in
+            CircleDetailView(
+                circles: circle.circles,
+                dataSource: dataSource,
+                tags: circle.tags
+            )
+        }
         .searchable(text: $model.searchQuery, prompt: "Search within this tag")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -111,28 +114,26 @@ struct ExploreTagPage: View {
     }
 }
 
-private struct ExploreTagCircleLink<Destination: View>: View {
+private struct ExploreTagCircleLink: View {
     let circle: ExploreCircle
     let model: ExploreModel
+    let onSelect: () -> Void
     let onLongPress: () -> Void
-    let destination: () -> Destination
 
     init(
         circle: ExploreCircle,
         model: ExploreModel,
-        onLongPress: @escaping () -> Void,
-        @ViewBuilder destination: @escaping () -> Destination
+        onSelect: @escaping () -> Void,
+        onLongPress: @escaping () -> Void
     ) {
         self.circle = circle
         self.model = model
+        self.onSelect = onSelect
         self.onLongPress = onLongPress
-        self.destination = destination
     }
 
     var body: some View {
-        NavigationLink {
-            destination()
-        } label: {
+        Button(action: onSelect) {
             HStack(spacing: 12) {
                 ExploreCircleRow(circle: circle, model: model)
 
@@ -158,6 +159,7 @@ private struct ExploreTagCircleLink<Destination: View>: View {
     struct ExploreTagLongPressUITestSurface: View {
         let circle: ExploreCircle
         let model: ExploreModel
+        let onSelect: (ExploreCircle) -> Void
 
         @State private var lightboxController = ExploreArtworkLightboxController()
 
@@ -169,10 +171,9 @@ private struct ExploreTagCircleLink<Destination: View>: View {
                     ExploreTagCircleLink(
                         circle: circle,
                         model: model,
+                        onSelect: { onSelect(circle) },
                         onLongPress: { openLightbox() }
-                    ) {
-                        EmptyView()
-                    }
+                    )
 
                     Divider()
                         .padding(.leading, 104)
