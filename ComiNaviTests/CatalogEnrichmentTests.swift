@@ -136,12 +136,12 @@ final class CatalogEnrichmentTests: XCTestCase {
         )
     }
 
-    func testWithdrawalEvidenceMapsToEveryMatchedCircleWithoutCreatingShinagaki() throws {
+    func testWithdrawalEvidenceMapsAttendanceTargetsWithoutCreatingShinagaki() throws {
         let data = Data(
             """
             [
               {
-                "tweet_id": "withdrawal-1",
+                "tweet_id": "2083911737565450341",
                 "tweet_url": "https://x.com/rurudo_/status/2083911737565450341",
                 "text": "C108は欠席いたします",
                 "created_at": "2026-08-04T12:30:00Z",
@@ -151,8 +151,8 @@ final class CatalogEnrichmentTests: XCTestCase {
                 "media": [],
                 "post_reasons": ["event_keyword"],
                 "post_confidence": "low",
-                "placement_confidence": "medium",
-                "matching_policy_id": "c108-shinagaki-placement-v2",
+                "placement_confidence": "unmatched",
+                "matching_policy_id": "c108-shinagaki-placement-v3",
                 "provenance": [
                   {
                     "sourceId": "x-public-post",
@@ -175,7 +175,8 @@ final class CatalogEnrichmentTests: XCTestCase {
                   ],
                   "policyId": "c108-participation-v1"
                 },
-                "matched_circles": [
+                "matched_circles": [],
+                "attendance_targets": [
                   {
                     "circle_id": 18223,
                     "wc_id": 23009270,
@@ -223,13 +224,55 @@ final class CatalogEnrichmentTests: XCTestCase {
             XCTAssertEqual(claim.status, .withdrawn)
             XCTAssertEqual(claim.confidence, .high)
             XCTAssertEqual(claim.policyID, "c108-participation-v1")
-            XCTAssertEqual(claim.matchingPolicyID, "c108-shinagaki-placement-v2")
+            XCTAssertEqual(claim.matchingPolicyID, "c108-shinagaki-placement-v3")
             XCTAssertEqual(claim.matchReasons, ["catalog_handle"])
             XCTAssertEqual(claim.provenance.count, 2)
             XCTAssertTrue(
                 claim.matchedCircleProvenance.first?.recordID?.hasPrefix("108:") == true
             )
         }
+    }
+
+    func testLegacyWithdrawalEvidenceFallsBackToMatchedCircles() throws {
+        let data = Data(
+            """
+            [
+              {
+                "tweet_id": "legacy-withdrawal",
+                "tweet_url": "https://x.com/legacy/status/1",
+                "text": "C108は欠席します",
+                "created_at": null,
+                "author_handle": "legacy",
+                "author_name": null,
+                "author": null,
+                "media": [],
+                "post_confidence": "low",
+                "placement_confidence": "medium",
+                "matched_circles": [
+                  {
+                    "circle_id": 77,
+                    "wc_id": 7007,
+                    "score": 80,
+                    "reasons": ["catalog_handle"]
+                  }
+                ],
+                "attendance": {
+                  "status": "withdrawn",
+                  "confidence": "medium",
+                  "policyId": "legacy-attendance-v1"
+                }
+              }
+            ]
+            """.utf8
+        )
+
+        let index = try CatalogEnrichmentIndex(data: data)
+        let enrichment = try XCTUnwrap(
+            index.enrichment(circleID: -1, publicCircleID: 7007)
+        )
+
+        XCTAssertTrue(enrichment.posts.isEmpty)
+        XCTAssertEqual(enrichment.withdrawalClaims.map(\.id), ["legacy-withdrawal"])
     }
 
     func testEmbeddedLegacyTagsDecodeButNeverBecomeVisibleOrSearchable() throws {

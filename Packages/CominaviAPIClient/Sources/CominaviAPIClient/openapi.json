@@ -6888,6 +6888,7 @@
                             },
                             "stateKind": {
                               "enum": [
+                                "attendance",
                                 "shinagaki",
                                 "cover"
                               ],

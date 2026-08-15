@@ -406,7 +406,7 @@ struct CatalogEnrichmentIndex: Sendable {
         for sourcePost in sourcePosts {
             var didMapSourcePost = false
 
-            for match in sourcePost.matchedCircles {
+            for match in sourcePost.attendanceTargets ?? sourcePost.matchedCircles {
                 guard let claim = sourcePost.catalogAttendanceClaim(match: match) else {
                     continue
                 }
@@ -682,6 +682,7 @@ private struct CollectorPost: Decodable {
     let postConfidence: CatalogConfidence
     let placementConfidence: CatalogConfidence
     let matchedCircles: [CollectorCircleMatch]
+    let attendanceTargets: [CollectorCircleMatch]?
     let matchingPolicyId: String?
     let attendance: CollectorAttendance?
     let provenance: [CollectorRecordProvenance]?

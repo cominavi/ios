@@ -8,6 +8,7 @@ collector_directory=${1:-"${project_directory}/../collector"}
 shinagaki_input=${2:-"${collector_directory}/out/c108-enriched/selected-posts.json"}
 destination="${project_directory}/ComiNavi/Resources/CrawlCatalogs/C108"
 catalog_source="${collector_directory}/out/catalog-seed/webcatalog108.db"
+matching_policy_source="${collector_directory}/src/matcher.rs"
 
 if [ -d "${shinagaki_input}" ]; then
     shinagaki_source="${shinagaki_input}/selected-posts.json"
@@ -28,6 +29,17 @@ fi
 
 if [ ! -f "${ocr_source}" ]; then
     echo "Missing OCR enrichment archive: ${ocr_source}" >&2
+    exit 1
+fi
+
+if [ ! -f "${matching_policy_source}" ]; then
+    echo "Missing collector matching-policy source: ${matching_policy_source}" >&2
+    exit 1
+fi
+
+expected_matching_policy_id=$(sed -n 's/^pub const MATCHING_POLICY_ID: &str = "\([^"]*\)";$/\1/p' "${matching_policy_source}")
+if [ -z "${expected_matching_policy_id}" ]; then
+    echo "Could not resolve the collector matching policy from: ${matching_policy_source}" >&2
     exit 1
 fi
 
@@ -97,12 +109,35 @@ if [ ! -s "${staged_enrichment}" ]; then
     exit 1
 fi
 
-if ! jq -e --arg catalog_digest "${catalog_source_digest}" '
+if ! jq -e \
+    --arg catalog_digest "${catalog_source_digest}" \
+    --arg matching_policy_id "${expected_matching_policy_id}" '
     def is_integer: type == "number" and . == floor;
+    def reportable_attendance:
+        ((.attendance.status // "unknown") != "unknown") and
+        ((.attendance.confidence // "unmatched") | IN("high", "medium"));
+    def valid_circle($catalog_digest):
+        . as $circle |
+        ($circle.comiket_no | is_integer and . == 108) and
+        ($circle.circle_id | is_integer) and
+        ($circle.wc_id | is_integer) and
+        any($circle.provenance[]?;
+            .sourceId == "circlems_webcatalog" and
+            .payloadSha256 == $catalog_digest and
+            (.recordId |
+                type == "string" and
+                (
+                    . == ("108:" + ($circle.circle_id | tostring)) or
+                    startswith("108:" + ($circle.circle_id | tostring) + ":")
+                )
+            ) and
+            (.fields | type == "array" and length > 0)
+        );
 
     type == "array" and length > 0 and
     all(.[];
         (.tweet_id | type == "string" and length > 0) and
+        (.matching_policy_id == $matching_policy_id) and
         (
             .providerRelationships as $relationships |
             ($relationships | type == "object") and
@@ -140,8 +175,8 @@ if ! jq -e --arg catalog_digest "${catalog_source_digest}" '
             ) or
             (
                 .post_confidence == "low" and
-                ((.attendance.status // "unknown") != "unknown") and
-                ((.attendance.confidence // "unmatched") | IN("high", "medium"))
+                reportable_attendance and
+                (.matched_circles | type == "array" and length == 0)
             )
         ) and
         any(.provenance[]?;
@@ -151,24 +186,16 @@ if ! jq -e --arg catalog_digest "${catalog_source_digest}" '
             ((.observationKey // "") | test("^[0-9a-f]{64}$"))
         ) and
         (.matched_circles | type == "array") and
-        all(.matched_circles[];
-            . as $circle |
-            ($circle.comiket_no | is_integer and . == 108) and
-            ($circle.circle_id | is_integer) and
-            ($circle.wc_id | is_integer) and
-            any($circle.provenance[]?;
-                .sourceId == "circlems_webcatalog" and
-                .payloadSha256 == $catalog_digest and
-                (.recordId |
-                    type == "string" and
-                    (
-                        . == ("108:" + ($circle.circle_id | tostring)) or
-                        startswith("108:" + ($circle.circle_id | tostring) + ":")
-                    )
-                ) and
-                (.fields | type == "array" and length > 0)
-            )
-        )
+        all(.matched_circles[]; valid_circle($catalog_digest)) and
+        (.attendance_targets | type == "array") and
+        (
+            if reportable_attendance then
+                (.attendance_targets | length > 0)
+            else
+                (.attendance_targets | length == 0)
+            end
+        ) and
+        all(.attendance_targets[]; valid_circle($catalog_digest))
     )
 ' "${staged_enrichment}" >/dev/null; then
     echo "Crawl enrichment is missing publishable confidence, complete post, or authoritative Circle.ms provenance." >&2
@@ -192,7 +219,7 @@ if [ "${duplicate_wcid_ownership_count}" -ne 0 ]; then
 fi
 
 expected_circles="${staging_directory}/expected-circles.tsv"
-jq -r '.[] | .matched_circles[] | [.comiket_no, .circle_id, .wc_id] | @tsv' \
+jq -r '.[] | (.matched_circles + .attendance_targets)[] | [.comiket_no, .circle_id, .wc_id] | @tsv' \
     "${staged_enrichment}" >"${expected_circles}"
 if [ ! -s "${expected_circles}" ]; then
     echo "Crawl enrichment did not contain any matched Circle.ms circles." >&2

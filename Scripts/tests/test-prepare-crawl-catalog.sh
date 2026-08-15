@@ -7,6 +7,7 @@ script_under_test="${test_directory}/../prepare-crawl-catalog.sh"
 fixture_root=$(mktemp -d "${TMPDIR:-/tmp}/prepare-crawl-catalog-tests.XXXXXX")
 fixture_hash=0000000000000000000000000000000000000000000000000000000000000000
 wrong_catalog_digest=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+current_matching_policy_id=c108-shinagaki-placement-v5
 
 cleanup() {
     if [ -n "${fixture_root:-}" ] && [ -d "${fixture_root}" ]; then
@@ -39,10 +40,13 @@ prepare_case() {
 
     mkdir -p \
         "${case_project}/Scripts" \
+        "${case_collector}/src" \
         "${case_collector}/out/c108-enriched" \
         "${case_collector}/out/catalog-seed"
     cp "${script_under_test}" "${case_project}/Scripts/prepare-crawl-catalog.sh"
     chmod +x "${case_project}/Scripts/prepare-crawl-catalog.sh"
+    printf 'pub const MATCHING_POLICY_ID: &str = "%s";\n' \
+        "${current_matching_policy_id}" >"${case_collector}/src/matcher.rs"
 
     sqlite3 "${case_catalog}" <<SQL
 CREATE TABLE ComiketCircleExtend (
@@ -71,6 +75,7 @@ SQL
     jq -n \
         --arg hash "${fixture_hash}" \
         --arg catalog_digest "${case_provenance_digest}" \
+        --arg matching_policy_id "${current_matching_policy_id}" \
         --arg record_id "${case_record_id}" \
         --argjson circle "${case_circle}" '
         [
@@ -78,6 +83,7 @@ SQL
                 tweet_id: "test-post",
                 post_confidence: "high",
                 placement_confidence: "high",
+                matching_policy_id: $matching_policy_id,
                 providerRelationships: {
                     decision: "eligible",
                     metadataComplete: true
@@ -104,7 +110,8 @@ SQL
                             }
                         ]
                     })
-                ]
+                ],
+                attendance_targets: []
             }
         ]
     ' >"${case_enrichment}"
@@ -260,6 +267,121 @@ run_same_author_quote_success_case() {
     echo "PASS: $1"
 }
 
+run_attendance_success_case() {
+    case_name=$1
+    second_circle='{"comiket_no":108,"circle_id":11,"wc_id":1001}'
+    attendance_rows='INSERT INTO ComiketCircleExtend (comiketNo, id, WCId) VALUES (108, 10, 1000); INSERT INTO ComiketCircleExtend (comiketNo, id, WCId) VALUES (108, 11, 1001);'
+    prepare_case "${case_name}" "${valid_circle}" "${attendance_rows}"
+    jq \
+        --arg catalog_digest "${case_catalog_digest}" \
+        --argjson second_circle "${second_circle}" '
+        .[0].matched_circles[0] as $first_target |
+        .[0] |= (
+            .tweet_id = "2083911737565450341" |
+            .post_confidence = "low" |
+            .placement_confidence = "unmatched" |
+            .media = [] |
+            .attendance = {
+                status: "withdrawn",
+                confidence: "high",
+                policyId: "operator-withdrawal-label-v1"
+            } |
+            .attendance_targets = [
+                $first_target,
+                ($second_circle + {
+                    score: 100,
+                    provenance: [
+                        {
+                            sourceId: "circlems_webcatalog",
+                            sourceKind: "catalog_snapshot",
+                            recordId: "108:11",
+                            payloadSha256: $catalog_digest,
+                            fields: ["WCId"]
+                        }
+                    ]
+                })
+            ] |
+            .matched_circles = []
+        )
+    ' "${case_enrichment}" >"${case_enrichment}.tmp"
+    mv "${case_enrichment}.tmp" "${case_enrichment}"
+
+    if ! "${case_project}/Scripts/prepare-crawl-catalog.sh" \
+        "${case_collector}" \
+        "${case_enrichment}" \
+        >"${case_stdout}" 2>"${case_stderr}"; then
+        sed -n '1,120p' "${case_stderr}" >&2
+        fail "${case_name} should have published reportable attendance"
+    fi
+    if ! jq -e '
+        .[0].tweet_id == "2083911737565450341" and
+        (.[0].matched_circles | length == 0) and
+        (.[0].attendance_targets | length == 2)
+    ' "${case_destination}/crawl-c108-shinagaki.json" >/dev/null; then
+        fail "${case_name} did not preserve attendance targets without menu matches"
+    fi
+    echo "PASS: ${case_name}"
+}
+
+run_missing_attendance_targets_failure_case() {
+    case_name=$1
+    prepare_case "${case_name}" "${valid_circle}" "${valid_row}"
+    jq '
+        .[0] |= (
+            .post_confidence = "low" |
+            .placement_confidence = "unmatched" |
+            .media = [] |
+            .matched_circles = [] |
+            .attendance_targets = [] |
+            .attendance = {status: "withdrawn", confidence: "high"}
+        )
+    ' "${case_enrichment}" >"${case_enrichment}.tmp"
+    mv "${case_enrichment}.tmp" "${case_enrichment}"
+
+    if "${case_project}/Scripts/prepare-crawl-catalog.sh" \
+        "${case_collector}" \
+        "${case_enrichment}" \
+        >"${case_stdout}" 2>"${case_stderr}"; then
+        fail "${case_name} should have rejected reportable attendance without targets"
+    fi
+    if ! grep -F "${schema_error}" "${case_stderr}" >/dev/null; then
+        sed -n '1,120p' "${case_stderr}" >&2
+        fail "${case_name} emitted the wrong validation error"
+    fi
+    echo "PASS: ${case_name}"
+}
+
+run_matching_policy_failure_case() {
+    case_name=$1
+    policy_mode=$2
+    prepare_case "${case_name}" "${valid_circle}" "${valid_row}"
+    case "${policy_mode}" in
+        missing)
+            jq 'del(.[0].matching_policy_id)' "${case_enrichment}" >"${case_enrichment}.tmp"
+            ;;
+        stale)
+            jq '.[0].matching_policy_id = "c108-shinagaki-placement-v4"' \
+                "${case_enrichment}" >"${case_enrichment}.tmp"
+            ;;
+        *)
+            fail "Unknown matching-policy fixture mode: ${policy_mode}"
+            ;;
+    esac
+    mv "${case_enrichment}.tmp" "${case_enrichment}"
+
+    if "${case_project}/Scripts/prepare-crawl-catalog.sh" \
+        "${case_collector}" \
+        "${case_enrichment}" \
+        >"${case_stdout}" 2>"${case_stderr}"; then
+        fail "${case_name} should have rejected ${policy_mode} matching policy"
+    fi
+    if ! grep -F "${schema_error}" "${case_stderr}" >/dev/null; then
+        sed -n '1,120p' "${case_stderr}" >&2
+        fail "${case_name} emitted the wrong validation error"
+    fi
+    echo "PASS: ${case_name}"
+}
+
 valid_circle='{"comiket_no":108,"circle_id":10,"wc_id":1000}'
 valid_row='INSERT INTO ComiketCircleExtend (comiketNo, id, WCId) VALUES (108, 10, 1000);'
 schema_error='Crawl enrichment is missing publishable confidence, complete post, or authoritative Circle.ms provenance.'
@@ -276,6 +398,16 @@ run_success_case \
     "${valid_row}" \
     catalog \
     '108:10:ComiketCircleExtend.twitterURL:test'
+run_attendance_success_case \
+    valid_two_circle_withdrawal
+run_missing_attendance_targets_failure_case \
+    reportable_attendance_without_targets
+run_matching_policy_failure_case \
+    missing_matching_policy \
+    missing
+run_matching_policy_failure_case \
+    stale_matching_policy \
+    stale
 run_confidence_failure_case \
     medium_shinagaki_confidence
 run_relationship_failure_case \

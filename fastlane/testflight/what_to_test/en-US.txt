@@ -1,1 +1,1 @@
-Fixed an issue that prevented X following imports on iOS 18 when reading timestamps returned by the import service. Diagnostics for invalid import responses now include the failed stream stage and safe decoding context.
+Updated the C108 Shinagaki catalog with previously missing posts. Also fixed absent and attending status updates not being applied to the correct circle spaces.
