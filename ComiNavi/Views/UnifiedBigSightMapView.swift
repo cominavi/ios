@@ -1,6 +1,7 @@
 import CoreLocation
 import MapLibre
 import OSLog
+import QuartzCore
 import SpriteKit
 import SwiftUI
 import UIKit
@@ -149,11 +150,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             onCameraRotationChange: onCameraRotationChange,
             onLocate: onLocate
         )
-        host.mapView.presentScene(renderer)
-        host.mapView.preferredFramesPerSecond = UIScreen.main.maximumFramesPerSecond
-        host.mapView.ignoresSiblingOrder = true
-        host.mapView.shouldCullNonVisibleNodes = true
-        host.mapView.isAsynchronous = true
+        host.presentScene(renderer)
         update(host: host, renderer: renderer)
         return host
     }
@@ -444,6 +441,9 @@ final class UnifiedMapHostView: UIView {
         mapView.backgroundColor = .clear
         mapView.allowsTransparency = true
         mapView.isOpaque = false
+        mapView.preferredFramesPerSecond = UIScreen.main.maximumFramesPerSecond
+        mapView.ignoresSiblingOrder = true
+        mapView.shouldCullNonVisibleNodes = true
         mapView.isAccessibilityElement = true
         mapView.accessibilityIdentifier = "unified-map-canvas"
         addSubview(mapView)
@@ -580,6 +580,7 @@ final class UnifiedMapHostView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        synchronizeRendererPresentation()
         synchronizeBasemapFromScene()
 
         // SpriteKit applies `.resizeFill` after the SKView receives its final
@@ -588,6 +589,30 @@ final class UnifiedMapHostView: UIView {
         DispatchQueue.main.async { [weak self] in
             self?.synchronizeBasemapFromScene()
         }
+    }
+
+    func presentScene(_ scene: SKScene) {
+        mapView.presentScene(scene)
+        synchronizeRendererPresentation()
+    }
+
+    var isRendererPresentationSynchronized: Bool {
+        if !mapView.isAsynchronous { return true }
+        let layers = rendererPresentationLayers(in: mapView.layer)
+        return !layers.isEmpty && layers.allSatisfy(\.presentsWithTransaction)
+    }
+
+    private func synchronizeRendererPresentation() {
+        mapView.isAsynchronous = false
+        mapView.layer.drawsAsynchronously = false
+        for metalLayer in rendererPresentationLayers(in: mapView.layer) {
+            metalLayer.presentsWithTransaction = true
+        }
+    }
+
+    private func rendererPresentationLayers(in layer: CALayer) -> [CAMetalLayer] {
+        let current = (layer as? CAMetalLayer).map { [$0] } ?? []
+        return current + (layer.sublayers ?? []).flatMap(rendererPresentationLayers)
     }
 
     func updateAppearance(_ appearance: UnifiedMapAppearance) {
@@ -932,6 +957,30 @@ enum UnifiedMapMarkerMetrics {
     }
 }
 
+enum UnifiedMapArtworkLevelOfDetail {
+    private static let preferredOversampling: CGFloat = 1.1
+    private static let downgradeOversampling: CGFloat = 1.35
+
+    static func textureIndex(
+        pixelDimensions: [CGFloat],
+        renderedMaximumPixelDimension: CGFloat,
+        currentIndex: Int
+    ) -> Int {
+        guard !pixelDimensions.isEmpty else { return 0 }
+        let boundedCurrentIndex = min(max(currentIndex, 0), pixelDimensions.count - 1)
+        let preferredIndex =
+            pixelDimensions.firstIndex {
+                $0 >= renderedMaximumPixelDimension * preferredOversampling
+            } ?? pixelDimensions.count - 1
+
+        guard preferredIndex < boundedCurrentIndex else { return preferredIndex }
+        return renderedMaximumPixelDimension * downgradeOversampling
+            <= pixelDimensions[preferredIndex]
+            ? preferredIndex
+            : boundedCurrentIndex
+    }
+}
+
 @MainActor
 final class UnifiedBigSightScene: SKScene {
     enum Hit {
@@ -955,6 +1004,17 @@ final class UnifiedBigSightScene: SKScene {
         let minimumZoom: CGFloat
         let labelMinimumZoom: CGFloat
         let maximumZoom: CGFloat
+    }
+
+    private struct AuthoredArtworkTexture {
+        let texture: SKTexture
+        let maximumPixelDimension: CGFloat
+    }
+
+    private struct AuthoredArtworkSprite {
+        let node: SKSpriteNode
+        let textures: [AuthoredArtworkTexture]
+        var textureIndex: Int
     }
 
     private static let darkArtworkShader = SKShader(
@@ -994,6 +1054,8 @@ final class UnifiedBigSightScene: SKScene {
     private var venueMarkers: [ScreenSpaceMarker] = []
     private var facilityMarkers: [ScreenSpaceMarker] = []
     private var blockLabels: [SKLabelNode] = []
+    private var authoredArtworkSprites: [AuthoredArtworkSprite] = []
+    private var authoredArtworkTextureCache: [String: [AuthoredArtworkTexture]] = [:]
     private var minimumCameraScale: CGFloat = 1
     private var maximumCameraScale: CGFloat = 0.01
     private var hasFittedInitialCamera = false
@@ -1043,6 +1105,10 @@ final class UnifiedBigSightScene: SKScene {
     var zoomFactor: CGFloat { minimumCameraScale / max(mapCamera.xScale, 0.000_1) }
     var staticShapeNodeCount: Int { staticRoot.descendants(of: SKShapeNode.self).count }
     var authoredMapNodeCount: Int { venueRoot.children.compactMap { $0 as? SKSpriteNode }.count }
+    var authoredMapNodeIdentifiers: [ObjectIdentifier] {
+        authoredArtworkSprites.map { ObjectIdentifier($0.node) }
+    }
+    var authoredMapTextureIndices: [Int] { authoredArtworkSprites.map(\.textureIndex) }
     var openStreetMapFeatureNodeCount: Int {
         pedestrianRoot.children.filter {
             $0.name?.hasPrefix("openstreetmap-feature-") == true
@@ -1222,6 +1288,7 @@ final class UnifiedBigSightScene: SKScene {
     ) {
         if self.campus.id != campus.id {
             self.campus = campus
+            authoredArtworkTextureCache.removeAll(keepingCapacity: true)
             lastDynamicFingerprint = nil
             lastRenderedLocatedUser = nil
             buildStaticScene()
@@ -1524,6 +1591,7 @@ final class UnifiedBigSightScene: SKScene {
         venueMarkers = []
         facilityMarkers = []
         blockLabels = []
+        authoredArtworkSprites = []
         staticRoot.addChild(campusDetailRoot)
         staticRoot.addChild(pedestrianRoot)
         staticRoot.addChild(markerRoot)
@@ -1630,9 +1698,8 @@ final class UnifiedBigSightScene: SKScene {
         venueRoot.addChild(floor)
 
         if let artwork = venue.scene.artwork {
-            let texture = SKTexture(cgImage: artwork.image)
-            texture.filteringMode = .linear
-            let map = SKSpriteNode(texture: texture)
+            let textures = authoredArtworkTextures(for: artwork)
+            let map = SKSpriteNode(texture: textures[0].texture)
             map.name = "authored-map-\(artwork.name)"
             map.position = UnifiedMapProjection.scenePoint(fromCampus: venue.center)
             map.size = CGSize(
@@ -1642,6 +1709,13 @@ final class UnifiedBigSightScene: SKScene {
             map.zRotation = -venue.rotation
             map.zPosition = -4
             map.shader = appearance == .dark ? Self.darkArtworkShader : nil
+            authoredArtworkSprites.append(
+                AuthoredArtworkSprite(
+                    node: map,
+                    textures: textures,
+                    textureIndex: 0
+                )
+            )
             venueRoot.addChild(map)
         } else {
             for (blockID, tables) in Dictionary(grouping: venue.scene.tables, by: { $0.id.blockID })
@@ -1941,6 +2015,7 @@ final class UnifiedBigSightScene: SKScene {
         genreRoot.isHidden = scope != .venue
         dynamicRoot.isHidden = false
         markerRoot.isHidden = isSearchActive
+        updateAuthoredArtworkTextures()
         for marker in destinationRoot.children where marker.name == "map-destination-marker" {
             marker.setScale(mapCamera.xScale)
             marker.zRotation = levelRotation
@@ -1979,6 +2054,50 @@ final class UnifiedBigSightScene: SKScene {
         }
         for child in userRoot.children {
             child.setScale(mapCamera.xScale)
+        }
+    }
+
+    private func authoredArtworkTextures(
+        for artwork: CatalogMapArtwork
+    ) -> [AuthoredArtworkTexture] {
+        let key = "\(artwork.name):\(artwork.pixelSize.width)x\(artwork.pixelSize.height)"
+        if let cached = authoredArtworkTextureCache[key] {
+            return cached
+        }
+
+        let textures = artwork.renderingImages.sorted {
+            max($0.width, $0.height) < max($1.width, $1.height)
+        }.map { image in
+            let texture = SKTexture(cgImage: image)
+            texture.filteringMode = .linear
+            return AuthoredArtworkTexture(
+                texture: texture,
+                maximumPixelDimension: CGFloat(max(image.width, image.height))
+            )
+        }
+        SKTexture.preload(textures.map(\.texture), withCompletionHandler: {})
+        authoredArtworkTextureCache[key] = textures
+        return textures
+    }
+
+    private func updateAuthoredArtworkTextures() {
+        let contentScale = view?.contentScaleFactor ?? UIScreen.main.scale
+        let cameraScale = max(mapCamera.xScale, 0.000_1)
+
+        for index in authoredArtworkSprites.indices {
+            let artwork = authoredArtworkSprites[index]
+            guard artwork.textures.count > 1 else { continue }
+            let renderedMaximumPixelDimension =
+                max(artwork.node.size.width, artwork.node.size.height)
+                / cameraScale * contentScale
+            let textureIndex = UnifiedMapArtworkLevelOfDetail.textureIndex(
+                pixelDimensions: artwork.textures.map(\.maximumPixelDimension),
+                renderedMaximumPixelDimension: renderedMaximumPixelDimension,
+                currentIndex: artwork.textureIndex
+            )
+            guard textureIndex != artwork.textureIndex else { continue }
+            artwork.node.texture = artwork.textures[textureIndex].texture
+            authoredArtworkSprites[index].textureIndex = textureIndex
         }
     }
 

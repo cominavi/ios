@@ -6,9 +6,53 @@ struct CatalogMapArtwork: Equatable, @unchecked Sendable {
     let name: String
     let pixelSize: CGSize
     let image: CGImage
+    let renderingImages: [CGImage]
+
+    init(
+        name: String,
+        pixelSize: CGSize,
+        image: CGImage,
+        renderingImages: [CGImage]? = nil
+    ) {
+        self.name = name
+        self.pixelSize = pixelSize
+        self.image = image
+        self.renderingImages =
+            renderingImages.flatMap { $0.isEmpty ? nil : $0 }
+            ?? [image]
+    }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.name == rhs.name && lhs.pixelSize == rhs.pixelSize
+    }
+}
+
+enum CatalogMapArtworkRendering {
+    static let intermediateMaximumPixelDimensions = [1_536, 3_072]
+
+    static func intermediatePixelDimensions(for sourceSize: CGSize) -> [Int] {
+        let sourceMaximum = Int(max(sourceSize.width, sourceSize.height).rounded(.down))
+        return intermediateMaximumPixelDimensions.filter { $0 < sourceMaximum }
+    }
+
+    static func images(
+        from source: CGImageSource,
+        original: CGImage,
+        sourceSize: CGSize
+    ) -> [CGImage] {
+        let intermediateImages = intermediatePixelDimensions(for: sourceSize).compactMap {
+            maximumDimension in
+            CGImageSourceCreateThumbnailAtIndex(
+                source,
+                0,
+                [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceThumbnailMaxPixelSize: maximumDimension,
+                    kCGImageSourceShouldCacheImmediately: true,
+                ] as CFDictionary
+            )
+        }
+        return intermediateImages + [original]
     }
 }
 
@@ -401,7 +445,12 @@ struct SQLiteMapCatalog: MapCatalog {
             return CatalogMapArtwork(
                 name: artworkName,
                 pixelSize: CGSize(width: width, height: height),
-                image: image
+                image: image,
+                renderingImages: CatalogMapArtworkRendering.images(
+                    from: source,
+                    original: image,
+                    sourceSize: CGSize(width: width, height: height)
+                )
             )
         }
 

@@ -448,6 +448,126 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
+    func testUnifiedHostSynchronizesSpriteKitRenderingWithCoreAnimation() {
+        let host = UnifiedMapHostView(
+            frame: CGRect(x: 0, y: 0, width: 390, height: 844)
+        )
+        host.presentScene(SKScene(size: host.bounds.size))
+        host.layoutIfNeeded()
+
+        XCTAssertTrue(host.isRendererPresentationSynchronized)
+        XCTAssertFalse(host.mapView.layer.drawsAsynchronously)
+        XCTAssertTrue(host.mapView.ignoresSiblingOrder)
+        XCTAssertTrue(host.mapView.shouldCullNonVisibleNodes)
+        XCTAssertEqual(
+            host.mapView.preferredFramesPerSecond,
+            UIScreen.main.maximumFramesPerSecond
+        )
+    }
+
+    func testAuthoredArtworkResolutionLadderUsesStableZoomBands() {
+        XCTAssertEqual(
+            CatalogMapArtworkRendering.intermediatePixelDimensions(
+                for: CGSize(width: 4_680, height: 1_680)
+            ),
+            [1_536, 3_072]
+        )
+        XCTAssertEqual(
+            CatalogMapArtworkRendering.intermediatePixelDimensions(
+                for: CGSize(width: 2_440, height: 2_640)
+            ),
+            [1_536]
+        )
+
+        let dimensions = [CGFloat(1_536), 3_072, 4_680]
+        XCTAssertEqual(
+            UnifiedMapArtworkLevelOfDetail.textureIndex(
+                pixelDimensions: dimensions,
+                renderedMaximumPixelDimension: 1_000,
+                currentIndex: 0
+            ),
+            0
+        )
+        XCTAssertEqual(
+            UnifiedMapArtworkLevelOfDetail.textureIndex(
+                pixelDimensions: dimensions,
+                renderedMaximumPixelDimension: 1_500,
+                currentIndex: 0
+            ),
+            1
+        )
+        XCTAssertEqual(
+            UnifiedMapArtworkLevelOfDetail.textureIndex(
+                pixelDimensions: dimensions,
+                renderedMaximumPixelDimension: 1_200,
+                currentIndex: 1
+            ),
+            1,
+            "Small zoom fluctuations should not swap textures repeatedly"
+        )
+        XCTAssertEqual(
+            UnifiedMapArtworkLevelOfDetail.textureIndex(
+                pixelDimensions: dimensions,
+                renderedMaximumPixelDimension: 1_100,
+                currentIndex: 1
+            ),
+            0
+        )
+    }
+
+    @MainActor
+    func testAuthoredArtworkChangesResolutionWithoutReplacingItsSprite() async throws {
+        let detailImage = try XCTUnwrap(makeImage(width: 200, height: 100))
+        let overviewImage = try XCTUnwrap(makeImage(width: 100, height: 50))
+        let catalogScene = CatalogMapScene(
+            id: .init(day: 1, mapID: 1),
+            name: "Test Hall",
+            size: CGSize(width: 200, height: 100),
+            tableSize: CGSize(width: 40, height: 40),
+            tables: [],
+            artwork: CatalogMapArtwork(
+                name: "TestArtworkLOD",
+                pixelSize: CGSize(width: 200, height: 100),
+                image: detailImage,
+                renderingImages: [overviewImage, detailImage]
+            )
+        )
+        let venue = BigSightVenuePlacement(
+            kind: .east123,
+            scene: catalogScene,
+            coordinate: BigSightCampusLayout.eastBuilding,
+            center: .zero,
+            rotation: 0,
+            metersPerMapPoint: BigSightCampusLayout.metersPerMapPoint
+        )
+        let campus = BigSightCampusScene(
+            id: .init(day: 1, mapIDs: [1]),
+            venues: [venue],
+            connections: [],
+            bounds: venue.bounds.insetBy(dx: -70, dy: -70)
+        )
+        let renderer = UnifiedBigSightScene(campus: campus)
+        let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        view.presentScene(renderer)
+        try await Task.sleep(for: .milliseconds(30))
+        renderer.didFinishUpdate()
+
+        let nodeIdentifiers = renderer.authoredMapNodeIdentifiers
+        XCTAssertEqual(renderer.authoredMapTextureIndices, [0])
+
+        renderer.zoom(
+            by: 80,
+            around: CGPoint(x: view.bounds.midX, y: view.bounds.midY),
+            in: view
+        )
+        renderer.didFinishUpdate()
+
+        XCTAssertEqual(renderer.authoredMapTextureIndices, [1])
+        XCTAssertEqual(renderer.authoredMapNodeIdentifiers, nodeIdentifiers)
+        XCTAssertEqual(renderer.authoredMapNodeCount, 1)
+    }
+
+    @MainActor
     func testDarkAppearanceUsesBundledStyleAndDarkChrome() throws {
         let host = UnifiedMapHostView(
             frame: CGRect(x: 0, y: 0, width: 390, height: 844),
@@ -1462,6 +1582,21 @@ final class UnifiedBigSightMapTests: XCTestCase {
             XCTAssertEqual(artwork.image.width, Int(venue.scene.size.width))
             XCTAssertEqual(artwork.image.height, Int(venue.scene.size.height))
             XCTAssertEqual(artwork.name, "LWMP1\(filename)")
+            let renderingDimensions = artwork.renderingImages.map {
+                max($0.width, $0.height)
+            }
+            XCTAssertEqual(
+                renderingDimensions.count,
+                CatalogMapArtworkRendering.intermediatePixelDimensions(
+                    for: artwork.pixelSize
+                ).count + 1
+            )
+            XCTAssertEqual(renderingDimensions, renderingDimensions.sorted())
+            XCTAssertEqual(
+                renderingDimensions.last,
+                max(artwork.image.width, artwork.image.height)
+            )
+            XCTAssertLessThan(renderingDimensions[0], renderingDimensions.last ?? 0)
         }
         XCTAssertEqual(
             campus.venues.first { $0.kind == .east456 }?.scene.layoutRotation,
