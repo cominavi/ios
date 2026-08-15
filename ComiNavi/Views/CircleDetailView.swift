@@ -666,6 +666,7 @@ private struct CircleDetailHeader: View {
                     }
                     .padding(.vertical, 2)
                 }
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("circle-external-links")
             }
