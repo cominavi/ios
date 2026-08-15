@@ -1256,6 +1256,10 @@ final class UnifiedBigSightScene: SKScene {
 
     override func didFinishUpdate() {
         super.didFinishUpdate()
+        publishCameraChangeIfNeeded()
+    }
+
+    private func publishCameraChangeIfNeeded() {
         guard
             mapCamera.position != lastCameraPosition
                 || mapCamera.xScale != lastCameraScale
@@ -1483,6 +1487,10 @@ final class UnifiedBigSightScene: SKScene {
         if shouldUpdateSemanticScope {
             updateSemanticScope()
         }
+        // A zero-duration reduced-motion transition completes before
+        // SpriteKit's next frame. Publish its final state now so compass
+        // appearance and accessibility never remain one frame behind.
+        publishCameraChangeIfNeeded()
     }
 
     func requestVenue(_ mapID: Int) {
