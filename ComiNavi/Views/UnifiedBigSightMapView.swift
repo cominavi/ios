@@ -122,6 +122,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     let visibleMapLayers: Set<BigSightMapLayer>
     let locationFocusBottomInset: CGFloat
     let onViewportChange: (CatalogMapViewport) -> Void
+    let onCameraRotationChange: (CGFloat) -> Void
     let onSelectVenue: (Int) -> Void
     let onShowCampus: () -> Void
     let onSelectTable: (CatalogMapTable, Int) -> Void
@@ -145,6 +146,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             onShowCampus: onShowCampus,
             onSelectTable: onSelectTable,
             onSelectLocatedUser: onSelectLocatedUser,
+            onCameraRotationChange: onCameraRotationChange,
             onLocate: onLocate
         )
         host.mapView.presentScene(renderer)
@@ -163,6 +165,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             onShowCampus: onShowCampus,
             onSelectTable: onSelectTable,
             onSelectLocatedUser: onSelectLocatedUser,
+            onCameraRotationChange: onCameraRotationChange,
             onLocate: onLocate
         )
         update(host: host, renderer: renderer)
@@ -203,16 +206,18 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
         private var onShowCampus: () -> Void = {}
         private var onSelectTable: (CatalogMapTable, Int) -> Void = { _, _ in }
         private var onSelectLocatedUser: () -> Void = {}
+        private var onCameraRotationChange: (CGFloat) -> Void = { _ in }
         private var onLocate: (Int, CGPoint, CatalogMapTable, Int) -> Void = { _, _, _, _ in }
 
         func connect(host: UnifiedMapHostView, renderer: UnifiedBigSightScene) {
             self.host = host
             self.renderer = renderer
-            renderer.onCameraChange = { [weak host, weak renderer] in
-                guard let host, let renderer else { return }
+            renderer.onCameraChange = { [weak self, weak host, weak renderer] in
+                guard let self, let host, let renderer else { return }
                 host.updateCompass(rotation: renderer.cameraRotation)
                 host.updateBasemap(camera: renderer.basemapCamera)
                 host.updateAccessibility(renderer: renderer, scope: renderer.scope)
+                self.onCameraRotationChange(renderer.cameraRotation)
             }
             renderer.onSemanticScopeChange = { [weak self] scope, mapID in
                 guard let self else { return }
@@ -260,12 +265,14 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             onShowCampus: @escaping () -> Void,
             onSelectTable: @escaping (CatalogMapTable, Int) -> Void,
             onSelectLocatedUser: @escaping () -> Void,
+            onCameraRotationChange: @escaping (CGFloat) -> Void,
             onLocate: @escaping (Int, CGPoint, CatalogMapTable, Int) -> Void
         ) {
             self.onSelectVenue = onSelectVenue
             self.onShowCampus = onShowCampus
             self.onSelectTable = onSelectTable
             self.onSelectLocatedUser = onSelectLocatedUser
+            self.onCameraRotationChange = onCameraRotationChange
             self.onLocate = onLocate
         }
 

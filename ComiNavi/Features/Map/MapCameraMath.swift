@@ -113,6 +113,16 @@ enum MapCameraMath {
         normalizedRotation(mapRotation)
     }
 
+    /// Rotates a device heading into screen space after the user rotates the map.
+    static func headingIndicatorRotation(
+        headingDegrees: Double,
+        mapRotation: CGFloat
+    ) -> CGFloat {
+        normalizedRotation(
+            CGFloat(headingDegrees * .pi / 180) + mapRotation
+        )
+    }
+
     /// Produces the camera displayed while fingers are on screen. Scaling and
     /// rotation are both anchored to their gesture origins, while translation
     /// uses a UIKit-style rubber band beyond the strict content limits.

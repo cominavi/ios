@@ -1003,6 +1003,17 @@ final class UnifiedBigSightMapTests: XCTestCase {
     func testCompassIndicatorPointsTowardRenderedNorth() async throws {
         let renderer = UnifiedBigSightScene(campus: makeGeographicCampus())
         let host = UnifiedMapHostView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let coordinator = UnifiedBigSightMapView.Coordinator()
+        var publishedRotation: CGFloat?
+        coordinator.connect(host: host, renderer: renderer)
+        coordinator.updateCallbacks(
+            onSelectVenue: { _ in },
+            onShowCampus: {},
+            onSelectTable: { _, _ in },
+            onSelectLocatedUser: {},
+            onCameraRotationChange: { publishedRotation = $0 },
+            onLocate: { _, _, _, _ in }
+        )
         let controller = UIViewController()
         controller.view = host
         let window = UIWindow(frame: host.bounds)
@@ -1015,8 +1026,9 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
         let pivot = CGPoint(x: host.bounds.midX, y: host.bounds.midY)
         renderer.rotate(by: .pi / 4, around: pivot, in: host.mapView)
-        host.updateCompass(rotation: renderer.cameraRotation)
+        renderer.onCameraChange?()
         XCTAssertTrue(host.compassButton.usesTwoToneNeedle)
+        XCTAssertEqual(publishedRotation, renderer.cameraRotation)
 
         let center = renderer.cameraCampusCenter
         let north = CGPoint(

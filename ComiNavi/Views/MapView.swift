@@ -49,6 +49,7 @@ struct MapView: View {
     @State private var locationService: WhereAmILocationService
     @State private var showsGPSLocationWarning = false
     @State private var isManualCompassEnabled = false
+    @State private var mapRotation: CGFloat = 0
     @State private var gpsSession: GPSLocationSession?
     @State private var locationBeforeManualPicker: LocatedMapUser?
     @State private var isMapLegendExpanded = true
@@ -121,7 +122,10 @@ struct MapView: View {
                 .ignoresSafeArea()
 
             if locationMode == .manual, isManualCompassEnabled {
-                ManualCompassOverlay(headingDegrees: locationService.headingDegrees)
+                ManualCompassOverlay(
+                    headingDegrees: locationService.headingDegrees,
+                    mapRotation: mapRotation
+                )
                     .frame(maxWidth: 280, maxHeight: 280)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
@@ -412,6 +416,9 @@ struct MapView: View {
                     visibleMapLayers: visibleMapLayers,
                     locationFocusBottomInset: currentLocationMapBottomInset,
                     onViewportChange: model.updateViewport,
+                    onCameraRotationChange: { rotation in
+                        mapRotation = rotation
+                    },
                     onSelectVenue: model.select(mapID:),
                     onShowCampus: model.showCampus,
                     onSelectTable: model.select(table:preferredSubspace:),
@@ -445,6 +452,9 @@ struct MapView: View {
                     locatedUser: model.locatedUser,
                     locationFocusBottomInset: currentLocationMapBottomInset,
                     onViewportChange: model.updateViewport,
+                    onCameraRotationChange: { rotation in
+                        mapRotation = rotation
+                    },
                     onSelect: model.select(table:preferredSubspace:),
                     onSelectLocatedUser: {
                         showsCurrentLocation = true
@@ -920,6 +930,7 @@ private struct MapLocationModeOptionButton: View {
 
 private struct ManualCompassOverlay: View {
     let headingDegrees: Double?
+    let mapRotation: CGFloat
 
     var body: some View {
         ZStack {
@@ -928,7 +939,7 @@ private struct ManualCompassOverlay: View {
 
             LucideIcon("location.north.fill", size: 104)
                 .foregroundStyle(Color.blue.opacity(0.48))
-                .rotationEffect(.degrees(headingDegrees ?? 0))
+                .rotationEffect(.radians(pointerRotation))
                 .opacity(headingDegrees == nil ? 0.18 : 1)
         }
         .padding(8)
@@ -944,6 +955,14 @@ private struct ManualCompassOverlay: View {
             return String(localized: "Waiting for compass heading")
         }
         return "\(Int(headingDegrees.rounded()))°"
+    }
+
+    private var pointerRotation: CGFloat {
+        guard let headingDegrees else { return 0 }
+        return MapCameraMath.headingIndicatorRotation(
+            headingDegrees: headingDegrees,
+            mapRotation: mapRotation
+        )
     }
 }
 
@@ -1320,6 +1339,7 @@ private struct InteractiveMapCanvas: View {
     let locatedUser: LocatedMapUser?
     let locationFocusBottomInset: CGFloat
     let onViewportChange: (CatalogMapViewport) -> Void
+    let onCameraRotationChange: (CGFloat) -> Void
     let onSelect: (CatalogMapTable, Int) -> Void
     let onSelectLocatedUser: () -> Void
     let onLocate: (CGPoint, CatalogMapTable, Int) -> Void
@@ -1354,6 +1374,7 @@ private struct InteractiveMapCanvas: View {
         locatedUser: LocatedMapUser?,
         locationFocusBottomInset: CGFloat,
         onViewportChange: @escaping (CatalogMapViewport) -> Void,
+        onCameraRotationChange: @escaping (CGFloat) -> Void,
         onSelect: @escaping (CatalogMapTable, Int) -> Void,
         onSelectLocatedUser: @escaping () -> Void,
         onLocate: @escaping (CGPoint, CatalogMapTable, Int) -> Void
@@ -1370,6 +1391,7 @@ private struct InteractiveMapCanvas: View {
         self.locatedUser = locatedUser
         self.locationFocusBottomInset = locationFocusBottomInset
         self.onViewportChange = onViewportChange
+        self.onCameraRotationChange = onCameraRotationChange
         self.onSelect = onSelect
         self.onSelectLocatedUser = onSelectLocatedUser
         self.onLocate = onLocate
@@ -1507,6 +1529,9 @@ private struct InteractiveMapCanvas: View {
             }
             .onChange(of: committedViewport, initial: true) { _, viewport in
                 onViewportChange(viewport)
+            }
+            .onChange(of: effectiveCamera.rotation, initial: true) { _, rotation in
+                onCameraRotationChange(rotation)
             }
             .onAppear {
                 guard !hasAppliedInitialCamera else { return }

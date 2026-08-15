@@ -67,6 +67,39 @@ final class MapCameraMathTests: XCTestCase {
         }
     }
 
+    func testHeadingIndicatorStaysAlignedWithTheRotatedMap() {
+        let mapRotations: [CGFloat] = [0, .pi / 3, -.pi / 4]
+        let headings = [0.0, 72.0, 180.0, 315.0]
+
+        for mapRotation in mapRotations {
+            for headingDegrees in headings {
+                let headingRotation = CGFloat(headingDegrees * .pi / 180)
+                let expectedDirection = CGPoint(x: 0, y: -1)
+                    .applying(CGAffineTransform(rotationAngle: headingRotation))
+                    .applying(CGAffineTransform(rotationAngle: mapRotation))
+                let indicatorDirection = CGPoint(x: 0, y: -1).applying(
+                    CGAffineTransform(
+                        rotationAngle: MapCameraMath.headingIndicatorRotation(
+                            headingDegrees: headingDegrees,
+                            mapRotation: mapRotation
+                        )
+                    )
+                )
+
+                XCTAssertEqual(
+                    indicatorDirection.x,
+                    expectedDirection.x,
+                    accuracy: 0.000_001
+                )
+                XCTAssertEqual(
+                    indicatorDirection.y,
+                    expectedDirection.y,
+                    accuracy: 0.000_001
+                )
+            }
+        }
+    }
+
     func testScalingKeepsTheGestureOriginStationary() {
         let viewport = CGSize(width: 390, height: 844)
         let anchor = CGPoint(x: 74, y: 637)
