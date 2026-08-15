@@ -988,6 +988,9 @@ private struct SharedPlanCircleGroupHeader: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                LucideLabel(verbatim: identity.dayAndLocation, icon: "map-pin")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)
             if conflictCount > 0 {
