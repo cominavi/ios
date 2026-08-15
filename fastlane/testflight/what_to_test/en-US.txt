@@ -1,1 +1,1 @@
-Updated the C108 Shinagaki catalog with previously missing posts, fixed absent and attending statuses being applied to the wrong circle spaces, and now remembers the last selected catalog day.
+Shared plans can now be exported as ZIP archives, and the plan editor shows the total amount.
