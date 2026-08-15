@@ -327,16 +327,30 @@ private struct CatalogContentView: View {
         }
         .onChange(of: circle.readiness, initial: true) {
             guard case .ready = circle.readiness,
-                let days = circle.comiket?.days,
-                let firstDay = days.first,
-                !days.contains(where: { $0.dayIndex == selectedDay })
+                  let rememberedDay = catalogLibrary.preferredDay(
+                      forEventNumber: circle.comiket.number,
+                      availableDayIndices: availableDayIndices
+                  ),
+                  rememberedDay != selectedDay
             else { return }
 
-            selectedDay = firstDay.dayIndex
+            selectedDay = rememberedDay
+        }
+        .onChange(of: selectedDay) { _, day in
+            guard case .ready = circle.readiness else { return }
+            catalogLibrary.rememberSelectedDay(
+                day,
+                forEventNumber: circle.comiket.number,
+                availableDayIndices: availableDayIndices
+            )
         }
         .onChange(of: sharedLocationInbox.pending?.id, initial: true) {
             handlePendingSharedLocation()
         }
+    }
+
+    private var availableDayIndices: [Int] {
+        circle.comiket.days.map(\.dayIndex)
     }
 
     private func handlePendingSharedLocation() {

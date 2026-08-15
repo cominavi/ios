@@ -172,6 +172,74 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertNil(library.dataSource)
     }
 
+    func testSelectedDayPersistsPerEventAndFallsBackToAnAvailableDay() {
+        let (defaults, suiteName) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let source = CatalogSourceStub(
+            mode: .cominavi,
+            behavior: .events([]),
+            recorder: CatalogSourceInvocationRecorder()
+        )
+        let firstLibrary = CatalogLibrary(
+            sources: [.cominavi: source],
+            defaults: defaults,
+            initialMode: .cominavi
+        )
+
+        firstLibrary.rememberSelectedDay(
+            2,
+            forEventNumber: 108,
+            availableDayIndices: [1, 2]
+        )
+
+        let restoredLibrary = CatalogLibrary(
+            sources: [.cominavi: source],
+            defaults: defaults,
+            initialMode: .cominavi
+        )
+        XCTAssertEqual(
+            restoredLibrary.preferredDay(
+                forEventNumber: 108,
+                availableDayIndices: [1, 2]
+            ),
+            2
+        )
+
+        restoredLibrary.rememberSelectedDay(
+            1,
+            forEventNumber: 108,
+            availableDayIndices: [1, 2]
+        )
+        let dayOneLibrary = CatalogLibrary(
+            sources: [.cominavi: source],
+            defaults: defaults,
+            initialMode: .cominavi
+        )
+        XCTAssertEqual(
+            dayOneLibrary.preferredDay(
+                forEventNumber: 108,
+                availableDayIndices: [1, 2]
+            ),
+            1
+        )
+        XCTAssertEqual(
+            restoredLibrary.preferredDay(
+                forEventNumber: 104,
+                availableDayIndices: [1, 2]
+            ),
+            1,
+            "A different Comiket should keep its own day selection"
+        )
+        XCTAssertEqual(
+            restoredLibrary.preferredDay(
+                forEventNumber: 108,
+                availableDayIndices: [1]
+            ),
+            1,
+            "An unavailable remembered day should fall back safely"
+        )
+    }
+
     func testFutureOnlyEventListFailsWithoutRequestingMetadata() async throws {
         let response = eventListResponse(
             events: [.init(eventID: 240, eventNumber: 109)],

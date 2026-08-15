@@ -408,6 +408,30 @@ final class CatalogLibrary {
         load(event)
     }
 
+    func preferredDay(
+        forEventNumber eventNumber: Int,
+        availableDayIndices: [Int]
+    ) -> Int? {
+        guard let firstDay = availableDayIndices.first else { return nil }
+
+        let storedDay = defaults.object(
+            forKey: selectedDayDefaultsKey(eventNumber: eventNumber)
+        ) as? Int
+        guard let storedDay, availableDayIndices.contains(storedDay) else {
+            return firstDay
+        }
+        return storedDay
+    }
+
+    func rememberSelectedDay(
+        _ day: Int,
+        forEventNumber eventNumber: Int,
+        availableDayIndices: [Int]
+    ) {
+        guard availableDayIndices.contains(day) else { return }
+        defaults.set(day, forKey: selectedDayDefaultsKey(eventNumber: eventNumber))
+    }
+
     func selectMode(_ newMode: CatalogDataMode) {
         guard newMode != mode, sources[newMode] != nil else { return }
 
@@ -581,6 +605,10 @@ final class CatalogLibrary {
 
     private var selectedEventDefaultsKey: String {
         "CatalogLibrary.selectedEventID.\(AppEnvironment.current.storageNamespace).\(mode.rawValue)"
+    }
+
+    private func selectedDayDefaultsKey(eventNumber: Int) -> String {
+        "CatalogLibrary.selectedDay.\(AppEnvironment.current.storageNamespace).C\(eventNumber)"
     }
 
     private static func initialMode(
