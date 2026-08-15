@@ -1,1 +1,1 @@
-C108 Day 2 fixes: smaller non-hall map markers, steadier venue maps, faster Explore day switching, horizontal multi-image browsing, multi-post long-press previews, image save and share, and no unnecessary scrolling for social links.
+Fixes map layer alignment while zooming and keeps circle details visible when removing a favorite from Saved Only Explore results.
