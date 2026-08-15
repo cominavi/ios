@@ -1,1 +1,1 @@
-The map compass now rotates with the venue grid, and shared-plan locations show their hall names.
+C108 Day 2 fixes: smaller non-hall map markers, steadier venue maps, faster Explore day switching, horizontal multi-image browsing, multi-post long-press previews, image save and share, and no unnecessary scrolling for social links.
