@@ -455,6 +455,7 @@ private struct FollowingImportedCircleRow: View {
                             .placeholder {
                                 Circle().fill(Color(uiColor: .secondarySystemFill))
                             }
+                            .targetCache(RemoteImagePipeline.cache(for: .profileImages))
                             .cacheOriginalImage()
                             .diskCacheExpiration(.never)
                             .waitForCache()

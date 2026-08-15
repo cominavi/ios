@@ -1,45 +1,154 @@
 import Kingfisher
 import UIKit
 
+enum RemoteImageCacheCategory: String, CaseIterable, Identifiable {
+    case shinagaki
+    case circleArtwork
+    case profileImages
+
+    var id: String {
+        rawValue
+    }
+
+    var defaultLimit: RemoteImageCacheLimit {
+        switch self {
+        case .shinagaki: .megabytes512
+        case .circleArtwork: .megabytes256
+        case .profileImages: .megabytes128
+        }
+    }
+
+    fileprivate var cacheName: String {
+        "cominavi.remote-images.\(rawValue).v1"
+    }
+
+    fileprivate var limitDefaultsKey: String {
+        "cominavi.remote-image-cache.\(rawValue).limit-megabytes.v1"
+    }
+}
+
+enum RemoteImageCacheLimit: Int, CaseIterable, Identifiable {
+    case megabytes64 = 64
+    case megabytes128 = 128
+    case megabytes256 = 256
+    case megabytes512 = 512
+    case gigabyte1 = 1024
+    case gigabytes2 = 2048
+
+    var id: Int {
+        rawValue
+    }
+
+    var bytes: UInt {
+        UInt(rawValue) * 1024 * 1024
+    }
+}
+
+struct RemoteImageCacheStatistics: Equatable {
+    let category: RemoteImageCacheCategory
+    let diskBytes: UInt
+    let limitBytes: UInt
+}
+
 enum RemoteImagePipeline {
-    static let diskCacheSizeLimit = 1_024 * 1_024 * 1_024
+    private static let shinagakiCache = ImageCache(
+        name: RemoteImageCacheCategory.shinagaki.cacheName
+    )
+    private static let circleArtworkCache = ImageCache(
+        name: RemoteImageCacheCategory.circleArtwork.cacheName
+    )
+    private static let profileImagesCache = ImageCache(
+        name: RemoteImageCacheCategory.profileImages.cacheName
+    )
 
-    private static let options: KingfisherOptionsInfo = [
-        .cacheOriginalImage,
-        .diskCacheExpiration(.never),
-        .waitForCache,
-    ]
+    static func configureCaches(defaults: UserDefaults = .standard) {
+        for category in RemoteImageCacheCategory.allCases {
+            let cache = cache(for: category)
+            cache.diskStorage.config.expiration = .never
+            cache.diskStorage.config.sizeLimit = configuredLimit(
+                for: category,
+                defaults: defaults
+            ).bytes
+        }
+    }
 
-    static func configureCache() {
-        ImageCache.default.diskStorage.config.expiration = .never
-        ImageCache.default.diskStorage.config.sizeLimit = UInt(diskCacheSizeLimit)
+    static func cache(for category: RemoteImageCacheCategory) -> ImageCache {
+        switch category {
+        case .shinagaki: shinagakiCache
+        case .circleArtwork: circleArtworkCache
+        case .profileImages: profileImagesCache
+        }
+    }
+
+    static func configuredLimit(
+        for category: RemoteImageCacheCategory,
+        defaults: UserDefaults = .standard
+    ) -> RemoteImageCacheLimit {
+        guard let stored = defaults.object(forKey: category.limitDefaultsKey) as? NSNumber,
+              let limit = RemoteImageCacheLimit(rawValue: stored.intValue)
+        else { return category.defaultLimit }
+        return limit
+    }
+
+    @MainActor
+    static func setLimit(
+        _ limit: RemoteImageCacheLimit,
+        for category: RemoteImageCacheCategory,
+        defaults: UserDefaults = .standard
+    ) async {
+        defaults.set(limit.rawValue, forKey: category.limitDefaultsKey)
+        let cache = cache(for: category)
+        cache.diskStorage.config.sizeLimit = limit.bytes
+        await cache.cleanExpiredDiskCache()
     }
 
     static func image(
         for url: URL,
+        category: RemoteImageCacheCategory,
         targetPixelSize: CGSize? = nil
     ) async -> UIImage? {
-        await result(for: url, targetPixelSize: targetPixelSize)?.image
+        await result(
+            for: url,
+            category: category,
+            targetPixelSize: targetPixelSize
+        )?.image
     }
 
-    static func imageData(for url: URL) async -> Data? {
-        guard let dataProvider = await result(for: url)?.data else { return nil }
+    static func imageData(
+        for url: URL,
+        category: RemoteImageCacheCategory,
+        cacheKey: String? = nil
+    ) async -> Data? {
+        guard let dataProvider = await result(
+            for: url,
+            category: category,
+            cacheKey: cacheKey
+        )?.data else {
+            return nil
+        }
         return await Task.detached(priority: .utility) {
             dataProvider()
         }.value
     }
 
-    static func cachedImageData(forKey key: String) async -> Data? {
-        guard let image = try? await ImageCache.default.retrieveImage(
+    static func cachedImageData(
+        forKey key: String,
+        category: RemoteImageCacheCategory
+    ) async -> Data? {
+        guard let image = try? await cache(for: category).retrieveImage(
             forKey: key,
             options: [.diskCacheExpiration(.never)]
         ).image else { return nil }
         return await encodedPNGData(for: image)
     }
 
-    static func storeImageData(_ data: Data, forKey key: String) async {
+    static func storeImageData(
+        _ data: Data,
+        forKey key: String,
+        category: RemoteImageCacheCategory
+    ) async {
         guard let image = UIImage(data: data) else { return }
-        try? await ImageCache.default.store(image, original: data, forKey: key)
+        try? await cache(for: category).store(image, original: data, forKey: key)
     }
 
     static func authenticatedCacheKey(for url: URL, revision: Int?) -> String {
@@ -52,18 +161,79 @@ enum RemoteImagePipeline {
         }.value
     }
 
+    static func statistics(
+        for category: RemoteImageCacheCategory
+    ) async throws -> RemoteImageCacheStatistics {
+        let cache = cache(for: category)
+        return try await RemoteImageCacheStatistics(
+            category: category,
+            diskBytes: cache.diskStorageSize,
+            limitBytes: cache.diskStorage.config.sizeLimit
+        )
+    }
+
+    static func allStatistics() async throws -> [RemoteImageCacheStatistics] {
+        try await withThrowingTaskGroup(of: RemoteImageCacheStatistics.self) { group in
+            for category in RemoteImageCacheCategory.allCases {
+                group.addTask {
+                    try await statistics(for: category)
+                }
+            }
+
+            var statisticsByCategory: [RemoteImageCacheCategory: RemoteImageCacheStatistics] = [:]
+            for try await statistics in group {
+                statisticsByCategory[statistics.category] = statistics
+            }
+            return RemoteImageCacheCategory.allCases.compactMap {
+                statisticsByCategory[$0]
+            }
+        }
+    }
+
+    static func clear(_ category: RemoteImageCacheCategory) async {
+        let cache = cache(for: category)
+        cache.clearMemoryCache()
+        await cache.clearDiskCache()
+    }
+
+    static func clearAll() async {
+        await withTaskGroup(of: Void.self) { group in
+            for category in RemoteImageCacheCategory.allCases {
+                group.addTask {
+                    await clear(category)
+                }
+            }
+        }
+    }
+
+    private static func options(
+        for category: RemoteImageCacheCategory,
+        targetPixelSize: CGSize?
+    ) -> KingfisherOptionsInfo {
+        let cache = cache(for: category)
+        var options: KingfisherOptionsInfo = [
+            .targetCache(cache),
+            .originalCache(cache),
+            .cacheOriginalImage,
+            .diskCacheExpiration(.never),
+            .waitForCache,
+        ]
+        if let targetPixelSize {
+            options.append(.processor(DownsamplingImageProcessor(size: targetPixelSize)))
+        }
+        return options
+    }
+
     private static func result(
         for url: URL,
-        targetPixelSize: CGSize? = nil
+        category: RemoteImageCacheCategory,
+        targetPixelSize: CGSize? = nil,
+        cacheKey: String? = nil
     ) async -> RetrieveImageResult? {
-        var requestOptions = options
-        if let targetPixelSize {
-            requestOptions.append(.processor(DownsamplingImageProcessor(size: targetPixelSize)))
-        }
-
+        let resource = KF.ImageResource(downloadURL: url, cacheKey: cacheKey)
         return try? await KingfisherManager.shared.retrieveImage(
-            with: url,
-            options: requestOptions
+            with: resource,
+            options: options(for: category, targetPixelSize: targetPixelSize)
         )
     }
 }

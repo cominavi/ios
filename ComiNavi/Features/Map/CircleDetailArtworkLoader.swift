@@ -10,48 +10,54 @@ protocol CircleDetailArtworkLoading: Sendable {
 /// The catalog database is optimized for bulk/offline map rendering. The
 /// authenticated circle endpoint can provide a newer web cut at a higher
 /// resolution, so selection details prefer that image and retain it in the
-/// event's disposable image cache. Offline and demo use still work through the
+/// categorized remote-image cache. Offline and demo use still work through the
 /// database fallback.
-struct CircleDetailArtworkLoader: CircleDetailArtworkLoading, Sendable {
-    typealias RemoteImageFetcher = @Sendable (_ publicCircleID: Int) async -> Data?
+struct CircleDetailArtworkLoader: CircleDetailArtworkLoading {
+    typealias RemoteImageFetcher = @Sendable (
+        _ publicCircleID: Int,
+        _ updateID: Int?
+    ) async -> Data?
 
-    private let cacheDirectory: URL
     private let fetchRemoteImage: RemoteImageFetcher
 
-    init(eventID: Int, eventNumber: Int) {
-        cacheDirectory = DirectoryManager.shared
-            .cachesFor(
-                eventID: eventID,
-                comiketId: String(eventNumber),
-                .circlems,
-                .images,
-                createIfNeeded: true
+    init() {
+        fetchRemoteImage = { publicCircleID, updateID in
+            let cacheKey = Self.remoteCacheKey(
+                publicCircleID: publicCircleID,
+                updateID: updateID
             )
-            .appendingPathComponent("selected-circles", isDirectory: true)
-        try? FileManager.default.createDirectory(
-            at: cacheDirectory,
-            withIntermediateDirectories: true
-        )
+            if let cached = await RemoteImagePipeline.cachedImageData(
+                forKey: cacheKey,
+                category: .circleArtwork
+            ) {
+                return cached
+            }
 
-        fetchRemoteImage = { publicCircleID in
-            guard !(await AppData.getUserToken()).isEmpty,
+            guard await !(AppData.getUserToken()).isEmpty,
                   let circleResponse = try? await CirclemsAPI.getCircle(wcid: String(publicCircleID)),
                   let url = URL(string: circleResponse.response.cutUrl),
                   url.scheme?.lowercased() == "https",
-                  let data = await RemoteImagePipeline.imageData(for: url),
+                  let data = await RemoteImagePipeline.imageData(
+                      for: url,
+                      category: .circleArtwork,
+                      cacheKey: cacheKey
+                  ),
                   Self.pixelArea(of: data) != nil
             else { return nil }
             return data
         }
     }
 
-    init(cacheDirectory: URL, fetchRemoteImage: @escaping RemoteImageFetcher) {
-        self.cacheDirectory = cacheDirectory
+    init(fetchRemoteImage: @escaping RemoteImageFetcher) {
         self.fetchRemoteImage = fetchRemoteImage
-        try? FileManager.default.createDirectory(
-            at: cacheDirectory,
-            withIntermediateDirectories: true
-        )
+    }
+
+    init(
+        fetchRemoteImage: @escaping @Sendable (_ publicCircleID: Int) async -> Data?
+    ) {
+        self.init { publicCircleID, _ in
+            await fetchRemoteImage(publicCircleID)
+        }
     }
 
     func bestImageData(for circle: CatalogMapCircle, fallback: Data?) async -> Data? {
@@ -68,31 +74,17 @@ struct CircleDetailArtworkLoader: CircleDetailArtworkLoading, Sendable {
         fallback: Data?
     ) async -> Data? {
         guard let publicCircleID else { return fallback }
-        let cacheURL = cacheURL(
-            publicCircleID: publicCircleID,
-            updateID: updateID
-        )
-
-        if let cached = try? Data(contentsOf: cacheURL, options: .mappedIfSafe),
-           Self.isHigherResolution(cached, than: fallback)
-        {
-            return cached
-        }
-
         guard !Task.isCancelled,
-              let remote = await fetchRemoteImage(publicCircleID),
+              let remote = await fetchRemoteImage(publicCircleID, updateID),
               !Task.isCancelled,
               Self.isHigherResolution(remote, than: fallback)
         else { return fallback }
 
-        try? remote.write(to: cacheURL, options: .atomic)
         return remote
     }
 
-    private func cacheURL(publicCircleID: Int, updateID: Int?) -> URL {
-        cacheDirectory.appendingPathComponent(
-            "circle-\(publicCircleID)-update-\(updateID ?? 0).image"
-        )
+    static func remoteCacheKey(publicCircleID: Int, updateID: Int?) -> String {
+        "circle-artwork:\(publicCircleID):update:\(updateID ?? 0)"
     }
 
     private static func isHigherResolution(_ candidate: Data, than fallback: Data?) -> Bool {

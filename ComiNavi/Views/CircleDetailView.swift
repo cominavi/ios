@@ -448,6 +448,7 @@ private struct CircleXProfileAvatar: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(uiColor: .secondarySystemFill))
             }
+            .targetCache(RemoteImagePipeline.cache(for: .profileImages))
             .cacheOriginalImage()
             .diskCacheExpiration(.never)
             .waitForCache()
@@ -1774,7 +1775,10 @@ private struct ShinagakiRemoteImage: View {
         image = nil
         didFail = false
 
-        guard let decodedImage = await RemoteImagePipeline.image(for: media.displayURL),
+        guard let decodedImage = await RemoteImagePipeline.image(
+            for: media.displayURL,
+            category: .shinagaki
+        ),
               !Task.isCancelled
         else {
             if !Task.isCancelled {

@@ -675,7 +675,6 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
     private var authenticationGeneration: UInt64 = 0
     private var refreshTask: Task<CominaviAuthenticationSession, Error>?
     private var refreshTaskToken: String?
-    private var avatarDataCache: [String: Data] = [:]
 
     init(
         baseURL: URL = URL(string: "https://cominavi.net")!,
@@ -2956,7 +2955,6 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
             profile: profile,
             expectedAuthenticationGeneration: generation
         )
-        avatarDataCache.removeAll()
         return profile
     }
 
@@ -2991,13 +2989,11 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
             profile: profile,
             expectedAuthenticationGeneration: generation
         )
-        avatarDataCache.removeAll()
         return profile
     }
 
     func loadAvatarData(from url: URL) async throws -> Data {
-        let (path, userID) = try authenticatedAvatarPath(for: url)
-        if let cached = avatarDataCache[path] { return cached }
+        let (_, userID) = try authenticatedAvatarPath(for: url)
         let output = try await generatedAuthorizedRequest(
             operation: { client in
                 try await client.getUserAvatar(.init(path: .init(userID: userID)))
@@ -3023,7 +3019,6 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         default:
             throw CominaviServiceError.invalidResponse
         }
-        avatarDataCache[path] = data
         return data
     }
 
@@ -4329,7 +4324,6 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         authenticationGeneration += 1
         session = nil
         requiresExplicitAuthentication = true
-        avatarDataCache.removeAll()
         refreshTask?.cancel()
         refreshTask = nil
         refreshTaskToken = nil

@@ -1,0 +1,174 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Cache statistics are unavailable." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キャッシュ情報を取得できません。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캐시 정보를 불러올 수 없습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无法获取缓存信息。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "無法取得快取資訊。" } }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キャンセル" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "취소" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "取消" } }
+      }
+    },
+    "Circle artwork" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "サークル画像" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "서클 이미지" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "社团图片" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "社團圖片" } }
+      }
+    },
+    "Clear All" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "すべて削除" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "모두 지우기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全部清除" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "全部清除" } }
+      }
+    },
+    "Clear All Image Caches" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "すべての画像キャッシュを削除" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "모든 이미지 캐시 지우기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除全部图片缓存" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "清除全部圖片快取" } }
+      }
+    },
+    "Clear Cache" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キャッシュを削除" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캐시 지우기" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除缓存" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "清除快取" } }
+      }
+    },
+    "Clear all image caches?" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "すべての画像キャッシュを削除しますか？" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "모든 이미지 캐시를 지울까요?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除全部图片缓存？" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "清除全部圖片快取？" } }
+      }
+    },
+    "Combined limit" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "合計上限" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "합산 한도" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "总上限" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "總上限" } }
+      }
+    },
+    "ComiNavi, X, and followed-account profile images." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ComiNavi、X、フォロー中アカウントのプロフィール画像。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "ComiNavi, X 및 팔로우 중인 계정의 프로필 이미지입니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "ComiNavi、X 以及已关注账号的头像。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "ComiNavi、X 以及已追蹤帳號的頭像。" } }
+      }
+    },
+    "Disk limit" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ディスク上限" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "디스크 한도" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "磁盘上限" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "磁碟上限" } }
+      }
+    },
+    "Downloaded images will be removed and downloaded again when needed." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダウンロード済みの画像は削除され、必要になったときに再ダウンロードされます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다운로드한 이미지가 삭제되며 필요할 때 다시 다운로드됩니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已下载的图片将被删除，并会在需要时重新下载。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "已下載的圖片將被刪除，並會在需要時重新下載。" } }
+      }
+    },
+    "Higher-resolution Circle.ms circle cuts." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "高解像度のCircle.msサークルカット。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "고해상도 Circle.ms 서클 이미지입니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更高分辨率的 Circle.ms 社团图片。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "更高解析度的 Circle.ms 社團圖片。" } }
+      }
+    },
+    "Image Cache" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "画像キャッシュ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이미지 캐시" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图片缓存" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "圖片快取" } }
+      }
+    },
+    "Image caches keep downloaded images available without downloading them again." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "画像キャッシュに保存すると、ダウンロードし直さずに画像を表示できます。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "이미지 캐시에 저장하면 다시 다운로드하지 않고 이미지를 볼 수 있습니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图片缓存会保留已下载的图片，之后无需再次下载。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "圖片快取會保留已下載的圖片，之後無需再次下載。" } }
+      }
+    },
+    "Product previews and Shinagaki images shown in Explore and circle details." : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "Exploreやサークル詳細に表示される頒布物プレビューとお品書き画像。" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "둘러보기와 서클 상세 화면에 표시되는 판매 목록 및 상품 미리보기 이미지입니다." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "“发现”和社团详情中显示的商品预览与摊位商品图。" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "「探索」與社團詳細資訊中顯示的商品預覽及攤位商品圖。" } }
+      }
+    },
+    "Profile images" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プロフィール画像" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "프로필 이미지" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "头像" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "頭像" } }
+      }
+    },
+    "Refresh Cache Statistics" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "キャッシュ情報を更新" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "캐시 정보 새로고침" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新缓存信息" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "重新整理快取資訊" } }
+      }
+    },
+    "Shinagaki images" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "お品書き画像" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "판매 목록 이미지" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "摊位商品图" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "攤位商品圖" } }
+      }
+    },
+    "Storage" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ストレージ" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "저장 공간" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存储空间" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "儲存空間" } }
+      }
+    },
+    "Try Again" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "もう一度試す" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "다시 시도" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重试" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "再試一次" } }
+      }
+    },
+    "Used" : {
+      "localizations" : {
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "使用中" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "사용 중" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已使用" } },
+        "zh-Hant" : { "stringUnit" : { "state" : "translated", "value" : "已使用" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

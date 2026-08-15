@@ -80,10 +80,7 @@ struct MapView: View {
             eventNumber: dataSource.comiket.number,
             selectedDay: selectedDay.wrappedValue,
             catalog: dataSource.mapCatalog,
-            detailArtworkLoader: CircleDetailArtworkLoader(
-                eventID: dataSource.eventID,
-                eventNumber: dataSource.comiket.number
-            ),
+            detailArtworkLoader: CircleDetailArtworkLoader(),
             userPlanStore: dataSource.userPlanStore,
             bookmarkSyncCoordinator: dataSource.bookmarkSyncCoordinator,
             primarySharedPlanProvider: SharedPlanPrimaryMapCircleProvider(

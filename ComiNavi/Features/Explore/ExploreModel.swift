@@ -417,10 +417,7 @@ final class ExploreModel {
         fixedTag = selectedTag
         self.selectedDay = selectedDay
         self.selectedTag = selectedTag
-        artworkLoader = CircleDetailArtworkLoader(
-            eventID: dataSource.eventID,
-            eventNumber: Int(dataSource.comiketId) ?? 0
-        )
+        artworkLoader = CircleDetailArtworkLoader()
         imageCache.totalCostLimit = 48 * 1_024 * 1_024
         coverThumbnailCache.totalCostLimit = 12 * 1_024 * 1_024
     }
@@ -683,7 +680,10 @@ final class ExploreModel {
     func fullCoverImage(for circle: ExploreCircle) async -> UIImage? {
         for url in circle.preferredCoverURLs {
             guard !Task.isCancelled else { return nil }
-            if let image = await RemoteImagePipeline.image(for: url) {
+            if let image = await RemoteImagePipeline.image(
+                for: url,
+                category: .shinagaki
+            ) {
                 return image
             }
         }
@@ -814,6 +814,7 @@ final class ExploreModel {
 
         guard let image = await RemoteImagePipeline.image(
             for: url,
+            category: .shinagaki,
             targetPixelSize: CGSize(
                 width: targetPixelSize.width,
                 height: targetPixelSize.height

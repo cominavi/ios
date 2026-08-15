@@ -342,6 +342,21 @@ struct ProfileScreen: View {
                 }
             }
 
+            Section {
+                NavigationLink {
+                    ImageCacheManagementScreen()
+                } label: {
+                    Label {
+                        Text("Image Cache", tableName: "ImageCache")
+                    } icon: {
+                        Image(systemName: "photo.stack")
+                    }
+                }
+                .accessibilityIdentifier("profile-image-cache")
+            } header: {
+                Text("Storage", tableName: "ImageCache")
+            }
+
             Section("Support") {
                 Button {
                     presentedSheet = .issueReport
@@ -680,13 +695,20 @@ struct AuthenticatedProfileAvatar: View {
                 revision: revision
             )
             let data: Data
-            if let cached = await RemoteImagePipeline.cachedImageData(forKey: cacheKey) {
+            if let cached = await RemoteImagePipeline.cachedImageData(
+                forKey: cacheKey,
+                category: .profileImages
+            ) {
                 data = cached
             } else if let downloaded = try? await CominaviServiceClient.shared.loadAvatarData(
                 from: url
             ) {
                 data = downloaded
-                await RemoteImagePipeline.storeImageData(downloaded, forKey: cacheKey)
+                await RemoteImagePipeline.storeImageData(
+                    downloaded,
+                    forKey: cacheKey,
+                    category: .profileImages
+                )
             } else {
                 return
             }

@@ -489,6 +489,45 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["共有プラン"].waitForExistence(timeout: 5))
     }
 
+    @MainActor
+    func testProfileOpensCategorizedImageCacheManagement() {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-ui-testing-no-catalog-shell")
+        app.launch()
+
+        XCTAssertTrue(
+            app.otherElements["catalog-independent-shell"].waitForExistence(timeout: 5)
+        )
+        app.buttons["Profile"].tap()
+        let imageCacheLink = app.buttons["profile-image-cache"]
+        for _ in 0 ..< 6 where !imageCacheLink.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(imageCacheLink.isHittable)
+        imageCacheLink.tap()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["image-cache-screen"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(app.buttons["image-cache-clear-all"].exists)
+        XCTAssertTrue(app.buttons["image-cache-shinagaki-clear"].exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["image-cache-shinagaki-limit"].exists
+        )
+        takeScreenshot(named: "Image-Cache-Management-Top")
+
+        for _ in 0 ..< 6 where !app.buttons["image-cache-profileImages-clear"].isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(app.buttons["image-cache-circleArtwork-clear"].exists)
+        XCTAssertTrue(app.buttons["image-cache-profileImages-clear"].isHittable)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["image-cache-profileImages-limit"].exists
+        )
+        takeScreenshot(named: "Image-Cache-Management-Categories")
+    }
+
     /// Opt-in production acceptance for a preserved signed-in device or
     /// simulator. This exercises discovery, authenticated artifact download,
     /// verification, installation, and the real C108 catalog shell.

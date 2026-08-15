@@ -1,8 +1,8 @@
+@testable import ComiNavi
 import CoreGraphics
 import ImageIO
 import UniformTypeIdentifiers
 import XCTest
-@testable import ComiNavi
 
 final class CircleDetailArtworkLoaderTests: XCTestCase {
     @MainActor
@@ -54,13 +54,11 @@ final class CircleDetailArtworkLoaderTests: XCTestCase {
         XCTAssertEqual(model.selection?.selectedCircleID, circleID)
     }
 
-    func testHigherResolutionRemoteCutReplacesDatabaseFallbackAndIsCached() async throws {
-        let directory = temporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
+    func testHigherResolutionRemoteCutReplacesDatabaseFallback() async throws {
         let fallback = try makePNG(width: 180, height: 256)
         let remote = try makePNG(width: 600, height: 850)
         let circle = makeCircle(publicCircleID: 42, updateID: 7)
-        let loader = CircleDetailArtworkLoader(cacheDirectory: directory) { id in
+        let loader = CircleDetailArtworkLoader { id in
             XCTAssertEqual(id, 42)
             return remote
         }
@@ -68,21 +66,12 @@ final class CircleDetailArtworkLoaderTests: XCTestCase {
         let selected = await loader.bestImageData(for: circle, fallback: fallback)
 
         XCTAssertEqual(selected, remote)
-
-        let cachedLoader = CircleDetailArtworkLoader(cacheDirectory: directory) { _ in
-            XCTFail("A valid versioned cache entry should avoid another request")
-            return nil
-        }
-        let cached = await cachedLoader.bestImageData(for: circle, fallback: fallback)
-        XCTAssertEqual(cached, remote)
     }
 
     func testSmallerRemoteCutDoesNotReplaceDatabaseImage() async throws {
-        let directory = temporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let fallback = try makePNG(width: 211, height: 300)
         let remote = try makePNG(width: 90, height: 128)
-        let loader = CircleDetailArtworkLoader(cacheDirectory: directory) { _ in remote }
+        let loader = CircleDetailArtworkLoader { _ in remote }
 
         let selected = await loader.bestImageData(
             for: makeCircle(publicCircleID: 42, updateID: 7),
@@ -90,14 +79,11 @@ final class CircleDetailArtworkLoaderTests: XCTestCase {
         )
 
         XCTAssertEqual(selected, fallback)
-        XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
     }
 
     func testCircleWithoutPublicIDStaysFullyOffline() async throws {
-        let directory = temporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let fallback = try makePNG(width: 180, height: 256)
-        let loader = CircleDetailArtworkLoader(cacheDirectory: directory) { _ in
+        let loader = CircleDetailArtworkLoader { _ in
             XCTFail("A private catalog circle cannot be requested from the API")
             return nil
         }
@@ -111,10 +97,8 @@ final class CircleDetailArtworkLoaderTests: XCTestCase {
     }
 
     func testIdentifierBasedLookupLoadsArtworkForExploreCards() async throws {
-        let directory = temporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
         let remote = try makePNG(width: 600, height: 850)
-        let loader = CircleDetailArtworkLoader(cacheDirectory: directory) { id in
+        let loader = CircleDetailArtworkLoader { id in
             XCTAssertEqual(id, 42)
             return remote
         }
@@ -126,6 +110,13 @@ final class CircleDetailArtworkLoaderTests: XCTestCase {
         )
 
         XCTAssertEqual(selected, remote)
+    }
+
+    func testRemoteCacheKeyChangesWithCircleRevision() {
+        XCTAssertNotEqual(
+            CircleDetailArtworkLoader.remoteCacheKey(publicCircleID: 42, updateID: 7),
+            CircleDetailArtworkLoader.remoteCacheKey(publicCircleID: 42, updateID: 8)
+        )
     }
 
     private func makeCircle(publicCircleID: Int?, updateID: Int?) -> CatalogMapCircle {
@@ -140,11 +131,6 @@ final class CircleDetailArtworkLoaderTests: XCTestCase {
             genreName: nil,
             circlemsURL: nil
         )
-    }
-
-    private func temporaryDirectory() -> URL {
-        FileManager.default.temporaryDirectory
-            .appendingPathComponent("circle-detail-artwork-\(UUID().uuidString)", isDirectory: true)
     }
 
     private func makePNG(width: Int, height: Int) throws -> Data {
@@ -170,7 +156,7 @@ final class CircleDetailArtworkLoaderTests: XCTestCase {
         )
         context.setFillColor(CGColor(gray: 1, alpha: 1))
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
-        CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), nil)
+        try CGImageDestinationAddImage(destination, XCTUnwrap(context.makeImage()), nil)
         XCTAssertTrue(CGImageDestinationFinalize(destination))
         return data as Data
     }
@@ -192,7 +178,7 @@ final class CircleDetailArtworkLoaderTests: XCTestCase {
 private struct StubCircleDetailArtworkLoader: CircleDetailArtworkLoading {
     let data: Data
 
-    func bestImageData(for circle: CatalogMapCircle, fallback: Data?) async -> Data? {
+    func bestImageData(for _: CatalogMapCircle, fallback _: Data?) async -> Data? {
         data
     }
 }
