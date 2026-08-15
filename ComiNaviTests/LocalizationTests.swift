@@ -476,19 +476,34 @@ final class LocalizationTests: XCTestCase {
 
     func testLocalizedLocationPermissionCopyIsPresent() throws {
         let expectedCopy = [
-            "ja": "会場候補を表示するために位置情報を使用します",
-            "zh-Hans": "Tokyo Big Sight 展馆",
-            "zh-Hant": "Tokyo Big Sight 展館",
-            "ko": "도쿄 빅사이트",
+            "en": "ComiNavi uses your location in GPS Mode to update your position on the Tokyo Big Sight map. GPS may be inaccurate indoors.",
+            "ja": "ComiNaviは、GPSモードで東京ビッグサイトのマップ上の現在地を更新するために位置情報を使用します。屋内ではGPSが不正確になる場合があります。",
+            "ko": "ComiNavi는 GPS 모드에서 도쿄 빅사이트 지도상의 현재 위치를 업데이트하기 위해 위치 정보를 사용합니다. 실내에서는 GPS가 부정확할 수 있습니다.",
+            "zh-Hans": "ComiNavi 会在 GPS 模式下使用你的位置信息，更新你在 Tokyo Big Sight 地图上的位置。GPS 在室内可能不准确",
+            "zh-Hant": "ComiNavi 會在 GPS 模式下使用你的位置資訊，更新你在 Tokyo Big Sight 地圖上的位置。GPS 在室內可能不準確",
         ]
 
+        let appSourceURL = sourceCatalogURL.deletingLastPathComponent()
+        let basePlistData = try Data(contentsOf: appSourceURL.appending(path: "Info.plist"))
+        let basePlist = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: basePlistData, format: nil)
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            basePlist["NSLocationWhenInUseUsageDescription"] as? String,
+            expectedCopy["en"]
+        )
+
         for (language, expected) in expectedCopy {
-            let url = sourceCatalogURL
-                .deletingLastPathComponent()
+            let url = appSourceURL
                 .appending(path: "\(language).lproj/InfoPlist.strings")
             let contents = try String(contentsOf: url, encoding: .utf8)
-            XCTAssertTrue(contents.contains("NSLocationWhenInUseUsageDescription"))
-            XCTAssertTrue(contents.contains(expected), "Missing \(language) permission copy")
+            XCTAssertTrue(
+                contents.contains(
+                    "\"NSLocationWhenInUseUsageDescription\" = \"\(expected)\";"
+                ),
+                "Incorrect \(language) permission copy"
+            )
         }
     }
 

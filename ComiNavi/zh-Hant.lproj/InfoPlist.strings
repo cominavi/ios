@@ -1,2 +1,2 @@
 "CFBundleDisplayName" = "ComiNavi";
-"NSLocationWhenInUseUsageDescription" = "使用「設定目前位置」時，ComiNavi 會使用你的位置資訊，推測你所在的 Tokyo Big Sight 展館";
+"NSLocationWhenInUseUsageDescription" = "ComiNavi 會在 GPS 模式下使用你的位置資訊，更新你在 Tokyo Big Sight 地圖上的位置。GPS 在室內可能不準確";
