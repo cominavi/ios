@@ -84,12 +84,15 @@ final class ExploreModelTests: XCTestCase {
         await model.load()
 
         model.searchQuery = "Artist Two"
+        await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [2])
 
         model.searchQuery = "Robots"
+        await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [3])
 
         model.searchQuery = "Action"
+        await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [1])
     }
 
@@ -128,6 +131,7 @@ final class ExploreModelTests: XCTestCase {
         await model.load()
 
         model.searchQuery = "限定セット"
+        await model.waitForSearch()
 
         XCTAssertEqual(model.visibleCircles.map(\.id), [2, 1])
     }
@@ -146,12 +150,15 @@ final class ExploreModelTests: XCTestCase {
         await model.load()
 
         model.searchQuery = "あいすここなすてっかー"
+        await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [31])
 
         model.searchQuery = "かたかな作家"
+        await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [31])
 
         model.searchQuery = "ぶるーあーかいぶ"
+        await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [31])
     }
 
@@ -220,6 +227,7 @@ final class ExploreModelTests: XCTestCase {
 
         model.selectedTag = nil
         model.searchQuery = "ブルーアーカイブ"
+        await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [21])
     }
 
@@ -300,6 +308,7 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertTrue(model.tagFacets.isEmpty)
         XCTAssertTrue(model.allCircles[0].tags.isEmpty)
         model.searchQuery = "同人誌"
+        await model.waitForSearch()
         XCTAssertTrue(model.visibleCircles.isEmpty)
         model.searchQuery = ""
         model.selectedTag = "同人誌"
@@ -804,10 +813,23 @@ final class ExploreModelTests: XCTestCase {
         await model.load()
 
         model.searchQuery = "rare_handle"
+        await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [2])
 
         model.searchQuery = "限定アクキー"
+        await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [2])
+    }
+
+    func testRapidSearchChangesOnlyApplyTheLatestQuery() async {
+        let model = ExploreModel(circles: fixtures, selectedDay: 1)
+        await model.load()
+
+        model.searchQuery = "Artist"
+        model.searchQuery = "Robots"
+        await model.waitForSearch()
+
+        XCTAssertEqual(model.visibleCircles.map(\.id), [3])
     }
 
     func testDiscoveryCloudContainsPopularTagsOrderedByCircleCount() {

@@ -26,6 +26,7 @@ final class MapCatalogSearchTests: XCTestCase {
             XCTAssertEqual(mapMatches.map(\.mapID), [1, 2])
 
             exploreModel.searchQuery = query
+            await exploreModel.waitForSearch()
             XCTAssertEqual(
                 exploreModel.visibleCircles.map(\.id),
                 [1],
