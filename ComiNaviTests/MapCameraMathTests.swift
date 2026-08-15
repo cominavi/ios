@@ -67,6 +67,65 @@ final class MapCameraMathTests: XCTestCase {
         }
     }
 
+    func testCompassAdvancesFromNorthToGridAndOtherwiseReturnsNorth() {
+        let gridAlignedRotation = CGFloat(33.02 * .pi / 180)
+
+        XCTAssertEqual(
+            MapCameraMath.compassTargetRotation(
+                currentRotation: 0,
+                gridAlignedRotation: gridAlignedRotation
+            ),
+            gridAlignedRotation,
+            accuracy: 0.000_001
+        )
+        for rotation in [gridAlignedRotation, -CGFloat.pi / 3, CGFloat.pi * 0.9] {
+            XCTAssertEqual(
+                MapCameraMath.compassTargetRotation(
+                    currentRotation: rotation,
+                    gridAlignedRotation: gridAlignedRotation
+                ),
+                0,
+                accuracy: 0.000_001
+            )
+        }
+    }
+
+    func testCompassTreatsNearNorthAsNorth() {
+        let gridAlignedRotation = CGFloat.pi / 6
+
+        XCTAssertEqual(
+            MapCameraMath.compassTargetRotation(
+                currentRotation: MapCameraMath.compassAlignmentTolerance * 0.9,
+                gridAlignedRotation: gridAlignedRotation
+            ),
+            gridAlignedRotation,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            MapCameraMath.compassTargetRotation(
+                currentRotation: MapCameraMath.compassAlignmentTolerance * 1.1,
+                gridAlignedRotation: gridAlignedRotation
+            ),
+            0,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testNearestQuarterTurnEquivalentKeepsVenueGridNearNorth() {
+        let westHallCameraRotation = CGFloat(-146.97977914964463 * .pi / 180)
+
+        XCTAssertEqual(
+            MapCameraMath.nearestQuarterTurnEquivalent(westHallCameraRotation) * 180 / .pi,
+            33.02022085035537,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            MapCameraMath.nearestQuarterTurnEquivalent(westHallCameraRotation + .pi),
+            MapCameraMath.nearestQuarterTurnEquivalent(westHallCameraRotation),
+            accuracy: 0.000_001
+        )
+    }
+
     func testHeadingIndicatorStaysAlignedWithTheRotatedMap() {
         let mapRotations: [CGFloat] = [0, .pi / 3, -.pi / 4]
         let headings = [0.0, 72.0, 180.0, 315.0]

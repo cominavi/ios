@@ -3400,6 +3400,34 @@
         }
       }
     },
+    "Align map to venue grid" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地図を会場グリッドに合わせる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지도를 행사장 격자에 맞추기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将地图与会场网格对齐"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將地圖與會場網格對齊"
+          }
+        }
+      }
+    },
     "All" : {
       "localizations" : {
         "ja" : {
@@ -14216,6 +14244,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "綠色"
+          }
+        }
+      }
+    },
+    "Grid aligned" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会場グリッドに整列"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "행사장 격자에 맞춤"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已与会场网格对齐"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已與會場網格對齊"
           }
         }
       }

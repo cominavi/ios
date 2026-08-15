@@ -214,7 +214,10 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             self.renderer = renderer
             renderer.onCameraChange = { [weak self, weak host, weak renderer] in
                 guard let self, let host, let renderer else { return }
-                host.updateCompass(rotation: renderer.cameraRotation)
+                host.updateCompass(
+                    rotation: renderer.cameraRotation,
+                    gridAlignedRotation: renderer.gridAlignedCameraRotation
+                )
                 host.updateBasemap(camera: renderer.basemapCamera)
                 host.updateAccessibility(renderer: renderer, scope: renderer.scope)
                 self.onCameraRotationChange(renderer.cameraRotation)
@@ -257,7 +260,11 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             [pan, pinch, rotation, tap, doubleTap, longPress].forEach(
                 host.mapView.addGestureRecognizer)
             host.compassButton.addTarget(
-                self, action: #selector(resetRotation), for: .touchUpInside)
+                self, action: #selector(advanceCompassRotation), for: .touchUpInside)
+            host.updateCompass(
+                rotation: renderer.cameraRotation,
+                gridAlignedRotation: renderer.gridAlignedCameraRotation
+            )
         }
 
         func updateCallbacks(
@@ -375,8 +382,8 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             )
         }
 
-        @objc private func resetRotation() {
-            renderer?.resetRotation()
+        @objc private func advanceCompassRotation() {
+            renderer?.advanceCompassRotation()
         }
     }
 }
@@ -403,12 +410,18 @@ final class UnifiedMapHostView: UIView {
     let mapView = SKView(frame: .zero)
     let compassButton = MapCompassButton(type: .system)
     private let dataAttributionButton = UIButton(type: .system)
-    private var dataAttributionTrailingConstraint: NSLayoutConstraint?
     private let campusAccessibilityProxy = UIView(frame: .zero)
     private let venueAccessibilityProxy = UIView(frame: .zero)
     private var requestedBasemapCamera: UnifiedBasemapCamera?
     private var lastBasemapCamera: UnifiedBasemapCamera?
     private var appearance: UnifiedMapAppearance
+    private var compassState = CompassState.north
+
+    private enum CompassState: Equatable {
+        case north
+        case gridAligned
+        case free
+    }
 
     init(frame: CGRect = .zero, appearance: UnifiedMapAppearance = .light) {
         self.appearance = appearance
@@ -457,10 +470,9 @@ final class UnifiedMapHostView: UIView {
         configuration.baseBackgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
         configuration.cornerStyle = .capsule
         compassButton.configuration = configuration
-        compassButton.accessibilityLabel = String(localized: "Reset map to north")
+        compassButton.accessibilityLabel = String(localized: "Align map to venue grid")
         compassButton.accessibilityIdentifier = "map-compass-button"
         compassButton.translatesAutoresizingMaskIntoConstraints = false
-        compassButton.isHidden = true
         addSubview(compassButton)
 
         var attributionConfiguration = UIButton.Configuration.plain()
@@ -508,9 +520,8 @@ final class UnifiedMapHostView: UIView {
 
         let dataAttributionTrailingConstraint = dataAttributionButton.trailingAnchor.constraint(
             equalTo: safeAreaLayoutGuide.trailingAnchor,
-            constant: -MapChromeLayout.attributionTrailingInset(showsCompass: false)
+            constant: -MapChromeLayout.attributionTrailingInset(showsCompass: true)
         )
-        self.dataAttributionTrailingConstraint = dataAttributionTrailingConstraint
 
         NSLayoutConstraint.activate([
             basemapView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -599,11 +610,20 @@ final class UnifiedMapHostView: UIView {
         basemapView.isHidden = false
     }
 
-    func updateCompass(rotation: CGFloat) {
-        let showsCompass = abs(rotation) >= .pi / 180
-        compassButton.isHidden = !showsCompass
-        dataAttributionTrailingConstraint?.constant =
-            -MapChromeLayout.attributionTrailingInset(showsCompass: showsCompass)
+    func updateCompass(rotation: CGFloat, gridAlignedRotation: CGFloat) {
+        let state: CompassState
+        if MapCameraMath.isRotation(rotation, alignedWith: gridAlignedRotation) {
+            state = .gridAligned
+        } else if MapCameraMath.isRotation(rotation, alignedWith: 0) {
+            state = .north
+        } else {
+            state = .free
+        }
+        if state != compassState {
+            compassState = state
+            updateCompassAccessibility()
+            applyCompassAppearance()
+        }
         compassButton.updateIndicator(
             rotation: MapCameraMath.northIndicatorRotation(mapRotation: rotation)
         )
@@ -638,16 +658,36 @@ final class UnifiedMapHostView: UIView {
 
     private func applyChromeAppearance() {
         let palette = appearance.palette
-        var compassConfiguration = compassButton.configuration
-        compassConfiguration?.baseForegroundColor = palette.primaryText
-        compassConfiguration?.baseBackgroundColor = palette.chromeBackground
-        compassButton.configuration = compassConfiguration
-        compassButton.updateIndicatorColor(palette.primaryText)
+        applyCompassAppearance()
 
         var attributionConfiguration = dataAttributionButton.configuration
         attributionConfiguration?.baseForegroundColor = palette.secondaryText
         dataAttributionButton.configuration = attributionConfiguration
         dataAttributionButton.backgroundColor = palette.chromeBackground.withAlphaComponent(0.76)
+    }
+
+    private func applyCompassAppearance() {
+        let palette = appearance.palette
+        var compassConfiguration = compassButton.configuration
+        compassConfiguration?.baseForegroundColor = palette.primaryText
+        compassConfiguration?.baseBackgroundColor = palette.chromeBackground
+        compassButton.configuration = compassConfiguration
+        compassButton.updateIndicatorColor(
+            palette.primaryText,
+            isGridAligned: compassState == .gridAligned
+        )
+    }
+
+    private func updateCompassAccessibility() {
+        switch compassState {
+        case .north:
+            compassButton.accessibilityLabel = String(localized: "Align map to venue grid")
+        case .gridAligned, .free:
+            compassButton.accessibilityLabel = String(localized: "Reset map to north")
+        }
+        compassButton.accessibilityValue = compassState == .gridAligned
+            ? String(localized: "Grid aligned")
+            : nil
     }
 
     private static func styleURL(for appearance: UnifiedMapAppearance) -> URL {
@@ -799,6 +839,7 @@ final class MapCompassButton: UIButton {
     private let southNeedleLayer = CAShapeLayer()
     private let centerCapLayer = CAShapeLayer()
     private(set) var indicatorRotation: CGFloat = 0
+    private(set) var isGridAligned = false
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -821,11 +862,19 @@ final class MapCompassButton: UIButton {
         indicatorView.transform = CGAffineTransform(rotationAngle: rotation)
     }
 
-    func updateIndicatorColor(_ color: UIColor) {
+    func updateIndicatorColor(_ color: UIColor, isGridAligned: Bool) {
+        self.isGridAligned = isGridAligned
+        let accentColor = UIColor(named: "AccentColor") ?? color
         northNeedleLayer.fillColor = UIColor.systemRed.cgColor
-        southNeedleLayer.fillColor = color.withAlphaComponent(0.72).cgColor
+        southNeedleLayer.fillColor = (
+            isGridAligned ? accentColor : color.withAlphaComponent(0.72)
+        ).cgColor
         centerCapLayer.fillColor = UIColor.systemBackground.cgColor
-        layer.borderColor = UIColor.separator.withAlphaComponent(0.35).cgColor
+        layer.borderColor = (
+            isGridAligned
+                ? accentColor.withAlphaComponent(0.58)
+                : UIColor.separator.withAlphaComponent(0.35)
+        ).cgColor
     }
 
     override func layoutSubviews() {
@@ -956,6 +1005,7 @@ final class UnifiedBigSightScene: SKScene {
     private var isSearchActive = false
 
     var cameraRotation: CGFloat { mapCamera.zRotation }
+    var gridAlignedCameraRotation: CGFloat { campus.gridAlignedCameraRotation }
     var cameraCampusCenter: CGPoint {
         UnifiedMapProjection.campusPoint(fromScene: mapCamera.position)
     }
@@ -1314,20 +1364,30 @@ final class UnifiedBigSightScene: SKScene {
         mapCamera.run(group) { [weak self] in self?.endGesture() }
     }
 
-    func resetRotation() {
-        mapCamera.removeAction(forKey: "reset-rotation")
+    func advanceCompassRotation() {
+        let targetRotation = MapCameraMath.compassTargetRotation(
+            currentRotation: mapCamera.zRotation,
+            gridAlignedRotation: gridAlignedCameraRotation
+        )
+        mapCamera.removeAction(forKey: "compass-rotation")
         let action = SKAction.rotate(
-            toAngle: 0, duration: reduceMotion ? 0 : 0.22, shortestUnitArc: true)
+            toAngle: targetRotation,
+            duration: reduceMotion ? 0 : 0.22,
+            shortestUnitArc: true
+        )
         action.timingMode = .easeOut
-        let commitNorth = SKAction.run { [weak self] in
+        let commitRotation = SKAction.run { [weak self] in
             guard let self else { return }
             // SpriteKit can finish the shortest-arc animation with a tiny
-            // negative remainder. Commit exact north so the map, compass, and
-            // accessibility value all agree after the reset.
-            self.mapCamera.zRotation = 0
+            // remainder. Commit the exact target so the map, compass color,
+            // and accessibility state all agree after the transition.
+            self.mapCamera.zRotation = targetRotation
             self.endGesture()
         }
-        mapCamera.run(.sequence([action, commitNorth]), withKey: "reset-rotation")
+        mapCamera.run(
+            .sequence([action, commitRotation]),
+            withKey: "compass-rotation"
+        )
     }
 
     func endGesture(updateSemanticScope shouldUpdateSemanticScope: Bool = true) {

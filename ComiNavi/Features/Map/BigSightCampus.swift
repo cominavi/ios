@@ -34,6 +34,17 @@ struct BigSightCampusScene: Equatable, Sendable {
         self.facilities = facilities
         self.bounds = bounds
     }
+
+    /// The camera rotation that makes the physical Big Sight venue grid run
+    /// horizontally and vertically. Prefer West Hall as the reference shown
+    /// on the campus map, and remove catalog-only artwork flips first.
+    var gridAlignedCameraRotation: CGFloat {
+        guard let venue = venues.first(where: { $0.kind == .west }) ?? venues.first else {
+            return 0
+        }
+        let physicalVenueRotation = venue.rotation - venue.scene.layoutRotation
+        return MapCameraMath.nearestQuarterTurnEquivalent(-physicalVenueRotation)
+    }
 }
 
 struct BigSightOpenStreetMapFeature: Identifiable, Equatable, Sendable {
@@ -398,6 +409,11 @@ enum BigSightCampusLayout {
     static let metersPerMapPoint: CGFloat = 1.8 / 40
     static let mapBoundaryPaddingMeters: CGFloat = 70
     static let additionalNorthBoundaryMeters: CGFloat = 100
+    static let westHallGridAlignedCameraRotation = MapCameraMath.nearestQuarterTurnEquivalent(
+        -degreesToRadians(westHallBaseRotationDegrees)
+    )
+
+    private static let westHallBaseRotationDegrees: CGFloat = 146.97977914964463
 
     /// Venue artwork alignment authored against OpenStreetMap for a specific event.
     /// `baseRotation` excludes the catalog's `mapRotation` so rotated map variants still
@@ -645,7 +661,7 @@ enum BigSightCampusLayout {
                     latitude: 35.62877144202331,
                     longitude: 139.79501092499783
                 ),
-                baseRotation: degreesToRadians(146.97977914964463),
+                baseRotation: degreesToRadians(westHallBaseRotationDegrees),
                 widthMeters: 205.27930023717607,
                 heightMeters: 145.97639127976964,
                 sceneSize: sceneSize
@@ -688,7 +704,7 @@ enum BigSightCampusLayout {
                     latitude: 35.62877144202331,
                     longitude: 139.79501092499783
                 ),
-                baseRotation: degreesToRadians(146.97977914964463),
+                baseRotation: degreesToRadians(westHallBaseRotationDegrees),
                 widthMeters: 205.27930023717607,
                 heightMeters: 152.81943451220806,
                 sceneSize: sceneSize

@@ -1288,13 +1288,15 @@ private struct MapLoadingView: View {
 }
 
 private struct MapCompassNeedle: View {
+    let isGridAligned: Bool
+
     var body: some View {
         ZStack {
             MapCompassNeedleHalf(pointsNorth: true)
                 .fill(.red)
 
             MapCompassNeedleHalf(pointsNorth: false)
-                .fill(.primary.opacity(0.72))
+                .fill(isGridAligned ? Color.accentColor : .primary.opacity(0.72))
 
             Circle()
                 .fill(.background)
@@ -1745,46 +1747,60 @@ private struct InteractiveMapCanvas: View {
         )
     }
 
-    @ViewBuilder
     private func compassButton(viewportSize: CGSize) -> some View {
-        if abs(MapCameraMath.normalizedRotation(camera.rotation)) > .pi / 180 {
-            Button {
-                let center = CGPoint(x: viewportSize.width / 2, y: viewportSize.height / 2)
-                let target = MapCameraMath.applyingGesture(
-                    to: camera,
-                    magnificationAnchor: center,
-                    rotation: -camera.rotation,
-                    rotationAnchor: center,
-                    geometry: cameraGeometry(viewportSize: viewportSize),
-                    tuning: .venue,
-                    allowsRubberBand: false
-                )
-                if reduceMotion {
+        let gridAlignedRotation = BigSightCampusLayout.westHallGridAlignedCameraRotation
+        let isNorth = MapCameraMath.isRotation(camera.rotation, alignedWith: 0)
+        let isGridAligned = MapCameraMath.isRotation(
+            camera.rotation,
+            alignedWith: gridAlignedRotation
+        )
+        return Button {
+            let targetRotation = MapCameraMath.compassTargetRotation(
+                currentRotation: camera.rotation,
+                gridAlignedRotation: gridAlignedRotation
+            )
+            let center = CGPoint(x: viewportSize.width / 2, y: viewportSize.height / 2)
+            let target = MapCameraMath.applyingGesture(
+                to: camera,
+                magnificationAnchor: center,
+                rotation: MapCameraMath.normalizedRotation(targetRotation - camera.rotation),
+                rotationAnchor: center,
+                geometry: cameraGeometry(viewportSize: viewportSize),
+                tuning: .venue,
+                allowsRubberBand: false
+            )
+            if reduceMotion {
+                camera = target
+            } else {
+                withAnimation(.smooth(duration: 0.22)) {
                     camera = target
-                } else {
-                    withAnimation(.smooth(duration: 0.22)) {
-                        camera = target
-                    }
                 }
-            } label: {
-                MapCompassNeedle()
-                    .rotationEffect(
-                        .radians(MapCameraMath.northIndicatorRotation(mapRotation: camera.rotation))
-                    )
-                    .frame(width: 30, height: 30)
-                    .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: .circle)
-                    .overlay {
-                        Circle()
-                            .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
-                    }
-                    .accessibilityHidden(true)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Reset map to north")
-            .accessibilityIdentifier("map-compass-button")
-            .transition(.scale.combined(with: .opacity))
+        } label: {
+            MapCompassNeedle(isGridAligned: isGridAligned)
+                .rotationEffect(
+                    .radians(MapCameraMath.northIndicatorRotation(mapRotation: camera.rotation))
+                )
+                .frame(width: 30, height: 30)
+                .frame(width: 44, height: 44)
+                .background(.regularMaterial, in: .circle)
+                .overlay {
+                    Circle()
+                        .stroke(
+                            isGridAligned
+                                ? Color.accentColor.opacity(0.58)
+                                : Color(uiColor: .separator).opacity(0.35),
+                            lineWidth: 0.5
+                        )
+                }
+                .accessibilityHidden(true)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            isNorth ? Text("Align map to venue grid") : Text("Reset map to north")
+        )
+        .accessibilityValue(isGridAligned ? Text("Grid aligned") : Text(""))
+        .accessibilityIdentifier("map-compass-button")
     }
 
     private func draw(

@@ -67,6 +67,8 @@ struct MapCameraTuning: Equatable {
 }
 
 enum MapCameraMath {
+    static let compassAlignmentTolerance: CGFloat = .pi / 180
+
     /// The point that remains visible when bottom chrome, such as a map sheet,
     /// obscures part of the full rendering surface.
     static func visibleViewportCenter(
@@ -111,6 +113,35 @@ enum MapCameraMath {
     /// inverse bearing, which is not the angle the indicator itself needs.
     static func northIndicatorRotation(mapRotation: CGFloat) -> CGFloat {
         normalizedRotation(mapRotation)
+    }
+
+    /// Picks the compass button's next stop. A freely rotated map returns to
+    /// north first; a north-up map advances directly to the venue grid.
+    static func compassTargetRotation(
+        currentRotation: CGFloat,
+        gridAlignedRotation: CGFloat
+    ) -> CGFloat {
+        isRotation(currentRotation, alignedWith: 0)
+            ? normalizedRotation(gridAlignedRotation)
+            : 0
+    }
+
+    static func isRotation(
+        _ rotation: CGFloat,
+        alignedWith target: CGFloat,
+        tolerance: CGFloat = compassAlignmentTolerance
+    ) -> Bool {
+        abs(normalizedRotation(rotation - target)) <= tolerance
+    }
+
+    /// A rectangular venue grid has the same screen alignment after any
+    /// quarter turn. Return the equivalent rotation closest to north-up.
+    static func nearestQuarterTurnEquivalent(_ rotation: CGFloat) -> CGFloat {
+        let quarterTurn = CGFloat.pi / 2
+        let normalized = normalizedRotation(rotation)
+        return normalizedRotation(
+            normalized - (normalized / quarterTurn).rounded() * quarterTurn
+        )
     }
 
     /// Rotates a device heading into screen space after the user rotates the map.

@@ -972,7 +972,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
         XCTAssertEqual(
             badge.frame.maxX,
-            390 - MapChromeLayout.attributionTrailingInset(showsCompass: false),
+            host.compassButton.frame.minX - MapChromeLayout.controlSpacing,
             accuracy: 0.5
         )
         XCTAssertLessThan(badge.frame.width, 100)
@@ -982,16 +982,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertEqual(badge.menu?.title, "Map data attribution")
         XCTAssertEqual(badge.menu?.children.count, 4)
 
-        host.updateCompass(rotation: .pi / 4)
-        host.setNeedsLayout()
-        host.layoutIfNeeded()
-
         XCTAssertFalse(host.compassButton.isHidden)
-        XCTAssertEqual(
-            badge.frame.maxX,
-            host.compassButton.frame.minX - MapChromeLayout.controlSpacing,
-            accuracy: 0.5
-        )
         XCTAssertEqual(
             host.compassButton.frame.maxY,
             844 - MapChromeLayout.edgeInset,
@@ -1048,6 +1039,61 @@ final class UnifiedBigSightMapTests: XCTestCase {
             atan2(renderedNorth.dy, renderedNorth.dx),
             accuracy: 0.000_1
         )
+        window.isHidden = true
+    }
+
+    @MainActor
+    func testCompassCyclesNorthGridNorthAndReturnsFreeRotationToNorth() async throws {
+        let renderer = UnifiedBigSightScene(campus: makeGridAlignedCampus())
+        renderer.reduceMotion = true
+        let host = UnifiedMapHostView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let coordinator = UnifiedBigSightMapView.Coordinator()
+        coordinator.connect(host: host, renderer: renderer)
+        let controller = UIViewController()
+        controller.view = host
+        let window = UIWindow(frame: host.bounds)
+        window.rootViewController = controller
+        window.isHidden = false
+        host.mapView.presentScene(renderer)
+        host.layoutIfNeeded()
+        try await Task.sleep(for: .milliseconds(30))
+
+        XCTAssertFalse(host.compassButton.isHidden)
+        XCTAssertEqual(
+            host.compassButton.accessibilityLabel,
+            String(localized: "Align map to venue grid")
+        )
+
+        host.compassButton.sendActions(for: .touchUpInside)
+        try await Task.sleep(for: .milliseconds(30))
+
+        XCTAssertEqual(
+            renderer.cameraRotation,
+            renderer.gridAlignedCameraRotation,
+            accuracy: 0.000_001
+        )
+        XCTAssertTrue(host.compassButton.isGridAligned)
+        XCTAssertEqual(
+            host.compassButton.accessibilityValue,
+            String(localized: "Grid aligned")
+        )
+
+        host.compassButton.sendActions(for: .touchUpInside)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(renderer.cameraRotation, 0, accuracy: 0.000_001)
+        XCTAssertFalse(host.compassButton.isGridAligned)
+
+        renderer.rotate(
+            by: .pi / 5,
+            around: CGPoint(x: host.bounds.midX, y: host.bounds.midY),
+            in: host.mapView
+        )
+        renderer.onCameraChange?()
+        host.compassButton.sendActions(for: .touchUpInside)
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(renderer.cameraRotation, 0, accuracy: 0.000_001)
+
+        withExtendedLifetime(coordinator) {}
         window.isHidden = true
     }
 
@@ -1797,6 +1843,25 @@ final class UnifiedBigSightMapTests: XCTestCase {
             venues: [venue],
             connections: [],
             bounds: CGRect(x: -240, y: -240, width: 480, height: 480)
+        )
+    }
+
+    private func makeGridAlignedCampus() -> BigSightCampusScene {
+        let base = makeGeographicCampus()
+        let source = base.venues[0]
+        let venue = BigSightVenuePlacement(
+            kind: .west,
+            scene: source.scene,
+            coordinate: source.coordinate,
+            center: source.center,
+            rotation: CGFloat(146.97977914964463 * .pi / 180),
+            metersPerMapPoint: source.metersPerMapPoint
+        )
+        return BigSightCampusScene(
+            id: base.id,
+            venues: [venue],
+            connections: base.connections,
+            bounds: venue.bounds.insetBy(dx: -70, dy: -70)
         )
     }
 

@@ -175,6 +175,11 @@ final class BigSightCampusLayoutTests: XCTestCase {
                 accuracy: 0.000_001
             )
         }
+        XCTAssertEqual(
+            campus.gridAlignedCameraRotation * 180 / .pi,
+            33.02022085035537,
+            accuracy: 0.000_001
+        )
     }
 
     func testC108VenueCalibrationMatchesSavedAlignment() throws {
@@ -278,6 +283,11 @@ final class BigSightCampusLayoutTests: XCTestCase {
         XCTAssertEqual(
             normalizedAngle(rotated.rotation - unrotated.rotation),
             .pi,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            rotatedCampus.gridAlignedCameraRotation,
+            unrotatedCampus.gridAlignedCameraRotation,
             accuracy: 0.000_001
         )
     }
