@@ -1075,6 +1075,7 @@ final class UnifiedBigSightScene: SKScene {
     private var lastCameraPosition = CGPoint(x: CGFloat.infinity, y: CGFloat.infinity)
     private var lastCameraScale: CGFloat = .infinity
     private var lastCameraRotation: CGFloat = .infinity
+    private var needsLevelOfDetailUpdate = true
     private var viewportWorkItem: DispatchWorkItem?
     private var requestedScopeInternally = false
     private var lastDynamicFingerprint: Int?
@@ -1290,14 +1291,21 @@ final class UnifiedBigSightScene: SKScene {
         publishCameraChangeIfNeeded()
     }
 
-    private func publishCameraChangeIfNeeded() {
-        guard
+    private func publishCameraChangeIfNeeded(
+        updateLevelOfDetail: Bool = true
+    ) {
+        let cameraChanged =
             mapCamera.position != lastCameraPosition
                 || mapCamera.xScale != lastCameraScale
                 || mapCamera.zRotation != lastCameraRotation
-        else { return }
         clampCamera()
-        applyLevelOfDetail()
+        if updateLevelOfDetail, cameraChanged || needsLevelOfDetailUpdate {
+            applyLevelOfDetail()
+            needsLevelOfDetailUpdate = false
+        } else if cameraChanged {
+            needsLevelOfDetailUpdate = true
+        }
+        guard cameraChanged else { return }
         lastCameraPosition = mapCamera.position
         lastCameraScale = mapCamera.xScale
         lastCameraRotation = mapCamera.zRotation
@@ -1408,6 +1416,11 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     func pan(by translation: CGPoint, in view: SKView) {
+        applyPan(by: translation, in: view)
+        publishCameraChangeIfNeeded(updateLevelOfDetail: false)
+    }
+
+    private func applyPan(by translation: CGPoint, in view: SKView) {
         guard translation != .zero else { return }
         let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
         let before = convertPoint(fromView: center)
@@ -1427,7 +1440,7 @@ final class UnifiedBigSightScene: SKScene {
             y: max(-1_800, min(1_800, velocity.y)) * 0.16
         )
         let original = mapCamera.position
-        pan(by: projected, in: view)
+        applyPan(by: projected, in: view)
         let target = mapCamera.position
         mapCamera.position = original
         let action = SKAction.move(to: target, duration: reduceMotion ? 0 : 0.34)
@@ -1436,6 +1449,11 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     func zoom(by scale: CGFloat, around viewPoint: CGPoint, in view: SKView) {
+        applyZoom(by: scale, around: viewPoint, in: view)
+        publishCameraChangeIfNeeded(updateLevelOfDetail: false)
+    }
+
+    private func applyZoom(by scale: CGFloat, around viewPoint: CGPoint, in view: SKView) {
         guard scale.isFinite, scale > 0, scale != 1 else { return }
         let before = convertPoint(fromView: viewPoint)
         let target = max(maximumCameraScale, min(minimumCameraScale, mapCamera.xScale / scale))
@@ -1447,6 +1465,11 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     func rotate(by angle: CGFloat, around viewPoint: CGPoint, in view: SKView) {
+        applyRotation(by: angle, around: viewPoint, in: view)
+        publishCameraChangeIfNeeded(updateLevelOfDetail: false)
+    }
+
+    private func applyRotation(by angle: CGFloat, around viewPoint: CGPoint, in view: SKView) {
         guard angle.isFinite, angle != 0 else { return }
         let before = convertPoint(fromView: viewPoint)
         // UIKit reports a positive rotation for a clockwise twist in its
@@ -1463,7 +1486,7 @@ final class UnifiedBigSightScene: SKScene {
         beginGesture()
         let startPosition = mapCamera.position
         let startScale = mapCamera.xScale
-        zoom(by: scale, around: viewPoint, in: view)
+        applyZoom(by: scale, around: viewPoint, in: view)
         let targetPosition = mapCamera.position
         let targetScale = mapCamera.xScale
         mapCamera.position = startPosition
