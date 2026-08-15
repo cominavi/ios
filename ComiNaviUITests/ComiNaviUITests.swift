@@ -1187,6 +1187,45 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testDemoExploreGalleryLongPressOpensLightboxWithoutNavigating() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        let exploreTab = app.buttons["Explore"].firstMatch
+        XCTAssertTrue(exploreTab.waitForExistence(timeout: 30))
+        exploreTab.tap()
+
+        if app.descendants(matching: .any)["explore-zoom-onboarding"]
+            .waitForExistence(timeout: 2)
+        {
+            app.buttons["Got it"].tap()
+        }
+
+        let gallery = app.collectionViews["explore-gallery"]
+        XCTAssertTrue(gallery.waitForExistence(timeout: 15))
+        let firstCircle = gallery.cells.element(boundBy: 0)
+        XCTAssertTrue(firstCircle.waitForExistence(timeout: 5))
+
+        firstCircle.press(forDuration: 0.7)
+
+        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        XCTAssertTrue(lightbox.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.descendants(matching: .any)["circle-detail-screen"].exists)
+
+        let close = app.buttons["shinagaki-lightbox-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+        XCTAssertTrue(lightbox.waitForNonExistence(timeout: 5))
+
+        firstCircle.tap()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["circle-detail-screen"]
+                .waitForExistence(timeout: 10)
+        )
+    }
+
+    @MainActor
     func testDemoExplorePopularTagsSupportMultipleSelection() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")

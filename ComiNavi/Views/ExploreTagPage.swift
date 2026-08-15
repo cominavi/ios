@@ -5,7 +5,7 @@ struct ExploreTagPage: View {
     let dataSource: CirclemsDataSource
 
     @State private var model: ExploreModel
-    @State private var lightboxImage: UIImage?
+    @State private var lightboxController = ExploreArtworkLightboxController()
     @State private var showsFilters = false
 
     init(tag: String, day: Int, dataSource: CirclemsDataSource) {
@@ -19,6 +19,8 @@ struct ExploreTagPage: View {
     }
 
     var body: some View {
+        @Bindable var lightboxController = lightboxController
+
         Group {
             if (model.isLoading && model.allCircles.isEmpty) || model.isResolvingFixedTag {
                 ProgressView("Loading circles…")
@@ -52,9 +54,10 @@ struct ExploreTagPage: View {
                                 .contentShape(.rect)
                             }
                             .buttonStyle(.plain)
-                            .onLongPressGesture(minimumDuration: 0.45) {
-                                openLightbox(circle)
-                            }
+                            .highPriorityGesture(
+                                LongPressGesture(minimumDuration: 0.45)
+                                    .onEnded { _ in openLightbox(circle) }
+                            )
 
                             Divider()
                                 .padding(.leading, 104)
@@ -87,24 +90,19 @@ struct ExploreTagPage: View {
         .task(id: tag) {
             await model.load()
         }
-        .sheet(isPresented: Binding(
-            get: { lightboxImage != nil },
-            set: { if !$0 { lightboxImage = nil } }
-        )) {
-            if let lightboxImage {
-                ShinagakiLightbox(
-                    image: lightboxImage,
-                    accessibilityLabel: String(localized: "Circle cover")
-                )
+        .sheet(item: $lightboxController.presentation) { presentation in
+            ShinagakiLightbox(presentation: presentation)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.black)
-            }
         }
         .sheet(isPresented: $showsFilters) {
             ExploreTagFilterSheet(model: model, dataSource: dataSource)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+        }
+        .onDisappear {
+            lightboxController.cancelPendingLoad()
         }
         .accessibilityIdentifier("circle-tag-page")
     }
@@ -120,8 +118,8 @@ struct ExploreTagPage: View {
     }
 
     private func openLightbox(_ circle: ExploreCircle) {
-        Task { @MainActor in
-            lightboxImage = await model.fullCoverImage(for: circle)
+        lightboxController.present(circle: circle) {
+            await model.fullCoverImage(for: circle)
         }
     }
 }

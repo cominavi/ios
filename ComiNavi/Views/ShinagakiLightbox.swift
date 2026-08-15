@@ -59,6 +59,13 @@ struct ShinagakiLightboxPage: Identifiable {
         previewURL ?? originalURL
     }
 
+    var imageLoadURLs: [URL] {
+        var seen = Set<URL>()
+        return [previewURL, originalURL]
+            .compactMap { $0 }
+            .filter { seen.insert($0).inserted }
+    }
+
     init(
         id: String,
         image: UIImage,
@@ -110,6 +117,19 @@ struct ShinagakiLightboxPage: Identifiable {
             originalURL: originalURL,
             previewURL: previewURL
         )
+    }
+
+    @MainActor
+    func loadImage(
+        using loader: (URL) async -> UIImage?
+    ) async -> UIImage? {
+        for url in imageLoadURLs {
+            guard !Task.isCancelled else { return nil }
+            if let image = await loader(url) {
+                return image
+            }
+        }
+        return nil
     }
 
     static func pages(
@@ -313,12 +333,14 @@ private struct ShinagakiLightboxPageView: View {
     }
 
     private func loadImageIfNeeded() async {
-        guard image == nil, let displayURL = page.displayURL else { return }
+        guard image == nil, !page.imageLoadURLs.isEmpty else { return }
         didFail = false
-        guard let decodedImage = await RemoteImagePipeline.image(
-            for: displayURL,
-            category: .shinagaki
-        ),
+        guard let decodedImage = await page.loadImage(using: { url in
+            await RemoteImagePipeline.image(
+                for: url,
+                category: .shinagaki
+            )
+        }),
               !Task.isCancelled
         else {
             if !Task.isCancelled {

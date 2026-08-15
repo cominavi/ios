@@ -630,6 +630,178 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertTrue(circle.preferredCoverURLs.isEmpty)
     }
 
+    func testLightboxPagesSpanPostsWithoutDuplicatingURLFallbacks() throws {
+        let originalURL = try XCTUnwrap(
+            URL(string: "https://example.com/shared-original.jpg")
+        )
+        let previewURL = try XCTUnwrap(
+            URL(string: "https://example.com/shared-preview.jpg")
+        )
+        let firstPost = makeEnrichment(
+            postID: "first-post",
+            handle: "first_handle",
+            text: "First",
+            date: Date(timeIntervalSince1970: 400),
+            postConfidence: .high,
+            placementConfidence: .high,
+            media: [
+                CatalogShinagakiMedia(
+                    kind: .photo,
+                    url: originalURL,
+                    previewURL: previewURL
+                ),
+            ]
+        ).posts[0]
+        let secondPost = makeEnrichment(
+            postID: "second-post",
+            handle: "second_handle",
+            text: "Second",
+            date: Date(timeIntervalSince1970: 300),
+            postConfidence: .high,
+            placementConfidence: .high,
+            media: [
+                CatalogShinagakiMedia(
+                    kind: .photo,
+                    url: originalURL,
+                    previewURL: previewURL
+                ),
+            ]
+        ).posts[0]
+        let circle = makeExploreCircle(
+            id: 13,
+            day: 1,
+            genreID: 10,
+            name: "Multi-post Circle",
+            penName: "Artist",
+            description: "Two posts",
+            tags: [],
+            enrichment: CatalogCircleEnrichment(posts: [firstPost, secondPost])
+        )
+
+        let presentation = try XCTUnwrap(circle.shinagakiLightboxPresentation)
+
+        XCTAssertEqual(
+            presentation.pages.map(\.id),
+            ["first-post-media-0", "second-post-media-0"]
+        )
+        XCTAssertEqual(presentation.pages.count, 2)
+        XCTAssertEqual(
+            presentation.pages.compactMap(\.originalURL),
+            [originalURL, originalURL]
+        )
+        XCTAssertEqual(
+            presentation.pages.compactMap(\.previewURL),
+            [previewURL, previewURL]
+        )
+        XCTAssertEqual(presentation.selectedPageID, "first-post-media-0")
+    }
+
+    func testLightboxSkipsUnpreviewableVideoAndSelectsTheCardCover() throws {
+        let videoURL = try XCTUnwrap(URL(string: "https://example.com/video.mp4"))
+        let videoPreviewURL = try XCTUnwrap(
+            URL(string: "https://example.com/video-preview.jpg")
+        )
+        let imageURL = try XCTUnwrap(URL(string: "https://example.com/menu.jpg"))
+        let imagePreviewURL = try XCTUnwrap(
+            URL(string: "https://example.com/menu-preview.jpg")
+        )
+        let circle = makeExploreCircle(
+            id: 14,
+            day: 1,
+            genreID: 10,
+            name: "Mixed-media Circle",
+            penName: "Artist",
+            description: "Videos and a menu",
+            tags: [],
+            enrichment: makeEnrichment(
+                postID: "mixed-post",
+                handle: "mixed_handle",
+                text: "Mixed",
+                date: Date(timeIntervalSince1970: 300),
+                postConfidence: .high,
+                placementConfidence: .high,
+                media: [
+                    CatalogShinagakiMedia(
+                        kind: .video,
+                        url: videoURL,
+                        previewURL: nil
+                    ),
+                    CatalogShinagakiMedia(
+                        kind: .video,
+                        url: videoURL,
+                        previewURL: videoPreviewURL
+                    ),
+                    CatalogShinagakiMedia(
+                        kind: .photo,
+                        url: imageURL,
+                        previewURL: imagePreviewURL
+                    ),
+                ]
+            )
+        )
+
+        let presentation = try XCTUnwrap(circle.shinagakiLightboxPresentation)
+
+        XCTAssertEqual(
+            presentation.pages.map(\.id),
+            ["mixed-post-media-1", "mixed-post-media-2"]
+        )
+        XCTAssertEqual(presentation.pages[0].originalURL, videoPreviewURL)
+        XCTAssertNil(presentation.pages[0].previewURL)
+        XCTAssertEqual(presentation.selectedPageID, "mixed-post-media-2")
+    }
+
+    @MainActor
+    func testLightboxControllerIgnoresCancelledFallbackLoad() async {
+        let firstCircle = makeExploreCircle(
+            id: 15,
+            day: 1,
+            genreID: 10,
+            name: "First Circle",
+            penName: "Artist",
+            description: "",
+            tags: []
+        )
+        let secondCircle = makeExploreCircle(
+            id: 16,
+            day: 1,
+            genreID: 10,
+            name: "Second Circle",
+            penName: "Artist",
+            description: "",
+            tags: []
+        )
+        let firstImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 20, height: 20)
+        ).image { _ in }
+        let secondImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 40, height: 20)
+        ).image { _ in }
+        let controller = ExploreArtworkLightboxController()
+
+        controller.present(circle: firstCircle) {
+            try? await Task.sleep(for: .milliseconds(100))
+            return firstImage
+        }
+        await Task.yield()
+        controller.present(circle: secondCircle) {
+            secondImage
+        }
+        for _ in 0..<10 where controller.presentation == nil {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(
+            controller.presentation?.selectedPageID,
+            "circle-16-cover"
+        )
+        try? await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(
+            controller.presentation?.selectedPageID,
+            "circle-16-cover"
+        )
+    }
+
     func testCoverRetriesOriginalShinagakiBeforeCircleFallback() async {
         let previewURL = URL(string: "https://example.com/preview.jpg")!
         let originalURL = URL(string: "https://example.com/original.jpg")!

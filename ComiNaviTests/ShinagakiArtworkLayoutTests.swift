@@ -81,6 +81,37 @@ final class ShinagakiArtworkLayoutTests: XCTestCase {
         XCTAssertEqual(presentation.selectedPageID, "second")
     }
 
+    @MainActor
+    func testRemotePageRetriesOriginalWhenPreviewFails() async throws {
+        let originalURL = try XCTUnwrap(
+            URL(string: "https://example.com/poster-original.jpg")
+        )
+        let previewURL = try XCTUnwrap(
+            URL(string: "https://example.com/poster-preview.jpg")
+        )
+        let expectedImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 20, height: 20)
+        ).image { _ in }
+        let page = ShinagakiLightboxPage(
+            id: "tweet-123-media-0",
+            media: CatalogShinagakiMedia(
+                kind: .photo,
+                url: originalURL,
+                previewURL: previewURL
+            ),
+            accessibilityLabel: "Shinagaki"
+        )
+        var attemptedURLs: [URL] = []
+
+        let loadedImage = await page.loadImage { url in
+            attemptedURLs.append(url)
+            return url == originalURL ? expectedImage : nil
+        }
+
+        XCTAssertEqual(attemptedURLs, [previewURL, originalURL])
+        XCTAssertTrue(loadedImage === expectedImage)
+    }
+
     func testDefaultPreviewAspectRatioMatchesPortraitA4() {
         XCTAssertEqual(
             ShinagakiArtworkLayout.a4PortraitAspectRatio,

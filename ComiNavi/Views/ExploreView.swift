@@ -1,3 +1,4 @@
+import Observation
 import SwiftUI
 
 enum ExploreLayoutMetrics {
@@ -631,7 +632,7 @@ private struct ExploreGallery<Header: View>: View {
     let headerLayoutVersion: Int
     let header: Header
     @State private var selectedCircleID: Int?
-    @State private var lightboxItem: ExploreArtworkLightboxItem?
+    @State private var lightboxController = ExploreArtworkLightboxController()
 
     init(
         circles: [ExploreCircle],
@@ -646,6 +647,8 @@ private struct ExploreGallery<Header: View>: View {
     }
 
     var body: some View {
+        @Bindable var lightboxController = lightboxController
+
         ExploreGalleryCollection(
             circles: circles,
             model: model,
@@ -670,14 +673,14 @@ private struct ExploreGallery<Header: View>: View {
                 )
             }
         }
-        .sheet(item: $lightboxItem) { item in
-            ShinagakiLightbox(
-                image: item.image,
-                accessibilityLabel: String(localized: "Circle cover for \(item.circleName)")
-            )
+        .sheet(item: $lightboxController.presentation) { presentation in
+            ShinagakiLightbox(presentation: presentation)
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .presentationBackground(.black)
+        }
+        .onDisappear {
+            lightboxController.cancelPendingLoad()
         }
     }
 
@@ -688,20 +691,105 @@ private struct ExploreGallery<Header: View>: View {
 
     private func openLightbox(circleID: Int) {
         guard let circle = circles.first(where: { $0.id == circleID }) else { return }
-        Task { @MainActor in
-            guard let image = await model.fullCoverImage(for: circle) else { return }
-            lightboxItem = ExploreArtworkLightboxItem(
-                image: image,
-                circleName: circle.displayName
-            )
+        lightboxController.present(circle: circle) {
+            await model.fullCoverImage(for: circle)
         }
     }
 }
 
-private struct ExploreArtworkLightboxItem: Identifiable {
-    let id = UUID()
-    let image: UIImage
-    let circleName: String
+@MainActor
+@Observable
+final class ExploreArtworkLightboxController {
+    var presentation: ShinagakiLightboxPresentation?
+
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
+
+    func present(
+        circle: ExploreCircle,
+        loadFallbackImage: @escaping @MainActor () async -> UIImage?
+    ) {
+        cancelPendingLoad()
+
+        if let shinagakiPresentation = circle.shinagakiLightboxPresentation {
+            presentation = shinagakiPresentation
+            return
+        }
+
+        presentation = nil
+        loadTask = Task { [weak self] in
+            let image = await loadFallbackImage()
+            guard !Task.isCancelled, let self, let image else { return }
+            let page = ShinagakiLightboxPage(
+                id: "circle-\(circle.id)-cover",
+                image: image,
+                accessibilityLabel: String(
+                    localized: "Circle cover for \(circle.displayName)"
+                )
+            )
+            presentation = ShinagakiLightboxPresentation(
+                pages: [page],
+                selectedPageID: page.id
+            )
+            loadTask = nil
+        }
+    }
+
+    func cancelPendingLoad() {
+        loadTask?.cancel()
+        loadTask = nil
+    }
+}
+
+extension ExploreCircle {
+    var shinagakiLightboxPresentation: ShinagakiLightboxPresentation? {
+        struct PageSource {
+            let id: String
+            let media: CatalogShinagakiMedia
+        }
+
+        guard let enrichment else { return nil }
+        let sources = enrichment.posts.flatMap { post in
+            post.media.enumerated().compactMap { index, media -> PageSource? in
+                if media.kind == .video {
+                    guard let previewURL = media.previewURL else { return nil }
+                    return PageSource(
+                        id: "\(post.id)-media-\(index)",
+                        media: CatalogShinagakiMedia(
+                            kind: .photo,
+                            url: previewURL,
+                            previewURL: nil
+                        )
+                    )
+                }
+                return PageSource(
+                    id: "\(post.id)-media-\(index)",
+                    media: media
+                )
+            }
+        }
+        guard !sources.isEmpty else { return nil }
+
+        let context = String(localized: "Circle cover for \(displayName)")
+        let pages = sources.enumerated().map { index, source in
+            ShinagakiLightboxPage(
+                id: source.id,
+                media: source.media,
+                accessibilityLabel: String(
+                    localized: "Image \(index + 1) of \(sources.count): \(context)",
+                    comment: "Accessibility label for one image in a multi-image Shinagaki post."
+                )
+            )
+        }
+        let preferredURL = preferredCoverURL
+        let selectedPageID = zip(sources, pages).first { source, _ in
+            source.media.displayURL == preferredURL
+                || source.media.url == preferredURL
+        }?.1.id ?? pages[0].id
+        return ShinagakiLightboxPresentation(
+            pages: pages,
+            selectedPageID: selectedPageID
+        )
+    }
 }
 
 enum ExploreGalleryCardDetail: Equatable {
@@ -763,7 +851,7 @@ private struct ExploreList<Header: View>: View {
     let circles: [ExploreCircle]
     let model: ExploreModel
     let header: Header
-    @State private var lightboxItem: ExploreArtworkLightboxItem?
+    @State private var lightboxController = ExploreArtworkLightboxController()
 
     init(
         circles: [ExploreCircle],
@@ -776,6 +864,8 @@ private struct ExploreList<Header: View>: View {
     }
 
     var body: some View {
+        @Bindable var lightboxController = lightboxController
+
         ScrollView {
             LazyVStack(spacing: 0) {
                 header
@@ -803,9 +893,10 @@ private struct ExploreList<Header: View>: View {
                         .contentShape(.rect)
                     }
                     .buttonStyle(CircleListRowButtonStyle())
-                    .onLongPressGesture(minimumDuration: 0.45) {
-                        openLightbox(circle)
-                    }
+                    .highPriorityGesture(
+                        LongPressGesture(minimumDuration: 0.45)
+                            .onEnded { _ in openLightbox(circle) }
+                    )
                     .accessibilityIdentifier("explore-list-circle-\(circle.id)")
 
                     Divider()
@@ -814,14 +905,14 @@ private struct ExploreList<Header: View>: View {
             }
         }
         .accessibilityIdentifier("explore-list")
-        .sheet(item: $lightboxItem) { item in
-            ShinagakiLightbox(
-                image: item.image,
-                accessibilityLabel: String(localized: "Circle cover for \(item.circleName)")
-            )
+        .sheet(item: $lightboxController.presentation) { presentation in
+            ShinagakiLightbox(presentation: presentation)
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             .presentationBackground(.black)
+        }
+        .onDisappear {
+            lightboxController.cancelPendingLoad()
         }
     }
 
@@ -829,12 +920,8 @@ private struct ExploreList<Header: View>: View {
     private var artworkWidth = ExploreLayoutMetrics.listArtworkWidth
 
     private func openLightbox(_ circle: ExploreCircle) {
-        Task { @MainActor in
-            guard let image = await model.fullCoverImage(for: circle) else { return }
-            lightboxItem = ExploreArtworkLightboxItem(
-                image: image,
-                circleName: circle.displayName
-            )
+        lightboxController.present(circle: circle) {
+            await model.fullCoverImage(for: circle)
         }
     }
 }

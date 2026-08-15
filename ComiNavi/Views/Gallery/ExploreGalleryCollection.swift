@@ -73,6 +73,9 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             action: #selector(Coordinator.handleLongPress(_:))
         )
         longPress.minimumPressDuration = 0.45
+        longPress.cancelsTouchesInView = true
+        longPress.delaysTouchesEnded = true
+        longPress.delegate = context.coordinator
         collectionView.addGestureRecognizer(longPress)
 
         context.coordinator.install(on: collectionView)
