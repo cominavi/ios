@@ -1089,7 +1089,8 @@ struct SharedPlanDetailScreen: View {
                         store: store,
                         planID: planID,
                         features: features,
-                        favoriteImportService: favoriteImportService
+                        favoriteImportService: favoriteImportService,
+                        catalogDataSource: catalogDataSource
                     )
                 } label: {
                     Label("Plan information", systemImage: "info.circle")
@@ -1123,17 +1124,20 @@ private struct SharedPlanInformationScreen: View {
     let planID: String
     let features: SharedPlanPresentationFeatures
     let favoriteImportService: any CirclemsFavoriteImportServicing
+    let catalogDataSource: CirclemsDataSource?
 
     init(
         store: SharedPlanStore,
         planID: String,
         features: SharedPlanPresentationFeatures,
-        favoriteImportService: any CirclemsFavoriteImportServicing
+        favoriteImportService: any CirclemsFavoriteImportServicing,
+        catalogDataSource: CirclemsDataSource?
     ) {
         self.store = store
         self.planID = planID
         self.features = features
         self.favoriteImportService = favoriteImportService
+        self.catalogDataSource = catalogDataSource
         _managementModel = State(initialValue: SharedPlanManagementModel(
             planID: planID,
             features: features
@@ -1211,6 +1215,21 @@ private struct SharedPlanInformationScreen: View {
                             } icon: {
                                 Image(systemName: "square.and.arrow.down")
                             }
+                        }
+                    }
+
+                    if let catalogDataSource {
+                        Section {
+                            NavigationLink {
+                                SharedPlanExportScreen(
+                                    store: store,
+                                    planID: plan.id,
+                                    dataSource: catalogDataSource
+                                )
+                            } label: {
+                                Label("Export sharing plan", systemImage: "archivebox")
+                            }
+                            .accessibilityIdentifier("shared-plan-export-button")
                         }
                     }
 
