@@ -43,5 +43,7 @@
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ComiNavi uses your location in GPS Mode to update your position on the Tokyo Big Sight map. GPS may be inaccurate indoors.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ComiNavi needs access to your photo library to save images you choose from the image viewer.</string>
 </dict>
 </plist>

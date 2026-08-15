@@ -50,6 +50,34 @@ final class ShinagakiArtworkLayoutTests: XCTestCase {
         )
     }
 
+    func testLightboxPagesSkipVideoWithoutPreview() throws {
+        let videoURL = try XCTUnwrap(
+            URL(string: "https://example.com/movie.mp4")
+        )
+        let previewURL = try XCTUnwrap(
+            URL(string: "https://example.com/movie-preview.jpg")
+        )
+        let pages = ShinagakiLightboxPage.pages(
+            postID: "tweet-video",
+            media: [
+                CatalogShinagakiMedia(
+                    kind: .video,
+                    url: videoURL,
+                    previewURL: previewURL
+                ),
+                CatalogShinagakiMedia(
+                    kind: .video,
+                    url: videoURL,
+                    previewURL: nil
+                ),
+            ],
+            accessibilityLabel: "Shinagaki"
+        )
+
+        XCTAssertEqual(pages.map(\.id), ["tweet-video-media-0"])
+        XCTAssertEqual(pages[0].imageLoadURLs, [previewURL])
+    }
+
     func testLightboxPresentationStartsOnTappedPage() throws {
         let firstImage = UIGraphicsImageRenderer(
             size: CGSize(width: 20, height: 20)
@@ -79,6 +107,47 @@ final class ShinagakiArtworkLayoutTests: XCTestCase {
 
         XCTAssertEqual(presentation.pages.map(\.id), ["first", "second"])
         XCTAssertEqual(presentation.selectedPageID, "second")
+    }
+
+    @MainActor
+    func testImageActionSnapshotsTheSelectedPagesBytes() async throws {
+        let firstImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 3, height: 2)
+        ).image { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 3, height: 2))
+        }
+        let secondImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 5, height: 4)
+        ).image { context in
+            UIColor.systemRed.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 5, height: 4))
+        }
+        let pages = [
+            ShinagakiLightboxPage(
+                id: "first",
+                image: firstImage,
+                accessibilityLabel: "First"
+            ),
+            ShinagakiLightboxPage(
+                id: "second",
+                image: secondImage,
+                accessibilityLabel: "Second"
+            ),
+        ]
+
+        let action = try XCTUnwrap(
+            ShinagakiLightboxImageAction(
+                kind: .share,
+                pages: pages,
+                selectedPageID: "second"
+            )
+        )
+        let exportedData = await action.page.imageExportData { _ in nil }
+
+        XCTAssertEqual(action.page.id, "second")
+        XCTAssertEqual(exportedData?.data, secondImage.pngData())
+        XCTAssertNotEqual(exportedData?.data, firstImage.pngData())
     }
 
     @MainActor

@@ -429,9 +429,15 @@ final class ComiNaviUITests: XCTestCase {
         let lightbox = app.collectionViews["shinagaki-lightbox"]
         let firstPage = app.images["Test Shinagaki page 1"]
         let secondPage = app.images["Test Shinagaki page 2"]
+        let shareButton = app.buttons["shinagaki-lightbox-share"]
+        let saveButton = app.buttons["shinagaki-lightbox-save"]
         XCTAssertTrue(lightbox.waitForExistence(timeout: 5))
         XCTAssertTrue(firstPage.waitForExistence(timeout: 5))
         XCTAssertTrue(firstPage.isHittable)
+        XCTAssertTrue(shareButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(shareButton.isHittable)
+        XCTAssertTrue(saveButton.isHittable)
 
         lightbox.swipeLeft()
 
@@ -440,6 +446,8 @@ final class ComiNaviUITests: XCTestCase {
             evaluatedWith: secondPage
         )
         waitForExpectations(timeout: 3)
+        XCTAssertTrue(shareButton.isHittable)
+        XCTAssertTrue(saveButton.isHittable)
 
         lightbox.swipeRight()
         expectation(
@@ -447,6 +455,70 @@ final class ComiNaviUITests: XCTestCase {
             evaluatedWith: firstPage
         )
         waitForExpectations(timeout: 3)
+    }
+
+    @MainActor
+    func testShinagakiLightboxActionsUseSelectedPage() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-ui-testing-shinagaki-lightbox")
+        app.launch()
+
+        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let secondPage = app.images["Test Shinagaki page 2"]
+        XCTAssertTrue(lightbox.waitForExistence(timeout: 5))
+        lightbox.swipeLeft()
+        expectation(
+            for: NSPredicate(format: "hittable == true"),
+            evaluatedWith: secondPage
+        )
+        waitForExpectations(timeout: 3)
+
+        app.buttons["shinagaki-lightbox-save"].tap()
+        let savedAlert = app.alerts["Image saved"]
+        XCTAssertTrue(savedAlert.waitForExistence(timeout: 5))
+        savedAlert.buttons["OK"].tap()
+
+        app.buttons["shinagaki-lightbox-share"].tap()
+        XCTAssertTrue(
+            app.otherElements["ActivityListView"].waitForExistence(timeout: 10)
+        )
+    }
+
+    @MainActor
+    func testDismissingLightboxCancelsPendingPhotoSave() throws {
+        let app = XCUIApplication()
+        app.launchArguments.append(
+            "-cominavi-ui-testing-shinagaki-lightbox-cancel-save"
+        )
+        app.launch()
+
+        let saveButton = app.buttons["shinagaki-lightbox-save"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        saveButton.tap()
+        XCTAssertTrue(
+            app.staticTexts["shinagaki-test-authorization-started"]
+                .waitForExistence(timeout: 5)
+        )
+        app.buttons["shinagaki-lightbox-close"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["shinagaki-test-lightbox-dismissed"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.staticTexts["shinagaki-test-authorization-resumed"]
+                .waitForExistence(timeout: 5)
+        )
+
+        let unexpectedSave = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == true"),
+            object: app.staticTexts["shinagaki-test-photo-save-performed"]
+        )
+        unexpectedSave.isInverted = true
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [unexpectedSave], timeout: 1),
+            .completed
+        )
     }
 
     @MainActor

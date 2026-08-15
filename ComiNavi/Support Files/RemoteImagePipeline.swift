@@ -51,6 +51,12 @@ struct RemoteImageCacheStatistics: Equatable {
 }
 
 enum RemoteImagePipeline {
+    private static let originalDataSerializer: DefaultCacheSerializer = {
+        var serializer = DefaultCacheSerializer()
+        serializer.preferCacheOriginalData = true
+        return serializer
+    }()
+
     private static let shinagakiCache = ImageCache(
         name: RemoteImageCacheCategory.shinagaki.cacheName
     )
@@ -105,12 +111,14 @@ enum RemoteImagePipeline {
     static func image(
         for url: URL,
         category: RemoteImageCacheCategory,
-        targetPixelSize: CGSize? = nil
+        targetPixelSize: CGSize? = nil,
+        downloader: ImageDownloader? = nil
     ) async -> UIImage? {
         await result(
             for: url,
             category: category,
-            targetPixelSize: targetPixelSize
+            targetPixelSize: targetPixelSize,
+            downloader: downloader
         )?.image
     }
 
@@ -119,15 +127,41 @@ enum RemoteImagePipeline {
         category: RemoteImageCacheCategory,
         cacheKey: String? = nil
     ) async -> Data? {
+        let resolvedCacheKey = cacheKey ?? url.absoluteString
+        if let cachedData = await diskCachedImageData(
+            forKey: resolvedCacheKey,
+            category: category
+        ) {
+            return cachedData
+        }
+
+        // A memory-only entry can still be the exact image the user sees.
+        // Encoding it gives Save/Share a reliable offline fallback without
+        // attempting a network refresh.
+        if let cachedData = await cachedImageData(
+            forKey: resolvedCacheKey,
+            category: category
+        ) {
+            return cachedData
+        }
+
         guard let dataProvider = await result(
             for: url,
             category: category,
-            cacheKey: cacheKey
-        )?.data else {
-            return nil
-        }
+            cacheKey: resolvedCacheKey
+        )?.data else { return nil }
         return await Task.detached(priority: .utility) {
             dataProvider()
+        }.value
+    }
+
+    private static func diskCachedImageData(
+        forKey key: String,
+        category: RemoteImageCacheCategory
+    ) async -> Data? {
+        let diskStorage = cache(for: category).diskStorage
+        return await Task.detached(priority: .utility) {
+            try? diskStorage.value(forKey: key)
         }.value
     }
 
@@ -208,7 +242,8 @@ enum RemoteImagePipeline {
 
     private static func options(
         for category: RemoteImageCacheCategory,
-        targetPixelSize: CGSize?
+        targetPixelSize: CGSize?,
+        downloader: ImageDownloader? = nil
     ) -> KingfisherOptionsInfo {
         let cache = cache(for: category)
         var options: KingfisherOptionsInfo = [
@@ -220,6 +255,15 @@ enum RemoteImagePipeline {
         ]
         if let targetPixelSize {
             options.append(.processor(DownsamplingImageProcessor(size: targetPixelSize)))
+        } else {
+            // Full-resolution image data remains byte-for-byte exportable.
+            // Processed thumbnails keep Kingfisher's normal serializer so a
+            // disk hit does not decode and re-encode the original before
+            // downsampling it again.
+            options.append(.cacheSerializer(originalDataSerializer))
+        }
+        if let downloader {
+            options.append(.downloader(downloader))
         }
         return options
     }
@@ -228,12 +272,17 @@ enum RemoteImagePipeline {
         for url: URL,
         category: RemoteImageCacheCategory,
         targetPixelSize: CGSize? = nil,
-        cacheKey: String? = nil
+        cacheKey: String? = nil,
+        downloader: ImageDownloader? = nil
     ) async -> RetrieveImageResult? {
         let resource = KF.ImageResource(downloadURL: url, cacheKey: cacheKey)
         return try? await KingfisherManager.shared.retrieveImage(
             with: resource,
-            options: options(for: category, targetPixelSize: targetPixelSize)
+            options: options(
+                for: category,
+                targetPixelSize: targetPixelSize,
+                downloader: downloader
+            )
         )
     }
 }

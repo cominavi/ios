@@ -518,6 +518,99 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
+    func testLocalizedPhotoLibraryPermissionCopyIsPresent() throws {
+        let expectedCopy = [
+            "en": "ComiNavi needs access to your photo library to save images you choose from the image viewer.",
+            "ja": "ComiNaviで選んだ画像を写真ライブラリに保存するために、写真へのアクセスが必要です。",
+            "ko": "ComiNavi에서 선택한 이미지를 사진 보관함에 저장하려면 사진 접근 권한이 필요합니다.",
+            "zh-Hans": "ComiNavi 需要访问你的照片图库，以保存你在图片查看器中选择的图片",
+            "zh-Hant": "ComiNavi 需要取用你的照片圖庫，以儲存你在圖片瀏覽器中選取的圖片",
+        ]
+
+        let appSourceURL = sourceCatalogURL.deletingLastPathComponent()
+        let basePlistData = try Data(contentsOf: appSourceURL.appending(path: "Info.plist"))
+        let basePlist = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: basePlistData, format: nil)
+                as? [String: Any]
+        )
+        XCTAssertEqual(
+            basePlist["NSPhotoLibraryAddUsageDescription"] as? String,
+            expectedCopy["en"]
+        )
+
+        for (language, expected) in expectedCopy {
+            let url = appSourceURL
+                .appending(path: "\(language).lproj/InfoPlist.strings")
+            let contents = try String(contentsOf: url, encoding: .utf8)
+            XCTAssertTrue(
+                contents.contains(
+                    "\"NSPhotoLibraryAddUsageDescription\" = \"\(expected)\";"
+                ),
+                "Incorrect \(language) photo-library permission copy"
+            )
+        }
+    }
+
+    func testLightboxImageActionsHaveReviewedTranslations() throws {
+        let data = try Data(contentsOf: sourceCatalogURL)
+        let root = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        let strings = try XCTUnwrap(root["strings"] as? [String: Any])
+        let expectedCopy = [
+            "Save image": [
+                "ja": "画像を保存",
+                "ko": "이미지 저장",
+                "zh-Hans": "保存图片",
+                "zh-Hant": "儲存圖片",
+            ],
+            "Share image": [
+                "ja": "画像を共有",
+                "ko": "이미지 공유",
+                "zh-Hans": "分享图片",
+                "zh-Hant": "分享圖片",
+            ],
+            "Image saved": [
+                "ja": "画像を保存しました",
+                "ko": "이미지를 저장했습니다",
+                "zh-Hans": "图片已保存",
+                "zh-Hant": "圖片已儲存",
+            ],
+            "Couldn’t save image": [
+                "ja": "画像を保存できませんでした",
+                "ko": "이미지를 저장할 수 없습니다",
+                "zh-Hans": "无法保存图片",
+                "zh-Hant": "無法儲存圖片",
+            ],
+            "Photo access is required to save images": [
+                "ja": "画像を保存するには写真へのアクセスが必要です",
+                "ko": "이미지를 저장하려면 사진 접근 권한이 필요합니다",
+                "zh-Hans": "保存图片需要照片访问权限",
+                "zh-Hant": "儲存圖片需要照片取用權限",
+            ],
+        ]
+
+        for (key, translations) in expectedCopy {
+            let entry = try XCTUnwrap(strings[key] as? [String: Any], "Missing \(key)")
+            let localizations = try XCTUnwrap(
+                entry["localizations"] as? [String: Any],
+                "Missing localizations for \(key)"
+            )
+            for language in supportedLanguages {
+                let localization = try XCTUnwrap(
+                    localizations[language] as? [String: Any],
+                    "Missing \(language) localization for \(key)"
+                )
+                let unit = try XCTUnwrap(
+                    localization["stringUnit"] as? [String: Any],
+                    "Missing string unit for \(key) in \(language)"
+                )
+                XCTAssertEqual(unit["state"] as? String, "translated")
+                XCTAssertEqual(unit["value"] as? String, translations[language])
+            }
+        }
+    }
+
     func testAccountDeletionCopyKeepsCirclemsAccountSeparate() throws {
         let key = "This permanently deletes your ComiNavi account and its data. Your Circle.ms account will not be deleted, even if you connected it to ComiNavi."
         let expectedCopy = [

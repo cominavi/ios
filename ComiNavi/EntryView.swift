@@ -394,22 +394,19 @@ struct EntryView: View {
                     }
                 }
             } else if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-shinagaki-lightbox-cancel-save"
+            ) {
+                ShinagakiCancellationTestHost(
+                    pages: Self.shinagakiTestPages,
+                    photoSaver: Self.shinagakiDelayedTestPhotoSaver
+                )
+            } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-shinagaki-lightbox"
             ) {
                 ShinagakiLightbox(
-                    pages: [
-                        ShinagakiLightboxPage(
-                            id: "test-page-1",
-                            image: Self.shinagakiTestImage,
-                            accessibilityLabel: "Test Shinagaki page 1"
-                        ),
-                        ShinagakiLightboxPage(
-                            id: "test-page-2",
-                            image: Self.shinagakiWideTestImage,
-                            accessibilityLabel: "Test Shinagaki page 2"
-                        ),
-                    ],
-                    selectedPageID: "test-page-1"
+                    pages: Self.shinagakiTestPages,
+                    selectedPageID: "test-page-1",
+                    photoSaver: Self.shinagakiTestPhotoSaver
                 )
             } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-no-catalog-shell"
@@ -530,6 +527,122 @@ struct EntryView: View {
             ]
             NSString(string: "PAGE 2")
                 .draw(at: CGPoint(x: 450, y: 250), withAttributes: attributes)
+        }
+
+        private static var shinagakiTestPages: [ShinagakiLightboxPage] {
+            [
+                ShinagakiLightboxPage(
+                    id: "test-page-1",
+                    image: shinagakiTestImage,
+                    accessibilityLabel: "Test Shinagaki page 1"
+                ),
+                ShinagakiLightboxPage(
+                    id: "test-page-2",
+                    image: shinagakiWideTestImage,
+                    accessibilityLabel: "Test Shinagaki page 2"
+                ),
+            ]
+        }
+
+        private static var shinagakiTestPhotoSaver: ShinagakiPhotoSaver {
+            let expectedImageData = shinagakiWideTestImage.pngData()
+            return ShinagakiPhotoSaver(
+                requestAuthorization: { .authorized },
+                performChanges: { imageData in
+                    guard imageData == expectedImageData else {
+                        throw ShinagakiUITestSaveError.unexpectedImage
+                    }
+                }
+            )
+        }
+
+        private static var shinagakiDelayedTestPhotoSaver: ShinagakiPhotoSaver {
+            ShinagakiPhotoSaver(
+                requestAuthorization: {
+                    UserDefaults.standard.set(
+                        true,
+                        forKey: ShinagakiCancellationTestHost.authorizationStartedKey
+                    )
+                    try? await Task.sleep(for: .seconds(1))
+                    UserDefaults.standard.set(
+                        true,
+                        forKey: ShinagakiCancellationTestHost.authorizationResumedKey
+                    )
+                    return .authorized
+                },
+                performChanges: { _ in
+                    UserDefaults.standard.set(
+                        true,
+                        forKey: ShinagakiCancellationTestHost.photoSavePerformedKey
+                    )
+                }
+            )
+        }
+
+        private struct ShinagakiCancellationTestHost: View {
+            nonisolated static let authorizationStartedKey =
+                "cominavi-ui-testing-shinagaki-authorization-started"
+            nonisolated static let authorizationResumedKey =
+                "cominavi-ui-testing-shinagaki-authorization-resumed"
+            nonisolated static let photoSavePerformedKey =
+                "cominavi-ui-testing-shinagaki-photo-save-performed"
+
+            let pages: [ShinagakiLightboxPage]
+            let photoSaver: ShinagakiPhotoSaver
+
+            @State private var isPresented = true
+            @State private var didResetTestState = false
+            @AppStorage(Self.authorizationStartedKey)
+            private var authorizationStarted = false
+            @AppStorage(Self.authorizationResumedKey)
+            private var authorizationResumed = false
+            @AppStorage(Self.photoSavePerformedKey)
+            private var photoSavePerformed = false
+
+            var body: some View {
+                VStack {
+                    Text("Lightbox dismissed")
+                        .accessibilityIdentifier(
+                            "shinagaki-test-lightbox-dismissed"
+                        )
+                    if authorizationStarted {
+                        Text("Authorization started")
+                            .accessibilityIdentifier(
+                                "shinagaki-test-authorization-started"
+                            )
+                    }
+                    if authorizationResumed {
+                        Text("Authorization resumed")
+                            .accessibilityIdentifier(
+                                "shinagaki-test-authorization-resumed"
+                            )
+                    }
+                    if photoSavePerformed {
+                        Text("Photo save performed")
+                            .accessibilityIdentifier(
+                                "shinagaki-test-photo-save-performed"
+                            )
+                    }
+                }
+                .onAppear {
+                    guard !didResetTestState else { return }
+                    didResetTestState = true
+                    authorizationStarted = false
+                    authorizationResumed = false
+                    photoSavePerformed = false
+                }
+                .sheet(isPresented: $isPresented) {
+                    ShinagakiLightbox(
+                        pages: pages,
+                        selectedPageID: pages[0].id,
+                        photoSaver: photoSaver
+                    )
+                }
+            }
+        }
+
+        private enum ShinagakiUITestSaveError: Error {
+            case unexpectedImage
         }
     #endif
 

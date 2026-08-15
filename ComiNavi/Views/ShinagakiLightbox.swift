@@ -86,12 +86,24 @@ struct ShinagakiLightboxPage: Identifiable {
         accessibilityLabel: String,
         image: UIImage? = nil
     ) {
+        let originalURL: URL?
+        let previewURL: URL?
+        switch media.kind {
+        case .photo, .animatedGIF, .unknown:
+            originalURL = media.url
+            previewURL = media.previewURL
+        case .video:
+            // The lightbox displays a video's still preview. Never treat the
+            // MP4 as an exportable image or download it through the image path.
+            originalURL = media.previewURL
+            previewURL = nil
+        }
         self.init(
             id: id,
             accessibilityLabel: accessibilityLabel,
             image: image,
-            originalURL: media.url,
-            previewURL: media.previewURL
+            originalURL: originalURL,
+            previewURL: previewURL
         )
     }
 
@@ -137,13 +149,17 @@ struct ShinagakiLightboxPage: Identifiable {
         media: [CatalogShinagakiMedia],
         accessibilityLabel: String
     ) -> [Self] {
-        media.enumerated().map { index, item in
+        let visibleMedia = media.enumerated().filter { _, item in
+            item.kind != .video || item.previewURL != nil
+        }
+        return visibleMedia.enumerated().map { pageIndex, source in
+            let (mediaIndex, item) = source
             let pageAccessibilityLabel = String(
-                localized: "Image \(index + 1) of \(media.count): \(accessibilityLabel)",
+                localized: "Image \(pageIndex + 1) of \(visibleMedia.count): \(accessibilityLabel)",
                 comment: "Accessibility label for one image in a multi-image Shinagaki post."
             )
             return Self(
-                id: "\(postID)-media-\(index)",
+                id: "\(postID)-media-\(mediaIndex)",
                 media: item,
                 accessibilityLabel: pageAccessibilityLabel
             )
@@ -170,13 +186,19 @@ struct ShinagakiLightboxPresentation: Identifiable {
 
 struct ShinagakiLightbox: View {
     let pages: [ShinagakiLightboxPage]
+    private let photoSaver: ShinagakiPhotoSaver
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPageID: ShinagakiLightboxPage.ID
+    @State private var activeImageAction: ShinagakiLightboxImageAction?
+    @State private var imageActionTask: Task<Void, Never>?
+    @State private var sharePresentation: ShinagakiSharePresentation?
+    @State private var imageActionAlert: ShinagakiLightboxAlert?
 
     init(
         image: UIImage,
-        accessibilityLabel: String
+        accessibilityLabel: String,
+        photoSaver: ShinagakiPhotoSaver = ShinagakiPhotoSaver()
     ) {
         let page = ShinagakiLightboxPage(
             id: "single-image",
@@ -184,20 +206,27 @@ struct ShinagakiLightbox: View {
             accessibilityLabel: accessibilityLabel
         )
         pages = [page]
+        self.photoSaver = photoSaver
         _selectedPageID = State(initialValue: page.id)
     }
 
-    init(presentation: ShinagakiLightboxPresentation) {
+    init(
+        presentation: ShinagakiLightboxPresentation,
+        photoSaver: ShinagakiPhotoSaver = ShinagakiPhotoSaver()
+    ) {
         pages = presentation.pages
+        self.photoSaver = photoSaver
         _selectedPageID = State(initialValue: presentation.selectedPageID)
     }
 
     init(
         pages: [ShinagakiLightboxPage],
-        selectedPageID: ShinagakiLightboxPage.ID
+        selectedPageID: ShinagakiLightboxPage.ID,
+        photoSaver: ShinagakiPhotoSaver = ShinagakiPhotoSaver()
     ) {
         precondition(!pages.isEmpty)
         self.pages = pages
+        self.photoSaver = photoSaver
         _selectedPageID = State(
             initialValue: pages.contains(where: { $0.id == selectedPageID })
                 ? selectedPageID
@@ -223,6 +252,15 @@ struct ShinagakiLightbox: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .accessibilityIdentifier("shinagaki-lightbox")
                 .ignoresSafeArea()
+
+                imageActionControls
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .topLeading
+                    )
+                    .padding(.top, proxy.safeAreaInsets.top + 8)
+                    .padding(.leading, 16)
 
                 Button {
                     dismiss()
@@ -274,9 +312,73 @@ struct ShinagakiLightbox: View {
         // is a presentation-level preference and can change the presenting
         // app's appearance while this sheet is shown.
         .environment(\.colorScheme, .dark)
+        .sheet(item: $sharePresentation) { presentation in
+            ShinagakiShareSheet(payload: presentation.payload) {
+                sharePresentation = nil
+            }
+        }
+        .alert(item: $imageActionAlert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: alert.message.map(Text.init),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+        .onDisappear {
+            cancelImageAction()
+        }
         .accessibilityAction(.escape) {
             dismiss()
         }
+    }
+
+    private var imageActionControls: some View {
+        HStack(spacing: 8) {
+            Button {
+                startImageAction(.share)
+            } label: {
+                imageActionLabel(for: .share)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Share image")
+            .accessibilityIdentifier("shinagaki-lightbox-share")
+
+            Button {
+                startImageAction(.save)
+            } label: {
+                imageActionLabel(for: .save)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Save image")
+            .accessibilityIdentifier("shinagaki-lightbox-save")
+        }
+        .disabled(activeImageAction != nil)
+    }
+
+    @ViewBuilder
+    private func imageActionLabel(
+        for kind: ShinagakiLightboxImageAction.Kind
+    ) -> some View {
+        Group {
+            if activeImageAction?.kind == kind {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(.white)
+            } else {
+                switch kind {
+                case .share:
+                    LucideIcon("square.and.arrow.up")
+                        .font(.body.weight(.bold))
+                case .save:
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.body.weight(.bold))
+                }
+            }
+        }
+        .foregroundStyle(.white)
+        .frame(width: 44, height: 44)
+        .background(.ultraThinMaterial, in: .circle)
+        .contentShape(.circle)
     }
 
     private var selectedPageIndex: Int {
@@ -294,6 +396,198 @@ struct ShinagakiLightbox: View {
             return
         }
         selectedPageID = pages[targetIndex].id
+    }
+
+    private func startImageAction(
+        _ kind: ShinagakiLightboxImageAction.Kind
+    ) {
+        guard activeImageAction == nil,
+              let action = ShinagakiLightboxImageAction(
+                  kind: kind,
+                  pages: pages,
+                  selectedPageID: selectedPageID
+              )
+        else { return }
+        let page = action.page
+        activeImageAction = action
+        imageActionTask = Task { @MainActor in
+            switch kind {
+            case .share:
+                guard let payload = await page.imageExportPayload() else {
+                    guard isCurrentImageAction(action), !Task.isCancelled else { return }
+                    imageActionAlert = .imageUnavailable
+                    completeImageAction(action)
+                    return
+                }
+                guard isCurrentImageAction(action),
+                      !Task.isCancelled
+                else {
+                    payload.removeTemporaryFile()
+                    completeImageAction(action)
+                    return
+                }
+                sharePresentation = ShinagakiSharePresentation(
+                    payload: payload
+                )
+            case .save:
+                guard let exportData = await page.imageExportData() else {
+                    guard isCurrentImageAction(action), !Task.isCancelled else { return }
+                    imageActionAlert = .saveFailed
+                    completeImageAction(action)
+                    return
+                }
+                guard isCurrentImageAction(action),
+                      !Task.isCancelled
+                else { return }
+                let status = await photoSaver.save(exportData.data)
+                guard isCurrentImageAction(action), !Task.isCancelled else { return }
+                imageActionAlert = ShinagakiLightboxAlert(saveStatus: status)
+            }
+            completeImageAction(action)
+        }
+    }
+
+    private func isCurrentImageAction(
+        _ action: ShinagakiLightboxImageAction
+    ) -> Bool {
+        activeImageAction?.id == action.id
+    }
+
+    private func completeImageAction(
+        _ action: ShinagakiLightboxImageAction
+    ) {
+        guard isCurrentImageAction(action) else { return }
+        activeImageAction = nil
+        imageActionTask = nil
+    }
+
+    private func cancelImageAction() {
+        imageActionTask?.cancel()
+        imageActionTask = nil
+        activeImageAction = nil
+    }
+}
+
+struct ShinagakiLightboxImageAction: Identifiable {
+    enum Kind: Equatable {
+        case share
+        case save
+    }
+
+    let id = UUID()
+    let kind: Kind
+    let page: ShinagakiLightboxPage
+
+    init?(
+        kind: Kind,
+        pages: [ShinagakiLightboxPage],
+        selectedPageID: ShinagakiLightboxPage.ID
+    ) {
+        guard let page = pages.first(where: { $0.id == selectedPageID }) else {
+            return nil
+        }
+        self.kind = kind
+        self.page = page
+    }
+}
+
+private struct ShinagakiSharePresentation: Identifiable {
+    let id = UUID()
+    let payload: ShinagakiImageExportPayload
+}
+
+enum ShinagakiLightboxAlert: Int, Identifiable, Equatable {
+    case saved
+    case photoAccessRequired
+    case saveFailed
+    case imageUnavailable
+
+    var id: Int { rawValue }
+
+    init(saveStatus: ShinagakiPhotoSaveStatus) {
+        self = switch saveStatus {
+        case .saved: .saved
+        case .permissionDenied, .restricted: .photoAccessRequired
+        case .failed, .cancelled: .saveFailed
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .saved:
+            String(localized: "Image saved")
+        case .photoAccessRequired, .saveFailed:
+            String(localized: "Couldn’t save image")
+        case .imageUnavailable:
+            String(localized: "Image unavailable")
+        }
+    }
+
+    var message: String? {
+        switch self {
+        case .photoAccessRequired:
+            String(localized: "Photo access is required to save images")
+        case .saved, .saveFailed, .imageUnavailable:
+            nil
+        }
+    }
+}
+
+struct ShinagakiShareSheet: UIViewControllerRepresentable {
+    let payload: ShinagakiImageExportPayload
+    let onCompletion: @MainActor () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(payload: payload, onCompletion: onCompletion)
+    }
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(
+            activityItems: [payload.fileURL],
+            applicationActivities: nil
+        )
+        controller.completionWithItemsHandler = { _, _, _, _ in
+            Task { @MainActor in
+                context.coordinator.finish(notify: true)
+            }
+        }
+        return controller
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIActivityViewController,
+        context: Context
+    ) {}
+
+    static func dismantleUIViewController(
+        _ uiViewController: UIActivityViewController,
+        coordinator: Coordinator
+    ) {
+        coordinator.finish(notify: false)
+    }
+
+    @MainActor
+    final class Coordinator {
+        private let payload: ShinagakiImageExportPayload
+        private let onCompletion: @MainActor () -> Void
+        private var didFinish = false
+
+        init(
+            payload: ShinagakiImageExportPayload,
+            onCompletion: @escaping @MainActor () -> Void
+        ) {
+            self.payload = payload
+            self.onCompletion = onCompletion
+        }
+
+        func finish(notify: Bool) {
+            guard !didFinish else { return }
+            didFinish = true
+            payload.removeTemporaryFile()
+            if notify {
+                onCompletion()
+            }
+        }
     }
 }
 

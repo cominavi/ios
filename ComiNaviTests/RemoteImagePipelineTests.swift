@@ -5,26 +5,144 @@ import XCTest
 
 final class RemoteImagePipelineTests: XCTestCase {
     @MainActor
+    func testDisplayedDownloadPreservesExactBytesForOfflineExport() async throws {
+        RemoteImagePipeline.configureCaches()
+
+        let url = try XCTUnwrap(
+            URL(string: "https://remote-image-pipeline.test/\(UUID().uuidString).png")
+        )
+        let data = makePNG()
+        let cache = RemoteImagePipeline.cache(for: .shinagaki)
+        let downloader = ImageDownloader(name: "RemoteImagePipelineTests-\(UUID())")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RemoteImagePipelineURLProtocol.self]
+        downloader.sessionConfiguration = configuration
+        RemoteImagePipelineURLProtocol.setResponseData(data, for: url)
+        defer {
+            RemoteImagePipelineURLProtocol.setResponseData(nil, for: url)
+            cache.clearMemoryCache()
+        }
+
+        let displayedImage = await RemoteImagePipeline.image(
+            for: url,
+            category: .shinagaki,
+            downloader: downloader
+        )
+        XCTAssertNotNil(displayedImage)
+
+        RemoteImagePipelineURLProtocol.setResponseData(nil, for: url)
+        cache.clearMemoryCache()
+        XCTAssertEqual(cache.imageCachedType(forKey: url.absoluteString), .disk)
+
+        let exportedData = await RemoteImagePipeline.imageData(
+            for: url,
+            category: .shinagaki
+        )
+        XCTAssertEqual(exportedData, data)
+
+        try await cache.removeImage(forKey: url.absoluteString)
+    }
+
+    @MainActor
+    func testDownsampledDownloadPreservesOriginalBytesForOfflineExport() async throws {
+        RemoteImagePipeline.configureCaches()
+
+        let url = try XCTUnwrap(
+            URL(string: "https://remote-image-pipeline.test/\(UUID().uuidString).png")
+        )
+        let data = makePNG()
+        let cache = RemoteImagePipeline.cache(for: .shinagaki)
+        let downloader = ImageDownloader(name: "RemoteImagePipelineTests-\(UUID())")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RemoteImagePipelineURLProtocol.self]
+        downloader.sessionConfiguration = configuration
+        RemoteImagePipelineURLProtocol.setResponseData(data, for: url)
+        defer {
+            RemoteImagePipelineURLProtocol.setResponseData(nil, for: url)
+            cache.clearMemoryCache()
+        }
+
+        let displayedImage = await RemoteImagePipeline.image(
+            for: url,
+            category: .shinagaki,
+            targetPixelSize: CGSize(width: 8, height: 8),
+            downloader: downloader
+        )
+        XCTAssertNotNil(displayedImage)
+
+        RemoteImagePipelineURLProtocol.setResponseData(nil, for: url)
+        cache.clearMemoryCache()
+        XCTAssertEqual(cache.imageCachedType(forKey: url.absoluteString), .disk)
+
+        let exportedData = await RemoteImagePipeline.imageData(
+            for: url,
+            category: .shinagaki
+        )
+        XCTAssertEqual(exportedData, data)
+
+        try await cache.removeImage(forKey: url.absoluteString)
+    }
+
+    @MainActor
     func testPipelineReadsAnImageAfterOnlyItsDiskCopyRemains() async throws {
         RemoteImagePipeline.configureCaches()
 
         let url = try XCTUnwrap(URL(string: "https://example.invalid/\(UUID().uuidString).png"))
         let data = makePNG()
-        let image = try XCTUnwrap(UIImage(data: data))
         let cache = RemoteImagePipeline.cache(for: .shinagaki)
         let key = url.absoluteString
 
-        try await cache.store(image, original: data, forKey: key)
-        try await cache.removeImage(forKey: key, fromMemory: true, fromDisk: false)
+        try await cache.storeToDisk(
+            data,
+            forKey: key,
+            expiration: .never
+        )
 
         XCTAssertEqual(cache.imageCachedType(forKey: key), .disk)
         let loadedData = await RemoteImagePipeline.imageData(
             for: url,
             category: .shinagaki
         )
-        XCTAssertNotNil(loadedData.flatMap(UIImage.init(data:)))
+        XCTAssertEqual(loadedData, data)
 
         try await cache.removeImage(forKey: key)
+    }
+
+    @MainActor
+    func testImageDataUsesVisibleMemoryCacheWithoutNetwork() async throws {
+        RemoteImagePipeline.configureCaches()
+
+        let url = try XCTUnwrap(
+            URL(string: "https://example.invalid/\(UUID().uuidString).jpg")
+        )
+        let renderedImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 17, height: 13)
+        ).image { context in
+            UIColor.systemPurple.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 17, height: 13))
+        }
+        let displayedData = try XCTUnwrap(
+            renderedImage.jpegData(compressionQuality: 0.83)
+        )
+        let image = try XCTUnwrap(UIImage(data: displayedData))
+        let cache = RemoteImagePipeline.cache(for: .shinagaki)
+        let key = url.absoluteString
+
+        try await cache.store(
+            image,
+            original: displayedData,
+            forKey: key,
+            toDisk: false
+        )
+
+        XCTAssertEqual(cache.imageCachedType(forKey: key), .memory)
+        let loadedData = await RemoteImagePipeline.imageData(
+            for: url,
+            category: .shinagaki
+        )
+        XCTAssertNotNil(loadedData.flatMap(UIImage.init(data:)))
+
+        cache.clearMemoryCache()
     }
 
     @MainActor
@@ -145,4 +263,48 @@ final class RemoteImagePipelineTests: XCTestCase {
             context.fill(CGRect(x: 0, y: 0, width: 16, height: 16))
         }
     }
+}
+
+private final class RemoteImagePipelineURLProtocol: URLProtocol,
+    @unchecked Sendable
+{
+    private static let responseLock = NSLock()
+    nonisolated(unsafe) private static var responseDataByURL: [URL: Data] = [:]
+
+    static func setResponseData(_ data: Data?, for url: URL) {
+        responseLock.withLock {
+            responseDataByURL[url] = data
+        }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host == "remote-image-pipeline.test"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let url = request.url,
+              let data = Self.responseLock.withLock({ Self.responseDataByURL[url] }),
+              let response = HTTPURLResponse(
+                  url: url,
+                  statusCode: 200,
+                  httpVersion: "HTTP/1.1",
+                  headerFields: ["Content-Type": "image/png"]
+              )
+        else {
+            client?.urlProtocol(
+                self,
+                didFailWithError: URLError(.notConnectedToInternet)
+            )
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

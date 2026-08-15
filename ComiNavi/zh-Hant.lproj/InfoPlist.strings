@@ -1,2 +1,3 @@
 "CFBundleDisplayName" = "ComiNavi";
 "NSLocationWhenInUseUsageDescription" = "ComiNavi 會在 GPS 模式下使用你的位置資訊，更新你在 Tokyo Big Sight 地圖上的位置。GPS 在室內可能不準確";
+"NSPhotoLibraryAddUsageDescription" = "ComiNavi 需要取用你的照片圖庫，以儲存你在圖片瀏覽器中選取的圖片";

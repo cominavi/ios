@@ -8,3 +8,4 @@
 
 "CFBundleDisplayName" = "コミナビ";
 "NSLocationWhenInUseUsageDescription" = "ComiNaviは、GPSモードで東京ビッグサイトのマップ上の現在地を更新するために位置情報を使用します。屋内ではGPSが不正確になる場合があります。";
+"NSPhotoLibraryAddUsageDescription" = "ComiNaviで選んだ画像を写真ライブラリに保存するために、写真へのアクセスが必要です。";

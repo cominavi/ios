@@ -8,3 +8,4 @@
 
 "CFBundleDisplayName" = "ComiNavi";
 "NSLocationWhenInUseUsageDescription" = "ComiNavi uses your location in GPS Mode to update your position on the Tokyo Big Sight map. GPS may be inaccurate indoors.";
+"NSPhotoLibraryAddUsageDescription" = "ComiNavi needs access to your photo library to save images you choose from the image viewer.";

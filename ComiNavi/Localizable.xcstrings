@@ -29,6 +29,35 @@
         }
       }
     },
+    "Couldn’t save image" : {
+      "comment" : "Error shown when an image cannot be saved to the photo library.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を保存できませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지를 저장할 수 없습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法保存图片"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法儲存圖片"
+          }
+        }
+      }
+    },
     "Export sharing plan" : {
       "localizations" : {
         "ja" : {
@@ -14787,6 +14816,35 @@
         }
       }
     },
+    "Image saved" : {
+      "comment" : "Confirmation shown after an image is saved to the photo library.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を保存しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지를 저장했습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图片已保存"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "圖片已儲存"
+          }
+        }
+      }
+    },
     "Images" : {
       "localizations" : {
         "ja" : {
@@ -20549,6 +20607,35 @@
         }
       }
     },
+    "Photo access is required to save images" : {
+      "comment" : "Explains that photo-library permission is needed before saving an image.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を保存するには写真へのアクセスが必要です"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지를 저장하려면 사진 접근 권한이 필요합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存图片需要照片访问权限"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存圖片需要照片取用權限"
+          }
+        }
+      }
+    },
     "Photo ID" : {
       "localizations" : {
         "ja" : {
@@ -24209,6 +24296,35 @@
         }
       }
     },
+    "Save image" : {
+      "comment" : "Button that saves the current lightbox image to the photo library.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を保存"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 저장"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存图片"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "儲存圖片"
+          }
+        }
+      }
+    },
     "Save circle" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -25116,6 +25232,35 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "分享目的地，但不宣稱提供館內路線"
+          }
+        }
+      }
+    },
+    "Share image" : {
+      "comment" : "Button that shares the current lightbox image.",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画像を共有"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이미지 공유"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享图片"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享圖片"
           }
         }
       }
