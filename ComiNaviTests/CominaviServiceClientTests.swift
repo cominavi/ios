@@ -1390,7 +1390,7 @@ final class CominaviServiceClientTests: XCTestCase {
             data: {"page":1,"fetchedCount":1,"maximumCount":5000,"followings":[{"id":"x-1","userName":"circle","name":"Circle","url":"https://x.com/circle"}]}
 
             event: done
-            data: {"twitterUserName":"cominavi","importedAt":"2026-08-11T08:00:00Z","nextAllowedAt":"2026-08-11T14:00:00Z","followings":[{"id":"x-1","userName":"circle","name":"Circle","url":"https://x.com/circle"}],"source":"twitterapi.io"}
+            data: {"twitterUserName":"cominavi","importedAt":"2026-08-11T08:00:00.000Z","nextAllowedAt":"2026-08-11T14:00:00.000Z","followings":[{"id":"x-1","userName":"circle","name":"Circle","url":"https://x.com/circle"}],"source":"twitterapi.io"}
 
             """.utf8
         )
@@ -1439,10 +1439,11 @@ final class CominaviServiceClientTests: XCTestCase {
     }
 
     func testStreamingXFollowingImportPreservesTypedEventError() async throws {
+        let nextAllowedAt = "2026-08-11T09:00:00.000Z"
         let streamBody = Data(
             """
             event: error
-            data: {"defined":true,"code":"UNPROCESSABLE_CONTENT","status":422,"message":"Too many followings.","data":{"error":"twitter_following_limit_exceeded"}}
+            data: {"defined":true,"code":"UNPROCESSABLE_CONTENT","status":422,"message":"Too many followings.","data":{"error":"twitter_following_limit_exceeded","nextAllowedAt":"\(nextAllowedAt)"}}
 
             """.utf8
         )
@@ -1471,7 +1472,45 @@ final class CominaviServiceClientTests: XCTestCase {
         } catch FollowingImportAPIError.server(let code, let message, let nextAllowedAt) {
             XCTAssertEqual(code, "twitter_following_limit_exceeded")
             XCTAssertEqual(message, "Too many followings.")
-            XCTAssertNil(nextAllowedAt)
+            XCTAssertEqual(nextAllowedAt, try fixtureDate("2026-08-11T09:00:00Z"))
+        }
+    }
+
+    func testStreamingXFollowingImportMapsMalformedCompletionToActionableError() async throws {
+        let streamBody = Data(
+            """
+            event: done
+            data: {"twitterUserName":"cominavi","importedAt":"not-a-date","nextAllowedAt":"2026-08-11T14:00:00.000Z","followings":[],"source":"twitterapi.io"}
+
+            """.utf8
+        )
+        let streamingTransport = StaticCominaviStreamingTransport(
+            status: 200,
+            data: streamBody,
+            contentType: "text/event-stream"
+        )
+        let client = try CominaviServiceClient(
+            baseURL: XCTUnwrap(URL(string: "https://cominavi.net")),
+            transport: { _ in throw URLError(.unsupportedURL) },
+            streamingTransport: { request in
+                try await streamingTransport.response(for: request)
+            },
+            sessionStore: FixedCominaviSessionStore(session: CominaviAuthenticationSession(
+                accessToken: "fixture-access",
+                expiresAt: Date(timeIntervalSinceNow: 3_600),
+                refreshToken: "fixture-refresh",
+                refreshExpiresAt: Date(timeIntervalSinceNow: 86_400)
+            ))
+        )
+
+        do {
+            _ = try await client.importXFollowings(userName: "cominavi") { _ in }
+            XCTFail("A malformed completion must be rejected")
+        } catch FollowingImportAPIError.invalidResponse {
+            XCTAssertEqual(
+                FollowingImportAPIError.invalidResponse.localizedDescription,
+                "The import service returned an invalid response."
+            )
         }
     }
 

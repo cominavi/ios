@@ -1132,19 +1132,26 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         }
 
         guard let response = result.response as? HTTPURLResponse else {
-            throw FollowingImportAPIError.invalidResponse
+            throw invalidFollowingImportResponse(stage: "response_metadata")
         }
         guard response.statusCode == 200 else {
             if response.statusCode == 401 {
                 throw FollowingImportAPIError.notLoggedIn
             }
             let data = try await collectedFollowingImportBytes(result.bytes)
-            throw followingImportError(from: data)
+            let error = followingImportError(from: data)
+            if case .invalidResponse = error {
+                throw invalidFollowingImportResponse(
+                    stage: "http_error_decode",
+                    dataByteCount: data.count
+                )
+            }
+            throw error
         }
         guard response.value(forHTTPHeaderField: "Content-Type")?
             .lowercased()
             .contains("text/event-stream") == true
-        else { throw FollowingImportAPIError.invalidResponse }
+        else { throw invalidFollowingImportResponse(stage: "response_content_type") }
 
         return try await consumeFollowingImportEvents(
             result.bytes,
@@ -1195,14 +1202,14 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
             if byte != 0x0A {
                 lineBytes.append(byte)
                 guard lineBytes.count <= 16 * 1_024 * 1_024 else {
-                    throw FollowingImportAPIError.invalidResponse
+                    throw invalidFollowingImportResponse(stage: "stream_line_length")
                 }
                 continue
             }
 
             if lineBytes.last == 0x0D { lineBytes.removeLast() }
             guard let line = String(bytes: lineBytes, encoding: .utf8) else {
-                throw FollowingImportAPIError.invalidResponse
+                throw invalidFollowingImportResponse(stage: "stream_utf8")
             }
             lineBytes.removeAll(keepingCapacity: true)
 
@@ -1234,7 +1241,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         if !lineBytes.isEmpty {
             if lineBytes.last == 0x0D { lineBytes.removeLast() }
             guard let line = String(bytes: lineBytes, encoding: .utf8) else {
-                throw FollowingImportAPIError.invalidResponse
+                throw invalidFollowingImportResponse(stage: "stream_utf8")
             }
             if line.hasPrefix("data:") {
                 dataLines.append(String(line.dropFirst(5)).drop(while: { $0 == " " }).description)
@@ -1249,7 +1256,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         ) {
             return payload
         }
-        throw FollowingImportAPIError.invalidResponse
+        throw invalidFollowingImportResponse(stage: "stream_incomplete")
     }
 
     private func consumeFollowingImportEvent(
@@ -1261,24 +1268,57 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         let data = Data(dataLines.joined(separator: "\n").utf8)
         switch eventName.isEmpty ? "message" : eventName {
         case "message":
-            let progress = try followingImportDecoder().decode(
-                FollowingImportProgress.self,
-                from: data
-            )
+            let progress: FollowingImportProgress
+            do {
+                progress = try followingImportDecoder().decode(
+                    FollowingImportProgress.self,
+                    from: data
+                )
+            } catch {
+                throw invalidFollowingImportResponse(
+                    error,
+                    stage: "progress_decode",
+                    eventName: "message",
+                    dataByteCount: data.count
+                )
+            }
             guard (1...25).contains(progress.page),
                   progress.maximumCount == FollowingImportProgress.maximumFollowingCount,
                   (0...progress.maximumCount).contains(progress.fetchedCount),
                   progress.followings.count <= progress.fetchedCount
-            else { throw FollowingImportAPIError.invalidResponse }
+            else {
+                throw invalidFollowingImportResponse(
+                    stage: "progress_validation",
+                    eventName: "message",
+                    dataByteCount: data.count
+                )
+            }
             await onProgress(progress)
             return nil
         case "done":
-            return try followingImportDecoder().decode(
-                FollowingImportPayload.self,
-                from: data
-            )
+            do {
+                return try followingImportDecoder().decode(
+                    FollowingImportPayload.self,
+                    from: data
+                )
+            } catch {
+                throw invalidFollowingImportResponse(
+                    error,
+                    stage: "completion_decode",
+                    eventName: "done",
+                    dataByteCount: data.count
+                )
+            }
         case "error":
-            throw followingImportError(from: data)
+            let error = followingImportError(from: data)
+            if case .invalidResponse = error {
+                throw invalidFollowingImportResponse(
+                    stage: "error_event_decode",
+                    eventName: "error",
+                    dataByteCount: data.count
+                )
+            }
+            throw error
         default:
             return nil
         }
@@ -1299,8 +1339,45 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
 
     private nonisolated func followingImportDecoder() -> JSONDecoder {
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            guard let date = Self.followingImportDate(from: value) else {
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Expected an RFC 3339 timestamp."
+                )
+            }
+            return date
+        }
         return decoder
+    }
+
+    private static func followingImportDate(from value: String) -> Date? {
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractionalFormatter.date(from: value) {
+            return date
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
+    }
+
+    private func invalidFollowingImportResponse(
+        _ error: Error? = nil,
+        stage: String,
+        eventName: String? = nil,
+        dataByteCount: Int? = nil
+    ) -> FollowingImportAPIError {
+        AppDiagnostics.captureFollowingImportFailure(
+            error,
+            stage: stage,
+            eventName: eventName,
+            dataByteCount: dataByteCount
+        )
+        return .invalidResponse
     }
 
     private nonisolated func followingImportError(from data: Data) -> FollowingImportAPIError {
@@ -1312,7 +1389,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         else { return .invalidResponse }
         let nextAllowedAtValue = (details?["nextAllowedAt"] ?? root["nextAllowedAt"]) as? String
         let nextAllowedAt = nextAllowedAtValue.flatMap {
-            ISO8601DateFormatter().date(from: $0)
+            Self.followingImportDate(from: $0)
         }
         return .server(
             code: code,
