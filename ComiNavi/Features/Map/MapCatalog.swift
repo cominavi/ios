@@ -3,165 +3,12 @@ import GRDB
 import ImageIO
 
 struct CatalogMapArtwork: Equatable, @unchecked Sendable {
-    private enum RenderingSource {
-        case originalOnly
-        case encoded(data: Data, overview: CGImage)
-        #if DEBUG
-            case prepared([CGImage])
-        #endif
-    }
-
     let name: String
     let pixelSize: CGSize
     let image: CGImage
-    let renderingMaximumPixelDimensions: [Int]
-
-    private let renderingSource: RenderingSource
-
-    init(
-        name: String,
-        pixelSize: CGSize,
-        image: CGImage
-    ) {
-        self.init(
-            name: name,
-            pixelSize: pixelSize,
-            image: image,
-            renderingSource: .originalOnly,
-            renderingMaximumPixelDimensions: [max(image.width, image.height)]
-        )
-    }
-
-    private init(
-        name: String,
-        pixelSize: CGSize,
-        image: CGImage,
-        renderingSource: RenderingSource,
-        renderingMaximumPixelDimensions: [Int]
-    ) {
-        self.name = name
-        self.pixelSize = pixelSize
-        self.image = image
-        self.renderingSource = renderingSource
-        self.renderingMaximumPixelDimensions = renderingMaximumPixelDimensions
-    }
-
-    fileprivate static func encoded(
-        name: String,
-        pixelSize: CGSize,
-        image: CGImage,
-        data: Data,
-        overview: CGImage
-    ) -> Self {
-        Self(
-            name: name,
-            pixelSize: pixelSize,
-            image: image,
-            renderingSource: .encoded(data: data, overview: overview),
-            renderingMaximumPixelDimensions:
-                CatalogMapArtworkRendering.intermediatePixelDimensions(for: pixelSize)
-                + [max(image.width, image.height)]
-        )
-    }
-
-    func renderingImage(at index: Int) -> CGImage {
-        let safeIndex = min(max(index, 0), renderingMaximumPixelDimensions.count - 1)
-        if let precomputedImage = precomputedRenderingImage(at: safeIndex) {
-            return precomputedImage
-        }
-        guard case .encoded(let data, _) = renderingSource,
-              safeIndex < renderingMaximumPixelDimensions.count - 1,
-              let intermediate = CatalogMapArtworkRendering.image(
-                  from: data,
-                  maximumPixelDimension: renderingMaximumPixelDimensions[safeIndex]
-              )
-        else { return image }
-        return intermediate
-    }
-
-    func precomputedRenderingImage(at index: Int) -> CGImage? {
-        let safeIndex = min(max(index, 0), renderingMaximumPixelDimensions.count - 1)
-        switch renderingSource {
-        case .originalOnly:
-            return image
-        case .encoded(_, let overview):
-            if safeIndex == 0 { return overview }
-            if safeIndex == renderingMaximumPixelDimensions.count - 1 { return image }
-            return nil
-        #if DEBUG
-            case .prepared(let images):
-                return images[safeIndex]
-        #endif
-        }
-    }
-
-    #if DEBUG
-        static func testingEncoded(
-            name: String,
-            pixelSize: CGSize,
-            image: CGImage,
-            data: Data,
-            overview: CGImage
-        ) -> Self {
-            encoded(
-                name: name,
-                pixelSize: pixelSize,
-                image: image,
-                data: data,
-                overview: overview
-            )
-        }
-
-        static func testing(
-            name: String,
-            pixelSize: CGSize,
-            image: CGImage,
-            renderingImages: [CGImage]
-        ) -> Self {
-            let images = renderingImages.isEmpty ? [image] : renderingImages.sorted {
-                max($0.width, $0.height) < max($1.width, $1.height)
-            }
-            return Self(
-                name: name,
-                pixelSize: pixelSize,
-                image: image,
-                renderingSource: .prepared(images),
-                renderingMaximumPixelDimensions: images.map {
-                    max($0.width, $0.height)
-                }
-            )
-        }
-    #endif
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.name == rhs.name && lhs.pixelSize == rhs.pixelSize
-    }
-}
-
-enum CatalogMapArtworkRendering {
-    static let intermediateMaximumPixelDimensions = [1_536, 3_072]
-
-    static func intermediatePixelDimensions(for sourceSize: CGSize) -> [Int] {
-        let sourceMaximum = Int(max(sourceSize.width, sourceSize.height).rounded(.down))
-        return intermediateMaximumPixelDimensions.filter { $0 < sourceMaximum }
-    }
-
-    static func image(
-        from encodedData: Data,
-        maximumPixelDimension: Int
-    ) -> CGImage? {
-        guard let source = CGImageSourceCreateWithData(encodedData as CFData, nil) else {
-            return nil
-        }
-        return CGImageSourceCreateThumbnailAtIndex(
-            source,
-            0,
-            [
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceThumbnailMaxPixelSize: maximumPixelDimension,
-                kCGImageSourceShouldCacheImmediately: true,
-            ] as CFDictionary
-        )
     }
 }
 
@@ -551,28 +398,10 @@ struct SQLiteMapCatalog: MapCatalog {
             else {
                 return nil
             }
-            let sourceSize = CGSize(width: width, height: height)
-            let intermediateDimensions = CatalogMapArtworkRendering
-                .intermediatePixelDimensions(for: sourceSize)
-            guard let overviewMaximumDimension = intermediateDimensions.first else {
-                return CatalogMapArtwork(
-                    name: artworkName,
-                    pixelSize: sourceSize,
-                    image: image
-                )
-            }
-            guard let overviewImage = CatalogMapArtworkRendering.image(
-                from: data,
-                maximumPixelDimension: overviewMaximumDimension
-            ) else {
-                return nil
-            }
-            return CatalogMapArtwork.encoded(
+            return CatalogMapArtwork(
                 name: artworkName,
-                pixelSize: sourceSize,
-                image: image,
-                data: data,
-                overview: overviewImage
+                pixelSize: CGSize(width: width, height: height),
+                image: image
             )
         }
 

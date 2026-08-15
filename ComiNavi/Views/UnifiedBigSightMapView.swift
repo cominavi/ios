@@ -1,7 +1,6 @@
 import CoreLocation
 import MapLibre
 import OSLog
-import QuartzCore
 import SpriteKit
 import SwiftUI
 import UIKit
@@ -150,7 +149,11 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             onCameraRotationChange: onCameraRotationChange,
             onLocate: onLocate
         )
-        host.presentScene(renderer)
+        host.mapView.presentScene(renderer)
+        host.mapView.preferredFramesPerSecond = UIScreen.main.maximumFramesPerSecond
+        host.mapView.ignoresSiblingOrder = true
+        host.mapView.shouldCullNonVisibleNodes = true
+        host.mapView.isAsynchronous = true
         update(host: host, renderer: renderer)
         return host
     }
@@ -441,9 +444,6 @@ final class UnifiedMapHostView: UIView {
         mapView.backgroundColor = .clear
         mapView.allowsTransparency = true
         mapView.isOpaque = false
-        mapView.preferredFramesPerSecond = UIScreen.main.maximumFramesPerSecond
-        mapView.ignoresSiblingOrder = true
-        mapView.shouldCullNonVisibleNodes = true
         mapView.isAccessibilityElement = true
         mapView.accessibilityIdentifier = "unified-map-canvas"
         addSubview(mapView)
@@ -580,7 +580,6 @@ final class UnifiedMapHostView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        synchronizeRendererPresentation()
         synchronizeBasemapFromScene()
 
         // SpriteKit applies `.resizeFill` after the SKView receives its final
@@ -589,24 +588,6 @@ final class UnifiedMapHostView: UIView {
         DispatchQueue.main.async { [weak self] in
             self?.synchronizeBasemapFromScene()
         }
-    }
-
-    func presentScene(_ scene: SKScene) {
-        mapView.presentScene(scene)
-        synchronizeRendererPresentation()
-    }
-
-    private func synchronizeRendererPresentation() {
-        mapView.isAsynchronous = false
-        mapView.layer.drawsAsynchronously = false
-        for metalLayer in rendererPresentationLayers(in: mapView.layer) {
-            metalLayer.presentsWithTransaction = true
-        }
-    }
-
-    private func rendererPresentationLayers(in layer: CALayer) -> [CAMetalLayer] {
-        let current = (layer as? CAMetalLayer).map { [$0] } ?? []
-        return current + (layer.sublayers ?? []).flatMap(rendererPresentationLayers)
     }
 
     func updateAppearance(_ appearance: UnifiedMapAppearance) {
@@ -951,46 +932,6 @@ enum UnifiedMapMarkerMetrics {
     }
 }
 
-enum UnifiedMapArtworkLevelOfDetail {
-    private static let preferredOversampling: CGFloat = 1.1
-    private static let downgradeOversampling: CGFloat = 1.35
-
-    static func textureIndex(
-        pixelDimensions: [CGFloat],
-        renderedMaximumPixelDimension: CGFloat,
-        currentIndex: Int
-    ) -> Int {
-        guard !pixelDimensions.isEmpty else { return 0 }
-        let boundedCurrentIndex = min(max(currentIndex, 0), pixelDimensions.count - 1)
-        let preferredIndex =
-            pixelDimensions.firstIndex {
-                $0 >= renderedMaximumPixelDimension * preferredOversampling
-            } ?? pixelDimensions.count - 1
-
-        guard preferredIndex < boundedCurrentIndex else { return preferredIndex }
-        return renderedMaximumPixelDimension * downgradeOversampling
-            <= pixelDimensions[preferredIndex]
-            ? preferredIndex
-            : boundedCurrentIndex
-    }
-}
-
-private struct UnifiedMapPreparedArtworkImage: @unchecked Sendable {
-    let value: CGImage
-}
-
-private actor UnifiedMapArtworkImagePreparer {
-    func prepare(
-        artwork: CatalogMapArtwork,
-        textureIndex: Int
-    ) -> UnifiedMapPreparedArtworkImage? {
-        guard !Task.isCancelled else { return nil }
-        let image = artwork.renderingImage(at: textureIndex)
-        guard !Task.isCancelled else { return nil }
-        return UnifiedMapPreparedArtworkImage(value: image)
-    }
-}
-
 @MainActor
 final class UnifiedBigSightScene: SKScene {
     enum Hit {
@@ -1015,20 +956,6 @@ final class UnifiedBigSightScene: SKScene {
         let labelMinimumZoom: CGFloat
         let maximumZoom: CGFloat
     }
-
-    private struct AuthoredArtworkSprite {
-        let node: SKSpriteNode
-        let mapID: Int
-        let artwork: CatalogMapArtwork
-        let pixelDimensions: [CGFloat]
-        var cachedTextures: [Int: SKTexture]
-        var textureRecency: [Int]
-        var pendingTextureIndex: Int?
-        var texturePreparationTask: Task<Void, Never>?
-        var textureIndex: Int
-    }
-
-    private static let maximumCachedArtworkTexturesPerSprite = 2
 
     private static let darkArtworkShader = SKShader(
         source: """
@@ -1067,15 +994,12 @@ final class UnifiedBigSightScene: SKScene {
     private var venueMarkers: [ScreenSpaceMarker] = []
     private var facilityMarkers: [ScreenSpaceMarker] = []
     private var blockLabels: [SKLabelNode] = []
-    private var authoredArtworkSprites: [AuthoredArtworkSprite] = []
-    private let artworkImagePreparer = UnifiedMapArtworkImagePreparer()
     private var minimumCameraScale: CGFloat = 1
     private var maximumCameraScale: CGFloat = 0.01
     private var hasFittedInitialCamera = false
     private var lastCameraPosition = CGPoint(x: CGFloat.infinity, y: CGFloat.infinity)
     private var lastCameraScale: CGFloat = .infinity
     private var lastCameraRotation: CGFloat = .infinity
-    private var needsLevelOfDetailUpdate = true
     private var viewportWorkItem: DispatchWorkItem?
     private var requestedScopeInternally = false
     private var lastDynamicFingerprint: Int?
@@ -1118,29 +1042,7 @@ final class UnifiedBigSightScene: SKScene {
     }
     var zoomFactor: CGFloat { minimumCameraScale / max(mapCamera.xScale, 0.000_1) }
     var staticShapeNodeCount: Int { staticRoot.descendants(of: SKShapeNode.self).count }
-    #if DEBUG
-        var authoredMapNodeCount: Int {
-            venueRoot.children.compactMap { $0 as? SKSpriteNode }.count
-        }
-        var authoredMapNodeIdentifiers: [ObjectIdentifier] {
-            authoredArtworkSprites.map { ObjectIdentifier($0.node) }
-        }
-        var authoredMapTextureIndices: [Int] { authoredArtworkSprites.map(\.textureIndex) }
-        var authoredMapTextureIdentifiers: [ObjectIdentifier?] {
-            authoredArtworkSprites.map { $0.node.texture.map(ObjectIdentifier.init) }
-        }
-        var authoredMapCachedTextureCounts: [Int] {
-            authoredArtworkSprites.map(\.cachedTextures.count)
-        }
-        var authoredMapCachedTextureIndices: [[Int]] {
-            authoredArtworkSprites.map { $0.cachedTextures.keys.sorted() }
-        }
-        var authoredMapPendingTextureIndices: [Int?] {
-            authoredArtworkSprites.map(\.pendingTextureIndex)
-        }
-        var authoredMapImagePreparationOverride:
-            (@MainActor (CatalogMapArtwork, Int) async -> CGImage?)?
-    #endif
+    var authoredMapNodeCount: Int { venueRoot.children.compactMap { $0 as? SKSpriteNode }.count }
     var openStreetMapFeatureNodeCount: Int {
         pedestrianRoot.children.filter {
             $0.name?.hasPrefix("openstreetmap-feature-") == true
@@ -1291,21 +1193,14 @@ final class UnifiedBigSightScene: SKScene {
         publishCameraChangeIfNeeded()
     }
 
-    private func publishCameraChangeIfNeeded(
-        updateLevelOfDetail: Bool = true
-    ) {
-        let cameraChanged =
+    private func publishCameraChangeIfNeeded() {
+        guard
             mapCamera.position != lastCameraPosition
                 || mapCamera.xScale != lastCameraScale
                 || mapCamera.zRotation != lastCameraRotation
+        else { return }
         clampCamera()
-        if updateLevelOfDetail, cameraChanged || needsLevelOfDetailUpdate {
-            applyLevelOfDetail()
-            needsLevelOfDetailUpdate = false
-        } else if cameraChanged {
-            needsLevelOfDetailUpdate = true
-        }
-        guard cameraChanged else { return }
+        applyLevelOfDetail()
         lastCameraPosition = mapCamera.position
         lastCameraScale = mapCamera.xScale
         lastCameraRotation = mapCamera.zRotation
@@ -1416,11 +1311,6 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     func pan(by translation: CGPoint, in view: SKView) {
-        applyPan(by: translation, in: view)
-        publishCameraChangeIfNeeded(updateLevelOfDetail: false)
-    }
-
-    private func applyPan(by translation: CGPoint, in view: SKView) {
         guard translation != .zero else { return }
         let center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
         let before = convertPoint(fromView: center)
@@ -1440,7 +1330,7 @@ final class UnifiedBigSightScene: SKScene {
             y: max(-1_800, min(1_800, velocity.y)) * 0.16
         )
         let original = mapCamera.position
-        applyPan(by: projected, in: view)
+        pan(by: projected, in: view)
         let target = mapCamera.position
         mapCamera.position = original
         let action = SKAction.move(to: target, duration: reduceMotion ? 0 : 0.34)
@@ -1449,11 +1339,6 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     func zoom(by scale: CGFloat, around viewPoint: CGPoint, in view: SKView) {
-        applyZoom(by: scale, around: viewPoint, in: view)
-        publishCameraChangeIfNeeded(updateLevelOfDetail: false)
-    }
-
-    private func applyZoom(by scale: CGFloat, around viewPoint: CGPoint, in view: SKView) {
         guard scale.isFinite, scale > 0, scale != 1 else { return }
         let before = convertPoint(fromView: viewPoint)
         let target = max(maximumCameraScale, min(minimumCameraScale, mapCamera.xScale / scale))
@@ -1465,11 +1350,6 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     func rotate(by angle: CGFloat, around viewPoint: CGPoint, in view: SKView) {
-        applyRotation(by: angle, around: viewPoint, in: view)
-        publishCameraChangeIfNeeded(updateLevelOfDetail: false)
-    }
-
-    private func applyRotation(by angle: CGFloat, around viewPoint: CGPoint, in view: SKView) {
         guard angle.isFinite, angle != 0 else { return }
         let before = convertPoint(fromView: viewPoint)
         // UIKit reports a positive rotation for a clockwise twist in its
@@ -1486,7 +1366,7 @@ final class UnifiedBigSightScene: SKScene {
         beginGesture()
         let startPosition = mapCamera.position
         let startScale = mapCamera.xScale
-        applyZoom(by: scale, around: viewPoint, in: view)
+        zoom(by: scale, around: viewPoint, in: view)
         let targetPosition = mapCamera.position
         let targetScale = mapCamera.xScale
         mapCamera.position = startPosition
@@ -1641,7 +1521,6 @@ final class UnifiedBigSightScene: SKScene {
 
     private func buildStaticScene() {
         let palette = appearance.palette
-        authoredArtworkSprites.forEach { $0.texturePreparationTask?.cancel() }
         staticRoot.removeAllChildren()
         campusDetailRoot.removeAllChildren()
         pedestrianRoot.removeAllChildren()
@@ -1653,7 +1532,6 @@ final class UnifiedBigSightScene: SKScene {
         venueMarkers = []
         facilityMarkers = []
         blockLabels = []
-        authoredArtworkSprites = []
         staticRoot.addChild(campusDetailRoot)
         staticRoot.addChild(pedestrianRoot)
         staticRoot.addChild(markerRoot)
@@ -1760,12 +1638,9 @@ final class UnifiedBigSightScene: SKScene {
         venueRoot.addChild(floor)
 
         if let artwork = venue.scene.artwork {
-            let pixelDimensions = artwork.renderingMaximumPixelDimensions.map(CGFloat.init)
-            let overviewTexture = authoredArtworkTexture(
-                for: artwork.precomputedRenderingImage(at: 0) ?? artwork.image
-            )
-            SKTexture.preload([overviewTexture], withCompletionHandler: {})
-            let map = SKSpriteNode(texture: overviewTexture)
+            let texture = SKTexture(cgImage: artwork.image)
+            texture.filteringMode = .linear
+            let map = SKSpriteNode(texture: texture)
             map.name = "authored-map-\(artwork.name)"
             map.position = UnifiedMapProjection.scenePoint(fromCampus: venue.center)
             map.size = CGSize(
@@ -1775,19 +1650,6 @@ final class UnifiedBigSightScene: SKScene {
             map.zRotation = -venue.rotation
             map.zPosition = -4
             map.shader = appearance == .dark ? Self.darkArtworkShader : nil
-            authoredArtworkSprites.append(
-                AuthoredArtworkSprite(
-                    node: map,
-                    mapID: venue.id,
-                    artwork: artwork,
-                    pixelDimensions: pixelDimensions,
-                    cachedTextures: [0: overviewTexture],
-                    textureRecency: [0],
-                    pendingTextureIndex: nil,
-                    texturePreparationTask: nil,
-                    textureIndex: 0
-                )
-            )
             venueRoot.addChild(map)
         } else {
             for (blockID, tables) in Dictionary(grouping: venue.scene.tables, by: { $0.id.blockID })
@@ -2087,7 +1949,6 @@ final class UnifiedBigSightScene: SKScene {
         genreRoot.isHidden = scope != .venue
         dynamicRoot.isHidden = false
         markerRoot.isHidden = isSearchActive
-        updateAuthoredArtworkTextures()
         for marker in destinationRoot.children where marker.name == "map-destination-marker" {
             marker.setScale(mapCamera.xScale)
             marker.zRotation = levelRotation
@@ -2126,160 +1987,6 @@ final class UnifiedBigSightScene: SKScene {
         }
         for child in userRoot.children {
             child.setScale(mapCamera.xScale)
-        }
-    }
-
-    private func authoredArtworkTexture(for image: CGImage) -> SKTexture {
-        let texture = SKTexture(cgImage: image)
-        texture.filteringMode = .linear
-        return texture
-    }
-
-    private func cachedAuthoredArtworkTexture(
-        forSpriteAt spriteIndex: Int,
-        textureIndex: Int
-    ) -> SKTexture? {
-        var sprite = authoredArtworkSprites[spriteIndex]
-        guard let texture = sprite.cachedTextures[textureIndex] else { return nil }
-        sprite.textureRecency.removeAll { $0 == textureIndex }
-        sprite.textureRecency.append(textureIndex)
-        authoredArtworkSprites[spriteIndex] = sprite
-        return texture
-    }
-
-    private func cacheAuthoredArtworkTexture(
-        _ texture: SKTexture,
-        forSpriteAt spriteIndex: Int,
-        textureIndex: Int
-    ) {
-        var sprite = authoredArtworkSprites[spriteIndex]
-        sprite.cachedTextures[textureIndex] = texture
-        sprite.textureRecency.removeAll { $0 == textureIndex }
-        sprite.textureRecency.append(textureIndex)
-        while sprite.textureRecency.count > Self.maximumCachedArtworkTexturesPerSprite {
-            let evictionOffset = sprite.textureRecency.firstIndex {
-                $0 != 0 && $0 != textureIndex
-            } ?? sprite.textureRecency.startIndex
-            let evictedIndex = sprite.textureRecency.remove(at: evictionOffset)
-            sprite.cachedTextures.removeValue(forKey: evictedIndex)
-        }
-        authoredArtworkSprites[spriteIndex] = sprite
-    }
-
-    private func desiredArtworkTextureIndex(
-        for artwork: AuthoredArtworkSprite
-    ) -> Int {
-        guard scope == .venue, artwork.mapID == selectedMapID else { return 0 }
-        let contentScale = view?.contentScaleFactor ?? UIScreen.main.scale
-        let cameraScale = max(mapCamera.xScale, 0.000_1)
-        let renderedMaximumPixelDimension =
-            max(artwork.node.size.width, artwork.node.size.height)
-            / cameraScale * contentScale
-        return UnifiedMapArtworkLevelOfDetail.textureIndex(
-            pixelDimensions: artwork.pixelDimensions,
-            renderedMaximumPixelDimension: renderedMaximumPixelDimension,
-            currentIndex: artwork.textureIndex
-        )
-    }
-
-    private func prepareAuthoredArtworkTexture(
-        forSpriteAt spriteIndex: Int,
-        textureIndex: Int
-    ) {
-        var sprite = authoredArtworkSprites[spriteIndex]
-        sprite.texturePreparationTask?.cancel()
-        sprite.pendingTextureIndex = textureIndex
-        let artwork = sprite.artwork
-        let imagePreparer = artworkImagePreparer
-        let nodeIdentifier = ObjectIdentifier(sprite.node)
-        #if DEBUG
-            let imagePreparationOverride = authoredMapImagePreparationOverride
-        #endif
-        let task = Task { @MainActor [weak self] in
-            let preparedImage: UnifiedMapPreparedArtworkImage?
-            #if DEBUG
-                if let imagePreparationOverride {
-                    preparedImage = await imagePreparationOverride(artwork, textureIndex).map {
-                        UnifiedMapPreparedArtworkImage(value: $0)
-                    }
-                } else {
-                    preparedImage = await imagePreparer.prepare(
-                        artwork: artwork,
-                        textureIndex: textureIndex
-                    )
-                }
-            #else
-                preparedImage = await imagePreparer.prepare(
-                    artwork: artwork,
-                    textureIndex: textureIndex
-                )
-            #endif
-            guard let preparedImage,
-                  !Task.isCancelled,
-                  let self,
-                  authoredArtworkSprites.indices.contains(spriteIndex),
-                  ObjectIdentifier(authoredArtworkSprites[spriteIndex].node) == nodeIdentifier,
-                  authoredArtworkSprites[spriteIndex].pendingTextureIndex == textureIndex
-            else { return }
-
-            let texture = authoredArtworkTexture(for: preparedImage.value)
-            await withCheckedContinuation { continuation in
-                SKTexture.preload([texture]) {
-                    continuation.resume()
-                }
-            }
-            guard !Task.isCancelled,
-                  authoredArtworkSprites.indices.contains(spriteIndex),
-                  ObjectIdentifier(authoredArtworkSprites[spriteIndex].node) == nodeIdentifier,
-                  authoredArtworkSprites[spriteIndex].pendingTextureIndex == textureIndex
-            else { return }
-
-            cacheAuthoredArtworkTexture(
-                texture,
-                forSpriteAt: spriteIndex,
-                textureIndex: textureIndex
-            )
-            authoredArtworkSprites[spriteIndex].pendingTextureIndex = nil
-            authoredArtworkSprites[spriteIndex].texturePreparationTask = nil
-            if desiredArtworkTextureIndex(for: authoredArtworkSprites[spriteIndex]) == textureIndex {
-                authoredArtworkSprites[spriteIndex].node.texture = texture
-                authoredArtworkSprites[spriteIndex].textureIndex = textureIndex
-            }
-            updateAuthoredArtworkTextures()
-        }
-        sprite.texturePreparationTask = task
-        authoredArtworkSprites[spriteIndex] = sprite
-    }
-
-    private func updateAuthoredArtworkTextures() {
-
-        for index in authoredArtworkSprites.indices {
-            let artwork = authoredArtworkSprites[index]
-            guard artwork.pixelDimensions.count > 1 else { continue }
-            let textureIndex = desiredArtworkTextureIndex(for: artwork)
-            guard textureIndex != artwork.textureIndex else {
-                if artwork.pendingTextureIndex != nil {
-                    authoredArtworkSprites[index].texturePreparationTask?.cancel()
-                    authoredArtworkSprites[index].texturePreparationTask = nil
-                    authoredArtworkSprites[index].pendingTextureIndex = nil
-                }
-                continue
-            }
-            if let texture = cachedAuthoredArtworkTexture(
-                forSpriteAt: index,
-                textureIndex: textureIndex
-            ) {
-                authoredArtworkSprites[index].texturePreparationTask?.cancel()
-                authoredArtworkSprites[index].texturePreparationTask = nil
-                authoredArtworkSprites[index].pendingTextureIndex = nil
-                authoredArtworkSprites[index].node.texture = texture
-                authoredArtworkSprites[index].textureIndex = textureIndex
-            } else if artwork.pendingTextureIndex != textureIndex {
-                prepareAuthoredArtworkTexture(
-                    forSpriteAt: index,
-                    textureIndex: textureIndex
-                )
-            }
         }
     }
 

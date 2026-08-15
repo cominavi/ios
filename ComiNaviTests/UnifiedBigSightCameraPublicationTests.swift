@@ -5,49 +5,6 @@ import XCTest
 
 final class UnifiedBigSightCameraPublicationTests: XCTestCase {
     @MainActor
-    func testInteractiveZoomPublishesBasemapCameraSynchronously() async throws {
-        let renderer = UnifiedBigSightScene(campus: makeGridAlignedCampus())
-        let host = UnifiedMapHostView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
-        let coordinator = UnifiedBigSightMapView.Coordinator()
-        coordinator.connect(host: host, renderer: renderer)
-        host.presentScene(renderer)
-        host.layoutIfNeeded()
-        try await Task.sleep(for: .milliseconds(40))
-
-        XCTAssertEqual(
-            host.basemapView.zoomLevel,
-            renderer.basemapCamera.zoomLevel,
-            accuracy: 0.001
-        )
-
-        renderer.beginGesture()
-        renderer.zoom(
-            by: 2.4,
-            around: CGPoint(x: 137, y: 511),
-            in: host.mapView
-        )
-
-        // Do not wait for SpriteKit's next didFinishUpdate callback. Both
-        // renderers must enter the same display transaction during the pinch.
-        XCTAssertEqual(
-            host.basemapView.zoomLevel,
-            renderer.basemapCamera.zoomLevel,
-            accuracy: 0.001
-        )
-        XCTAssertEqual(
-            host.basemapView.centerCoordinate.latitude,
-            renderer.basemapCamera.coordinate.latitude,
-            accuracy: 0.000_001
-        )
-        XCTAssertEqual(
-            host.basemapView.centerCoordinate.longitude,
-            renderer.basemapCamera.coordinate.longitude,
-            accuracy: 0.000_001
-        )
-        withExtendedLifetime(coordinator) {}
-    }
-
-    @MainActor
     func testReducedMotionCompassPublishesFinalRotationSynchronously() throws {
         let renderer = UnifiedBigSightScene(campus: makeGridAlignedCampus())
         renderer.reduceMotion = true
