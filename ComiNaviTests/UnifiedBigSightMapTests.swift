@@ -94,7 +94,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
-    func testGlobalSearchOverlaysEveryVenueAtCampusScope() {
+    func testSearchAndFavoritesOverlayEveryVenueRegardlessOfSelectedVenue() {
         let tableID = CatalogMapTable.ID(blockID: 1, spaceNumber: 1)
         let firstScene = CatalogMapScene(
             id: .init(day: 1, mapID: 1),
@@ -181,6 +181,59 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
         XCTAssertEqual(renderer.persistentOverlayShapeCount, 2)
         XCTAssertTrue(renderer.areMapIconsHiddenForSearch)
+
+        let bookmarks = [
+            MapBookmark(
+                eventNumber: 108,
+                publicCircleID: 100,
+                catalogCircleID: 7,
+                updateID: 70,
+                day: 1,
+                mapID: firstVenue.id,
+                tableID: tableID,
+                subspace: 0,
+                color: .orange,
+                memo: "",
+                modifiedAt: .now,
+                syncState: .synced
+            ),
+            MapBookmark(
+                eventNumber: 108,
+                publicCircleID: 200,
+                catalogCircleID: 8,
+                updateID: 80,
+                day: 1,
+                mapID: secondVenue.id,
+                tableID: tableID,
+                subspace: 1,
+                color: .magenta,
+                memo: "",
+                modifiedAt: .now,
+                syncState: .synced
+            ),
+        ]
+
+        for selectedVenue in [firstVenue, secondVenue] {
+            renderer.update(
+                campus: campus,
+                scope: .venue,
+                selectedMapID: selectedVenue.id,
+                selectedTableID: nil,
+                circlePlacements: [],
+                circleArtwork: [:],
+                searchMatches: [],
+                searchActive: false,
+                genrePlacements: [],
+                bookmarks: bookmarks,
+                locatedUser: nil
+            )
+
+            XCTAssertEqual(
+                renderer.persistentOverlayShapeCount,
+                2,
+                "Changing the venue shortcut must not filter favorites from other venues."
+            )
+        }
     }
 
     func testAllComiNaviBigSightSVGsCompileAsImageAssets() {
@@ -1500,6 +1553,56 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
         XCTAssertTrue(model.isSearchPresented)
         XCTAssertEqual(model.locatedUser, updatedUser)
+    }
+
+    @MainActor
+    func testVenueShortcutKeepsEveryFavoriteForTheSelectedDayLoaded() async throws {
+        let store = InMemoryUserPlanStore()
+        let tableID = CatalogMapTable.ID(blockID: 1, spaceNumber: 1)
+        try await store.upsert([
+            MapBookmark(
+                eventNumber: 108,
+                publicCircleID: 100,
+                catalogCircleID: 7,
+                updateID: 70,
+                day: 1,
+                mapID: 101,
+                tableID: tableID,
+                subspace: 0,
+                color: .orange,
+                memo: "",
+                modifiedAt: .now,
+                syncState: .synced
+            ),
+            MapBookmark(
+                eventNumber: 108,
+                publicCircleID: 200,
+                catalogCircleID: 8,
+                updateID: 80,
+                day: 1,
+                mapID: 102,
+                tableID: tableID,
+                subspace: 1,
+                color: .magenta,
+                memo: "",
+                modifiedAt: .now,
+                syncState: .synced
+            ),
+        ])
+        let model = MapScreenModel.previewCampusFixture(userPlanStore: store)
+
+        model.load()
+        try await waitUntilReady(model)
+        try await waitUntil { model.favoriteBookmarks.count == 2 }
+
+        model.select(mapID: 101)
+        XCTAssertEqual(model.favoriteBookmarks.count, 2)
+
+        model.select(mapID: 102)
+        XCTAssertEqual(model.favoriteBookmarks.count, 2)
+
+        model.showCampus()
+        XCTAssertEqual(model.favoriteBookmarks.count, 2)
     }
 
     @MainActor

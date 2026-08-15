@@ -121,8 +121,7 @@ struct ExploreTagPage: View {
 
     private func openLightbox(_ circle: ExploreCircle) {
         Task { @MainActor in
-            guard let data = await model.fullCoverImageData(for: circle) else { return }
-            lightboxImage = UIImage(data: data)
+            lightboxImage = await model.fullCoverImage(for: circle)
         }
     }
 }

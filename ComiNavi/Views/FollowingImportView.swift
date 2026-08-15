@@ -1,3 +1,4 @@
+import Kingfisher
 import SwiftUI
 import UIKit
 
@@ -450,13 +451,17 @@ private struct FollowingImportedCircleRow: View {
 
                 ForEach(importedCircle.sources.prefix(2), id: \.twitterUserID) { source in
                     HStack(spacing: 6) {
-                        AsyncImage(url: source.profilePictureURL) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
-                            Circle().fill(Color(uiColor: .secondarySystemFill))
-                        }
-                        .frame(width: 22, height: 22)
-                        .clipShape(.circle)
+                        KFImage(source.profilePictureURL)
+                            .placeholder {
+                                Circle().fill(Color(uiColor: .secondarySystemFill))
+                            }
+                            .cacheOriginalImage()
+                            .diskCacheExpiration(.never)
+                            .waitForCache()
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 22, height: 22)
+                            .clipShape(.circle)
 
                         VStack(alignment: .leading, spacing: 0) {
                             Text(source.twitterDisplayName)

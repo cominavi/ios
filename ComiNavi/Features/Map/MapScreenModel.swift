@@ -212,6 +212,7 @@ final class MapScreenModel {
             destination = nil
         }
         phase = .loading
+        loadBookmarks()
         refreshPrimarySharedPlanCircles()
 
         let day = selectedDay
@@ -329,7 +330,6 @@ final class MapScreenModel {
 
     func showCampus() {
         guard scope != .campus else { return }
-        primarySharedPlanTask?.cancel()
         scope = .campus
         if showsGenreOverlay {
             toggleGenreOverlay()
@@ -338,8 +338,6 @@ final class MapScreenModel {
         visibleCirclePlacements = []
         visibleCircleArtwork = [:]
         genrePlacements = []
-        bookmarks = [:]
-        primarySharedPlanCircles = []
         if campusScene != nil {
             phase = .ready
         } else {
@@ -441,8 +439,6 @@ final class MapScreenModel {
         visibleCirclePlacements = []
         visibleCircleArtwork = [:]
         genrePlacements = []
-        bookmarks = [:]
-        primarySharedPlanCircles = []
         phase = .ready
         if showsGenreOverlay {
             loadGenrePlacements()
@@ -798,18 +794,16 @@ final class MapScreenModel {
     private func loadBookmarks() {
         bookmarkTask?.cancel()
         let day = selectedDay
-        let mapID = selectedMapID
         bookmarkTask = Task { [weak self, userPlanStore, eventNumber] in
             do {
-                let bookmarks = try await userPlanStore.bookmarks(
-                    eventNumber: eventNumber,
-                    day: day,
-                    mapID: mapID
-                )
+                let bookmarks = try await userPlanStore.allBookmarks(eventNumber: eventNumber)
                 try Task.checkCancellation()
-                guard let self, self.selectedDay == day, self.selectedMapID == mapID else { return }
+                guard let self, self.selectedDay == day else { return }
                 self.bookmarks = Dictionary(
-                    uniqueKeysWithValues: bookmarks.map { ($0.publicCircleID, $0) })
+                    uniqueKeysWithValues: bookmarks.lazy
+                        .filter { $0.day == day && $0.syncState != .pendingDelete }
+                        .map { ($0.publicCircleID, $0) }
+                )
                 if !self.hasAttemptedInitialBookmarkSync {
                     self.hasAttemptedInitialBookmarkSync = true
                     self.scheduleBookmarkSync(delay: .zero)
@@ -830,16 +824,13 @@ final class MapScreenModel {
 
         let eventNumber = eventNumber
         let day = selectedDay
-        let mapID = selectedMapID
         primarySharedPlanTask = Task { [weak self, catalog, primarySharedPlanProvider] in
             let publicCircleIDs = await primarySharedPlanProvider.publicCircleIDs(
                 eventNumber: eventNumber
             )
             guard !Task.isCancelled else { return }
             guard !publicCircleIDs.isEmpty else {
-                guard let self, self.selectedDay == day, self.selectedMapID == mapID else {
-                    return
-                }
+                guard let self, self.selectedDay == day else { return }
                 self.primarySharedPlanCircles = []
                 return
             }
@@ -849,18 +840,14 @@ final class MapScreenModel {
                     publicCircleIDs: Array(publicCircleIDs)
                 )
                 try Task.checkCancellation()
-                guard let self, self.selectedDay == day, self.selectedMapID == mapID else {
-                    return
-                }
+                guard let self, self.selectedDay == day else { return }
                 self.primarySharedPlanCircles = locations.filter {
-                    $0.day == day && $0.mapID == mapID
+                    $0.day == day
                 }.sorted { $0.publicCircleID < $1.publicCircleID }
             } catch is CancellationError {
                 return
             } catch {
-                guard let self, self.selectedDay == day, self.selectedMapID == mapID else {
-                    return
-                }
+                guard let self, self.selectedDay == day else { return }
                 self.primarySharedPlanCircles = []
             }
         }
@@ -871,7 +858,6 @@ final class MapScreenModel {
         bookmarkSyncTask?.cancel()
         let eventNumber = eventNumber
         let day = selectedDay
-        let mapID = selectedMapID
         bookmarkSyncTask = Task { [weak self, userPlanStore] in
             do {
                 if delay != .zero {
@@ -879,16 +865,15 @@ final class MapScreenModel {
                 }
                 try await bookmarkSyncCoordinator.sync()
                 try Task.checkCancellation()
-                let bookmarks = try await userPlanStore.bookmarks(
-                    eventNumber: eventNumber,
-                    day: day,
-                    mapID: mapID
-                )
+                let bookmarks = try await userPlanStore.allBookmarks(eventNumber: eventNumber)
                 try Task.checkCancellation()
                 guard let self else { return }
-                if self.selectedDay == day, self.selectedMapID == mapID {
+                if self.selectedDay == day {
                     self.bookmarks = Dictionary(
-                        uniqueKeysWithValues: bookmarks.map { ($0.publicCircleID, $0) })
+                        uniqueKeysWithValues: bookmarks.lazy
+                            .filter { $0.day == day && $0.syncState != .pendingDelete }
+                            .map { ($0.publicCircleID, $0) }
+                    )
                 }
             } catch is CancellationError {
                 return
@@ -1034,7 +1019,9 @@ final class MapScreenModel {
             )
         }
 
-        static func previewCampusFixture() -> MapScreenModel {
+        static func previewCampusFixture(
+            userPlanStore: any UserPlanStoring = InMemoryUserPlanStore()
+        ) -> MapScreenModel {
             MapScreenModel(
                 days: [
                     UFDSchema.Day(
@@ -1051,7 +1038,7 @@ final class MapScreenModel {
                 ],
                 eventNumber: 108,
                 catalog: FixtureMapCatalog(),
-                userPlanStore: InMemoryUserPlanStore()
+                userPlanStore: userPlanStore
             )
         }
 

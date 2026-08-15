@@ -1960,6 +1960,40 @@ final class UnifiedBigSightScene: SKScene {
             )
         }
 
+        for circle in primarySharedPlanCircles {
+            guard let venue = venuesByMapID[circle.mapID],
+                  let table = venue.scene.tableByID[circle.tableID]
+            else { continue }
+            addRectOverlay(
+                subspaceRect(
+                    table: table,
+                    subspace: circle.subspace,
+                    scene: venue.scene
+                ),
+                venue: venue,
+                fill: UIColor.systemGreen.withAlphaComponent(0.48),
+                stroke: .systemGreen,
+                zPosition: 42
+            )
+        }
+
+        for bookmark in bookmarks {
+            guard let venue = venuesByMapID[bookmark.mapID],
+                  let table = venue.scene.tableByID[bookmark.tableID]
+            else { continue }
+            addRectOverlay(
+                subspaceRect(
+                    table: table,
+                    subspace: bookmark.subspace,
+                    scene: venue.scene
+                ),
+                venue: venue,
+                fill: bookmark.color.uiColor.withAlphaComponent(0.62),
+                stroke: bookmark.color.uiColor,
+                zPosition: 43
+            )
+        }
+
         guard let venue = selectedVenue else { return }
         let scene = venue.scene
 
@@ -1974,28 +2008,6 @@ final class UnifiedBigSightScene: SKScene {
         }
 
         addGenreOverlays(genrePlacements, scene: scene, venue: venue)
-
-        for circle in primarySharedPlanCircles {
-            guard let table = scene.tableByID[circle.tableID] else { continue }
-            addRectOverlay(
-                subspaceRect(table: table, subspace: circle.subspace, scene: scene),
-                venue: venue,
-                fill: UIColor.systemGreen.withAlphaComponent(0.48),
-                stroke: .systemGreen,
-                zPosition: 42
-            )
-        }
-
-        for bookmark in bookmarks {
-            guard let table = scene.tableByID[bookmark.tableID] else { continue }
-            addRectOverlay(
-                subspaceRect(table: table, subspace: bookmark.subspace, scene: scene),
-                venue: venue,
-                fill: bookmark.color.uiColor.withAlphaComponent(0.62),
-                stroke: bookmark.color.uiColor,
-                zPosition: 43
-            )
-        }
 
         if zoomFactor >= 32, !searchActive {
             for placement in circlePlacements {
@@ -2257,12 +2269,16 @@ final class UnifiedBigSightScene: SKScene {
         hasher.combine(bookmarks.count)
         bookmarks.forEach {
             hasher.combine($0.publicCircleID)
+            hasher.combine($0.mapID)
+            hasher.combine($0.tableID)
+            hasher.combine($0.subspace)
             hasher.combine($0.color.rawValue)
         }
         hasher.combine(primarySharedPlanCircles.count)
         primarySharedPlanCircles.forEach {
             hasher.combine($0.publicCircleID)
             hasher.combine($0.catalogCircleID)
+            hasher.combine($0.mapID)
             hasher.combine($0.tableID)
             hasher.combine($0.subspace)
         }

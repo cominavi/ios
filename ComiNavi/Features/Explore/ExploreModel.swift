@@ -1,6 +1,7 @@
 import Foundation
 import ImageIO
 import Observation
+import UIKit
 import UniformTypeIdentifiers
 
 enum ExploreLayout: String, CaseIterable, Identifiable, Sendable {
@@ -679,19 +680,15 @@ final class ExploreModel {
         return imageData
     }
 
-    func fullCoverImageData(for circle: ExploreCircle) async -> Data? {
+    func fullCoverImage(for circle: ExploreCircle) async -> UIImage? {
         for url in circle.preferredCoverURLs {
-            var request = URLRequest(url: url)
-            request.cachePolicy = .returnCacheDataElseLoad
-            request.timeoutInterval = 30
-            if let (data, response) = try? await URLSession.shared.data(for: request),
-               !data.isEmpty,
-               (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) != false
-            {
-                return data
+            guard !Task.isCancelled else { return nil }
+            if let image = await RemoteImagePipeline.image(for: url) {
+                return image
             }
         }
-        return await imageData(for: circle)
+        guard let data = await imageData(for: circle), !Task.isCancelled else { return nil }
+        return UIImage(data: data)
     }
 
     private static func uniquePosts(_ posts: [CatalogShinagakiPost]) -> [CatalogShinagakiPost] {
@@ -815,42 +812,29 @@ final class ExploreModel {
             )
         }
 
-        var request = URLRequest(url: url)
-        request.cachePolicy = .returnCacheDataElseLoad
-        request.timeoutInterval = 30
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            try Task.checkCancellation()
-
-            if let response = response as? HTTPURLResponse {
-                guard (200..<300).contains(response.statusCode) else {
-                    return nil
-                }
-            }
-            guard !data.isEmpty else { return nil }
-
-            guard let thumbnailData = await Self.downsampledThumbnailData(
-                from: data,
-                targetPixelSize: targetPixelSize
-            ) else { return nil }
-            try Task.checkCancellation()
-
-            coverThumbnailCache.setObject(
-                thumbnailData as NSData,
-                forKey: cacheKey,
-                cost: thumbnailData.count
+        guard let image = await RemoteImagePipeline.image(
+            for: url,
+            targetPixelSize: CGSize(
+                width: targetPixelSize.width,
+                height: targetPixelSize.height
             )
-            return ExploreCoverCandidate(
-                data: thumbnailData,
-                targetCoverage: Self.targetCoverage(
-                    of: thumbnailData,
-                    for: targetPixelSize
-                )
+        ),
+            !Task.isCancelled,
+            let thumbnailData = await RemoteImagePipeline.encodedPNGData(for: image)
+        else { return nil }
+
+        coverThumbnailCache.setObject(
+            thumbnailData as NSData,
+            forKey: cacheKey,
+            cost: thumbnailData.count
+        )
+        return ExploreCoverCandidate(
+            data: thumbnailData,
+            targetCoverage: Self.targetCoverage(
+                of: thumbnailData,
+                for: targetPixelSize
             )
-        } catch {
-            return nil
-        }
+        )
     }
 
     nonisolated static func downsampledThumbnailData(

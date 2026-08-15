@@ -1,3 +1,4 @@
+import Kingfisher
 import SwiftUI
 import UIKit
 
@@ -440,40 +441,39 @@ private struct CircleXProfileAvatar: View {
     let size: CGFloat
 
     var body: some View {
-        AsyncImage(url: url?.highResolutionXProfileImageURL) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            default:
+        KFImage(url?.highResolutionXProfileImageURL)
+            .placeholder {
                 LucideIcon("person.circle.fill", size: Double(size * 0.62))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(uiColor: .secondarySystemFill))
             }
-        }
-        .frame(width: size, height: size)
-        .clipShape(.circle)
-        .overlay {
-            Circle()
-                .stroke(Color(uiColor: .separator).opacity(0.24), lineWidth: 0.5)
-        }
-        .overlay(alignment: .bottomTrailing) {
-            IconifyBrandIcon("x", size: 9)
-                .foregroundStyle(.primary)
-                .frame(width: 16, height: 16)
-                .background(.background, in: .circle)
-                .overlay {
-                    Circle()
-                        .stroke(
-                            Color(uiColor: .separator).opacity(0.32),
-                            lineWidth: 0.5
-                        )
-                }
-                .offset(x: 2, y: 2)
-        }
-        .accessibilityHidden(true)
+            .cacheOriginalImage()
+            .diskCacheExpiration(.never)
+            .waitForCache()
+            .resizable()
+            .scaledToFill()
+            .frame(width: size, height: size)
+            .clipShape(.circle)
+            .overlay {
+                Circle()
+                    .stroke(Color(uiColor: .separator).opacity(0.24), lineWidth: 0.5)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                IconifyBrandIcon("x", size: 9)
+                    .foregroundStyle(.primary)
+                    .frame(width: 16, height: 16)
+                    .background(.background, in: .circle)
+                    .overlay {
+                        Circle()
+                            .stroke(
+                                Color(uiColor: .separator).opacity(0.32),
+                                lineWidth: 0.5
+                            )
+                    }
+                    .offset(x: 2, y: 2)
+            }
+            .accessibilityHidden(true)
     }
 }
 
@@ -1774,31 +1774,15 @@ private struct ShinagakiRemoteImage: View {
         image = nil
         didFail = false
 
-        var request = URLRequest(url: media.displayURL)
-        request.cachePolicy = .returnCacheDataElseLoad
-        request.timeoutInterval = 30
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            try Task.checkCancellation()
-
-            if let response = response as? HTTPURLResponse {
-                guard (200..<300).contains(response.statusCode) else {
-                    didFail = true
-                    return
-                }
-            }
-
-            guard let decodedImage = UIImage(data: data) else {
+        guard let decodedImage = await RemoteImagePipeline.image(for: media.displayURL),
+              !Task.isCancelled
+        else {
+            if !Task.isCancelled {
                 didFail = true
-                return
             }
-            image = decodedImage
-        } catch is CancellationError {
             return
-        } catch {
-            didFail = true
         }
+        image = decodedImage
     }
 }
 

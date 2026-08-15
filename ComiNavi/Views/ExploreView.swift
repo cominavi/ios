@@ -689,9 +689,7 @@ private struct ExploreGallery<Header: View>: View {
     private func openLightbox(circleID: Int) {
         guard let circle = circles.first(where: { $0.id == circleID }) else { return }
         Task { @MainActor in
-            guard let data = await model.fullCoverImageData(for: circle),
-                  let image = UIImage(data: data)
-            else { return }
+            guard let image = await model.fullCoverImage(for: circle) else { return }
             lightboxItem = ExploreArtworkLightboxItem(
                 image: image,
                 circleName: circle.displayName
@@ -832,9 +830,7 @@ private struct ExploreList<Header: View>: View {
 
     private func openLightbox(_ circle: ExploreCircle) {
         Task { @MainActor in
-            guard let data = await model.fullCoverImageData(for: circle),
-                  let image = UIImage(data: data)
-            else { return }
+            guard let image = await model.fullCoverImage(for: circle) else { return }
             lightboxItem = ExploreArtworkLightboxItem(
                 image: image,
                 circleName: circle.displayName

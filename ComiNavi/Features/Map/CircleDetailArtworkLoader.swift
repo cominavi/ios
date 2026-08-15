@@ -38,9 +38,7 @@ struct CircleDetailArtworkLoader: CircleDetailArtworkLoading, Sendable {
                   let circleResponse = try? await CirclemsAPI.getCircle(wcid: String(publicCircleID)),
                   let url = URL(string: circleResponse.response.cutUrl),
                   url.scheme?.lowercased() == "https",
-                  let (data, urlResponse) = try? await URLSession.shared.data(from: url),
-                  let httpResponse = urlResponse as? HTTPURLResponse,
-                  (200..<300).contains(httpResponse.statusCode),
+                  let data = await RemoteImagePipeline.imageData(for: url),
                   Self.pixelArea(of: data) != nil
             else { return nil }
             return data

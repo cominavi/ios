@@ -674,9 +674,23 @@ struct AuthenticatedProfileAvatar: View {
         .accessibilityLabel("プロフィール画像")
         .task(id: loadID) {
             image = nil
-            guard let url,
-                  let data = try? await CominaviServiceClient.shared.loadAvatarData(from: url)
-            else { return }
+            guard let url else { return }
+            let cacheKey = RemoteImagePipeline.authenticatedCacheKey(
+                for: url,
+                revision: revision
+            )
+            let data: Data
+            if let cached = await RemoteImagePipeline.cachedImageData(forKey: cacheKey) {
+                data = cached
+            } else if let downloaded = try? await CominaviServiceClient.shared.loadAvatarData(
+                from: url
+            ) {
+                data = downloaded
+                await RemoteImagePipeline.storeImageData(downloaded, forKey: cacheKey)
+            } else {
+                return
+            }
+            guard !Task.isCancelled else { return }
             image = AvatarImageProcessor.circularImage(
                 from: data,
                 pointSize: size,
