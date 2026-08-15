@@ -289,6 +289,33 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertNil(BigSightMapIcon.southHalls.assetName)
     }
 
+    func testNonHallMapIconsUseCompactMarkerMetrics() {
+        XCTAssertEqual(UnifiedMapMarkerMetrics.venueIconSize, 32)
+        XCTAssertEqual(UnifiedMapMarkerMetrics.facilityIconSize(for: .information), 18)
+        XCTAssertEqual(UnifiedMapMarkerMetrics.facilityIconSize(for: .conferenceTower), 22)
+        XCTAssertEqual(
+            UnifiedMapMarkerMetrics.backingSize(
+                for: .eastHalls,
+                iconSize: UnifiedMapMarkerMetrics.venueIconSize
+            ),
+            42
+        )
+        XCTAssertEqual(
+            UnifiedMapMarkerMetrics.backingSize(
+                for: .information,
+                iconSize: UnifiedMapMarkerMetrics.facilityIconSize(for: .information)
+            ),
+            24
+        )
+        XCTAssertEqual(
+            UnifiedMapMarkerMetrics.backingSize(
+                for: .conferenceTower,
+                iconSize: UnifiedMapMarkerMetrics.facilityIconSize(for: .conferenceTower)
+            ),
+            28
+        )
+    }
+
     func testCampusSceneProjectionRoundTrips() {
         let campusPoint = CGPoint(x: 173.25, y: -84.5)
         let scenePoint = UnifiedMapProjection.scenePoint(fromCampus: campusPoint)

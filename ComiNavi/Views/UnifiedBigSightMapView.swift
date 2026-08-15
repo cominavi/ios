@@ -920,6 +920,18 @@ final class MapCompassButton: UIButton {
     }
 }
 
+enum UnifiedMapMarkerMetrics {
+    static let venueIconSize: CGFloat = 32
+
+    static func facilityIconSize(for kind: BigSightFacilityLocation.Kind) -> CGFloat {
+        kind == .conferenceTower ? 22 : 18
+    }
+
+    static func backingSize(for icon: BigSightMapIcon, iconSize: CGFloat) -> CGFloat {
+        iconSize + (icon.venueBadge == nil ? 6 : 10)
+    }
+}
+
 @MainActor
 final class UnifiedBigSightScene: SKScene {
     enum Hit {
@@ -1666,7 +1678,7 @@ final class UnifiedBigSightScene: SKScene {
             icon: venue.kind.icon,
             title: venue.kind.displayName,
             at: UnifiedMapProjection.scenePoint(fromCampus: venue.center),
-            iconSize: 32,
+            iconSize: UnifiedMapMarkerMetrics.venueIconSize,
             fontSize: 13,
             titleColor: palette.venueText,
             zPosition: 20
@@ -1709,7 +1721,7 @@ final class UnifiedBigSightScene: SKScene {
             icon: facility.kind.icon,
             title: presentation.title,
             at: UnifiedMapProjection.scenePoint(fromCampus: facility.center),
-            iconSize: facility.kind == .conferenceTower ? 28 : 23,
+            iconSize: UnifiedMapMarkerMetrics.facilityIconSize(for: facility.kind),
             fontSize: 11,
             titleColor: appearance.palette.primaryText,
             zPosition: 22
@@ -2402,7 +2414,10 @@ final class UnifiedBigSightScene: SKScene {
         container.position = position
         container.zPosition = zPosition
 
-        let backingSize = iconSize + (icon.venueBadge == nil ? 6 : 10)
+        let backingSize = UnifiedMapMarkerMetrics.backingSize(
+            for: icon,
+            iconSize: iconSize
+        )
         let backing: SKShapeNode
         switch icon.backdrop {
         case .standard:
