@@ -399,6 +399,7 @@ struct SharedPlanEditorScreen: View {
     @State private var presentedSheet: SharedPlanEditorSheet?
     @State private var confirmation: SharedPlanEditorConfirmation?
     @State private var catalogCircles: [SharedPlanCircleKey: CirclemsDataSchema.ComiketCircleWC] = [:]
+    @State private var catalogHallNames: [SharedPlanCircleKey: String] = [:]
     @State private var initialCircleNavigationPresented = false
     @State private var hasHandledInitialCircleNavigation = false
     @Environment(\.scenePhase) private var scenePhase
@@ -748,6 +749,7 @@ struct SharedPlanEditorScreen: View {
               model.plan?.comiketNo == catalog.number
         else {
             catalogCircles = [:]
+            catalogHallNames = [:]
             return
         }
 
@@ -758,7 +760,27 @@ struct SharedPlanEditorScreen: View {
                 loaded[content.key] = circle
             }
         }
+        guard !Task.isCancelled else { return }
+        let locations = (try? await catalogDataSource.mapCatalog.bookmarkLocations(
+            publicCircleIDs: model.circles.map(\.key.wcID)
+        )) ?? []
+        let locationsByPublicCircleID = Dictionary(
+            uniqueKeysWithValues: locations.map { ($0.publicCircleID, $0) }
+        )
+        let loadedHallNames = model.circles.reduce(
+            into: [SharedPlanCircleKey: String]()
+        ) { hallNames, content in
+            guard let location = locationsByPublicCircleID[content.key.wcID],
+                  let hallName = catalog.days
+                    .first(where: { $0.dayIndex == location.day })?
+                    .halls.first(where: { $0.externalMapId == location.mapID })?
+                    .name
+            else { return }
+            hallNames[content.key] = WhereAmIResolver.venueDisplayName(for: hallName)
+        }
+        guard !Task.isCancelled else { return }
         catalogCircles = loaded
+        catalogHallNames = loadedHallNames
     }
 
     private func circleIdentity(
@@ -774,6 +796,7 @@ struct SharedPlanEditorScreen: View {
             circleName: catalogCircle?.circleName,
             penName: catalogCircle?.penName,
             day: catalogCircle?.day,
+            hallName: catalogHallNames[key],
             blockName: blockName,
             spaceNumber: catalogCircle?.spaceNo,
             spaceNumberSub: catalogCircle?.spaceNoSub

@@ -204,12 +204,14 @@ struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
         circleName: String?,
         penName: String?,
         day: Int?,
+        hallName: String? = nil,
         blockName: String?,
         spaceNumber: Int?,
         spaceNumberSub: Int?
     ) {
         let normalizedCircleName = circleName?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedPenName = penName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedHallName = hallName?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedBlockName = blockName?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         self.circleName = if let normalizedCircleName, !normalizedCircleName.isEmpty {
@@ -223,14 +225,19 @@ struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
             nil
         }
 
-        let location: String? = if let normalizedBlockName,
-                                   !normalizedBlockName.isEmpty,
-                                   let spaceNumber
+        let space: String? = if let normalizedBlockName,
+                                !normalizedBlockName.isEmpty,
+                                let spaceNumber
         {
             "\(normalizedBlockName)\(String(format: "%02d", spaceNumber))\(spaceNumberSub == 1 ? "b" : "a")"
         } else {
             nil
         }
+        let locationParts: [String] = [normalizedHallName, space].compactMap { value in
+            guard let value, !value.isEmpty else { return nil }
+            return value
+        }
+        let location = locationParts.isEmpty ? nil : locationParts.joined(separator: " ")
 
         dayAndLocation = switch (day, location) {
         case let (.some(day), .some(location)):

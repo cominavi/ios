@@ -816,6 +816,7 @@ final class SharedPlanEditorPresentationTests: XCTestCase {
             circleName: " うどん道場 ",
             penName: " 青井 ",
             day: 1,
+            hallName: " East 1–3 ",
             blockName: "東A",
             spaceNumber: 12,
             spaceNumberSub: 1
@@ -823,7 +824,10 @@ final class SharedPlanEditorPresentationTests: XCTestCase {
 
         XCTAssertEqual(identity.circleName, "うどん道場")
         XCTAssertEqual(identity.penName, "青井")
-        XCTAssertEqual(identity.dayAndLocation, String(localized: "Day 1 · 東A12b"))
+        XCTAssertEqual(
+            identity.dayAndLocation,
+            String(localized: "Day 1 · East 1–3 東A12b")
+        )
         XCTAssertEqual(identity.displayName, "うどん道場 · 青井")
         XCTAssertEqual(identity.navigationSubtitle, "うどん道場 · 青井")
 
@@ -840,6 +844,20 @@ final class SharedPlanEditorPresentationTests: XCTestCase {
         XCTAssertEqual(fallback.displayName, String(localized: "Unnamed circle"))
         XCTAssertFalse(fallback.displayName.contains("WCID"))
         XCTAssertEqual(fallback.dayAndLocation, String(localized: "Location unavailable"))
+
+        let hallOnly = SharedPlanCircleIdentityPresentation(
+            circleName: nil,
+            penName: nil,
+            day: 2,
+            hallName: "West Halls",
+            blockName: nil,
+            spaceNumber: nil,
+            spaceNumberSub: nil
+        )
+        XCTAssertEqual(
+            hallOnly.dayAndLocation,
+            String(localized: "Day 2 · West Halls")
+        )
     }
 
     func testEditorAccessibilityIdentifiersAreStableAndEntityScoped() {
