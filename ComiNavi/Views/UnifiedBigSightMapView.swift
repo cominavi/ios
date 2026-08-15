@@ -1370,9 +1370,16 @@ final class UnifiedBigSightScene: SKScene {
             gridAlignedRotation: gridAlignedCameraRotation
         )
         mapCamera.removeAction(forKey: "compass-rotation")
+
+        if reduceMotion {
+            mapCamera.zRotation = targetRotation
+            endGesture()
+            return
+        }
+
         let action = SKAction.rotate(
             toAngle: targetRotation,
-            duration: reduceMotion ? 0 : 0.22,
+            duration: 0.22,
             shortestUnitArc: true
         )
         action.timingMode = .easeOut
