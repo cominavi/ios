@@ -596,12 +596,6 @@ final class UnifiedMapHostView: UIView {
         synchronizeRendererPresentation()
     }
 
-    var isRendererPresentationSynchronized: Bool {
-        if !mapView.isAsynchronous { return true }
-        let layers = rendererPresentationLayers(in: mapView.layer)
-        return !layers.isEmpty && layers.allSatisfy(\.presentsWithTransaction)
-    }
-
     private func synchronizeRendererPresentation() {
         mapView.isAsynchronous = false
         mapView.layer.drawsAsynchronously = false
@@ -981,6 +975,22 @@ enum UnifiedMapArtworkLevelOfDetail {
     }
 }
 
+private struct UnifiedMapPreparedArtworkImage: @unchecked Sendable {
+    let value: CGImage
+}
+
+private actor UnifiedMapArtworkImagePreparer {
+    func prepare(
+        artwork: CatalogMapArtwork,
+        textureIndex: Int
+    ) -> UnifiedMapPreparedArtworkImage? {
+        guard !Task.isCancelled else { return nil }
+        let image = artwork.renderingImage(at: textureIndex)
+        guard !Task.isCancelled else { return nil }
+        return UnifiedMapPreparedArtworkImage(value: image)
+    }
+}
+
 @MainActor
 final class UnifiedBigSightScene: SKScene {
     enum Hit {
@@ -1006,16 +1016,19 @@ final class UnifiedBigSightScene: SKScene {
         let maximumZoom: CGFloat
     }
 
-    private struct AuthoredArtworkTexture {
-        let texture: SKTexture
-        let maximumPixelDimension: CGFloat
-    }
-
     private struct AuthoredArtworkSprite {
         let node: SKSpriteNode
-        let textures: [AuthoredArtworkTexture]
+        let mapID: Int
+        let artwork: CatalogMapArtwork
+        let pixelDimensions: [CGFloat]
+        var cachedTextures: [Int: SKTexture]
+        var textureRecency: [Int]
+        var pendingTextureIndex: Int?
+        var texturePreparationTask: Task<Void, Never>?
         var textureIndex: Int
     }
+
+    private static let maximumCachedArtworkTexturesPerSprite = 2
 
     private static let darkArtworkShader = SKShader(
         source: """
@@ -1055,7 +1068,7 @@ final class UnifiedBigSightScene: SKScene {
     private var facilityMarkers: [ScreenSpaceMarker] = []
     private var blockLabels: [SKLabelNode] = []
     private var authoredArtworkSprites: [AuthoredArtworkSprite] = []
-    private var authoredArtworkTextureCache: [String: [AuthoredArtworkTexture]] = [:]
+    private let artworkImagePreparer = UnifiedMapArtworkImagePreparer()
     private var minimumCameraScale: CGFloat = 1
     private var maximumCameraScale: CGFloat = 0.01
     private var hasFittedInitialCamera = false
@@ -1104,11 +1117,29 @@ final class UnifiedBigSightScene: SKScene {
     }
     var zoomFactor: CGFloat { minimumCameraScale / max(mapCamera.xScale, 0.000_1) }
     var staticShapeNodeCount: Int { staticRoot.descendants(of: SKShapeNode.self).count }
-    var authoredMapNodeCount: Int { venueRoot.children.compactMap { $0 as? SKSpriteNode }.count }
-    var authoredMapNodeIdentifiers: [ObjectIdentifier] {
-        authoredArtworkSprites.map { ObjectIdentifier($0.node) }
-    }
-    var authoredMapTextureIndices: [Int] { authoredArtworkSprites.map(\.textureIndex) }
+    #if DEBUG
+        var authoredMapNodeCount: Int {
+            venueRoot.children.compactMap { $0 as? SKSpriteNode }.count
+        }
+        var authoredMapNodeIdentifiers: [ObjectIdentifier] {
+            authoredArtworkSprites.map { ObjectIdentifier($0.node) }
+        }
+        var authoredMapTextureIndices: [Int] { authoredArtworkSprites.map(\.textureIndex) }
+        var authoredMapTextureIdentifiers: [ObjectIdentifier?] {
+            authoredArtworkSprites.map { $0.node.texture.map(ObjectIdentifier.init) }
+        }
+        var authoredMapCachedTextureCounts: [Int] {
+            authoredArtworkSprites.map(\.cachedTextures.count)
+        }
+        var authoredMapCachedTextureIndices: [[Int]] {
+            authoredArtworkSprites.map { $0.cachedTextures.keys.sorted() }
+        }
+        var authoredMapPendingTextureIndices: [Int?] {
+            authoredArtworkSprites.map(\.pendingTextureIndex)
+        }
+        var authoredMapImagePreparationOverride:
+            (@MainActor (CatalogMapArtwork, Int) async -> CGImage?)?
+    #endif
     var openStreetMapFeatureNodeCount: Int {
         pedestrianRoot.children.filter {
             $0.name?.hasPrefix("openstreetmap-feature-") == true
@@ -1292,7 +1323,6 @@ final class UnifiedBigSightScene: SKScene {
     ) {
         if self.campus.id != campus.id {
             self.campus = campus
-            authoredArtworkTextureCache.removeAll(keepingCapacity: true)
             lastDynamicFingerprint = nil
             lastRenderedLocatedUser = nil
             buildStaticScene()
@@ -1588,6 +1618,7 @@ final class UnifiedBigSightScene: SKScene {
 
     private func buildStaticScene() {
         let palette = appearance.palette
+        authoredArtworkSprites.forEach { $0.texturePreparationTask?.cancel() }
         staticRoot.removeAllChildren()
         campusDetailRoot.removeAllChildren()
         pedestrianRoot.removeAllChildren()
@@ -1706,8 +1737,12 @@ final class UnifiedBigSightScene: SKScene {
         venueRoot.addChild(floor)
 
         if let artwork = venue.scene.artwork {
-            let textures = authoredArtworkTextures(for: artwork)
-            let map = SKSpriteNode(texture: textures[0].texture)
+            let pixelDimensions = artwork.renderingMaximumPixelDimensions.map(CGFloat.init)
+            let overviewTexture = authoredArtworkTexture(
+                for: artwork.precomputedRenderingImage(at: 0) ?? artwork.image
+            )
+            SKTexture.preload([overviewTexture], withCompletionHandler: {})
+            let map = SKSpriteNode(texture: overviewTexture)
             map.name = "authored-map-\(artwork.name)"
             map.position = UnifiedMapProjection.scenePoint(fromCampus: venue.center)
             map.size = CGSize(
@@ -1720,7 +1755,13 @@ final class UnifiedBigSightScene: SKScene {
             authoredArtworkSprites.append(
                 AuthoredArtworkSprite(
                     node: map,
-                    textures: textures,
+                    mapID: venue.id,
+                    artwork: artwork,
+                    pixelDimensions: pixelDimensions,
+                    cachedTextures: [0: overviewTexture],
+                    textureRecency: [0],
+                    pendingTextureIndex: nil,
+                    texturePreparationTask: nil,
                     textureIndex: 0
                 )
             )
@@ -2065,47 +2106,157 @@ final class UnifiedBigSightScene: SKScene {
         }
     }
 
-    private func authoredArtworkTextures(
-        for artwork: CatalogMapArtwork
-    ) -> [AuthoredArtworkTexture] {
-        let key = "\(artwork.name):\(artwork.pixelSize.width)x\(artwork.pixelSize.height)"
-        if let cached = authoredArtworkTextureCache[key] {
-            return cached
-        }
+    private func authoredArtworkTexture(for image: CGImage) -> SKTexture {
+        let texture = SKTexture(cgImage: image)
+        texture.filteringMode = .linear
+        return texture
+    }
 
-        let textures = artwork.renderingImages.sorted {
-            max($0.width, $0.height) < max($1.width, $1.height)
-        }.map { image in
-            let texture = SKTexture(cgImage: image)
-            texture.filteringMode = .linear
-            return AuthoredArtworkTexture(
-                texture: texture,
-                maximumPixelDimension: CGFloat(max(image.width, image.height))
-            )
+    private func cachedAuthoredArtworkTexture(
+        forSpriteAt spriteIndex: Int,
+        textureIndex: Int
+    ) -> SKTexture? {
+        var sprite = authoredArtworkSprites[spriteIndex]
+        guard let texture = sprite.cachedTextures[textureIndex] else { return nil }
+        sprite.textureRecency.removeAll { $0 == textureIndex }
+        sprite.textureRecency.append(textureIndex)
+        authoredArtworkSprites[spriteIndex] = sprite
+        return texture
+    }
+
+    private func cacheAuthoredArtworkTexture(
+        _ texture: SKTexture,
+        forSpriteAt spriteIndex: Int,
+        textureIndex: Int
+    ) {
+        var sprite = authoredArtworkSprites[spriteIndex]
+        sprite.cachedTextures[textureIndex] = texture
+        sprite.textureRecency.removeAll { $0 == textureIndex }
+        sprite.textureRecency.append(textureIndex)
+        while sprite.textureRecency.count > Self.maximumCachedArtworkTexturesPerSprite {
+            let evictionOffset = sprite.textureRecency.firstIndex {
+                $0 != 0 && $0 != textureIndex
+            } ?? sprite.textureRecency.startIndex
+            let evictedIndex = sprite.textureRecency.remove(at: evictionOffset)
+            sprite.cachedTextures.removeValue(forKey: evictedIndex)
         }
-        SKTexture.preload(textures.map(\.texture), withCompletionHandler: {})
-        authoredArtworkTextureCache[key] = textures
-        return textures
+        authoredArtworkSprites[spriteIndex] = sprite
+    }
+
+    private func desiredArtworkTextureIndex(
+        for artwork: AuthoredArtworkSprite
+    ) -> Int {
+        guard scope == .venue, artwork.mapID == selectedMapID else { return 0 }
+        let contentScale = view?.contentScaleFactor ?? UIScreen.main.scale
+        let cameraScale = max(mapCamera.xScale, 0.000_1)
+        let renderedMaximumPixelDimension =
+            max(artwork.node.size.width, artwork.node.size.height)
+            / cameraScale * contentScale
+        return UnifiedMapArtworkLevelOfDetail.textureIndex(
+            pixelDimensions: artwork.pixelDimensions,
+            renderedMaximumPixelDimension: renderedMaximumPixelDimension,
+            currentIndex: artwork.textureIndex
+        )
+    }
+
+    private func prepareAuthoredArtworkTexture(
+        forSpriteAt spriteIndex: Int,
+        textureIndex: Int
+    ) {
+        var sprite = authoredArtworkSprites[spriteIndex]
+        sprite.texturePreparationTask?.cancel()
+        sprite.pendingTextureIndex = textureIndex
+        let artwork = sprite.artwork
+        let imagePreparer = artworkImagePreparer
+        let nodeIdentifier = ObjectIdentifier(sprite.node)
+        #if DEBUG
+            let imagePreparationOverride = authoredMapImagePreparationOverride
+        #endif
+        let task = Task { @MainActor [weak self] in
+            let preparedImage: UnifiedMapPreparedArtworkImage?
+            #if DEBUG
+                if let imagePreparationOverride {
+                    preparedImage = await imagePreparationOverride(artwork, textureIndex).map {
+                        UnifiedMapPreparedArtworkImage(value: $0)
+                    }
+                } else {
+                    preparedImage = await imagePreparer.prepare(
+                        artwork: artwork,
+                        textureIndex: textureIndex
+                    )
+                }
+            #else
+                preparedImage = await imagePreparer.prepare(
+                    artwork: artwork,
+                    textureIndex: textureIndex
+                )
+            #endif
+            guard let preparedImage,
+                  !Task.isCancelled,
+                  let self,
+                  authoredArtworkSprites.indices.contains(spriteIndex),
+                  ObjectIdentifier(authoredArtworkSprites[spriteIndex].node) == nodeIdentifier,
+                  authoredArtworkSprites[spriteIndex].pendingTextureIndex == textureIndex
+            else { return }
+
+            let texture = authoredArtworkTexture(for: preparedImage.value)
+            await withCheckedContinuation { continuation in
+                SKTexture.preload([texture]) {
+                    continuation.resume()
+                }
+            }
+            guard !Task.isCancelled,
+                  authoredArtworkSprites.indices.contains(spriteIndex),
+                  ObjectIdentifier(authoredArtworkSprites[spriteIndex].node) == nodeIdentifier,
+                  authoredArtworkSprites[spriteIndex].pendingTextureIndex == textureIndex
+            else { return }
+
+            cacheAuthoredArtworkTexture(
+                texture,
+                forSpriteAt: spriteIndex,
+                textureIndex: textureIndex
+            )
+            authoredArtworkSprites[spriteIndex].pendingTextureIndex = nil
+            authoredArtworkSprites[spriteIndex].texturePreparationTask = nil
+            if desiredArtworkTextureIndex(for: authoredArtworkSprites[spriteIndex]) == textureIndex {
+                authoredArtworkSprites[spriteIndex].node.texture = texture
+                authoredArtworkSprites[spriteIndex].textureIndex = textureIndex
+            }
+            updateAuthoredArtworkTextures()
+        }
+        sprite.texturePreparationTask = task
+        authoredArtworkSprites[spriteIndex] = sprite
     }
 
     private func updateAuthoredArtworkTextures() {
-        let contentScale = view?.contentScaleFactor ?? UIScreen.main.scale
-        let cameraScale = max(mapCamera.xScale, 0.000_1)
 
         for index in authoredArtworkSprites.indices {
             let artwork = authoredArtworkSprites[index]
-            guard artwork.textures.count > 1 else { continue }
-            let renderedMaximumPixelDimension =
-                max(artwork.node.size.width, artwork.node.size.height)
-                / cameraScale * contentScale
-            let textureIndex = UnifiedMapArtworkLevelOfDetail.textureIndex(
-                pixelDimensions: artwork.textures.map(\.maximumPixelDimension),
-                renderedMaximumPixelDimension: renderedMaximumPixelDimension,
-                currentIndex: artwork.textureIndex
-            )
-            guard textureIndex != artwork.textureIndex else { continue }
-            artwork.node.texture = artwork.textures[textureIndex].texture
-            authoredArtworkSprites[index].textureIndex = textureIndex
+            guard artwork.pixelDimensions.count > 1 else { continue }
+            let textureIndex = desiredArtworkTextureIndex(for: artwork)
+            guard textureIndex != artwork.textureIndex else {
+                if artwork.pendingTextureIndex != nil {
+                    authoredArtworkSprites[index].texturePreparationTask?.cancel()
+                    authoredArtworkSprites[index].texturePreparationTask = nil
+                    authoredArtworkSprites[index].pendingTextureIndex = nil
+                }
+                continue
+            }
+            if let texture = cachedAuthoredArtworkTexture(
+                forSpriteAt: index,
+                textureIndex: textureIndex
+            ) {
+                authoredArtworkSprites[index].texturePreparationTask?.cancel()
+                authoredArtworkSprites[index].texturePreparationTask = nil
+                authoredArtworkSprites[index].pendingTextureIndex = nil
+                authoredArtworkSprites[index].node.texture = texture
+                authoredArtworkSprites[index].textureIndex = textureIndex
+            } else if artwork.pendingTextureIndex != textureIndex {
+                prepareAuthoredArtworkTexture(
+                    forSpriteAt: index,
+                    textureIndex: textureIndex
+                )
+            }
         }
     }
 

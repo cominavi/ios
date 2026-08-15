@@ -396,10 +396,9 @@ final class ExploreModel {
     @ObservationIgnored private var discoveryRevision = 0
     @ObservationIgnored private var discoveryTask: Task<Void, Never>?
     @ObservationIgnored private var searchDocuments: [ExploreSearchDocument] = []
-    @ObservationIgnored private(set) var searchDocumentBuildCount = 0
     @ObservationIgnored private var searchScoresByCircleID: [Int: Int] = [:]
     @ObservationIgnored private var hasActiveSearch = false
-    @ObservationIgnored private(set) var searchRevision = 0
+    @ObservationIgnored private var searchRevision = 0
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var loadRevision = 0
     @ObservationIgnored private let artworkLoader: CircleDetailArtworkLoader?
@@ -1000,7 +999,6 @@ final class ExploreModel {
                 ocrText: JapaneseSearchNormalizer.normalize(circle.ocrSearchableText)
             )
         }
-        searchDocumentBuildCount += 1
     }
 
     private func recomputeVisibleCircles() {

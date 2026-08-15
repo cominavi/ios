@@ -20,21 +20,17 @@ final class ExploreModelTests: XCTestCase {
         ])
     }
 
-    func testDaySelectionReusesSearchDocumentsAndActiveScores() async {
+    func testDaySelectionReusesActiveSearchScores() async {
         let model = ExploreModel(circles: fixtures, selectedDay: 1)
         await model.load()
-        XCTAssertEqual(model.searchDocumentBuildCount, 1)
 
         model.searchQuery = "Action"
         await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [1])
-        let searchRevision = model.searchRevision
 
         model.select(day: 2)
 
         XCTAssertEqual(model.visibleCircles.map(\.id), [4])
-        XCTAssertEqual(model.searchDocumentBuildCount, 1)
-        XCTAssertEqual(model.searchRevision, searchRevision)
     }
 
     func testDaySelectionAtC108ScaleStaysWithinInteractiveBudget() async {

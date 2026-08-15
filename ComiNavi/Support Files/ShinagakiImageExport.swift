@@ -9,11 +9,15 @@ struct ShinagakiImageExportData: Sendable {
 
 struct ShinagakiImageExportPayload: Sendable {
     let fileURL: URL
+    private let cleanupDirectoryURL: URL
+
+    fileprivate init(fileURL: URL, cleanupDirectoryURL: URL) {
+        self.fileURL = fileURL
+        self.cleanupDirectoryURL = cleanupDirectoryURL
+    }
 
     func removeTemporaryFile() {
-        try? FileManager.default.removeItem(
-            at: fileURL.deletingLastPathComponent()
-        )
+        try? FileManager.default.removeItem(at: cleanupDirectoryURL)
     }
 }
 
@@ -127,7 +131,10 @@ private enum ShinagakiImageExportWriter {
             try? FileManager.default.removeItem(at: directoryURL)
             return nil
         }
-        return ShinagakiImageExportPayload(fileURL: fileURL)
+        return ShinagakiImageExportPayload(
+            fileURL: fileURL,
+            cleanupDirectoryURL: directoryURL
+        )
     }
 
     private static func imageFileExtension(

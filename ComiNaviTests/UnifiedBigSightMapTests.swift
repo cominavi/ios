@@ -1,4 +1,5 @@
 import CoreGraphics
+import QuartzCore
 import SpriteKit
 import XCTest
 
@@ -316,6 +317,51 @@ final class UnifiedBigSightMapTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testNonHallMapMarkersRenderCompactBackingBounds() throws {
+        let baseCampus = makeSingleVenueCampus()
+        let facilities = [
+            BigSightFacilityLocation(
+                id: "information",
+                name: "Information",
+                kind: .information,
+                coordinate: BigSightCampusLayout.eastBuilding,
+                minimumZoom: 0
+            ),
+            BigSightFacilityLocation(
+                id: "conference-tower",
+                name: "Conference Tower",
+                kind: .conferenceTower,
+                coordinate: BigSightCampusLayout.eastBuilding,
+                minimumZoom: 0
+            ),
+        ]
+        let campus = BigSightCampusScene(
+            id: baseCampus.id,
+            venues: baseCampus.venues,
+            connections: baseCampus.connections,
+            facilities: facilities,
+            bounds: baseCampus.bounds
+        )
+        let renderer = UnifiedBigSightScene(campus: campus)
+
+        func backingBounds(for icon: BigSightMapIcon) throws -> CGSize {
+            let backing = try XCTUnwrap(
+                renderer.childNode(
+                    withName: "//map-marker-backdrop-\(icon.rawValue)"
+                ) as? SKShapeNode
+            )
+            return try XCTUnwrap(backing.path).boundingBoxOfPath.size
+        }
+
+        XCTAssertEqual(try backingBounds(for: .eastHalls), CGSize(width: 42, height: 42))
+        XCTAssertEqual(try backingBounds(for: .information), CGSize(width: 24, height: 24))
+        XCTAssertEqual(
+            try backingBounds(for: .conferenceTower),
+            CGSize(width: 28, height: 28)
+        )
+    }
+
     func testCampusSceneProjectionRoundTrips() {
         let campusPoint = CGPoint(x: 173.25, y: -84.5)
         let scenePoint = UnifiedMapProjection.scenePoint(fromCampus: campusPoint)
@@ -452,11 +498,13 @@ final class UnifiedBigSightMapTests: XCTestCase {
         let host = UnifiedMapHostView(
             frame: CGRect(x: 0, y: 0, width: 390, height: 844)
         )
+        let metalLayer = CAMetalLayer()
+        host.mapView.layer.addSublayer(metalLayer)
         host.presentScene(SKScene(size: host.bounds.size))
         host.layoutIfNeeded()
 
-        XCTAssertTrue(host.isRendererPresentationSynchronized)
         XCTAssertFalse(host.mapView.layer.drawsAsynchronously)
+        XCTAssertTrue(metalLayer.presentsWithTransaction)
         XCTAssertTrue(host.mapView.ignoresSiblingOrder)
         XCTAssertTrue(host.mapView.shouldCullNonVisibleNodes)
         XCTAssertEqual(
@@ -525,7 +573,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
             size: CGSize(width: 200, height: 100),
             tableSize: CGSize(width: 40, height: 40),
             tables: [],
-            artwork: CatalogMapArtwork(
+            artwork: CatalogMapArtwork.testing(
                 name: "TestArtworkLOD",
                 pixelSize: CGSize(width: 200, height: 100),
                 image: detailImage,
@@ -547,13 +595,16 @@ final class UnifiedBigSightMapTests: XCTestCase {
             bounds: venue.bounds.insetBy(dx: -70, dy: -70)
         )
         let renderer = UnifiedBigSightScene(campus: campus)
+        renderer.reduceMotion = true
         let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         view.presentScene(renderer)
         try await Task.sleep(for: .milliseconds(30))
         renderer.didFinishUpdate()
 
         let nodeIdentifiers = renderer.authoredMapNodeIdentifiers
+        let overviewTextureIdentifiers = renderer.authoredMapTextureIdentifiers
         XCTAssertEqual(renderer.authoredMapTextureIndices, [0])
+        XCTAssertEqual(renderer.authoredMapCachedTextureCounts, [1])
 
         renderer.zoom(
             by: 80,
@@ -562,9 +613,33 @@ final class UnifiedBigSightMapTests: XCTestCase {
         )
         renderer.didFinishUpdate()
 
+        XCTAssertEqual(
+            renderer.authoredMapTextureIndices,
+            [0],
+            "Campus scope should keep every hall on its overview texture"
+        )
+
+        renderer.requestVenue(1)
+        renderer.didFinishUpdate()
+        try await waitUntil { renderer.authoredMapTextureIndices == [1] }
         XCTAssertEqual(renderer.authoredMapTextureIndices, [1])
         XCTAssertEqual(renderer.authoredMapNodeIdentifiers, nodeIdentifiers)
         XCTAssertEqual(renderer.authoredMapNodeCount, 1)
+        XCTAssertEqual(renderer.authoredMapCachedTextureCounts, [2])
+
+        renderer.zoom(
+            by: 1 / 80,
+            around: CGPoint(x: view.bounds.midX, y: view.bounds.midY),
+            in: view
+        )
+        renderer.endGesture()
+        renderer.didFinishUpdate()
+
+        try await waitUntil { renderer.authoredMapTextureIndices == [0] }
+        XCTAssertEqual(renderer.scope, .campus)
+        XCTAssertEqual(renderer.authoredMapTextureIndices, [0])
+        XCTAssertEqual(renderer.authoredMapTextureIdentifiers, overviewTextureIdentifiers)
+        XCTAssertEqual(renderer.authoredMapCachedTextureCounts, [2])
     }
 
     @MainActor
@@ -1582,9 +1657,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
             XCTAssertEqual(artwork.image.width, Int(venue.scene.size.width))
             XCTAssertEqual(artwork.image.height, Int(venue.scene.size.height))
             XCTAssertEqual(artwork.name, "LWMP1\(filename)")
-            let renderingDimensions = artwork.renderingImages.map {
-                max($0.width, $0.height)
-            }
+            let renderingDimensions = artwork.renderingMaximumPixelDimensions
             XCTAssertEqual(
                 renderingDimensions.count,
                 CatalogMapArtworkRendering.intermediatePixelDimensions(
@@ -1597,6 +1670,11 @@ final class UnifiedBigSightMapTests: XCTestCase {
                 max(artwork.image.width, artwork.image.height)
             )
             XCTAssertLessThan(renderingDimensions[0], renderingDimensions.last ?? 0)
+            let overviewImage = artwork.renderingImage(at: 0)
+            XCTAssertEqual(
+                max(overviewImage.width, overviewImage.height),
+                renderingDimensions[0]
+            )
         }
         XCTAssertEqual(
             campus.venues.first { $0.kind == .east456 }?.scene.layoutRotation,

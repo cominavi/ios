@@ -638,37 +638,7 @@ private struct CircleDetailHeader: View {
             }
 
             if !otherExternalLinks.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(otherExternalLinks) { link in
-                            Link(destination: link.url) {
-                                CircleExternalLinkIcon(kind: link.kind)
-                                    .frame(width: 44, height: 44)
-                                    .background(
-                                        Color(uiColor: .secondarySystemGroupedBackground),
-                                        in: Circle()
-                                    )
-                                    .overlay {
-                                        Circle()
-                                            .stroke(
-                                                Color(uiColor: .separator).opacity(0.24),
-                                                lineWidth: 0.5
-                                            )
-                                    }
-                                    .contentShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Text(link.title))
-                            .accessibilityValue(Text(verbatim: link.preview))
-                            .accessibilityHint("Opens in your browser")
-                            .accessibilityIdentifier(link.accessibilityIdentifier)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-                .accessibilityElement(children: .contain)
-                .accessibilityIdentifier("circle-external-links")
+                CircleDetailExternalLinksRow(links: otherExternalLinks)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -676,27 +646,6 @@ private struct CircleDetailHeader: View {
 
     private var otherExternalLinks: [CircleExternalLink] {
         externalLinks.filter { $0.kind != .xProfile }
-    }
-
-    private struct CircleExternalLinkIcon: View {
-        let kind: CircleExternalLink.Kind
-
-        var body: some View {
-            Group {
-                switch kind {
-                case .xProfile:
-                    IconifyBrandIcon("x", size: 19)
-                case .pixiv:
-                    IconifyBrandIcon("pixiv", size: 21)
-                case .website:
-                    LucideIcon("globe", size: 20)
-                case .circlems:
-                    LucideIcon("person.2.crop.square.stack", size: 20)
-                }
-            }
-            .foregroundStyle(.primary)
-            .accessibilityHidden(true)
-        }
     }
 
     private func locationRow(spaceLabel: String) -> some View {
@@ -779,6 +728,75 @@ private struct CircleDetailHeader: View {
         circle.circleName.nonBlank ?? String(localized: "Unnamed circle")
     }
 }
+
+private struct CircleDetailExternalLinksRow: View {
+    let links: [CircleExternalLink]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(links) { link in
+                    Link(destination: link.url) {
+                        CircleExternalLinkIcon(kind: link.kind)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                Color(uiColor: .secondarySystemGroupedBackground),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .stroke(
+                                        Color(uiColor: .separator).opacity(0.24),
+                                        lineWidth: 0.5
+                                    )
+                            }
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(link.title))
+                    .accessibilityValue(Text(verbatim: link.preview))
+                    .accessibilityHint("Opens in your browser")
+                    .accessibilityIdentifier(link.accessibilityIdentifier)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("circle-external-links")
+    }
+
+    private struct CircleExternalLinkIcon: View {
+        let kind: CircleExternalLink.Kind
+
+        var body: some View {
+            Group {
+                switch kind {
+                case .xProfile:
+                    IconifyBrandIcon("x", size: 19)
+                case .pixiv:
+                    IconifyBrandIcon("pixiv", size: 21)
+                case .website:
+                    LucideIcon("globe", size: 20)
+                case .circlems:
+                    LucideIcon("person.2.crop.square.stack", size: 20)
+                }
+            }
+            .foregroundStyle(.primary)
+            .accessibilityHidden(true)
+        }
+    }
+}
+
+#if DEBUG
+    struct CircleDetailExternalLinksRowTestHost: View {
+        let links: [CircleExternalLink]
+
+        var body: some View {
+            CircleDetailExternalLinksRow(links: links)
+        }
+    }
+#endif
 
 private struct CircleUserPlanSection: View {
     let model: CircleUserPlanModel
@@ -1705,6 +1723,7 @@ private extension CatalogConfidence {
 
 private struct ShinagakiRemoteImage: View {
     let page: ShinagakiLightboxPage
+    let imageLoader: @MainActor (URL) async -> UIImage?
     let onOpen: (ShinagakiLightboxPage, UIImage) -> Void
 
     @State private var image: UIImage?
@@ -1765,14 +1784,7 @@ private struct ShinagakiRemoteImage: View {
         image = nil
         didFail = false
 
-        guard let displayURL = page.displayURL else {
-            didFail = true
-            return
-        }
-        guard let decodedImage = await RemoteImagePipeline.image(
-            for: displayURL,
-            category: .shinagaki
-        ),
+        guard let decodedImage = await page.loadImage(using: imageLoader),
               !Task.isCancelled
         else {
             if !Task.isCancelled {
@@ -1788,8 +1800,23 @@ private struct ShinagakiMediaGallery: View {
     let postID: String
     let media: [CatalogShinagakiMedia]
     let accessibilityLabel: String
+    private let imageLoader: @MainActor (URL) async -> UIImage?
 
     @State private var presentation: ShinagakiLightboxPresentation?
+
+    init(
+        postID: String,
+        media: [CatalogShinagakiMedia],
+        accessibilityLabel: String,
+        imageLoader: @escaping @MainActor (URL) async -> UIImage? = { url in
+            await RemoteImagePipeline.image(for: url, category: .shinagaki)
+        }
+    ) {
+        self.postID = postID
+        self.media = media
+        self.accessibilityLabel = accessibilityLabel
+        self.imageLoader = imageLoader
+    }
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -1797,6 +1824,7 @@ private struct ShinagakiMediaGallery: View {
                 ForEach(pages) { page in
                     ShinagakiRemoteImage(
                         page: page,
+                        imageLoader: imageLoader,
                         onOpen: open
                     )
                     .containerRelativeFrame(.horizontal)
@@ -1807,6 +1835,7 @@ private struct ShinagakiMediaGallery: View {
         .scrollTargetBehavior(.viewAligned)
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .scrollIndicators(.hidden)
+        .accessibilityIdentifier("shinagaki-media-gallery")
         .sheet(item: $presentation) { presentation in
             ShinagakiLightbox(presentation: presentation)
                 .presentationDetents([.large])
@@ -1838,6 +1867,24 @@ private struct ShinagakiMediaGallery: View {
         )
     }
 }
+
+#if DEBUG
+    struct ShinagakiMediaGalleryTestHost: View {
+        let postID: String
+        let media: [CatalogShinagakiMedia]
+        let accessibilityLabel: String
+        let imageLoader: @MainActor (URL) async -> UIImage?
+
+        var body: some View {
+            ShinagakiMediaGallery(
+                postID: postID,
+                media: media,
+                accessibilityLabel: accessibilityLabel,
+                imageLoader: imageLoader
+            )
+        }
+    }
+#endif
 
 private extension Optional where Wrapped == String {
     var nonBlank: String? {

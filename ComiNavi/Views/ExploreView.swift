@@ -626,6 +626,166 @@ private struct FilterChip: View {
     }
 }
 
+#if DEBUG
+    struct ExploreLongPressUITestHost: View {
+        private enum Surface: String, CaseIterable, Identifiable {
+            case gallery
+            case list
+            case tag
+
+            var id: Self { self }
+
+            var title: String {
+                rawValue.capitalized
+            }
+        }
+
+        @State private var selectedSurface = Surface.gallery
+        @State private var model: ExploreModel
+        private let circle: ExploreCircle
+
+        init() {
+            let circle = Self.makeCircle()
+            self.circle = circle
+            _model = State(initialValue: ExploreModel(
+                circles: [circle],
+                selectedDay: 2
+            ))
+        }
+
+        var body: some View {
+            NavigationStack {
+                VStack(spacing: 0) {
+                    Text("Explore multi-post fixture")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("explore-longpress-fixture-title")
+                        .padding(.top, 8)
+
+                    HStack(spacing: 8) {
+                        ForEach(Surface.allCases) { surface in
+                            Button(surface.title) {
+                                selectedSurface = surface
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(selectedSurface == surface ? .accentColor : .secondary)
+                            .accessibilityAddTraits(
+                                selectedSurface == surface ? .isSelected : []
+                            )
+                            .accessibilityIdentifier(
+                                "explore-longpress-surface-\(surface.rawValue)"
+                            )
+                        }
+                    }
+                    .padding(8)
+
+                    Divider()
+
+                    switch selectedSurface {
+                    case .gallery:
+                        ExploreGallery(
+                            circles: [circle],
+                            model: model,
+                            headerLayoutVersion: 0
+                        ) {
+                            EmptyView()
+                        }
+                    case .list:
+                        ExploreList(circles: [circle], model: model) {
+                            EmptyView()
+                        }
+                    case .tag:
+                        ExploreTagLongPressUITestSurface(
+                            circle: circle,
+                            model: model
+                        )
+                    }
+                }
+                .navigationTitle("Long-press fixture")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+
+        private static func makeCircle() -> ExploreCircle {
+            let posts = [
+                makePost(
+                    id: "ui-test-post-one",
+                    mediaPath: "post-one.jpg",
+                    createdAt: Date(timeIntervalSince1970: 100)
+                ),
+                makePost(
+                    id: "ui-test-post-two",
+                    mediaPath: "post-two.jpg",
+                    createdAt: Date(timeIntervalSince1970: 200)
+                ),
+            ]
+            return ExploreCircle(
+                circle: CirclemsDataSchema.ComiketCircleWC(
+                    comiketNo: 108,
+                    id: 10_802_055,
+                    pageNo: 1,
+                    cutIndex: 1,
+                    day: 2,
+                    blockId: 1,
+                    spaceNo: 55,
+                    spaceNoSub: 0,
+                    genreId: 1,
+                    circleName: "Two Post Circle",
+                    circleKana: "TWO POST CIRCLE",
+                    penName: "UI Test Artist",
+                    bookName: nil,
+                    url: nil,
+                    mailAddr: nil,
+                    description: "Deterministic Explore long-press fixture",
+                    memo: nil,
+                    updateId: 10_802_055,
+                    updateData: nil,
+                    circlems: nil,
+                    rss: nil,
+                    updateFlag: nil
+                ),
+                genreName: "UI Test",
+                blockName: "A",
+                tags: ["UI Test"],
+                enrichment: CatalogCircleEnrichment(posts: posts)
+            )
+        }
+
+        private static func makePost(
+            id: String,
+            mediaPath: String,
+            createdAt: Date
+        ) -> CatalogShinagakiPost {
+            CatalogShinagakiPost(
+                id: id,
+                postURL: testURL("\(id).html"),
+                text: "Two-post Explore fixture",
+                createdAt: createdAt,
+                authorHandle: "cominavi_ui_test",
+                authorName: "ComiNavi UI Test",
+                authorBio: nil,
+                authorProfileImageURL: nil,
+                media: [
+                    CatalogShinagakiMedia(
+                        kind: .photo,
+                        url: testURL(mediaPath),
+                        previewURL: nil
+                    ),
+                ],
+                tags: [],
+                postConfidence: .high,
+                placementConfidence: .high,
+                matchScore: 1_000,
+                matchReasons: ["ui-test"]
+            )
+        }
+
+        private static func testURL(_ path: String) -> URL {
+            URL(string: "https://ui-test.invalid/\(path)")!
+        }
+    }
+#endif
+
 private struct ExploreGallery<Header: View>: View {
     let circles: [ExploreCircle]
     let model: ExploreModel
@@ -750,17 +910,7 @@ extension ExploreCircle {
         guard let enrichment else { return nil }
         let sources = enrichment.posts.flatMap { post in
             post.media.enumerated().compactMap { index, media -> PageSource? in
-                if media.kind == .video {
-                    guard let previewURL = media.previewURL else { return nil }
-                    return PageSource(
-                        id: "\(post.id)-media-\(index)",
-                        media: CatalogShinagakiMedia(
-                            kind: .photo,
-                            url: previewURL,
-                            previewURL: nil
-                        )
-                    )
-                }
+                guard media.kind != .video || media.previewURL != nil else { return nil }
                 return PageSource(
                     id: "\(post.id)-media-\(index)",
                     media: media

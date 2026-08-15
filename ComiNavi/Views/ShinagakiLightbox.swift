@@ -317,12 +317,23 @@ struct ShinagakiLightbox: View {
                 sharePresentation = nil
             }
         }
-        .alert(item: $imageActionAlert) { alert in
-            Alert(
-                title: Text(alert.title),
-                message: alert.message.map(Text.init),
-                dismissButton: .default(Text("OK"))
-            )
+        .alert(
+            imageActionAlert?.title ?? "",
+            isPresented: Binding(
+                get: { imageActionAlert != nil },
+                set: { isPresented in
+                    if !isPresented { imageActionAlert = nil }
+                }
+            ),
+            presenting: imageActionAlert
+        ) { _ in
+            Button("OK", role: .cancel) {
+                imageActionAlert = nil
+            }
+        } message: { alert in
+            if let message = alert.message {
+                Text(message)
+            }
         }
         .onDisappear {
             cancelImageAction()

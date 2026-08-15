@@ -34,30 +34,17 @@ struct ExploreTagPage: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(model.visibleCircles) { circle in
-                            NavigationLink {
+                            ExploreTagCircleLink(
+                                circle: circle,
+                                model: model,
+                                onLongPress: { openLightbox(circle) }
+                            ) {
                                 CircleDetailView(
                                     circles: circle.circles,
                                     dataSource: dataSource,
                                     tags: circle.tags
                                 )
-                            } label: {
-                                HStack(spacing: 12) {
-                                    ExploreCircleRow(circle: circle, model: model)
-
-                                    LucideIcon("chevron.forward")
-                                        .font(.body.weight(.semibold))
-                                        .foregroundStyle(.tertiary)
-                                        .accessibilityHidden(true)
-                                }
-                                .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
-                                .padding(.vertical, 8)
-                                .contentShape(.rect)
                             }
-                            .buttonStyle(.plain)
-                            .highPriorityGesture(
-                                LongPressGesture(minimumDuration: 0.45)
-                                    .onEnded { _ in openLightbox(circle) }
-                            )
 
                             Divider()
                                 .padding(.leading, 104)
@@ -123,6 +110,93 @@ struct ExploreTagPage: View {
         }
     }
 }
+
+private struct ExploreTagCircleLink<Destination: View>: View {
+    let circle: ExploreCircle
+    let model: ExploreModel
+    let onLongPress: () -> Void
+    let destination: () -> Destination
+
+    init(
+        circle: ExploreCircle,
+        model: ExploreModel,
+        onLongPress: @escaping () -> Void,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) {
+        self.circle = circle
+        self.model = model
+        self.onLongPress = onLongPress
+        self.destination = destination
+    }
+
+    var body: some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack(spacing: 12) {
+                ExploreCircleRow(circle: circle, model: model)
+
+                LucideIcon("chevron.forward")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
+            .padding(.vertical, 8)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .highPriorityGesture(
+            LongPressGesture(minimumDuration: 0.45)
+                .onEnded { _ in onLongPress() }
+        )
+        .accessibilityIdentifier("explore-tag-circle-\(circle.id)")
+    }
+}
+
+#if DEBUG
+    struct ExploreTagLongPressUITestSurface: View {
+        let circle: ExploreCircle
+        let model: ExploreModel
+
+        @State private var lightboxController = ExploreArtworkLightboxController()
+
+        var body: some View {
+            @Bindable var lightboxController = lightboxController
+
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ExploreTagCircleLink(
+                        circle: circle,
+                        model: model,
+                        onLongPress: { openLightbox() }
+                    ) {
+                        EmptyView()
+                    }
+
+                    Divider()
+                        .padding(.leading, 104)
+                }
+            }
+            .accessibilityIdentifier("explore-tag-test-surface")
+            .sheet(item: $lightboxController.presentation) { presentation in
+                ShinagakiLightbox(presentation: presentation)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(.black)
+            }
+            .onDisappear {
+                lightboxController.cancelPendingLoad()
+            }
+        }
+
+        private func openLightbox() {
+            lightboxController.present(circle: circle) {
+                await model.fullCoverImage(for: circle)
+            }
+        }
+    }
+#endif
 
 private struct ExploreTagFilterSheet: View {
     @Environment(\.dismiss) private var dismiss

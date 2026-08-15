@@ -394,12 +394,32 @@ struct EntryView: View {
                     }
                 }
             } else if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-explore-multi-post-longpress"
+            ) {
+                ExploreLongPressUITestHost()
+            } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-shinagaki-lightbox-cancel-save"
             ) {
                 ShinagakiCancellationTestHost(
                     pages: Self.shinagakiTestPages,
                     photoSaver: Self.shinagakiDelayedTestPhotoSaver
                 )
+            } else if ProcessInfo.processInfo.arguments.contains(
+                "-cominavi-ui-testing-shinagaki-media-gallery"
+            ) {
+                ShinagakiMediaGalleryTestHost(
+                    postID: "ui-test-post",
+                    media: Self.shinagakiGalleryTestMedia,
+                    accessibilityLabel: "UI test Shinagaki",
+                    imageLoader: { url in
+                        switch url.lastPathComponent {
+                        case "first.jpg": Self.shinagakiTestImage
+                        case "second.jpg": Self.shinagakiWideTestImage
+                        default: nil
+                        }
+                    }
+                )
+                .padding()
             } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-shinagaki-lightbox"
             ) {
@@ -543,6 +563,19 @@ struct EntryView: View {
                 ),
             ]
         }
+
+        private static let shinagakiGalleryTestMedia = [
+            CatalogShinagakiMedia(
+                kind: .photo,
+                url: URL(string: "https://ui-test.invalid/first.jpg")!,
+                previewURL: nil
+            ),
+            CatalogShinagakiMedia(
+                kind: .photo,
+                url: URL(string: "https://ui-test.invalid/second.jpg")!,
+                previewURL: nil
+            ),
+        ]
 
         private static var shinagakiTestPhotoSaver: ShinagakiPhotoSaver {
             let expectedImageData = shinagakiWideTestImage.pngData()

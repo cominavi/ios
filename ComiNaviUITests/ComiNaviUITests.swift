@@ -458,6 +458,51 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
+    func testCircleDetailShinagakiGalleryOpensSecondMediaInSourceOrder() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-ui-testing-shinagaki-media-gallery",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+        ]
+        app.launch()
+
+        let gallery = app.descendants(matching: .any)["shinagaki-media-gallery"]
+        let firstPreview = app.buttons[
+            "shinagaki-image-preview-ui-test-post-media-0"
+        ]
+        let secondPreview = app.buttons[
+            "shinagaki-image-preview-ui-test-post-media-1"
+        ]
+        XCTAssertTrue(gallery.waitForExistence(timeout: 5))
+        XCTAssertTrue(firstPreview.waitForExistence(timeout: 5))
+        XCTAssertTrue(firstPreview.isHittable)
+        XCTAssertEqual(firstPreview.label, "Image 1 of 2: UI test Shinagaki")
+
+        gallery.swipeLeft()
+
+        XCTAssertTrue(secondPreview.waitForExistence(timeout: 5))
+        expectation(
+            for: NSPredicate(format: "hittable == true"),
+            evaluatedWith: secondPreview
+        )
+        waitForExpectations(timeout: 3)
+        XCTAssertEqual(secondPreview.label, "Image 2 of 2: UI test Shinagaki")
+        secondPreview.tap()
+
+        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let pageIndicator = app.descendants(matching: .any)[
+            "shinagaki-lightbox-page-indicator"
+        ]
+        let secondPage = app.images["Image 2 of 2: UI test Shinagaki"]
+        XCTAssertTrue(lightbox.waitForExistence(timeout: 5))
+        XCTAssertTrue(pageIndicator.waitForExistence(timeout: 5))
+        XCTAssertEqual(pageIndicator.value as? String, "2/2")
+        XCTAssertTrue(secondPage.waitForExistence(timeout: 5))
+        XCTAssertTrue(secondPage.isHittable)
+    }
+
+    @MainActor
     func testShinagakiLightboxActionsUseSelectedPage() throws {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-ui-testing-shinagaki-lightbox")
@@ -1256,6 +1301,93 @@ final class ComiNaviUITests: XCTestCase {
             8,
             "The circle under the pinch origin moved away while the gallery zoomed back in"
         )
+    }
+
+    @MainActor
+    func testExploreMultiPostLongPressOpensOneOrderedLightboxOnEverySurface() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-cominavi-ui-testing-explore-multi-post-longpress",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+        ]
+        app.launch()
+
+        let fixtureTitle = app.staticTexts["explore-longpress-fixture-title"]
+        XCTAssertTrue(fixtureTitle.waitForExistence(timeout: 10))
+
+        let surfaces = [
+            (
+                name: "gallery",
+                targetID: "explore-gallery-circle-10802055"
+            ),
+            (
+                name: "list",
+                targetID: "explore-list-circle-10802055"
+            ),
+            (
+                name: "tag",
+                targetID: "explore-tag-circle-10802055"
+            ),
+        ]
+
+        for surface in surfaces {
+            let surfaceButton = app.buttons[
+                "explore-longpress-surface-\(surface.name)"
+            ]
+            XCTAssertTrue(surfaceButton.waitForExistence(timeout: 5))
+            surfaceButton.tap()
+
+            let target = app.descendants(matching: .any)[surface.targetID]
+            XCTAssertTrue(
+                target.waitForExistence(timeout: 10),
+                "Missing the real \(surface.name) long-press target"
+            )
+            XCTAssertTrue(target.isHittable)
+            target.press(forDuration: 0.7)
+
+            let lightboxes = app.collectionViews.matching(
+                identifier: "shinagaki-lightbox"
+            )
+            let lightbox = lightboxes.firstMatch
+            XCTAssertTrue(
+                lightbox.waitForExistence(timeout: 10),
+                "The \(surface.name) long press did not open a lightbox"
+            )
+            XCTAssertEqual(
+                lightboxes.count,
+                1,
+                "The \(surface.name) long press presented more than one lightbox"
+            )
+
+            let pageIndicator = app.descendants(matching: .any)[
+                "shinagaki-lightbox-page-indicator"
+            ]
+            XCTAssertTrue(pageIndicator.waitForExistence(timeout: 5))
+            expectation(
+                for: NSPredicate(format: "value == %@", "1/2"),
+                evaluatedWith: pageIndicator
+            )
+            waitForExpectations(timeout: 5)
+            XCTAssertFalse(app.descendants(matching: .any)["circle-detail-screen"].exists)
+
+            lightbox.swipeLeft()
+            expectation(
+                for: NSPredicate(format: "value == %@", "2/2"),
+                evaluatedWith: pageIndicator
+            )
+            waitForExpectations(timeout: 5)
+
+            let close = app.buttons["shinagaki-lightbox-close"]
+            XCTAssertTrue(close.waitForExistence(timeout: 5))
+            close.tap()
+            XCTAssertTrue(lightbox.waitForNonExistence(timeout: 5))
+            XCTAssertTrue(
+                fixtureTitle.waitForExistence(timeout: 5),
+                "The \(surface.name) long press also navigated away from Explore"
+            )
+            XCTAssertTrue(surfaceButton.isHittable)
+        }
     }
 
     @MainActor
