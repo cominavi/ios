@@ -97,7 +97,11 @@ struct ExploreTagPage: View {
                 .presentationBackground(.black)
         }
         .sheet(isPresented: $showsFilters) {
-            ExploreTagFilterSheet(model: model, dataSource: dataSource)
+            ExploreTagFilterSheet(
+                model: model,
+                dataSource: dataSource,
+                favoriteColorLabelStore: favoriteColorLabelStore
+            )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -220,6 +224,7 @@ private struct ExploreTagFilterSheet: View {
     @Environment(\.dismiss) private var dismiss
     let model: ExploreModel
     let dataSource: CirclemsDataSource
+    let favoriteColorLabelStore: FavoriteColorLabelStore
 
     var body: some View {
         @Bindable var model = model
@@ -301,7 +306,10 @@ private struct ExploreTagFilterSheet: View {
                         }
                     }
 
-                    ExploreFavoriteColorFilter(selection: $model.selectedFavoriteColors)
+                    ExploreFavoriteColorFilter(
+                        selection: $model.selectedFavoriteColors,
+                        colorLabelStore: favoriteColorLabelStore
+                    )
                 }
 
                 Section("Order") {

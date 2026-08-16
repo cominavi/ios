@@ -48,6 +48,7 @@ extension BookmarkColor {
 
 enum FavoriteColorLabelMetrics {
     static let baseHeight: CGFloat = 20
+    static let controlBaseHeight: CGFloat = 28
 
     static func height(compatibleWith traits: UITraitCollection) -> CGFloat {
         UIFontMetrics(forTextStyle: .caption2).scaledValue(
@@ -57,25 +58,70 @@ enum FavoriteColorLabelMetrics {
     }
 }
 
+enum FavoriteColorLabelBadgeSize {
+    case compact
+    case control
+
+    fileprivate var height: CGFloat {
+        switch self {
+        case .compact: FavoriteColorLabelMetrics.baseHeight
+        case .control: FavoriteColorLabelMetrics.controlBaseHeight
+        }
+    }
+
+    fileprivate var horizontalPadding: CGFloat {
+        switch self {
+        case .compact: 7
+        case .control: 10
+        }
+    }
+
+    fileprivate var font: Font {
+        switch self {
+        case .compact: .caption2.weight(.semibold)
+        case .control: .caption.weight(.semibold)
+        }
+    }
+
+    fileprivate var relativeTextStyle: Font.TextStyle {
+        switch self {
+        case .compact: .caption2
+        case .control: .caption
+        }
+    }
+}
+
 struct FavoriteColorLabelBadge: View {
     let color: BookmarkColor
     let label: String?
+    let size: FavoriteColorLabelBadgeSize
 
-    @ScaledMetric(relativeTo: .caption2)
-    private var height = FavoriteColorLabelMetrics.baseHeight
-    @ScaledMetric(relativeTo: .caption2)
-    private var horizontalPadding: CGFloat = 7
+    @ScaledMetric private var height: CGFloat
+    @ScaledMetric private var horizontalPadding: CGFloat
 
-    init(color: BookmarkColor, label: String?) {
+    init(
+        color: BookmarkColor,
+        label: String?,
+        size: FavoriteColorLabelBadgeSize = .compact
+    ) {
         self.color = color
         let trimmed = label?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.label = trimmed?.isEmpty == false ? trimmed : nil
+        self.size = size
+        _height = ScaledMetric(
+            wrappedValue: size.height,
+            relativeTo: size.relativeTextStyle
+        )
+        _horizontalPadding = ScaledMetric(
+            wrappedValue: size.horizontalPadding,
+            relativeTo: size.relativeTextStyle
+        )
     }
 
     var body: some View {
         if let label {
             Text(verbatim: label)
-                .font(.caption2.weight(.semibold))
+                .font(size.font)
                 .foregroundStyle(color.favoriteLabelForegroundStyle)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -96,6 +142,65 @@ struct FavoriteColorLabelBadge: View {
                         .stroke(.black.opacity(0.14), lineWidth: 0.5)
                 }
                 .accessibilityLabel(Text(color.displayName))
+        }
+    }
+}
+
+struct FavoriteColorLabelSelectionButton: View {
+    let color: BookmarkColor
+    let label: String?
+    let isSelected: Bool
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            FavoriteColorLabelBadge(
+                color: color,
+                label: label,
+                size: .control
+            )
+            .overlay {
+                Capsule()
+                    .stroke(
+                        isSelected
+                            ? Color.primary
+                            : Color(uiColor: .separator).opacity(0.45),
+                        lineWidth: isSelected ? 2 : 1
+                    )
+                    .padding(isSelected ? -3 : 0)
+            }
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .background(Color.accentColor, in: .circle)
+                        .overlay {
+                            Circle()
+                                .stroke(Color(uiColor: .systemBackground), lineWidth: 2)
+                        }
+                        .offset(x: 5, y: -5)
+                }
+            }
+            .padding(8)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var accessibilityLabel: Text {
+        let trimmed = label?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let trimmed, !trimmed.isEmpty {
+            return Text(verbatim: trimmed)
+        } else {
+            return Text(color.displayName)
         }
     }
 }

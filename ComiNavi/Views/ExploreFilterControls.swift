@@ -55,6 +55,15 @@ struct ExploreFilterChoice<Label: View>: View {
 
 struct ExploreFavoriteColorFilter: View {
     @Binding var selection: Set<BookmarkColor>
+    let colorLabelStore: FavoriteColorLabelStore
+
+    init(
+        selection: Binding<Set<BookmarkColor>>,
+        colorLabelStore: FavoriteColorLabelStore = AppData.favoriteColorLabelStore
+    ) {
+        _selection = selection
+        self.colorLabelStore = colorLabelStore
+    }
 
     var body: some View {
         ExploreExpandedFilterField(title: "Color") {
@@ -62,49 +71,18 @@ struct ExploreFavoriteColorFilter: View {
                 ForEach(BookmarkColor.selectableColors) { color in
                     let isSelected = selection.contains(color)
 
-                    Button {
+                    FavoriteColorLabelSelectionButton(
+                        color: color,
+                        label: colorLabelStore.customLabels[color],
+                        isSelected: isSelected,
+                        accessibilityIdentifier: "explore-favorite-color-\(color.rawValue)"
+                    ) {
                         if isSelected {
                             selection.remove(color)
                         } else {
                             selection.insert(color)
                         }
-                    } label: {
-                        Circle()
-                            .fill(color.swiftUIColor)
-                            .frame(width: 26, height: 26)
-                            .frame(width: 44, height: 44)
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        isSelected
-                                            ? Color.primary
-                                            : Color(uiColor: .separator).opacity(0.45),
-                                        lineWidth: isSelected ? 2 : 1
-                                    )
-                            }
-                            .overlay(alignment: .topTrailing) {
-                                if isSelected {
-                                    Image(systemName: "checkmark")
-                                        .font(.caption2.weight(.bold))
-                                        .foregroundStyle(.white)
-                                        .padding(4)
-                                        .background(Color.accentColor, in: .circle)
-                                        .overlay {
-                                            Circle()
-                                                .stroke(
-                                                    Color(uiColor: .systemBackground),
-                                                    lineWidth: 2
-                                                )
-                                        }
-                                }
-                            }
-                            .contentShape(.circle)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(color.displayName)
-                    .accessibilityValue(isSelected ? "Selected" : "Not selected")
-                    .accessibilityAddTraits(isSelected ? .isSelected : [])
-                    .accessibilityIdentifier("explore-favorite-color-\(color.rawValue)")
                 }
             }
         }

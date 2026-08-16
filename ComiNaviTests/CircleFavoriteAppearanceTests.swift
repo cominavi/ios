@@ -59,6 +59,30 @@ final class CircleFavoriteAppearanceTests: XCTestCase {
         XCTAssertGreaterThan(pillSize.width, circleSize.width)
     }
 
+    @MainActor
+    func testFavoriteColorLabelSelectorKeepsEqualAdaptiveControlHeights() throws {
+        let circleSize = try renderedSize(
+            FavoriteColorLabelSelectionButton(
+                color: .blue,
+                label: nil,
+                isSelected: false,
+                accessibilityIdentifier: "circle"
+            ) {}
+        )
+        let pillSize = try renderedSize(
+            FavoriteColorLabelSelectionButton(
+                color: .blue,
+                label: "Must visit",
+                isSelected: true,
+                accessibilityIdentifier: "pill"
+            ) {}
+        )
+
+        XCTAssertEqual(circleSize.height, 44, accuracy: 0.5)
+        XCTAssertEqual(pillSize.height, circleSize.height, accuracy: 0.5)
+        XCTAssertGreaterThan(pillSize.width, circleSize.width)
+    }
+
     func testExploreArtworkOnlyOutlinesShinagakiFavorites() {
         XCTAssertEqual(
             ExploreArtworkBorderStyle.resolve(

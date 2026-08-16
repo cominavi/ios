@@ -855,6 +855,7 @@ private struct CircleUserPlanSection: View {
                             ForEach(BookmarkColor.selectableColors) { color in
                                 CirclePlanColorButton(
                                     color: color,
+                                    label: colorLabelStore.customLabels[color],
                                     isSelected: model.selectedColor == color,
                                     onSelect: { model.selectColor(color) }
                                 )
@@ -915,37 +916,18 @@ private struct CircleUserPlanSection: View {
 
 private struct CirclePlanColorButton: View {
     let color: BookmarkColor
+    let label: String?
     let isSelected: Bool
     let onSelect: () -> Void
 
     var body: some View {
-        Button(action: onSelect) {
-            Circle()
-                .fill(color.swiftUIColor)
-                .frame(width: 32, height: 32)
-                .overlay {
-                    if isSelected {
-                        LucideIcon("checkmark")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                    }
-                }
-                .overlay {
-                    Circle()
-                        .stroke(
-                            isSelected ? Color.primary : Color.clear,
-                            lineWidth: 2
-                        )
-                        .padding(-3)
-                }
-                .frame(width: 44, height: 44)
-                .contentShape(.circle)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(color.displayName))
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("circle-favorite-color-\(color.rawValue)")
+        FavoriteColorLabelSelectionButton(
+            color: color,
+            label: label,
+            isSelected: isSelected,
+            accessibilityIdentifier: "circle-favorite-color-\(color.rawValue)",
+            action: onSelect
+        )
     }
 }
 

@@ -395,11 +395,13 @@ struct SharedPlanEditorScreen: View {
     let store: SharedPlanStore
     let currentUserID: String?
     let catalogDataSource: CirclemsDataSource?
+    let favoriteColorLabelStore: FavoriteColorLabelStore
     @State private var model: SharedPlanEditorModel
     @State private var presentedSheet: SharedPlanEditorSheet?
     @State private var confirmation: SharedPlanEditorConfirmation?
     @State private var catalogCircles: [SharedPlanCircleKey: CirclemsDataSchema.ComiketCircleWC] = [:]
     @State private var catalogHallNames: [SharedPlanCircleKey: String] = [:]
+    @State private var favoriteBookmarksByPublicCircleID: [Int: MapBookmark] = [:]
     @State private var initialCircleNavigationPresented = false
     @State private var hasHandledInitialCircleNavigation = false
     @Environment(\.scenePhase) private var scenePhase
@@ -411,11 +413,13 @@ struct SharedPlanEditorScreen: View {
         currentUserID: String? = nil,
         features: SharedPlanPresentationFeatures = .production,
         catalogDataSource: CirclemsDataSource? = nil,
+        favoriteColorLabelStore: FavoriteColorLabelStore = AppData.favoriteColorLabelStore,
         initialPublicCircleID: Int? = nil
     ) {
         self.store = store
         self.currentUserID = currentUserID
         self.catalogDataSource = catalogDataSource
+        self.favoriteColorLabelStore = favoriteColorLabelStore
         self.initialPublicCircleID = initialPublicCircleID
         _model = State(initialValue: SharedPlanEditorModel(
             planID: planID,
@@ -442,6 +446,9 @@ struct SharedPlanEditorScreen: View {
         }
         .task(id: catalogCircleTaskID) {
             await loadCatalogCircles()
+        }
+        .task(id: favoriteBookmarkTaskID) {
+            await observeFavoriteBookmarks()
         }
         .onChange(of: initialCircleNavigationKey, initial: true) {
             presentInitialCircleDestinationIfReady()
@@ -710,6 +717,8 @@ struct SharedPlanEditorScreen: View {
                         identity: identity,
                         conflictCount: conflictCount(for: circle.key),
                         circle: circle.key,
+                        favoriteBookmark: favoriteBookmarksByPublicCircleID[circle.key.wcID],
+                        favoriteColorLabelStore: favoriteColorLabelStore,
                         catalogDataSource: catalogDataSource,
                         catalogCircle: catalogCircles[circle.key]
                     )
@@ -722,6 +731,10 @@ struct SharedPlanEditorScreen: View {
         let circleIDs = model.circles.map(\.key.id).joined(separator: ",")
         let isReady = catalogDataSource?.readiness == .ready
         return "\(catalogDataSource?.eventID ?? 0):\(isReady):\(circleIDs)"
+    }
+
+    private var favoriteBookmarkTaskID: String {
+        "\(catalogDataSource?.comiket.number ?? 0):\(model.plan?.comiketNo ?? 0)"
     }
 
     private var initialCircle: SharedPlanCircleKey? {
@@ -781,6 +794,31 @@ struct SharedPlanEditorScreen: View {
         guard !Task.isCancelled else { return }
         catalogCircles = loaded
         catalogHallNames = loadedHallNames
+    }
+
+    private func observeFavoriteBookmarks() async {
+        guard let catalogDataSource,
+              let eventNumber = model.plan?.comiketNo,
+              catalogDataSource.comiket.number == eventNumber
+        else {
+            favoriteBookmarksByPublicCircleID = [:]
+            return
+        }
+
+        let userPlanStore = catalogDataSource.userPlanStore
+        let updates = await userPlanStore.bookmarkUpdates(eventNumber: eventNumber)
+        for await _ in updates {
+            guard !Task.isCancelled else { return }
+            guard let bookmarks = try? await userPlanStore.allBookmarks(
+                eventNumber: eventNumber
+            ) else { continue }
+            guard !Task.isCancelled, model.plan?.comiketNo == eventNumber else { return }
+            favoriteBookmarksByPublicCircleID = bookmarks.reduce(into: [:]) {
+                result, bookmark in
+                guard bookmark.isFavorite else { return }
+                result[bookmark.publicCircleID] = bookmark
+            }
+        }
     }
 
     private func circleIdentity(
@@ -1032,11 +1070,19 @@ private struct SharedPlanCircleGroupHeader: View {
     let identity: SharedPlanCircleIdentityPresentation
     let conflictCount: Int
     let circle: SharedPlanCircleKey
+    let favoriteBookmark: MapBookmark?
+    let favoriteColorLabelStore: FavoriteColorLabelStore
     let catalogDataSource: CirclemsDataSource?
     let catalogCircle: CirclemsDataSchema.ComiketCircleWC?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if let favoriteBookmark, favoriteBookmark.isFavorite {
+                FavoriteColorLabelBadge(
+                    color: favoriteBookmark.color,
+                    label: favoriteColorLabelStore.customLabels[favoriteBookmark.color]
+                )
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(identity.circleName)
                     .font(.subheadline.weight(.semibold))

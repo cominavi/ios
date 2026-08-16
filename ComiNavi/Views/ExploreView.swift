@@ -151,7 +151,10 @@ struct ExploreView<EventDayHeader: View>: View {
                 }
             }
             .sheet(isPresented: $showsFilters) {
-                ExploreFilterSheet(model: model)
+                ExploreFilterSheet(
+                    model: model,
+                    favoriteColorLabelStore: favoriteColorLabelStore
+                )
             }
             .exploreCircleDestination(selection: $selectedCircle) { circle in
                 if let dataSource = model.catalogDataSource {
@@ -1369,6 +1372,7 @@ private struct ExploreFilterSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let model: ExploreModel
+    let favoriteColorLabelStore: FavoriteColorLabelStore
 
     var body: some View {
         @Bindable var model = model
@@ -1462,7 +1466,10 @@ private struct ExploreFilterSheet: View {
                         }
                     }
 
-                    ExploreFavoriteColorFilter(selection: $model.selectedFavoriteColors)
+                    ExploreFavoriteColorFilter(
+                        selection: $model.selectedFavoriteColors,
+                        colorLabelStore: favoriteColorLabelStore
+                    )
                 }
             }
             .navigationTitle("Filter circles")
