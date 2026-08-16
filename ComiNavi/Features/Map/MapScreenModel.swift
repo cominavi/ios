@@ -137,6 +137,7 @@ final class MapScreenModel {
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var genreTask: Task<Void, Never>?
     @ObservationIgnored private var bookmarkTask: Task<Void, Never>?
+    @ObservationIgnored private var bookmarkUpdatesTask: Task<Void, Never>?
     @ObservationIgnored private var bookmarkSyncTask: Task<Void, Never>?
     @ObservationIgnored private var primarySharedPlanTask: Task<Void, Never>?
     @ObservationIgnored private var hasAttemptedInitialBookmarkSync = false
@@ -185,6 +186,7 @@ final class MapScreenModel {
         searchTask?.cancel()
         genreTask?.cancel()
         bookmarkTask?.cancel()
+        bookmarkUpdatesTask?.cancel()
         bookmarkSyncTask?.cancel()
         primarySharedPlanTask?.cancel()
     }
@@ -212,6 +214,7 @@ final class MapScreenModel {
             destination = nil
         }
         phase = .loading
+        observeBookmarkUpdates()
         loadBookmarks()
         refreshPrimarySharedPlanCircles()
 
@@ -812,6 +815,35 @@ final class MapScreenModel {
                 guard let self else { return }
                 self.bookmarkError = error.localizedDescription
             }
+        }
+    }
+
+    private func observeBookmarkUpdates() {
+        guard bookmarkUpdatesTask == nil else { return }
+        bookmarkUpdatesTask = Task { [weak self, userPlanStore, eventNumber] in
+            let updates = await userPlanStore.bookmarkUpdates(eventNumber: eventNumber)
+            for await _ in updates {
+                guard !Task.isCancelled, let self else { return }
+                await self.refreshBookmarksFromStore()
+            }
+        }
+    }
+
+    private func refreshBookmarksFromStore() async {
+        let day = selectedDay
+        do {
+            let bookmarks = try await userPlanStore.allBookmarks(eventNumber: eventNumber)
+            try Task.checkCancellation()
+            guard selectedDay == day else { return }
+            self.bookmarks = Dictionary(
+                uniqueKeysWithValues: bookmarks.lazy
+                    .filter { $0.day == day && $0.syncState != .pendingDelete }
+                    .map { ($0.publicCircleID, $0) }
+            )
+        } catch is CancellationError {
+            return
+        } catch {
+            bookmarkError = error.localizedDescription
         }
     }
 

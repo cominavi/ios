@@ -1736,6 +1736,50 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
+    func testFavoriteChangesOutsideMapRefreshImmediately() async throws {
+        let store = InMemoryUserPlanStore()
+        let model = MapScreenModel.previewCampusFixture(userPlanStore: store)
+        let tableID = CatalogMapTable.ID(blockID: 1, spaceNumber: 1)
+        var bookmark = MapBookmark(
+            eventNumber: 108,
+            publicCircleID: 100,
+            catalogCircleID: 7,
+            updateID: 70,
+            day: 1,
+            mapID: 101,
+            tableID: tableID,
+            subspace: 0,
+            color: .orange,
+            memo: "",
+            modifiedAt: .now,
+            syncState: .synced
+        )
+
+        model.load()
+        try await waitUntilReady(model)
+        XCTAssertTrue(model.favoriteBookmarks.isEmpty)
+
+        try await store.upsert(bookmark)
+        try await waitUntil {
+            model.favoriteBookmarks[bookmark.publicCircleID]?.color == .orange
+        }
+
+        bookmark.color = .magenta
+        bookmark.modifiedAt = .now
+        try await store.upsert(bookmark)
+        try await waitUntil {
+            model.favoriteBookmarks[bookmark.publicCircleID]?.color == .magenta
+        }
+
+        bookmark.syncState = .pendingDelete
+        bookmark.modifiedAt = .now
+        try await store.upsert(bookmark)
+        try await waitUntil {
+            model.favoriteBookmarks[bookmark.publicCircleID] == nil
+        }
+    }
+
+    @MainActor
     func testGlobalSearchRespondsWithinInteractiveBudget() async throws {
         let model = MapScreenModel.previewCampusFixture()
         model.load()
