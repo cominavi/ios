@@ -6,6 +6,7 @@ struct CircleDetailView: View {
     let circles: [CirclemsDataSchema.ComiketCircleWC]
     let dataSource: CirclemsDataSource
     let tags: [String]
+    let favoriteColorLabelStore: FavoriteColorLabelStore
 
     @State private var details: CatalogCircleDetails?
     @State private var extensionsByCircleID: [Int: CirclemsDataSchema.ComiketCircleExtend] = [:]
@@ -18,11 +19,14 @@ struct CircleDetailView: View {
     init(
         circle: CirclemsDataSchema.ComiketCircleWC,
         dataSource: CirclemsDataSource,
-        tags: [String] = []
+        tags: [String] = [],
+        favoriteColorLabelStore: FavoriteColorLabelStore =
+            AppData.favoriteColorLabelStore
     ) {
         circles = [circle]
         self.dataSource = dataSource
         self.tags = tags
+        self.favoriteColorLabelStore = favoriteColorLabelStore
         _planModel = State(initialValue: CircleUserPlanModel(
             circle: circle,
             dataSource: dataSource
@@ -32,12 +36,15 @@ struct CircleDetailView: View {
     init(
         circles: [CirclemsDataSchema.ComiketCircleWC],
         dataSource: CirclemsDataSource,
-        tags: [String] = []
+        tags: [String] = [],
+        favoriteColorLabelStore: FavoriteColorLabelStore =
+            AppData.favoriteColorLabelStore
     ) {
         precondition(!circles.isEmpty)
         self.circles = circles.sorted { ($0.spaceNoSub ?? 0) < ($1.spaceNoSub ?? 0) }
         self.dataSource = dataSource
         self.tags = tags
+        self.favoriteColorLabelStore = favoriteColorLabelStore
         _planModel = State(initialValue: CircleUserPlanModel(
             circles: circles,
             dataSource: dataSource
@@ -79,12 +86,16 @@ struct CircleDetailView: View {
                     CircleDetailTagsSection(
                         tags: combinedTags,
                         day: circle.day ?? 1,
-                        dataSource: dataSource
+                        dataSource: dataSource,
+                        favoriteColorLabelStore: favoriteColorLabelStore
                     )
                 }
 
                 if details?.extensionRecord?.WCId != nil, planModel.isFavorite {
-                    CircleUserPlanSection(model: planModel)
+                    CircleUserPlanSection(
+                        model: planModel,
+                        colorLabelStore: favoriteColorLabelStore
+                    )
                 }
 
                 if !withdrawalClaims.isEmpty {
@@ -800,6 +811,7 @@ private struct CircleDetailExternalLinksRow: View {
 
 private struct CircleUserPlanSection: View {
     let model: CircleUserPlanModel
+    let colorLabelStore: FavoriteColorLabelStore
 
     @FocusState private var isNoteFocused: Bool
 
@@ -825,14 +837,10 @@ private struct CircleUserPlanSection: View {
                     Spacer(minLength: 8)
 
                     if let selectedColor = model.selectedColor {
-                        Circle()
-                            .fill(selectedColor.swiftUIColor)
-                            .frame(width: 18, height: 18)
-                            .overlay {
-                                Circle()
-                                    .stroke(Color(uiColor: .separator), lineWidth: 0.5)
-                            }
-                            .accessibilityLabel(Text(selectedColor.displayName))
+                        FavoriteColorLabelBadge(
+                            color: selectedColor,
+                            label: colorLabelStore.customLabels[selectedColor]
+                        )
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -1316,13 +1324,19 @@ private struct CircleDetailTagsSection: View {
     let tags: [String]
     let day: Int
     let dataSource: CirclemsDataSource
+    let favoriteColorLabelStore: FavoriteColorLabelStore
 
     var body: some View {
         CircleDetailSection("Tags") {
             CircleTagFlowLayout(spacing: 8) {
                 ForEach(tags, id: \.self) { tag in
                     NavigationLink {
-                        ExploreTagPage(tag: tag, day: day, dataSource: dataSource)
+                        ExploreTagPage(
+                            tag: tag,
+                            day: day,
+                            dataSource: dataSource,
+                            favoriteColorLabelStore: favoriteColorLabelStore
+                        )
                     } label: {
                         LucideLabel(verbatim: tag, icon: "tag")
                             .font(.subheadline.weight(.semibold))

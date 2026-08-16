@@ -3,15 +3,23 @@ import SwiftUI
 struct ExploreTagPage: View {
     let tag: String
     let dataSource: CirclemsDataSource
+    let favoriteColorLabelStore: FavoriteColorLabelStore
 
     @State private var model: ExploreModel
     @State private var lightboxController = ExploreArtworkLightboxController()
     @State private var selectedCircle: ExploreCircle?
     @State private var showsFilters = false
 
-    init(tag: String, day: Int, dataSource: CirclemsDataSource) {
+    init(
+        tag: String,
+        day: Int,
+        dataSource: CirclemsDataSource,
+        favoriteColorLabelStore: FavoriteColorLabelStore =
+            AppData.favoriteColorLabelStore
+    ) {
         self.tag = tag
         self.dataSource = dataSource
+        self.favoriteColorLabelStore = favoriteColorLabelStore
         _model = State(initialValue: ExploreModel(
             dataSource: dataSource,
             selectedDay: day,
@@ -38,6 +46,7 @@ struct ExploreTagPage: View {
                             ExploreTagCircleLink(
                                 circle: circle,
                                 model: model,
+                                favoriteColorLabels: favoriteColorLabelStore.customLabels,
                                 onSelect: { selectedCircle = circle },
                                 onLongPress: { openLightbox(circle) }
                             )
@@ -55,7 +64,8 @@ struct ExploreTagPage: View {
             CircleDetailView(
                 circles: circle.circles,
                 dataSource: dataSource,
-                tags: circle.tags
+                tags: circle.tags,
+                favoriteColorLabelStore: favoriteColorLabelStore
             )
         }
         .searchable(text: $model.searchQuery, prompt: "Search within this tag")
@@ -117,17 +127,20 @@ struct ExploreTagPage: View {
 private struct ExploreTagCircleLink: View {
     let circle: ExploreCircle
     let model: ExploreModel
+    let favoriteColorLabels: [BookmarkColor: String]
     let onSelect: () -> Void
     let onLongPress: () -> Void
 
     init(
         circle: ExploreCircle,
         model: ExploreModel,
+        favoriteColorLabels: [BookmarkColor: String] = [:],
         onSelect: @escaping () -> Void,
         onLongPress: @escaping () -> Void
     ) {
         self.circle = circle
         self.model = model
+        self.favoriteColorLabels = favoriteColorLabels
         self.onSelect = onSelect
         self.onLongPress = onLongPress
     }
@@ -135,7 +148,11 @@ private struct ExploreTagCircleLink: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
-                ExploreCircleRow(circle: circle, model: model)
+                ExploreCircleRow(
+                    circle: circle,
+                    model: model,
+                    favoriteColorLabels: favoriteColorLabels
+                )
 
                 LucideIcon("chevron.forward")
                     .font(.body.weight(.semibold))

@@ -35,6 +35,69 @@ extension BookmarkColor {
         case .red: "Red"
         }
     }
+
+    fileprivate var favoriteLabelForegroundStyle: Color {
+        switch self {
+        case .orange, .yellow, .cyan, .lime:
+            .black.opacity(0.82)
+        case .memoOnly, .magenta, .green, .purple, .blue, .red:
+            .white
+        }
+    }
+}
+
+enum FavoriteColorLabelMetrics {
+    static let baseHeight: CGFloat = 20
+
+    static func height(compatibleWith traits: UITraitCollection) -> CGFloat {
+        UIFontMetrics(forTextStyle: .caption2).scaledValue(
+            for: baseHeight,
+            compatibleWith: traits
+        )
+    }
+}
+
+struct FavoriteColorLabelBadge: View {
+    let color: BookmarkColor
+    let label: String?
+
+    @ScaledMetric(relativeTo: .caption2)
+    private var height = FavoriteColorLabelMetrics.baseHeight
+    @ScaledMetric(relativeTo: .caption2)
+    private var horizontalPadding: CGFloat = 7
+
+    init(color: BookmarkColor, label: String?) {
+        self.color = color
+        let trimmed = label?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.label = trimmed?.isEmpty == false ? trimmed : nil
+    }
+
+    var body: some View {
+        if let label {
+            Text(verbatim: label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(color.favoriteLabelForegroundStyle)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.horizontal, horizontalPadding)
+                .frame(maxWidth: 140, minHeight: height, maxHeight: height)
+                .background(color.swiftUIColor, in: .capsule)
+                .overlay {
+                    Capsule()
+                        .stroke(.black.opacity(0.14), lineWidth: 0.5)
+                }
+                .accessibilityLabel(Text(verbatim: label))
+        } else {
+            Circle()
+                .fill(color.swiftUIColor)
+                .frame(width: height, height: height)
+                .overlay {
+                    Circle()
+                        .stroke(.black.opacity(0.14), lineWidth: 0.5)
+                }
+                .accessibilityLabel(Text(color.displayName))
+        }
+    }
 }
 
 /// The color mark is aligned to the blank box authored into Circle.ms circle cuts.

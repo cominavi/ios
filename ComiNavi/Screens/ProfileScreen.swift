@@ -61,17 +61,20 @@ struct ProfileScreen: View {
     @State private var favoriteRecoveryIssue: String?
     @State private var favoriteRecoveryPendingDiscard: QuarantinedCanonicalFavoriteMutation?
     @State private var favoriteSyncState = FavoriteSyncState.idle
-    @State private var favoriteColorLabelStore = FavoriteColorLabelStore()
+    let favoriteColorLabelStore: FavoriteColorLabelStore
     @StateObject private var circlemsLinkViewModel = SignInViewModel()
     let catalogLibrary: CatalogLibrary
 
     @MainActor
     init(
         catalogLibrary: CatalogLibrary = AppData.catalogLibrary,
-        sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox
+        sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox,
+        favoriteColorLabelStore: FavoriteColorLabelStore =
+            AppData.favoriteColorLabelStore
     ) {
         self.catalogLibrary = catalogLibrary
         self.sharedLocationInbox = sharedLocationInbox
+        self.favoriteColorLabelStore = favoriteColorLabelStore
     }
 
     var body: some View {

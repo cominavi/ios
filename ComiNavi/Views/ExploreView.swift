@@ -59,11 +59,14 @@ struct ExploreView<EventDayHeader: View>: View {
     @State private var showsGalleryZoomOnboarding = false
     private let eventDayHeader: EventDayHeader
     private let onboardingStore: FeatureOnboardingStore
+    private let favoriteColorLabelStore: FavoriteColorLabelStore
 
     init(
         dataSource: CirclemsDataSource,
         selectedDay: Binding<Int>,
         onboardingDefaults: UserDefaults = .standard,
+        favoriteColorLabelStore: FavoriteColorLabelStore =
+            AppData.favoriteColorLabelStore,
         @ViewBuilder eventDayHeader: () -> EventDayHeader
     ) {
         _selectedDay = selectedDay
@@ -72,6 +75,7 @@ struct ExploreView<EventDayHeader: View>: View {
             selectedDay: selectedDay.wrappedValue
         ))
         onboardingStore = FeatureOnboardingStore(defaults: onboardingDefaults)
+        self.favoriteColorLabelStore = favoriteColorLabelStore
         self.eventDayHeader = eventDayHeader()
     }
 
@@ -154,7 +158,8 @@ struct ExploreView<EventDayHeader: View>: View {
                     CircleDetailView(
                         circles: circle.circles,
                         dataSource: dataSource,
-                        tags: circle.tags
+                        tags: circle.tags,
+                        favoriteColorLabelStore: favoriteColorLabelStore
                     )
                 }
             }
@@ -195,6 +200,7 @@ struct ExploreView<EventDayHeader: View>: View {
             ExploreGallery(
                 circles: model.visibleCircles,
                 model: model,
+                favoriteColorLabels: favoriteColorLabelStore.customLabels,
                 headerLayoutVersion: galleryHeaderLayoutVersion,
                 onSelect: { selectedCircle = $0 }
             ) {
@@ -205,6 +211,7 @@ struct ExploreView<EventDayHeader: View>: View {
             ExploreList(
                 circles: model.visibleCircles,
                 model: model,
+                favoriteColorLabels: favoriteColorLabelStore.customLabels,
                 onSelect: { selectedCircle = $0 }
             ) {
                 scrollingHeader(horizontalPadding: ExploreLayoutMetrics.horizontalContentInset)
@@ -736,6 +743,7 @@ private struct FilterChip: View {
                         ExploreGallery(
                             circles: visibleCircles,
                             model: model,
+                            favoriteColorLabels: [:],
                             headerLayoutVersion: 0,
                             onSelect: { selectedCircle = $0 }
                         ) {
@@ -745,6 +753,7 @@ private struct FilterChip: View {
                         ExploreList(
                             circles: visibleCircles,
                             model: model,
+                            favoriteColorLabels: [:],
                             onSelect: { selectedCircle = $0 }
                         ) {
                             EmptyView()
@@ -861,6 +870,7 @@ private struct FilterChip: View {
 private struct ExploreGallery<Header: View>: View {
     let circles: [ExploreCircle]
     let model: ExploreModel
+    let favoriteColorLabels: [BookmarkColor: String]
     let headerLayoutVersion: Int
     let onSelect: (ExploreCircle) -> Void
     let header: Header
@@ -869,12 +879,14 @@ private struct ExploreGallery<Header: View>: View {
     init(
         circles: [ExploreCircle],
         model: ExploreModel,
+        favoriteColorLabels: [BookmarkColor: String],
         headerLayoutVersion: Int,
         onSelect: @escaping (ExploreCircle) -> Void,
         @ViewBuilder header: () -> Header
     ) {
         self.circles = circles
         self.model = model
+        self.favoriteColorLabels = favoriteColorLabels
         self.headerLayoutVersion = headerLayoutVersion
         self.onSelect = onSelect
         self.header = header()
@@ -886,6 +898,7 @@ private struct ExploreGallery<Header: View>: View {
         ExploreGalleryCollection(
             circles: circles,
             model: model,
+            favoriteColorLabels: favoriteColorLabels,
             onSelect: { circleID in
                 guard let circle = circles.first(where: { $0.id == circleID }) else { return }
                 onSelect(circle)
@@ -1007,6 +1020,7 @@ enum ExploreGalleryCardDetail: Equatable {
 struct ExploreGalleryCard: View {
     let circle: ExploreCircle
     let model: ExploreModel
+    let favoriteColorLabels: [BookmarkColor: String]
     let artworkPixelSize: ExploreArtworkPixelSize
     var detail: ExploreGalleryCardDetail = .full
 
@@ -1033,10 +1047,18 @@ struct ExploreGalleryCard: View {
                         .truncationMode(.tail)
 
                     if detail == .full {
-                        Text(circle.spaceLabel)
-                            .font(.caption.monospaced().weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        HStack(spacing: 6) {
+                            Text(circle.spaceLabel)
+                                .font(.caption.monospaced().weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .layoutPriority(1)
+
+                            Spacer(minLength: 0)
+
+                            favoriteLabel
+                        }
+                        .frame(minHeight: FavoriteColorLabelMetrics.baseHeight)
                     }
                 }
             }
@@ -1047,15 +1069,34 @@ struct ExploreGalleryCard: View {
     }
 
     private var accessibilityLabel: String {
-        [circle.penName, circle.displayName, circle.spaceLabel]
+        [circle.penName, circle.displayName, circle.spaceLabel, favoriteAccessibilityLabel]
             .compactMap { $0 }
             .joined(separator: ", ")
+    }
+
+    @ViewBuilder
+    private var favoriteLabel: some View {
+        if let bookmark = model.bookmark(for: circle), bookmark.isFavorite {
+            FavoriteColorLabelBadge(
+                color: bookmark.color,
+                label: favoriteColorLabels[bookmark.color]
+            )
+        }
+    }
+
+    private var favoriteAccessibilityLabel: String? {
+        guard let bookmark = model.bookmark(for: circle), bookmark.isFavorite else {
+            return nil
+        }
+        return favoriteColorLabels[bookmark.color]
+            ?? String(localized: bookmark.color.displayName)
     }
 }
 
 private struct ExploreList<Header: View>: View {
     let circles: [ExploreCircle]
     let model: ExploreModel
+    let favoriteColorLabels: [BookmarkColor: String]
     let onSelect: (ExploreCircle) -> Void
     let header: Header
     @State private var lightboxController = ExploreArtworkLightboxController()
@@ -1063,11 +1104,13 @@ private struct ExploreList<Header: View>: View {
     init(
         circles: [ExploreCircle],
         model: ExploreModel,
+        favoriteColorLabels: [BookmarkColor: String],
         onSelect: @escaping (ExploreCircle) -> Void,
         @ViewBuilder header: () -> Header
     ) {
         self.circles = circles
         self.model = model
+        self.favoriteColorLabels = favoriteColorLabels
         self.onSelect = onSelect
         self.header = header()
     }
@@ -1084,7 +1127,11 @@ private struct ExploreList<Header: View>: View {
                         onSelect(circle)
                     } label: {
                         HStack(spacing: 12) {
-                            ExploreCircleRow(circle: circle, model: model)
+                            ExploreCircleRow(
+                                circle: circle,
+                                model: model,
+                                favoriteColorLabels: favoriteColorLabels
+                            )
 
                             LucideIcon("chevron.forward")
                                 .font(.body.weight(.semibold))
@@ -1132,6 +1179,7 @@ private struct ExploreList<Header: View>: View {
 struct ExploreCircleRow: View {
     let circle: ExploreCircle
     let model: ExploreModel
+    let favoriteColorLabels: [BookmarkColor: String]
 
     @ScaledMetric(relativeTo: .body)
     private var artworkWidth = ExploreLayoutMetrics.listArtworkWidth
@@ -1164,10 +1212,23 @@ struct ExploreCircleRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
 
-                Text(circle.spaceLabel)
-                    .font(.caption.monospaced().weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(circle.spaceLabel)
+                        .font(.caption.monospaced().weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+
+                    Spacer(minLength: 0)
+
+                    if let bookmark = model.bookmark(for: circle), bookmark.isFavorite {
+                        FavoriteColorLabelBadge(
+                            color: bookmark.color,
+                            label: favoriteColorLabels[bookmark.color]
+                        )
+                    }
+                }
+                .frame(minHeight: FavoriteColorLabelMetrics.baseHeight)
 
                 if !circle.tags.isEmpty {
                     Text(circle.tags.prefix(3).map { "#\($0)" }.joined(separator: "  "))

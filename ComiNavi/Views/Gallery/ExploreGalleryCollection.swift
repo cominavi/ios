@@ -4,6 +4,7 @@ import UIKit
 struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
     let circles: [ExploreCircle]
     let model: ExploreModel
+    let favoriteColorLabels: [BookmarkColor: String]
     let onSelect: (Int) -> Void
     let onLongPress: (Int) -> Void
     let headerLayoutVersion: Int
@@ -12,6 +13,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
     init(
         circles: [ExploreCircle],
         model: ExploreModel,
+        favoriteColorLabels: [BookmarkColor: String],
         onSelect: @escaping (Int) -> Void,
         onLongPress: @escaping (Int) -> Void,
         headerLayoutVersion: Int,
@@ -19,6 +21,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
     ) {
         self.circles = circles
         self.model = model
+        self.favoriteColorLabels = favoriteColorLabels
         self.onSelect = onSelect
         self.onLongPress = onLongPress
         self.headerLayoutVersion = headerLayoutVersion
@@ -148,6 +151,8 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
 
         func update(parent: ExploreGalleryCollection) {
             let headerLayoutChanged = parent.headerLayoutVersion != self.parent.headerLayoutVersion
+            let favoriteColorLabelsChanged =
+                parent.favoriteColorLabels != self.parent.favoriteColorLabels
             self.parent = parent
             if let collectionView {
                 applyAdaptiveColumnCountIfNeeded(in: collectionView)
@@ -156,6 +161,11 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                     collectionView.collectionViewLayout.invalidateLayout()
                 }
                 refreshVisibleArtworkIfNeeded(in: collectionView)
+                if favoriteColorLabelsChanged {
+                    collectionView.reconfigureItems(
+                        at: collectionView.indexPathsForVisibleItems
+                    )
+                }
             }
             let updatedIDs = parent.circles.map(\.id)
             guard updatedIDs != circleIDs else { return }
@@ -205,6 +215,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                 ExploreGalleryCard(
                     circle: circle,
                     model: parent.model,
+                    favoriteColorLabels: parent.favoriteColorLabels,
                     artworkPixelSize: artworkPixelSize,
                     detail: renderedCardDetail
                 )
@@ -240,7 +251,15 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             let hasLocation = renderedCardDetail == .full
                 && circleIndex(for: indexPath) != nil
             let locationHeight = hasLocation
-                ? 2 + UIFont.preferredFont(forTextStyle: .caption1).lineHeight
+                ? 2 + max(
+                    UIFont.preferredFont(
+                        forTextStyle: .caption1,
+                        compatibleWith: collectionView.traitCollection
+                    ).lineHeight,
+                    FavoriteColorLabelMetrics.height(
+                        compatibleWith: collectionView.traitCollection
+                    )
+                )
                 : 0
             return CGSize(
                 width: width,

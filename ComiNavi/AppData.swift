@@ -23,6 +23,7 @@ enum AppData {
     private static let serviceAuthenticationState =
         serviceAuthenticationSessionStore.loadState()
     static let catalogLibrary = CatalogLibrary()
+    static let favoriteColorLabelStore = FavoriteColorLabelStore()
     static let sharedLocationInbox = SharedLocationInbox()
     static let sharedLocationClipboardImporter = SharedLocationClipboardImporter()
     static let sharedPlanInvitationInbox = SharedPlanInvitationInbox(

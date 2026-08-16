@@ -1,4 +1,5 @@
 import CoreGraphics
+import SwiftUI
 import XCTest
 @testable import ComiNavi
 
@@ -26,6 +27,36 @@ final class CircleFavoriteAppearanceTests: XCTestCase {
     func testMemoOnlyIsNotAFavoriteColor() {
         XCTAssertFalse(BookmarkColor.memoOnly.isFavorite)
         XCTAssertTrue(BookmarkColor.orange.isFavorite)
+    }
+
+    @MainActor
+    func testFavoriteColorLabelBadgeUsesCircleWithoutCustomLabel() throws {
+        let unlabeledSize = try renderedSize(
+            FavoriteColorLabelBadge(color: .blue, label: nil)
+        )
+        let whitespaceSize = try renderedSize(
+            FavoriteColorLabelBadge(color: .blue, label: "   ")
+        )
+
+        XCTAssertEqual(
+            unlabeledSize.width,
+            FavoriteColorLabelMetrics.baseHeight,
+            accuracy: 0.5
+        )
+        XCTAssertEqual(unlabeledSize, whitespaceSize)
+    }
+
+    @MainActor
+    func testFavoriteColorLabelPillMatchesCircleHeightAndExpandsHorizontally() throws {
+        let circleSize = try renderedSize(
+            FavoriteColorLabelBadge(color: .blue, label: nil)
+        )
+        let pillSize = try renderedSize(
+            FavoriteColorLabelBadge(color: .blue, label: "Must visit")
+        )
+
+        XCTAssertEqual(pillSize.height, circleSize.height, accuracy: 0.5)
+        XCTAssertGreaterThan(pillSize.width, circleSize.width)
     }
 
     func testExploreArtworkOnlyOutlinesShinagakiFavorites() {
@@ -64,5 +95,12 @@ final class CircleFavoriteAppearanceTests: XCTestCase {
             ),
             .favorite(.magenta)
         )
+    }
+
+    @MainActor
+    private func renderedSize<Content: View>(_ content: Content) throws -> CGSize {
+        let renderer = ImageRenderer(content: content.fixedSize())
+        renderer.scale = 1
+        return try XCTUnwrap(renderer.uiImage).size
     }
 }
