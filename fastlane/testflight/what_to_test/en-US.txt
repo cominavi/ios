@@ -1,1 +1,1 @@
-Shows custom favorite color labels in Circle Detail, Explore filters, and Shared Plans. Favorite additions, color changes, and removals now appear on the map immediately.
+Fixes a crash that could occur on launch when Shared Plans reopened before the catalog finished loading. Also includes custom favorite color labels and immediate map updates.
