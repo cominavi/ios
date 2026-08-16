@@ -1,1 +1,1 @@
-Shows custom favorite color labels in circle details and Explore, using compact color pills while keeping unlabeled favorites as dots.
+Shows custom favorite color labels in Circle Detail, Explore filters, and Shared Plans. Favorite additions, color changes, and removals now appear on the map immediately.
