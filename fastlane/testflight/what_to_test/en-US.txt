@@ -1,1 +1,1 @@
-Rolls back last night's venue-map rendering changes while retaining the compass, compact map markers, and Saved Only detail fix.
+Shows custom favorite color labels in circle details and Explore, using compact color pills while keeping unlabeled favorites as dots.
