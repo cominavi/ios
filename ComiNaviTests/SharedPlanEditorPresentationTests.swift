@@ -4,6 +4,38 @@ import XCTest
 
 @MainActor
 final class SharedPlanEditorPresentationTests: XCTestCase {
+    func testEditorBodyDoesNotReadCatalogBeforePreparationCompletes() {
+        let missingCatalogURL = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("missing-catalog-\(UUID().uuidString).sqlite")
+        let configuration = CatalogDataSourceConfiguration(
+            eventID: 208,
+            eventNumber: 108,
+            main: CatalogDatabaseConfiguration(
+                digest: "missing-main",
+                origin: .local(missingCatalogURL)
+            ),
+            image: CatalogDatabaseConfiguration(
+                digest: "missing-image",
+                origin: .local(missingCatalogURL)
+            ),
+            allowsBookmarkSync: false
+        )
+        let dataSource = CirclemsDataSource(configuration: configuration)
+        let store = SharedPlanStore(
+            persistence: InMemorySharedPlanPersistence(),
+            actorUserID: { nil }
+        )
+
+        XCTAssertNil(dataSource.comiket)
+
+        let screen = SharedPlanEditorScreen(
+            store: store,
+            planID: Self.planID,
+            catalogDataSource: dataSource
+        )
+        _ = screen.body
+    }
+
     func testProductionGateStartsWritableSyncAndRoutesMutation() async {
         let service = EditorServiceStub(snapshot: makeSnapshot())
         let model = SharedPlanEditorModel(planID: Self.planID)

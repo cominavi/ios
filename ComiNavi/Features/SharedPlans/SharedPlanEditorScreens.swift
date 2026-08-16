@@ -734,7 +734,8 @@ struct SharedPlanEditorScreen: View {
     }
 
     private var favoriteBookmarkTaskID: String {
-        "\(catalogDataSource?.comiket.number ?? 0):\(model.plan?.comiketNo ?? 0)"
+        let isCatalogReady = catalogDataSource?.readiness == .ready
+        return "\(catalogDataSource?.eventID ?? 0):\(isCatalogReady):\(model.plan?.comiketNo ?? 0)"
     }
 
     private var initialCircle: SharedPlanCircleKey? {
@@ -798,8 +799,10 @@ struct SharedPlanEditorScreen: View {
 
     private func observeFavoriteBookmarks() async {
         guard let catalogDataSource,
+              catalogDataSource.readiness == .ready,
+              let catalog = catalogDataSource.comiket,
               let eventNumber = model.plan?.comiketNo,
-              catalogDataSource.comiket.number == eventNumber
+              catalog.number == eventNumber
         else {
             favoriteBookmarksByPublicCircleID = [:]
             return
