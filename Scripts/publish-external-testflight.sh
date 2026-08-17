@@ -7,6 +7,8 @@ repo_root="$(cd "${script_dir}/.." && pwd -P)"
 release_branch="$(git -C "${repo_root}" branch --show-current)"
 source_commit="$(git -C "${repo_root}" rev-parse HEAD)"
 build_directory="${repo_root}/build/fastlane"
+operation_status_path="${build_directory}/operation-status.json"
+operation_id="testflight-$(date -u +%Y%m%dT%H%M%SZ)-${source_commit:0:8}"
 key_path="${ASC_KEY_FILEPATH:-${repo_root}/fastlane/AuthKey_672X4QRBR9.p8}"
 dry_run=0
 
@@ -94,12 +96,33 @@ release_worktree="${temporary_root}/source"
 worktree_added=0
 
 cleanup() {
+  exit_status=$?
+  if [[ "${exit_status}" -ne 0 ]] && \
+    ! jq -e '.state == "failed"' "${operation_status_path}" >/dev/null 2>&1
+  then
+    COMINAVI_OPERATION_ID="${operation_id}" \
+    COMINAVI_OPERATION_STATUS_PATH="${operation_status_path}" \
+      "${repo_root}/Scripts/cominavi-ops" record testflight \
+        --state failed \
+        --stage failed \
+        --message "TestFlight publisher exited before completion." \
+        --error "Exit status ${exit_status}." >/dev/null 2>&1 || true
+  fi
   if [[ "${worktree_added}" == "1" ]]; then
     git -C "${repo_root}" worktree remove --force "${release_worktree}" >/dev/null 2>&1 || true
   fi
   rmdir "${temporary_root}" >/dev/null 2>&1 || true
+  trap - EXIT
+  exit "${exit_status}"
 }
 trap cleanup EXIT
+
+COMINAVI_OPERATION_ID="${operation_id}" \
+COMINAVI_OPERATION_STATUS_PATH="${operation_status_path}" \
+  "${repo_root}/Scripts/cominavi-ops" record testflight \
+    --state running \
+    --stage preparing \
+    --message "Preparing committed source for the external TestFlight release."
 
 git -C "${repo_root}" worktree add --detach "${release_worktree}" "${source_commit}"
 worktree_added=1
@@ -108,5 +131,7 @@ mkdir -p "${build_directory}"
 cd "${release_worktree}"
 ASC_KEY_FILEPATH="${key_path}" \
 COMINAVI_FASTLANE_BUILD_DIRECTORY="${build_directory}" \
+COMINAVI_OPERATION_ID="${operation_id}" \
+COMINAVI_OPERATION_STATUS_PATH="${operation_status_path}" \
 FASTLANE_SKIP_UPDATE_CHECK=1 \
   "${fastlane_command[@]}" ios external_beta "$@"

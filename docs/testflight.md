@@ -44,6 +44,13 @@ Store Connect state:
 FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios asc_check
 ```
 
+The workspace doctor includes this live, read-only API check and verifies the
+local key permissions:
+
+```sh
+Scripts/cominavi-ops doctor
+```
+
 Build a signed archive and IPA without uploading it:
 
 ```sh
@@ -83,6 +90,16 @@ signed archive, IPA, and dSYM remain under `build/fastlane`. Set
 `COMINAVI_ALLOW_NON_MAIN_RELEASE=1` only when intentionally releasing a
 different branch. Lane options such as `group:"Another Group"` can be passed
 after the script name.
+
+The publisher and underlying long-running Fastlane lanes atomically update
+`build/fastlane/operation-status.json`. Inspect or wait for the release through
+the shared operation contract instead of inferring completion from quiet
+Fastlane or App Store Connect output:
+
+```sh
+Scripts/cominavi-ops status testflight
+Scripts/cominavi-ops wait testflight --timeout 7200
+```
 
 The underlying Fastlane lane remains available directly as
 `bundle exec fastlane ios external_beta`.

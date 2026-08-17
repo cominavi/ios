@@ -1,4 +1,5 @@
 require "shellwords"
+require File.expand_path("../Scripts/lib/cominavi_operations", __dir__)
 
 default_platform(:ios)
 
@@ -19,6 +20,45 @@ FASTLANE_BUILD_DIRECTORY = File.expand_path(
 DEFAULT_IPA_PATH = File.join(FASTLANE_BUILD_DIRECTORY, "ComiNavi.ipa")
 TESTFLIGHT_EXTERNAL_GROUP = "External Beta"
 TESTFLIGHT_NOTES_DIRECTORY = File.expand_path("testflight/what_to_test", __dir__)
+
+def testflight_operation_status(state:, stage:, message:, progress: nil, receipt: nil, error: nil)
+  operation_id = ENV["COMINAVI_OPERATION_ID"] ||= begin
+    timestamp = Time.now.utc.strftime("%Y%m%dT%H%M%SZ")
+    "testflight-#{timestamp}-#{SecureRandom.hex(4)}"
+  end
+  status_path = File.expand_path(
+    ENV.fetch(
+      "COMINAVI_OPERATION_STATUS_PATH",
+      File.join(FASTLANE_BUILD_DIRECTORY, "operation-status.json")
+    )
+  )
+  artifacts = {
+    "buildDirectory" => FASTLANE_BUILD_DIRECTORY,
+    "archive" => File.join(FASTLANE_BUILD_DIRECTORY, "ComiNavi-TestFlight.xcarchive"),
+    "ipa" => DEFAULT_IPA_PATH
+  }
+
+  CominaviOperations::StatusRecord.write(
+    path: status_path,
+    operation: "testflight.release",
+    run_id: operation_id,
+    state: state,
+    stage: stage,
+    message: message,
+    progress: progress,
+    artifacts: artifacts,
+    receipt: receipt,
+    error: error
+  )
+end
+
+def begin_testflight_operation(stage:, message:)
+  testflight_operation_status(
+    state: "running",
+    stage: stage,
+    message: message
+  )
+end
 
 def testflight_release_note(locale, override)
   note = override.to_s.strip
@@ -104,6 +144,11 @@ private_lane :asc_api_key do
 end
 
 private_lane :verify_external_testflight_build do |options|
+  testflight_operation_status(
+    state: "running",
+    stage: "verifying",
+    message: "Verifying the external TestFlight assignment and review state."
+  ) if ENV["COMINAVI_OPERATION_ID"]
   asc_api_key
   app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
   UI.user_error!("App Store Connect app not found for #{APP_IDENTIFIER}") unless app
@@ -149,6 +194,17 @@ private_lane :verify_external_testflight_build do |options|
     "Verified #{options.fetch(:app_version)} (#{build.version}) in #{group.name}: " \
     "#{detail.external_build_state}"
   )
+  testflight_operation_status(
+    state: "succeeded",
+    stage: "complete",
+    message: "External TestFlight build is assigned and in an expected review or testing state.",
+    receipt: {
+      "appVersion" => options.fetch(:app_version),
+      "buildNumber" => build.version,
+      "group" => group.name,
+      "externalState" => detail.external_build_state
+    }
+  ) if ENV["COMINAVI_OPERATION_ID"]
 end
 
 platform :ios do
@@ -204,8 +260,12 @@ platform :ios do
 
   desc "Build a signed TestFlight archive and IPA without uploading it"
   lane :build_testflight do |options|
+    begin_testflight_operation(
+      stage: "building",
+      message: "Building the signed TestFlight archive and IPA."
+    )
     authentication_args = xcodebuild_authentication_args
-    build_app(
+    ipa_path = build_app(
       project: PROJECT_PATH,
       scheme: TESTFLIGHT_SCHEME,
       configuration: TESTFLIGHT_CONFIGURATION,
@@ -217,12 +277,25 @@ platform :ios do
       skip_build_archive: options[:skip_build_archive] || false,
       xcargs: authentication_args
     )
+    testflight_operation_status(
+      state: options[:part_of_release] ? "running" : "succeeded",
+      stage: options[:part_of_release] ? "built" : "complete",
+      message: options[:part_of_release] ? "Signed IPA is ready for upload." : "Signed TestFlight archive and IPA are ready."
+    )
+    ipa_path
   end
 
   desc "Upload an existing signed IPA to TestFlight"
   lane :upload_ipa do |options|
     ipa_path = File.expand_path(options[:ipa] || ENV.fetch("IPA_PATH", DEFAULT_IPA_PATH))
     UI.user_error!("Signed IPA not found at #{ipa_path}") unless File.file?(ipa_path)
+
+    begin_testflight_operation(
+      stage: "uploading",
+      message: "Uploading the signed IPA to TestFlight."
+    )
+    app_version = FastlaneCore::IpaFileAnalyser.fetch_app_version(ipa_path)
+    build_number = FastlaneCore::IpaFileAnalyser.fetch_app_build(ipa_path)
 
     upload_to_testflight(
       api_key: asc_api_key,
@@ -232,11 +305,22 @@ platform :ios do
       distribute_external: false,
       skip_waiting_for_build_processing: true
     )
+    testflight_operation_status(
+      state: "succeeded",
+      stage: "submitted",
+      message: "TestFlight accepted the IPA upload; Apple may still be processing it.",
+      receipt: {
+        "appVersion" => app_version,
+        "buildNumber" => build_number,
+        "processing" => "pending"
+      }
+    )
   end
 
   desc "Build and upload the current version to TestFlight"
   lane :beta do |options|
-    ipa_path = build_testflight
+    begin_testflight_operation(stage: "preparing", message: "Preparing an internal TestFlight release.")
+    ipa_path = build_testflight(part_of_release: true)
     upload_ipa(ipa: ipa_path, changelog: options[:changelog])
   end
 
@@ -248,6 +332,11 @@ platform :ios do
     app_version = FastlaneCore::IpaFileAnalyser.fetch_app_version(ipa_path)
     build_number = FastlaneCore::IpaFileAnalyser.fetch_app_build(ipa_path)
     group = external_testflight_group(options)
+
+    begin_testflight_operation(
+      stage: "uploading",
+      message: "Uploading and processing the external TestFlight build."
+    )
 
     upload_to_testflight(
       api_key: asc_api_key,
@@ -271,7 +360,8 @@ platform :ios do
 
   desc "Build, upload, submit, and verify an external TestFlight beta"
   lane :external_beta do |options|
-    ipa_path = build_testflight
+    begin_testflight_operation(stage: "preparing", message: "Preparing an external TestFlight release.")
+    ipa_path = build_testflight(part_of_release: true)
     upload_external_ipa(
       ipa: ipa_path,
       group: options[:group],
@@ -302,6 +392,10 @@ platform :ios do
     UI.user_error!("Set build_number, for example build_number:2026081202") if build_number.empty?
 
     group = external_testflight_group(options)
+    begin_testflight_operation(
+      stage: "processing",
+      message: "Assigning the uploaded build to external TestFlight testing."
+    )
     upload_to_testflight(
       api_key: asc_api_key,
       app_identifier: APP_IDENTIFIER,
@@ -324,10 +418,16 @@ platform :ios do
 
   desc "Build a new binary, replace the current App Review submission, and verify it"
   lane :replace_app_review do |options|
-    ipa_path = build_testflight
+    begin_testflight_operation(stage: "preparing", message: "Preparing a replacement App Review submission.")
+    ipa_path = build_testflight(part_of_release: true)
     app_version = FastlaneCore::IpaFileAnalyser.fetch_app_version(ipa_path)
     build_number = FastlaneCore::IpaFileAnalyser.fetch_app_build(ipa_path)
 
+    testflight_operation_status(
+      state: "running",
+      stage: "submitting",
+      message: "Replacing the current App Review submission."
+    )
     deliver(
       api_key: asc_api_key,
       app_identifier: APP_IDENTIFIER,
@@ -351,6 +451,11 @@ platform :ios do
       Spaceship::ConnectAPI::AppStoreVersion::AppVersionState::IN_REVIEW
     ]
     version = nil
+    testflight_operation_status(
+      state: "running",
+      stage: "verifying",
+      message: "Waiting for App Store Connect to expose the replacement submission."
+    )
     12.times do
       version = app.get_app_store_versions(
         filter: {
@@ -381,6 +486,16 @@ platform :ios do
     UI.success(
       "Verified App Review submission #{app_version} (#{build_number}): " \
       "#{version.app_version_state}"
+    )
+    testflight_operation_status(
+      state: "succeeded",
+      stage: "complete",
+      message: "Replacement App Review submission is verified.",
+      receipt: {
+        "appVersion" => app_version,
+        "buildNumber" => build_number,
+        "appReviewState" => version.app_version_state
+      }
     )
   end
 
@@ -423,5 +538,16 @@ platform :ios do
     options[:api_key] = asc_api_key
 
     deliver(**options)
+  end
+end
+
+error do |lane, exception|
+  if ENV["COMINAVI_OPERATION_ID"]
+    testflight_operation_status(
+      state: "failed",
+      stage: "failed",
+      message: "Fastlane lane #{lane} failed.",
+      error: exception.message
+    )
   end
 end

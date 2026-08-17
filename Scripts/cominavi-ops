@@ -1,0 +1,172 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "optparse"
+require_relative "lib/cominavi_operations"
+
+module CominaviOperations
+  class CLI
+    def initialize(argv, env: ENV, stdout: $stdout, stderr: $stderr)
+      @argv = argv.dup
+      @env = env
+      @stdout = stdout
+      @stderr = stderr
+      @json = false
+    end
+
+    def run
+      command = @argv.shift
+      case command
+      when "doctor"
+        doctor
+      when "status"
+        status
+      when "wait"
+        wait
+      when "record"
+        record
+      else
+        @stderr.puts usage
+        64
+      end
+    rescue OptionParser::ParseError, ArgumentError => error
+      @stderr.puts error.message
+      @stderr.puts usage
+      64
+    end
+
+    private
+
+    def doctor
+      remote = true
+      OptionParser.new do |parser|
+        parser.on("--json") { @json = true }
+        parser.on("--local", "Skip remote account/API checks") { remote = false }
+      end.parse!(@argv)
+      raise OptionParser::InvalidArgument, @argv.join(" ") unless @argv.empty?
+
+      result = Doctor.new(workspace: workspace, remote: remote, env: @env).call
+      render_doctor(result)
+      result["status"] == "fail" ? 1 : 0
+    end
+
+    def status
+      operation = @argv.shift
+      OptionParser.new { |parser| parser.on("--json") { @json = true } }.parse!(@argv)
+      raise OptionParser::MissingArgument, "operation (crawler or testflight)" unless operation
+      raise OptionParser::InvalidArgument, @argv.join(" ") unless @argv.empty?
+
+      result = status_provider(operation).call
+      render_status(result)
+      result["state"] == "failed" ? 1 : 0
+    end
+
+    def wait
+      operation = @argv.shift
+      timeout = 3600
+      interval = 5
+      OptionParser.new do |parser|
+        parser.on("--json") { @json = true }
+        parser.on("--timeout SECONDS", Integer) { |value| timeout = value }
+        parser.on("--interval SECONDS", Float) { |value| interval = value }
+      end.parse!(@argv)
+      raise OptionParser::MissingArgument, "operation (crawler or testflight)" unless operation
+      raise OptionParser::InvalidArgument, "timeout must be non-negative" if timeout.negative?
+      raise OptionParser::InvalidArgument, "interval must be positive" unless interval.positive?
+      raise OptionParser::InvalidArgument, @argv.join(" ") unless @argv.empty?
+
+      result, completed = Waiter.new(
+        status_provider: status_provider(operation),
+        timeout_seconds: timeout,
+        interval_seconds: interval
+      ).call
+      render_status(result)
+      return 124 unless completed
+
+      result["state"] == "failed" ? 1 : 0
+    end
+
+    def record
+      operation = @argv.shift
+      options = {
+        state: nil,
+        stage: nil,
+        run_id: @env["COMINAVI_OPERATION_ID"],
+        message: nil,
+        error: nil
+      }
+      OptionParser.new do |parser|
+        parser.on("--state VALUE") { |value| options[:state] = value }
+        parser.on("--stage VALUE") { |value| options[:stage] = value }
+        parser.on("--run-id VALUE") { |value| options[:run_id] = value }
+        parser.on("--message VALUE") { |value| options[:message] = value }
+        parser.on("--error VALUE") { |value| options[:error] = value }
+      end.parse!(@argv)
+      raise OptionParser::InvalidArgument, @argv.join(" ") unless @argv.empty?
+      raise OptionParser::InvalidArgument, "record only supports testflight" unless operation == "testflight"
+
+      StatusRecord.write(
+        path: workspace.testflight_status_path,
+        operation: "testflight.release",
+        run_id: options.fetch(:run_id),
+        state: options.fetch(:state),
+        stage: options.fetch(:stage),
+        message: options.fetch(:message),
+        error: options[:error]
+      )
+      0
+    end
+
+    def workspace
+      @workspace ||= Workspace.new(ios_root: File.expand_path("..", __dir__), env: @env)
+    end
+
+    def status_provider(operation)
+      case operation
+      when "crawler"
+        CrawlerStatus.new(output_root: workspace.collector_output_root, env: @env)
+      when "testflight"
+        TestFlightStatus.new(path: workspace.testflight_status_path)
+      else
+        raise OptionParser::InvalidArgument, "unknown operation #{operation.inspect}"
+      end
+    end
+
+    def render_status(result)
+      if @json
+        @stdout.puts JSON.pretty_generate(result)
+      else
+        @stdout.puts "#{result['operation']}: #{result['state']} / #{result['stage']}"
+        @stdout.puts result["message"]
+        @stdout.puts "Run: #{result['runId']}"
+        @stdout.puts "Heartbeat: #{result['heartbeatAt'] || 'none'}"
+        @stdout.puts "Error: #{result.dig('error', 'message')}" if result["error"]
+      end
+    end
+
+    def render_doctor(result)
+      if @json
+        @stdout.puts JSON.pretty_generate(result)
+        return
+      end
+
+      result["checks"].each do |check|
+        @stdout.puts "[#{check['status'].upcase}] #{check['name']}: #{check['summary']}"
+        @stdout.puts "  #{check['details']}" if check["details"] && !check["details"].empty?
+      end
+      @stdout.puts "Overall: #{result['status']}"
+    end
+
+    def usage
+      <<~USAGE
+        Usage:
+          Scripts/cominavi-ops doctor [--local] [--json]
+          Scripts/cominavi-ops status <crawler|testflight> [--json]
+          Scripts/cominavi-ops wait <crawler|testflight> [--timeout SECONDS] [--interval SECONDS] [--json]
+      USAGE
+    end
+  end
+end
+
+exit CominaviOperations::CLI.new(ARGV).run

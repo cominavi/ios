@@ -12,6 +12,22 @@ ComiNavi is an iPhone and iPad client for browsing Circle.ms catalog data.
 Swift Package Manager dependencies are resolved automatically from
 `ComiNavi.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`.
 
+## Operations preflight
+
+Before building, publishing, or operating the C108 crawler, run the workspace
+doctor:
+
+```sh
+Scripts/cominavi-ops doctor
+```
+
+It checks repository state, Git metadata access, runtimes and dependencies,
+Xcode/Simulator availability, GitHub, App Store Connect, Cloudflare, and the
+latest crawler state without mutating remote services. Use `--local` to skip
+remote account checks. `status` and `wait` expose a shared machine-readable
+contract for crawler and TestFlight operations; see
+[`docs/operations.md`](docs/operations.md).
+
 ## Run locally
 
 1. Open `ComiNavi.xcodeproj` in Xcode.
