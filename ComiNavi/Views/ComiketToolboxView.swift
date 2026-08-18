@@ -106,7 +106,7 @@ private struct ToolboxReminderSection: View {
                         .background(.secondary.opacity(0.1), in: .capsule)
                 }
 
-                Text("Get a Time Sensitive alert 15 minutes before selected milestones.")
+                Text("Choose when each selected milestone sends a Time Sensitive alert.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -114,29 +114,7 @@ private struct ToolboxReminderSection: View {
             .accessibilityElement(children: .combine)
 
             ForEach(ComiketReminderKind.allCases) { kind in
-                Toggle(
-                    isOn: Binding(
-                        get: { store.isEnabled(kind) },
-                        set: { enabled in
-                            store.setEnabledOptimistically(enabled, for: kind)
-                        }
-                    )
-                ) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(verbatim: kind.timeLabel)
-                            .font(.body.monospacedDigit().weight(.semibold))
-                            .frame(width: 50, alignment: .leading)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(kind.title)
-                                .font(.body)
-                            Text("Both days · 15 min before")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .accessibilityIdentifier("toolbox-reminder-\(kind.rawValue)")
+                ToolboxReminderRow(store: store, kind: kind)
             }
 
             reminderStatus
@@ -178,6 +156,71 @@ private struct ToolboxReminderSection: View {
                 .foregroundStyle(.orange)
             }
         }
+    }
+}
+
+private struct ToolboxReminderRow: View {
+    let store: ComiketReminderStore
+    let kind: ComiketReminderKind
+
+    private var alertTimeText: String {
+        String.localizedStringWithFormat(
+            String(localized: "Both days · Alert at %@"),
+            kind.notificationTimeLabel(for: store.timing(for: kind))
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(verbatim: kind.timeLabel)
+                    .font(.body.monospacedDigit().weight(.semibold))
+                    .frame(width: 50, alignment: .leading)
+
+                Text(kind.title)
+                    .font(.body)
+
+                Spacer()
+
+                Toggle(
+                    kind.title,
+                    isOn: Binding(
+                        get: { store.isEnabled(kind) },
+                        set: { enabled in
+                            store.setEnabledOptimistically(enabled, for: kind)
+                        }
+                    )
+                )
+                .labelsHidden()
+                .accessibilityIdentifier("toolbox-reminder-\(kind.rawValue)")
+            }
+
+            HStack(spacing: 12) {
+                Text(alertTimeText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Picker(
+                    "Notification timing",
+                    selection: Binding(
+                        get: { store.timing(for: kind) },
+                        set: { timing in
+                            store.setTimingOptimistically(timing, for: kind)
+                        }
+                    )
+                ) {
+                    ForEach(ComiketReminderTiming.allCases) { timing in
+                        Text(timing.pickerLabel).tag(timing)
+                    }
+                }
+                .pickerStyle(.menu)
+                .fixedSize()
+                .accessibilityIdentifier("toolbox-reminder-timing-\(kind.rawValue)")
+            }
+        }
+        .padding(.vertical, 2)
     }
 }
 
