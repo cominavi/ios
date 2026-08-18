@@ -1550,6 +1550,194 @@ final class UnifiedBigSightMapTests: XCTestCase {
         withExtendedLifetime(coordinator) {}
     }
 
+    #if DEBUG
+        @MainActor
+        func testPurePanPublishesAndAlignsEverySampleWhileInitializingRotationOnlyOnce() {
+            let renderer = UnifiedBigSightScene(campus: makeGeographicCampus())
+            let host = UnifiedMapHostView(
+                frame: CGRect(x: 0, y: 0, width: 390, height: 844)
+            )
+            let coordinator = UnifiedBigSightMapView.Coordinator()
+            var rotationPublicationCount = 0
+
+            host.layoutIfNeeded()
+            host.mapView.presentScene(renderer)
+            host.mapView.isPaused = true
+            renderer.didFinishUpdate()
+            coordinator.connect(host: host, renderer: renderer)
+            coordinator.updateCallbacks(
+                onSelectVenue: { _ in },
+                onShowCampus: {},
+                onSelectTable: { _, _ in },
+                onSelectLocatedUser: {},
+                onCameraRotationChange: { _ in rotationPublicationCount += 1 },
+                onLocate: { _, _, _, _ in }
+            )
+            renderer.resetDebugCameraWorkCounts()
+            host.resetDebugCameraUpdateCounts()
+
+            let samples = [
+                CGPoint(x: 18, y: 7),
+                CGPoint(x: -11, y: 13),
+                CGPoint(x: 9, y: -16),
+                CGPoint(x: -14, y: -6),
+            ]
+            for (index, translation) in samples.enumerated() {
+                renderer.pan(by: translation, in: host.mapView)
+                renderer.didFinishUpdate()
+
+                let expectedPublicationCount = index + 1
+                XCTAssertEqual(
+                    renderer.debugCameraPublicationCount,
+                    expectedPublicationCount
+                )
+                XCTAssertEqual(host.debugBasemapUpdateCount, expectedPublicationCount)
+                XCTAssertEqual(renderer.debugLevelOfDetailApplicationCount, 0)
+                XCTAssertEqual(rotationPublicationCount, 1)
+                XCTAssertEqual(host.debugCompassUpdateCount, 0)
+                assertCurrentBasemapAlignment(host: host, renderer: renderer)
+            }
+
+            withExtendedLifetime(coordinator) {}
+        }
+
+        @MainActor
+        func testZoomAndRotationSamplesRunOnlyTheirRequiredCameraWork() {
+            let renderer = UnifiedBigSightScene(campus: makeGeographicCampus())
+            let host = UnifiedMapHostView(
+                frame: CGRect(x: 0, y: 0, width: 390, height: 844)
+            )
+            let coordinator = UnifiedBigSightMapView.Coordinator()
+            var rotationPublicationCount = 0
+
+            host.layoutIfNeeded()
+            host.mapView.presentScene(renderer)
+            host.mapView.isPaused = true
+            renderer.didFinishUpdate()
+            coordinator.connect(host: host, renderer: renderer)
+            coordinator.updateCallbacks(
+                onSelectVenue: { _ in },
+                onShowCampus: {},
+                onSelectTable: { _, _ in },
+                onSelectLocatedUser: {},
+                onCameraRotationChange: { _ in rotationPublicationCount += 1 },
+                onLocate: { _, _, _, _ in }
+            )
+
+            renderer.pan(by: CGPoint(x: 12, y: -8), in: host.mapView)
+            renderer.didFinishUpdate()
+            XCTAssertEqual(rotationPublicationCount, 1)
+
+            renderer.resetDebugCameraWorkCounts()
+            host.resetDebugCameraUpdateCounts()
+            rotationPublicationCount = 0
+
+            let pivot = CGPoint(x: host.mapView.bounds.midX, y: host.mapView.bounds.midY)
+            renderer.zoom(by: 2, around: pivot, in: host.mapView)
+            renderer.didFinishUpdate()
+
+            XCTAssertEqual(renderer.debugCameraPublicationCount, 1)
+            XCTAssertEqual(renderer.debugLevelOfDetailApplicationCount, 1)
+            XCTAssertEqual(host.debugBasemapUpdateCount, 1)
+            XCTAssertEqual(host.debugCompassUpdateCount, 0)
+            XCTAssertEqual(rotationPublicationCount, 0)
+            assertCurrentBasemapAlignment(host: host, renderer: renderer)
+
+            renderer.resetDebugCameraWorkCounts()
+            host.resetDebugCameraUpdateCounts()
+            renderer.rotate(by: .pi / 7, around: pivot, in: host.mapView)
+            renderer.didFinishUpdate()
+
+            XCTAssertEqual(renderer.debugCameraPublicationCount, 1)
+            XCTAssertEqual(renderer.debugLevelOfDetailApplicationCount, 1)
+            XCTAssertEqual(host.debugBasemapUpdateCount, 1)
+            XCTAssertEqual(host.debugCompassUpdateCount, 1)
+            XCTAssertEqual(rotationPublicationCount, 1)
+            assertCurrentBasemapAlignment(host: host, renderer: renderer)
+
+            renderer.resetDebugCameraWorkCounts()
+            renderer.updateVisibleMapLayers([.gates])
+            XCTAssertEqual(renderer.debugCameraPublicationCount, 0)
+            XCTAssertEqual(renderer.debugLevelOfDetailApplicationCount, 1)
+
+            withExtendedLifetime(coordinator) {}
+        }
+
+        @MainActor
+        func testGridAlignmentTargetChangeUpdatesCompassWithoutPublishingCameraRotation() {
+            let initialCampus = makeGridAlignedCampus()
+            let renderer = UnifiedBigSightScene(campus: initialCampus)
+            let host = UnifiedMapHostView(
+                frame: CGRect(x: 0, y: 0, width: 390, height: 844)
+            )
+            let coordinator = UnifiedBigSightMapView.Coordinator()
+            var rotationPublicationCount = 0
+
+            host.layoutIfNeeded()
+            host.mapView.presentScene(renderer)
+            host.mapView.isPaused = true
+            renderer.didFinishUpdate()
+            coordinator.connect(host: host, renderer: renderer)
+            coordinator.updateCallbacks(
+                onSelectVenue: { _ in },
+                onShowCampus: {},
+                onSelectTable: { _, _ in },
+                onSelectLocatedUser: {},
+                onCameraRotationChange: { _ in rotationPublicationCount += 1 },
+                onLocate: { _, _, _, _ in }
+            )
+
+            renderer.pan(by: CGPoint(x: 12, y: -8), in: host.mapView)
+            renderer.didFinishUpdate()
+            XCTAssertEqual(rotationPublicationCount, 1)
+            rotationPublicationCount = 0
+
+            let source = initialCampus.venues[0]
+            let rotatedVenue = BigSightVenuePlacement(
+                kind: source.kind,
+                scene: source.scene,
+                coordinate: source.coordinate,
+                center: source.center,
+                rotation: source.scene.layoutRotation,
+                metersPerMapPoint: source.metersPerMapPoint
+            )
+            let updatedCampus = BigSightCampusScene(
+                id: .init(day: 2, mapIDs: [rotatedVenue.id]),
+                venues: [rotatedVenue],
+                connections: initialCampus.connections,
+                bounds: rotatedVenue.bounds.insetBy(dx: -70, dy: -70)
+            )
+            let initialRotation = renderer.cameraRotation
+            let initialGridRotation = renderer.gridAlignedCameraRotation
+            renderer.update(
+                campus: updatedCampus,
+                scope: .campus,
+                selectedMapID: rotatedVenue.id,
+                selectedTableID: nil,
+                circlePlacements: [],
+                circleArtwork: [:],
+                searchMatches: [],
+                searchActive: false,
+                genrePlacements: [],
+                bookmarks: [],
+                locatedUser: nil
+            )
+            XCTAssertEqual(renderer.cameraRotation, initialRotation, accuracy: 0.000_001)
+            XCTAssertNotEqual(renderer.gridAlignedCameraRotation, initialGridRotation)
+
+            renderer.resetDebugCameraWorkCounts()
+            host.resetDebugCameraUpdateCounts()
+            renderer.onCameraChange?()
+
+            XCTAssertEqual(host.debugBasemapUpdateCount, 1)
+            XCTAssertEqual(host.debugCompassUpdateCount, 1)
+            XCTAssertEqual(rotationPublicationCount, 0)
+            XCTAssertTrue(host.compassButton.isGridAligned)
+
+            withExtendedLifetime(coordinator) {}
+        }
+    #endif
+
     @MainActor
     func testC104VenueAndDaySelectionRetainUnifiedCampusScene() async throws {
         let configuration = try await DemoCatalogSource().configuration(for: DemoCatalogSource.c104)
@@ -2339,6 +2527,31 @@ final class UnifiedBigSightMapTests: XCTestCase {
             line: line
         )
     }
+
+    #if DEBUG
+        @MainActor
+        private func assertCurrentBasemapAlignment(
+            host: UnifiedMapHostView,
+            renderer: UnifiedBigSightScene,
+            file: StaticString = #filePath,
+            line: UInt = #line
+        ) {
+            let center = renderer.cameraCampusCenter
+            let radius = renderer.cameraMetersPerPoint * 100
+            let samples = [
+                center,
+                CGPoint(x: center.x - radius, y: center.y),
+                CGPoint(x: center.x + radius, y: center.y),
+                CGPoint(x: center.x, y: center.y - radius),
+                CGPoint(x: center.x, y: center.y + radius),
+            ]
+            for sample in samples {
+                let residual = host.alignmentResidual(at: sample, renderer: renderer)
+                XCTAssertEqual(residual.dx, 0, accuracy: 0.35, file: file, line: line)
+                XCTAssertEqual(residual.dy, 0, accuracy: 0.35, file: file, line: line)
+            }
+        }
+    #endif
 
     @MainActor
     private func assertCameraAlignment(
