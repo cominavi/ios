@@ -131,6 +131,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppPowerPolicy.self) private var powerPolicy
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -150,7 +151,6 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             onLocate: onLocate
         )
         host.mapView.presentScene(renderer)
-        host.mapView.preferredFramesPerSecond = UIScreen.main.maximumFramesPerSecond
         host.mapView.ignoresSiblingOrder = true
         host.mapView.shouldCullNonVisibleNodes = true
         host.mapView.isAsynchronous = true
@@ -174,9 +174,12 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     private func update(host: UnifiedMapHostView, renderer: UnifiedBigSightScene) {
         let appearance = UnifiedMapAppearance(colorScheme)
         host.updateAppearance(appearance)
+        host.mapView.preferredFramesPerSecond = powerPolicy.preferredMapFramesPerSecond(
+            maximum: UIScreen.main.maximumFramesPerSecond
+        )
         renderer.updateAppearance(appearance)
         renderer.onViewportChange = onViewportChange
-        renderer.reduceMotion = reduceMotion
+        renderer.reduceMotion = reduceMotion || powerPolicy.suppressesNonessentialAnimation
         renderer.update(
             campus: campus,
             scope: scope,
@@ -974,7 +977,13 @@ final class UnifiedBigSightScene: SKScene {
     var onViewportChange: ((CatalogMapViewport) -> Void)?
     var onCameraChange: (() -> Void)?
     var onSemanticScopeChange: ((MapScreenModel.Scope, Int?) -> Void)?
-    var reduceMotion = false
+    var reduceMotion = false {
+        didSet {
+            guard reduceMotion, reduceMotion != oldValue else { return }
+            mapCamera.removeAllActions()
+            endGesture()
+        }
+    }
 
     private var campus: BigSightCampusScene
     private var appearance: UnifiedMapAppearance
@@ -1017,6 +1026,7 @@ final class UnifiedBigSightScene: SKScene {
     private var isSearchActive = false
 
     var cameraRotation: CGFloat { mapCamera.zRotation }
+    var hasActiveCameraAnimation: Bool { mapCamera.hasActions() }
     var gridAlignedCameraRotation: CGFloat { campus.gridAlignedCameraRotation }
     var cameraCampusCenter: CGPoint {
         UnifiedMapProjection.campusPoint(fromScene: mapCamera.position)
