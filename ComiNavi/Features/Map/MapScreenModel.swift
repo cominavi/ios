@@ -83,9 +83,7 @@ final class MapScreenModel {
         }
 
         var selectedAddress: ComiketSpaceAddress {
-            guard circles.count == 2,
-                CatalogCirclePairing.sameIdentity(circles[0], circles[1])
-            else {
+            guard CatalogCirclePairing.isCombinedAB(circles) else {
                 return address.selecting(subspace: selectedCircle?.subspace ?? preferredSubspace)
             }
             return ComiketSpaceAddress(

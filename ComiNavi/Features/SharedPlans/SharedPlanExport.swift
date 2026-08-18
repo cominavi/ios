@@ -48,12 +48,18 @@ struct SharedPlanExportCatalogCircle: Equatable, Sendable {
     let venue: String
     let blockName: String
     let spaceNumber: Int?
-    let spaceSide: String
+    let subspace: Int
+    let isCombinedAB: Bool
     let image: SharedPlanExportImage?
 
     var locationCode: String {
         guard let spaceNumber else { return blockName }
-        return "\(blockName)\(String(format: "%02d", spaceNumber))\(spaceSide)"
+        return ComiketSpaceAddress.spaceCode(
+            blockName: blockName,
+            spaceNumber: spaceNumber,
+            subspace: subspace,
+            isCombinedAB: isCombinedAB
+        )
     }
 
     var imageFilename: String {
@@ -78,7 +84,8 @@ struct SharedPlanExportCatalogCircle: Equatable, Sendable {
             venue: "",
             blockName: "",
             spaceNumber: nil,
-            spaceSide: "",
+            subspace: 0,
+            isCombinedAB: false,
             image: nil
         )
     }
@@ -196,7 +203,7 @@ struct SharedPlanExportDocument: Equatable, Sendable {
         if left.spaceNumber != right.spaceNumber {
             return (left.spaceNumber ?? .max) < (right.spaceNumber ?? .max)
         }
-        if left.spaceSide != right.spaceSide { return left.spaceSide < right.spaceSide }
+        if left.subspace != right.subspace { return left.subspace < right.subspace }
         return left.circleName.localizedStandardCompare(right.circleName) == .orderedAscending
     }
 }
@@ -261,21 +268,19 @@ enum SharedPlanExportLoader {
             let dayMetadata = day.flatMap { day in
                 event.days.first { $0.dayIndex == day }
             }
-            let venue = location.flatMap { location in
-                dayMetadata?.halls.first { $0.externalMapId == location.mapID }
-            }
-
             exportCircles[publicCircleID] = SharedPlanExportCatalogCircle(
                 publicCircleID: publicCircleID,
                 circleName: normalized(circle.circleName),
                 penName: optionalNormalized(circle.penName),
                 dayIndex: day,
                 daySymbol: dayMetadata.map(weekdaySymbol) ?? day.map(String.init) ?? "",
-                venue: normalized(venue?.name),
+                venue: ComiketSpaceAddress.compactHallName(
+                    location?.resolvedHallName(in: event) ?? ""
+                ),
                 blockName: blockID.flatMap { blockNames[$0] } ?? "",
                 spaceNumber: spaceNumber,
-                spaceSide: tableKey.map { combinedTables.contains($0) }
-                    == true ? "ab" : (subspace == 1 ? "b" : "a"),
+                subspace: subspace,
+                isCombinedAB: tableKey.map { combinedTables.contains($0) } == true,
                 image: imagesByCatalogID[circle.id].flatMap {
                     SharedPlanExportImage(data: $0)
                 }
@@ -307,22 +312,11 @@ enum SharedPlanExportLoader {
             guard let members = try? await mapCatalog.circles(
                 day: key.day,
                 tableID: key.tableID
-            ), isCombinedCircle(members)
+            ), CatalogCirclePairing.isCombinedAB(members)
             else { continue }
             result.insert(key)
         }
         return result
-    }
-
-    private static func isCombinedCircle(_ circles: [CatalogMapCircle]) -> Bool {
-        guard circles.count == 2,
-              let first = circles.first,
-              !normalized(first.circleName).isEmpty
-        else { return false }
-        return circles.dropFirst().allSatisfy {
-            normalized($0.circleName) == normalized(first.circleName)
-                && normalized($0.penName) == normalized(first.penName)
-        }
     }
 
     private static func weekdaySymbol(_ day: UFDSchema.Day) -> String {
