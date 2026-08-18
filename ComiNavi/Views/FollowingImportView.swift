@@ -608,7 +608,7 @@ private struct FollowingImportedCircleRow: View {
         else { return nil }
         return ComiketSpaceAddress(
             day: location.day,
-            hallName: hall.name,
+            hallName: location.resolvedHallName(in: dataSource.comiket) ?? hall.name,
             blockName: block.name,
             spaceNumber: location.tableID.spaceNumber,
             subspace: importedCircle.isCombinedAB ? nil : location.subspace,

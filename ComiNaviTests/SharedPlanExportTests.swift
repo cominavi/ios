@@ -50,7 +50,7 @@ final class SharedPlanExportTests: XCTestCase {
         XCTAssertEqual(
             csv,
             "Circle Name,Pen Name,Day,Venue,Location code,Item Name,Item Amount,Item Quantity\r\n"
-                + "\"Chericot＊Rozel, Atelier\",\"茉宮\"\"祈芹\",日,東1,ア12ab,\"New, \"\"Book\"\"\",1500,2\r\n"
+                + "\"Chericot＊Rozel, Atelier\",\"茉宮\"\"祈芹\",日,東1,ア12a+b,\"New, \"\"Book\"\"\",1500,2\r\n"
         )
         XCTAssertFalse(csv.contains("Removed circle"))
         XCTAssertEqual(document.purchaseItemCount, 1)
@@ -74,7 +74,7 @@ final class SharedPlanExportTests: XCTestCase {
         )
 
         let csv = String(decoding: document.csvData.dropFirst(3), as: UTF8.self)
-        XCTAssertTrue(csv.hasSuffix("Chericot＊Rozel,茉宮祈芹,日,東1,ア12ab,,,\r\n"))
+        XCTAssertTrue(csv.hasSuffix("Chericot＊Rozel,茉宮祈芹,日,東1,ア12a+b,,,\r\n"))
         XCTAssertEqual(document.purchaseItemCount, 0)
     }
 
@@ -108,10 +108,10 @@ final class SharedPlanExportTests: XCTestCase {
             Set(entries.keys),
             [
                 "sharing-plan.csv",
-                "日東1ア12ab [Chericot＊Rozel (茉宮祈芹)].png",
+                "日東1ア12a+b [Chericot＊Rozel (茉宮祈芹)].png",
             ]
         )
-        XCTAssertEqual(entries["日東1ア12ab [Chericot＊Rozel (茉宮祈芹)].png"], png)
+        XCTAssertEqual(entries["日東1ア12a+b [Chericot＊Rozel (茉宮祈芹)].png"], png)
         XCTAssertEqual(document.imageCount, 1)
         XCTAssertEqual(document.missingImageCount, 0)
     }
@@ -178,7 +178,8 @@ final class SharedPlanExportTests: XCTestCase {
             venue: "東1",
             blockName: "ア",
             spaceNumber: 12,
-            spaceSide: "ab",
+            subspace: 0,
+            isCombinedAB: true,
             image: image
         )
     }

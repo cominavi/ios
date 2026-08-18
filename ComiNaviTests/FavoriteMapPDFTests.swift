@@ -109,8 +109,10 @@ final class FavoriteMapPDFTests: XCTestCase {
                 mapID: 1,
                 tableID: table.id,
                 subspace: index % 2,
+                hallName: "東1",
                 blockName: table.blockName,
                 spaceNumber: table.id.spaceNumber,
+                isCombinedAB: index == 0,
                 circleName: "Circle \(index + 1)",
                 penName: "Creator \(index + 1)",
                 memo: index.isMultiple(of: 4) ? "Bring the new release and say hello." : nil
@@ -121,6 +123,13 @@ final class FavoriteMapPDFTests: XCTestCase {
             eventTitle: "Comic Market 108",
             halls: [FavoriteMapPDFHall(name: "East Hall", scene: scene, circles: circles)]
         )
+    }
+
+    func testLocationLabelIncludesHallAndCombinedABMarker() {
+        let circle = fixtureDocument(circleCount: 1).halls[0].circles[0]
+
+        XCTAssertEqual(circle.locationLabel, "東1ホール A01a+b")
+        XCTAssertEqual(circle.dayAndSpace, "Day 1 · 東1ホール A01a+b")
     }
 
     private func bookmark(

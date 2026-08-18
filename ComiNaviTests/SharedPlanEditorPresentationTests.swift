@@ -898,11 +898,12 @@ final class SharedPlanEditorPresentationTests: XCTestCase {
             hallName: WhereAmIResolver.venueDisplayName(for: "東１"),
             blockName: "Ａ",
             spaceNumber: 1,
-            spaceNumberSub: 0
+            spaceNumberSub: 0,
+            isCombinedAB: true
         )
         XCTAssertEqual(
             exactEastHall.dayAndLocation,
-            String(localized: "Day 1 · East 1 Ａ01a")
+            String(localized: "Day 1 · East 1 Ａ01a+b")
         )
     }
 
