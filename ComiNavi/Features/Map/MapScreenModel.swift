@@ -142,6 +142,23 @@ final class MapScreenModel {
     @ObservationIgnored private var primarySharedPlanTask: Task<Void, Never>?
     @ObservationIgnored private var hasAttemptedInitialBookmarkSync = false
 
+    #if DEBUG
+        var cachedSceneDays: Set<Int> {
+            Set(sceneCache.keys.map(\.day))
+        }
+
+        var retainedSceneDays: Set<Int> {
+            var retained = cachedSceneDays
+            if let scene {
+                retained.insert(scene.id.day)
+            }
+            if let campusScene {
+                retained.insert(campusScene.id.day)
+            }
+            return retained
+        }
+    #endif
+
     var halls: [UFDSchema.DayHall] {
         days.first(where: { $0.dayIndex == selectedDay })?.halls ?? []
     }
@@ -230,16 +247,19 @@ final class MapScreenModel {
                     var scenes: [Int: CatalogMapScene] = [:]
                     var firstError: Error?
                     for hall in halls {
+                        try Task.checkCancellation()
                         let sceneID = CatalogMapScene.ID(day: day, mapID: hall.externalMapId)
                         if let cachedScene = cachedScenes[sceneID] {
                             scenes[hall.externalMapId] = cachedScene
                             continue
                         }
                         do {
-                            scenes[hall.externalMapId] = try await catalog.scene(
+                            let loaded = try await catalog.scene(
                                 day: day,
                                 mapID: hall.externalMapId
                             )
+                            try Task.checkCancellation()
+                            scenes[hall.externalMapId] = loaded
                         } catch is CancellationError {
                             throw CancellationError()
                         } catch {
@@ -264,6 +284,9 @@ final class MapScreenModel {
                     for scene in scenes.values {
                         self.sceneCache[scene.id] = scene
                     }
+                    if self.scene?.id.day != day {
+                        self.scene = nil
+                    }
                     self.campusScene = campus
                     self.phase = .ready
                     if !self.searchQuery.isEmpty {
@@ -282,6 +305,9 @@ final class MapScreenModel {
                     return
                 }
                 self.sceneCache[scene.id] = scene
+                if self.campusScene?.id.day != day {
+                    self.campusScene = nil
+                }
                 self.scene = scene
                 self.phase = .ready
                 if self.showsGenreOverlay {
@@ -301,10 +327,24 @@ final class MapScreenModel {
                 else {
                     return
                 }
-                if self.campusScene != nil || self.scene != nil {
+                if self.scene?.id.day != day {
+                    self.scene = nil
+                }
+                if self.campusScene?.id.day != day {
+                    self.campusScene = nil
+                }
+                let hasCurrentScene = switch scope {
+                case .campus:
+                    self.campusScene?.id.day == day
+                case .venue:
+                    self.scene?.id == CatalogMapScene.ID(day: day, mapID: mapID)
+                }
+                if hasCurrentScene {
                     self.phase = .ready
                     self.sceneError = error.localizedDescription
                 } else {
+                    self.scene = nil
+                    self.campusScene = nil
                     self.phase = .failed(error.localizedDescription)
                 }
             }
@@ -314,6 +354,10 @@ final class MapScreenModel {
     func select(day: Int) {
         guard selectedDay != day else { return }
         selectedDay = day
+        // Full hall artwork is decoded into each scene. Retaining scenes from
+        // prior days can otherwise keep another campus worth of large images
+        // alive after the visible transition has completed.
+        sceneCache = sceneCache.filter { $0.key.day == day }
         selectedMapID = halls.first?.externalMapId ?? selectedMapID
         load()
     }
@@ -323,7 +367,9 @@ final class MapScreenModel {
         scope = .venue
         selectedMapID = mapID
         if let cachedScene = sceneCache[.init(day: selectedDay, mapID: mapID)]
-            ?? campusScene?.venues.first(where: { $0.id == mapID })?.scene
+            ?? campusScene?.venues.first(where: {
+                $0.id == mapID && $0.scene.id.day == selectedDay
+            })?.scene
         {
             activateVenue(cachedScene)
         } else {
@@ -341,7 +387,7 @@ final class MapScreenModel {
         visibleCirclePlacements = []
         visibleCircleArtwork = [:]
         genrePlacements = []
-        if campusScene != nil {
+        if campusScene?.id.day == selectedDay {
             phase = .ready
         } else {
             load()
@@ -362,6 +408,8 @@ final class MapScreenModel {
             }
             do {
                 let loaded = try await catalog.scene(day: day, mapID: hall.externalMapId)
+                try Task.checkCancellation()
+                guard selectedDay == day else { throw CancellationError() }
                 sceneCache[loaded.id] = loaded
                 scenes[hall.externalMapId] = loaded
             } catch is CancellationError {
@@ -572,9 +620,7 @@ final class MapScreenModel {
                 guard self.selection?.id == table.id else { return }
                 self.selection?.imageDataByCircleID.merge(bestImages) { _, best in best }
 
-                let decodedBestImages = await Task.detached(priority: .userInitiated) {
-                    bestImages.compactMapValues(Self.decodeImage)
-                }.value
+                let decodedBestImages = try await Self.decodeImages(bestImages)
                 try Task.checkCancellation()
                 guard self.selection?.id == table.id else { return }
                 let visibleCircleIDs = Set(self.visibleCirclePlacements.map(\.circleID))
@@ -984,9 +1030,7 @@ final class MapScreenModel {
 
                 if !missingIDs.isEmpty {
                     let imageData = try await catalog.circleImages(circleIDs: missingIDs)
-                    let decoded = await Task.detached(priority: .userInitiated) {
-                        imageData.compactMapValues(Self.decodeImage)
-                    }.value
+                    let decoded = try await Self.decodeImages(imageData)
                     try Task.checkCancellation()
 
                     for (circleID, image) in decoded {
@@ -999,6 +1043,7 @@ final class MapScreenModel {
                     }
                 }
 
+                try Task.checkCancellation()
                 guard self.scene?.id == viewport.sceneID else { return }
                 self.visibleCirclePlacements = placements
                 self.visibleCircleArtwork = artwork
@@ -1019,6 +1064,37 @@ final class MapScreenModel {
             [
                 kCGImageSourceShouldCacheImmediately: true
             ] as CFDictionary)
+    }
+
+    nonisolated private static func decodeImages(
+        _ imageData: [Int: Data]
+    ) async throws -> [Int: CGImage] {
+        try await decodeImages(imageData, using: decodeImage)
+    }
+
+    nonisolated static func decodeImages(
+        _ imageData: [Int: Data],
+        using decode: @escaping @Sendable (Data) -> CGImage?
+    ) async throws -> [Int: CGImage] {
+        let worker = Task.detached(priority: .userInitiated) {
+            var decoded: [Int: CGImage] = [:]
+            decoded.reserveCapacity(imageData.count)
+            for (circleID, data) in imageData {
+                try Task.checkCancellation()
+                if let image = autoreleasepool(invoking: { decode(data) }) {
+                    decoded[circleID] = image
+                }
+            }
+            try Task.checkCancellation()
+            return decoded
+        }
+        let decoded = try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
+        try Task.checkCancellation()
+        return decoded
     }
 
     #if DEBUG

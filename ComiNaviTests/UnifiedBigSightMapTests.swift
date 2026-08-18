@@ -1514,12 +1514,10 @@ final class UnifiedBigSightMapTests: XCTestCase {
     func testAnimatedCameraKeepsBasemapRegisteredOnEverySample() async throws {
         let renderer = UnifiedBigSightScene(campus: makeGeographicCampus())
         let host = UnifiedMapHostView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let coordinator = UnifiedBigSightMapView.Coordinator()
         host.layoutIfNeeded()
+        coordinator.connect(host: host, renderer: renderer)
         host.mapView.presentScene(renderer)
-        renderer.onCameraChange = { [weak host, weak renderer] in
-            guard let host, let renderer else { return }
-            host.updateBasemap(camera: renderer.basemapCamera)
-        }
         try await Task.sleep(for: .milliseconds(40))
         host.updateBasemap(camera: renderer.basemapCamera)
 
@@ -1549,6 +1547,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
             0.75,
             "MapLibre used a stale camera during SpriteKit interpolation"
         )
+        withExtendedLifetime(coordinator) {}
     }
 
     @MainActor
@@ -1574,6 +1573,8 @@ final class UnifiedBigSightMapTests: XCTestCase {
         model.load()
         try await waitUntilReady(model)
         let campus = try XCTUnwrap(model.campusScene)
+        XCTAssertEqual(model.cachedSceneDays, [1])
+        XCTAssertEqual(model.retainedSceneDays, [1])
         let venue = try XCTUnwrap(campus.venues.first)
         XCTAssertGreaterThan(venue.scene.tables.count, 1_000)
         XCTAssertEqual(campus.venues.count, 4)
@@ -1655,6 +1656,8 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
         try await waitUntilReady(model)
         XCTAssertEqual(model.campusScene?.id.day, 2)
+        XCTAssertEqual(model.cachedSceneDays, [2])
+        XCTAssertEqual(model.retainedSceneDays, [2])
 
         let dayTwoCampus = try XCTUnwrap(model.campusScene)
         model.select(day: 1)
@@ -1668,6 +1671,190 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
         try await waitUntilReady(model)
         XCTAssertEqual(model.campusScene?.id.day, 1)
+        XCTAssertEqual(model.cachedSceneDays, [1])
+        XCTAssertEqual(model.retainedSceneDays, [1])
+    }
+
+    @MainActor
+    func testCancelledArtworkBatchStopsDecodingSupersededImages() async throws {
+        let image = try XCTUnwrap(makeImage(width: 1, height: 1))
+        let counter = MapArtworkDecodeCounter(image: image)
+        let imageData = Dictionary(
+            uniqueKeysWithValues: (0..<200).map { index -> (Int, Data) in
+                (index, Data([UInt8(index & 0xFF)]))
+            }
+        )
+        let task = Task {
+            try await MapScreenModel.decodeImages(imageData) { data in
+                counter.decode(data)
+            }
+        }
+
+        try await waitUntil { counter.count >= 3 }
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("A superseded artwork batch should be cancelled")
+        } catch is CancellationError {}
+        XCTAssertLessThan(counter.count, imageData.count)
+    }
+
+    @MainActor
+    func testSceneCacheRetainsOnlyTheSelectedDay() async throws {
+        let model = makeTwoDayMapModel()
+
+        model.load()
+        try await waitUntilReady(model)
+        XCTAssertEqual(model.cachedSceneDays, [1])
+        XCTAssertEqual(model.retainedSceneDays, [1])
+
+        model.select(day: 2)
+        XCTAssertTrue(model.cachedSceneDays.isEmpty)
+        XCTAssertEqual(
+            model.retainedSceneDays,
+            [1],
+            "Only the visible transition scene should retain the previous day while loading"
+        )
+        try await waitUntilReady(model)
+        XCTAssertEqual(model.cachedSceneDays, [2])
+        XCTAssertEqual(model.retainedSceneDays, [2])
+    }
+
+    @MainActor
+    func testVenueDaySwitchCannotReuseThePreviousDayCampus() async throws {
+        let model = makeTwoDayMapModel()
+
+        model.load()
+        try await waitUntilReady(model)
+        model.select(mapID: 101)
+        XCTAssertEqual(model.scene?.id.day, 1)
+
+        model.select(day: 2)
+        try await waitUntilReady(model)
+        XCTAssertEqual(model.scene?.id.day, 2)
+        XCTAssertEqual(model.retainedSceneDays, [2])
+
+        model.showCampus()
+        try await waitUntilReady(model)
+        XCTAssertEqual(model.campusScene?.id.day, 2)
+        XCTAssertEqual(model.retainedSceneDays, [2])
+    }
+
+    @MainActor
+    func testFailedDaySwitchDoesNotExposeThePreviousDayAsReady() async throws {
+        for initialScope in [MapScreenModel.Scope.campus, .venue] {
+            let model = makeTwoDayMapModel(
+                initialScope: initialScope,
+                catalog: FailingDayMapCatalog(failingDay: 2)
+            )
+            model.load()
+            try await waitUntilReady(model)
+
+            model.select(day: 2)
+            try await waitUntil { model.phase != .loading }
+
+            guard case .failed = model.phase else {
+                XCTFail("A failed day switch must not make the previous day interactive")
+                continue
+            }
+            XCTAssertTrue(model.retainedSceneDays.isEmpty)
+        }
+    }
+
+    @MainActor
+    func testFailedSameDayVenueSwitchExposesRetryAndRetriesTheRequestedVenue() async throws {
+        let catalog = SelectivelyFailingMapCatalog(failingMapIDs: [102])
+        let model = makeTwoDayMapModel(initialScope: .venue, catalog: catalog)
+        model.load()
+        try await waitUntilReady(model)
+
+        model.select(mapID: 102)
+        try await waitUntil { model.phase != .loading }
+
+        guard case .failed = model.phase else {
+            return XCTFail("The requested venue failure should remain visible")
+        }
+        XCTAssertNil(model.scene)
+        XCTAssertNil(model.campusScene)
+        let initialRequestCount = await catalog.requestCount(day: 1, mapID: 102)
+        XCTAssertEqual(initialRequestCount, 1)
+
+        model.load()
+        try await waitUntil { model.phase != .loading }
+        let retriedRequestCount = await catalog.requestCount(day: 1, mapID: 102)
+        XCTAssertEqual(retriedRequestCount, 2)
+    }
+
+    @MainActor
+    func testFailedSameDayCampusSwitchExposesRetryAndRetriesCampusLoading() async throws {
+        let catalog = SelectivelyFailingMapCatalog(failingMapIDs: [101, 102, 103, 104])
+        let model = makeTwoDayMapModel(
+            initialScope: .venue,
+            selectedMapID: 1,
+            catalog: catalog
+        )
+        model.load()
+        try await waitUntilReady(model)
+
+        model.showCampus()
+        try await waitUntil { model.phase != .loading }
+
+        guard case .failed = model.phase else {
+            return XCTFail("The campus failure should replace the standalone venue")
+        }
+        XCTAssertNil(model.scene)
+        XCTAssertNil(model.campusScene)
+        let initialRequestCount = await catalog.requestCount(day: 1, mapID: 101)
+        XCTAssertEqual(initialRequestCount, 1)
+
+        model.load()
+        try await waitUntil { model.phase != .loading }
+        let retriedRequestCount = await catalog.requestCount(day: 1, mapID: 101)
+        XCTAssertEqual(retriedRequestCount, 2)
+    }
+
+    @MainActor
+    func testWhereAmIVenuesCannotReinsertAPreviousDayScene() async throws {
+        let catalog = PausableMapCatalog()
+        let model = makeTwoDayMapModel(initialScope: .venue, catalog: catalog)
+        model.load()
+        try await waitUntilReady(model)
+        await catalog.pauseNextScene(day: 1, mapID: 102)
+
+        let venues = Task { try await model.whereAmIVenues() }
+        await catalog.waitUntilSceneIsPaused()
+        model.select(day: 2)
+        await catalog.resumePausedScene()
+
+        do {
+            _ = try await venues.value
+            XCTFail("A previous-day venue lookup should be cancelled")
+        } catch is CancellationError {}
+        try await waitUntilReady(model)
+        XCTAssertEqual(model.retainedSceneDays, [2])
+    }
+
+    @MainActor
+    func testDaySwitchStopsLoadingRemainingSupersededCampusHalls() async throws {
+        let catalog = PausableMapCatalog()
+        let model = makeTwoDayMapModel(catalog: catalog)
+        await catalog.pauseNextScene(day: 1, mapID: 101)
+
+        model.load()
+        await catalog.waitUntilSceneIsPaused()
+        model.select(day: 2)
+        await catalog.resumePausedScene()
+
+        try await waitUntilReady(model)
+        let requestedOldDayMapIDs = await catalog.requestedMapIDs(day: 1)
+        XCTAssertEqual(
+            requestedOldDayMapIDs,
+            [101],
+            "Cancelling a campus load should prevent the remaining old-day halls from loading"
+        )
+        XCTAssertEqual(model.campusScene?.id.day, 2)
+        XCTAssertEqual(model.retainedSceneDays, [2])
     }
 
     @MainActor
@@ -1961,6 +2148,45 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
+    private func makeTwoDayMapModel(
+        initialScope: MapScreenModel.Scope = .campus,
+        selectedMapID: Int? = nil,
+        catalog: any MapCatalog = FixtureMapCatalog()
+    ) -> MapScreenModel {
+        func hall(id: Int, name: String, mapName: String) -> UFDSchema.DayHall {
+            UFDSchema.DayHall(
+                id: "two-day-hall-\(id)",
+                name: name,
+                mapName: mapName,
+                externalMapId: id,
+                externalCorrespondingFloorId: 1,
+                areas: []
+            )
+        }
+        let halls = [
+            hall(id: 101, name: "東123", mapName: "E123"),
+            hall(id: 102, name: "東7", mapName: "E7"),
+            hall(id: 103, name: "西12", mapName: "W12"),
+            hall(id: 104, name: "南12", mapName: "S12"),
+        ]
+        return MapScreenModel(
+            days: [1, 2].map { day in
+                UFDSchema.Day(
+                    id: "two-day-fixture-\(day)",
+                    dayIndex: day,
+                    date: DateComponents(year: 2026, month: 8, day: 14 + day),
+                    halls: halls
+                )
+            },
+            eventNumber: 108,
+            selectedMapID: selectedMapID,
+            initialScope: initialScope,
+            catalog: catalog,
+            userPlanStore: InMemoryUserPlanStore()
+        )
+    }
+
+    @MainActor
     private func waitUntilReady(
         _ model: MapScreenModel,
         timeout: Duration = .seconds(10)
@@ -2136,5 +2362,193 @@ final class UnifiedBigSightMapTests: XCTestCase {
             XCTAssertEqual(residual.dx, 0, accuracy: 0.35, file: file, line: line)
             XCTAssertEqual(residual.dy, 0, accuracy: 0.35, file: file, line: line)
         }
+    }
+}
+
+private struct FailingDayMapCatalog: MapCatalog {
+    private let base = FixtureMapCatalog()
+    let failingDay: Int
+
+    func scene(day: Int, mapID: Int) async throws -> CatalogMapScene {
+        guard day != failingDay else { throw MapCatalogError.missingMap(mapID) }
+        return try await base.scene(day: day, mapID: mapID)
+    }
+
+    func circles(day: Int, tableID: CatalogMapTable.ID) async throws -> [CatalogMapCircle] {
+        try await base.circles(day: day, tableID: tableID)
+    }
+
+    func circlePlacements(in viewport: CatalogMapViewport) async throws
+        -> [CatalogMapCirclePlacement]
+    {
+        try await base.circlePlacements(in: viewport)
+    }
+
+    func circleImages(circleIDs: [Int]) async throws -> [Int: Data] {
+        try await base.circleImages(circleIDs: circleIDs)
+    }
+
+    func search(day: Int, query: String) async throws -> [CatalogMapSearchMatch] {
+        try await base.search(day: day, query: query)
+    }
+
+    func genrePlacements(day: Int, mapID: Int) async throws -> [CatalogMapGenrePlacement] {
+        try await base.genrePlacements(day: day, mapID: mapID)
+    }
+
+    func bookmarkLocations(updateIDs: [Int]) async throws -> [CatalogBookmarkLocation] {
+        try await base.bookmarkLocations(updateIDs: updateIDs)
+    }
+
+    func bookmarkLocations(publicCircleIDs: [Int]) async throws -> [CatalogBookmarkLocation] {
+        try await base.bookmarkLocations(publicCircleIDs: publicCircleIDs)
+    }
+}
+
+private actor SelectivelyFailingMapCatalog: MapCatalog {
+    private let base = FixtureMapCatalog()
+    private let failingMapIDs: Set<Int>
+    private var sceneRequestCounts: [CatalogMapScene.ID: Int] = [:]
+
+    init(failingMapIDs: Set<Int>) {
+        self.failingMapIDs = failingMapIDs
+    }
+
+    func requestCount(day: Int, mapID: Int) -> Int {
+        sceneRequestCounts[.init(day: day, mapID: mapID), default: 0]
+    }
+
+    func scene(day: Int, mapID: Int) async throws -> CatalogMapScene {
+        sceneRequestCounts[.init(day: day, mapID: mapID), default: 0] += 1
+        guard !failingMapIDs.contains(mapID) else {
+            throw MapCatalogError.missingMap(mapID)
+        }
+        return try await base.scene(day: day, mapID: mapID)
+    }
+
+    func circles(day: Int, tableID: CatalogMapTable.ID) async throws -> [CatalogMapCircle] {
+        try await base.circles(day: day, tableID: tableID)
+    }
+
+    func circlePlacements(in viewport: CatalogMapViewport) async throws
+        -> [CatalogMapCirclePlacement]
+    {
+        try await base.circlePlacements(in: viewport)
+    }
+
+    func circleImages(circleIDs: [Int]) async throws -> [Int: Data] {
+        try await base.circleImages(circleIDs: circleIDs)
+    }
+
+    func search(day: Int, query: String) async throws -> [CatalogMapSearchMatch] {
+        try await base.search(day: day, query: query)
+    }
+
+    func genrePlacements(day: Int, mapID: Int) async throws -> [CatalogMapGenrePlacement] {
+        try await base.genrePlacements(day: day, mapID: mapID)
+    }
+
+    func bookmarkLocations(updateIDs: [Int]) async throws -> [CatalogBookmarkLocation] {
+        try await base.bookmarkLocations(updateIDs: updateIDs)
+    }
+
+    func bookmarkLocations(publicCircleIDs: [Int]) async throws -> [CatalogBookmarkLocation] {
+        try await base.bookmarkLocations(publicCircleIDs: publicCircleIDs)
+    }
+}
+
+private actor PausableMapCatalog: MapCatalog {
+    private let base = FixtureMapCatalog()
+    private var pauseTarget: (day: Int, mapID: Int)?
+    private var isScenePaused = false
+    private var sceneContinuation: CheckedContinuation<Void, Never>?
+    private var pauseWaiters: [CheckedContinuation<Void, Never>] = []
+    private var sceneRequests: [(day: Int, mapID: Int)] = []
+
+    func pauseNextScene(day: Int, mapID: Int) {
+        pauseTarget = (day, mapID)
+    }
+
+    func waitUntilSceneIsPaused() async {
+        guard !isScenePaused else { return }
+        await withCheckedContinuation { continuation in
+            pauseWaiters.append(continuation)
+        }
+    }
+
+    func resumePausedScene() {
+        sceneContinuation?.resume()
+        sceneContinuation = nil
+    }
+
+    func requestedMapIDs(day: Int) -> [Int] {
+        sceneRequests.compactMap { request in
+            request.day == day ? request.mapID : nil
+        }
+    }
+
+    func scene(day: Int, mapID: Int) async throws -> CatalogMapScene {
+        sceneRequests.append((day, mapID))
+        if pauseTarget?.day == day, pauseTarget?.mapID == mapID {
+            pauseTarget = nil
+            isScenePaused = true
+            pauseWaiters.forEach { $0.resume() }
+            pauseWaiters.removeAll()
+            await withCheckedContinuation { continuation in
+                sceneContinuation = continuation
+            }
+            isScenePaused = false
+        }
+        return try await base.scene(day: day, mapID: mapID)
+    }
+
+    func circles(day: Int, tableID: CatalogMapTable.ID) async throws -> [CatalogMapCircle] {
+        try await base.circles(day: day, tableID: tableID)
+    }
+
+    func circlePlacements(in viewport: CatalogMapViewport) async throws
+        -> [CatalogMapCirclePlacement]
+    {
+        try await base.circlePlacements(in: viewport)
+    }
+
+    func circleImages(circleIDs: [Int]) async throws -> [Int: Data] {
+        try await base.circleImages(circleIDs: circleIDs)
+    }
+
+    func search(day: Int, query: String) async throws -> [CatalogMapSearchMatch] {
+        try await base.search(day: day, query: query)
+    }
+
+    func genrePlacements(day: Int, mapID: Int) async throws -> [CatalogMapGenrePlacement] {
+        try await base.genrePlacements(day: day, mapID: mapID)
+    }
+
+    func bookmarkLocations(updateIDs: [Int]) async throws -> [CatalogBookmarkLocation] {
+        try await base.bookmarkLocations(updateIDs: updateIDs)
+    }
+
+    func bookmarkLocations(publicCircleIDs: [Int]) async throws -> [CatalogBookmarkLocation] {
+        try await base.bookmarkLocations(publicCircleIDs: publicCircleIDs)
+    }
+}
+
+private final class MapArtworkDecodeCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private let image: CGImage
+    private var decodedCount = 0
+
+    init(image: CGImage) {
+        self.image = image
+    }
+
+    var count: Int {
+        lock.withLock { decodedCount }
+    }
+
+    func decode(_ data: Data) -> CGImage? {
+        lock.withLock { decodedCount += 1 }
+        Thread.sleep(forTimeInterval: 0.002)
+        return image
     }
 }
