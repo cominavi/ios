@@ -49,6 +49,85 @@ final class MapCameraMathTests: XCTestCase {
         XCTAssertEqual(projected.y, target.y, accuracy: 0.000_001)
     }
 
+    func testSpriteKitViewTransformAccountsForCameraScaleAndRotation() {
+        let viewportSize = CGSize(width: 390, height: 844)
+        let cameraPosition = CGPoint(x: 1_240, y: -830)
+        let cameraScale: CGFloat = 0.38
+        let cameraRotation = CGFloat.pi / 5
+        let scenePoint = CGPoint(x: 1_360, y: -710)
+        let projected = scenePoint.applying(
+            MapCameraMath.spriteKitViewTransform(
+                viewportSize: viewportSize,
+                cameraPosition: cameraPosition,
+                cameraScale: cameraScale,
+                cameraRotation: cameraRotation
+            )
+        )
+        let recoveredCameraPosition = MapCameraMath.spriteKitCameraPosition(
+            focusing: scenePoint,
+            at: projected,
+            viewportSize: viewportSize,
+            cameraScale: cameraScale,
+            cameraRotation: cameraRotation
+        )
+
+        XCTAssertEqual(recoveredCameraPosition.x, cameraPosition.x, accuracy: 0.000_001)
+        XCTAssertEqual(recoveredCameraPosition.y, cameraPosition.y, accuracy: 0.000_001)
+    }
+
+    func testZoomOutFactorLeavesAnAlreadyVisibleLocationUnchanged() {
+        XCTAssertEqual(
+            MapCameraMath.zoomOutFactorToReveal(
+                location: CGPoint(x: 120, y: 180),
+                renderedBy: .identity,
+                viewportSize: CGSize(width: 390, height: 844),
+                bottomInset: 430,
+                padding: 28
+            ),
+            1
+        )
+    }
+
+    func testZoomOutFactorRevealsARotatedLocationAboveTheSheet() {
+        let viewportSize = CGSize(width: 390, height: 844)
+        let bottomInset: CGFloat = 430
+        let padding: CGFloat = 28
+        let anchor = MapCameraMath.visibleViewportCenter(
+            viewportSize: viewportSize,
+            bottomInset: bottomInset
+        )
+        // A quarter-turn sends this location below the visible viewport.
+        let transform = CGAffineTransform(
+            a: 0,
+            b: 3,
+            c: -3,
+            d: 0,
+            tx: anchor.x,
+            ty: anchor.y
+        )
+        let location = CGPoint(x: 100, y: 0)
+        let rendered = location.applying(transform)
+        let factor = MapCameraMath.zoomOutFactorToReveal(
+            location: location,
+            renderedBy: transform,
+            viewportSize: viewportSize,
+            bottomInset: bottomInset,
+            padding: padding
+        )
+        let revealed = CGPoint(
+            x: anchor.x + (rendered.x - anchor.x) * factor,
+            y: anchor.y + (rendered.y - anchor.y) * factor
+        )
+
+        XCTAssertLessThan(factor, 1)
+        XCTAssertEqual(
+            revealed.y,
+            viewportSize.height - bottomInset - padding,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(revealed.x, anchor.x, accuracy: 0.000_001)
+    }
+
     func testNorthIndicatorUsesTheRenderedMapDirection() {
         for rotation in [CGFloat.pi / 3, -CGFloat.pi / 4] {
             let mapNorth = CGPoint(x: 0, y: -1).applying(

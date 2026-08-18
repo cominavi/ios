@@ -724,7 +724,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
-    func testGuidedLocationGetsPersistentPuckAndCloseCameraFocus() async throws {
+    func testVisibleGuidedLocationKeepsTheExistingCamera() async throws {
         let campus = makeSingleVenueCampus()
         let venue = try XCTUnwrap(campus.venues.first)
         let table = try XCTUnwrap(venue.scene.tables.first)
@@ -733,6 +733,24 @@ final class UnifiedBigSightMapTests: XCTestCase {
         let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         view.presentScene(renderer)
         try await Task.sleep(for: .milliseconds(30))
+        renderer.update(
+            campus: campus,
+            scope: .venue,
+            selectedMapID: venue.id,
+            selectedTableID: nil,
+            circlePlacements: [],
+            circleArtwork: [:],
+            searchMatches: [],
+            searchActive: false,
+            genrePlacements: [],
+            bookmarks: [],
+            locatedUser: nil
+        )
+        renderer.didFinishUpdate()
+        let cameraBeforeLocation = renderer.basemapCamera
+        let centerBeforeLocation = renderer.cameraCampusCenter
+        let scaleBeforeLocation = renderer.cameraMetersPerPoint
+        let rotationBeforeLocation = renderer.cameraRotation
         let user = WhereAmIResolver.locatedUser(
             at: table,
             in: WhereAmIVenueOption(displayName: "Test Hall", placement: venue),
@@ -765,17 +783,80 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
         XCTAssertEqual(renderer.userMarkerCount, 1)
         XCTAssertEqual(renderer.userHeadingIndicatorCount, 1)
-        XCTAssertGreaterThanOrEqual(renderer.zoomFactor, 50)
-        let userOnScreen = renderer.viewPoint(
-            forCampus: user.point.applying(venue.transform),
-            in: view
-        )
-        XCTAssertEqual(userOnScreen.x, view.bounds.midX, accuracy: 0.5)
-        XCTAssertEqual(userOnScreen.y, view.bounds.midY, accuracy: 0.5)
+        XCTAssertEqual(renderer.basemapCamera, cameraBeforeLocation)
+        XCTAssertEqual(renderer.cameraCampusCenter.x, centerBeforeLocation.x, accuracy: 0.000_001)
+        XCTAssertEqual(renderer.cameraCampusCenter.y, centerBeforeLocation.y, accuracy: 0.000_001)
+        XCTAssertEqual(renderer.cameraMetersPerPoint, scaleBeforeLocation, accuracy: 0.000_001)
+        XCTAssertEqual(renderer.cameraRotation, rotationBeforeLocation, accuracy: 0.000_001)
         let markerPoint = try XCTUnwrap(renderer.userMarkerViewPoint(in: view))
         guard case .userLocation = renderer.hit(at: markerPoint, in: view) else {
             return XCTFail("The current-location marker should win map hit testing")
         }
+    }
+
+    @MainActor
+    func testOffscreenLocationOnlyZoomsOutAndPreservesRotation() async throws {
+        let campus = makeSingleVenueCampus()
+        let venue = try XCTUnwrap(campus.venues.first)
+        let table = try XCTUnwrap(venue.scene.tables.first)
+        let renderer = UnifiedBigSightScene(campus: campus)
+        renderer.reduceMotion = true
+        let view = SKView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        view.presentScene(renderer)
+        try await Task.sleep(for: .milliseconds(30))
+
+        renderer.update(
+            campus: campus,
+            scope: .venue,
+            selectedMapID: venue.id,
+            selectedTableID: nil,
+            circlePlacements: [],
+            circleArtwork: [:],
+            searchMatches: [],
+            searchActive: false,
+            genrePlacements: [],
+            bookmarks: [],
+            locatedUser: nil
+        )
+        renderer.didFinishUpdate()
+
+        let bottomInset: CGFloat = 430
+        let visibleCenter = MapCameraMath.visibleViewportCenter(
+            viewportSize: view.bounds.size,
+            bottomInset: bottomInset
+        )
+        renderer.rotate(by: .pi / 5, around: visibleCenter, in: view)
+        renderer.zoom(by: 8, around: visibleCenter, in: view)
+        let user = WhereAmIResolver.locatedUser(
+            at: table,
+            in: WhereAmIVenueOption(displayName: "Test Hall", placement: venue),
+            subspace: nil,
+            point: CGPoint(
+                x: venue.scene.size.width / 2,
+                y: venue.scene.size.height / 2
+            ),
+            headingDegrees: 72,
+            locationReading: nil,
+            placedAt: Date(timeIntervalSince1970: 100)
+        )
+        let campusPoint = user.point.applying(venue.transform)
+        let markerPadding = MapCameraMath.locationMarkerViewportPadding
+        let safeRect = CGRect(
+            x: markerPadding,
+            y: markerPadding,
+            width: view.bounds.width - markerPadding * 2,
+            height: view.bounds.height - bottomInset - markerPadding * 2
+        )
+        for _ in 0..<6
+        where safeRect.contains(renderer.viewPoint(forCampus: campusPoint, in: view)) {
+            renderer.pan(by: CGPoint(x: 120, y: 120), in: view)
+        }
+        let locationBeforeFocus = renderer.viewPoint(forCampus: campusPoint, in: view)
+        XCTAssertFalse(safeRect.contains(locationBeforeFocus))
+
+        let anchoredScenePointBefore = renderer.convertPoint(fromView: visibleCenter)
+        let scaleBeforeFocus = renderer.cameraMetersPerPoint
+        let rotationBeforeFocus = renderer.cameraRotation
 
         renderer.update(
             campus: campus,
@@ -789,21 +870,29 @@ final class UnifiedBigSightMapTests: XCTestCase {
             genrePlacements: [],
             bookmarks: [],
             locatedUser: user,
-            locationFocusBottomInset: 430
+            locationFocusBottomInset: bottomInset
         )
-        try await Task.sleep(for: .milliseconds(30))
         renderer.didFinishUpdate()
 
-        let userAboveSheet = renderer.viewPoint(
-            forCampus: user.point.applying(venue.transform),
-            in: view
-        )
-        XCTAssertEqual(userAboveSheet.x, view.bounds.midX, accuracy: 0.5)
+        let locationAfterFocus = renderer.viewPoint(forCampus: campusPoint, in: view)
+        let anchoredScenePointAfter = renderer.convertPoint(fromView: visibleCenter)
+        XCTAssertTrue(safeRect.insetBy(dx: -0.5, dy: -0.5).contains(locationAfterFocus))
+        XCTAssertGreaterThan(renderer.cameraMetersPerPoint, scaleBeforeFocus)
+        XCTAssertEqual(renderer.cameraRotation, rotationBeforeFocus, accuracy: 0.000_001)
         XCTAssertEqual(
-            userAboveSheet.y,
-            (view.bounds.height - 430) / 2,
-            accuracy: 0.5
+            anchoredScenePointAfter.x,
+            anchoredScenePointBefore.x,
+            accuracy: 0.001
         )
+        XCTAssertEqual(
+            anchoredScenePointAfter.y,
+            anchoredScenePointBefore.y,
+            accuracy: 0.001
+        )
+        XCTAssertGreaterThan(hypot(
+            locationAfterFocus.x - visibleCenter.x,
+            locationAfterFocus.y - visibleCenter.y
+        ), 1)
     }
 
     @MainActor

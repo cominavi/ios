@@ -2124,37 +2124,33 @@ private struct InteractiveMapCanvas: View {
         safeAreaBottomInset: CGFloat,
         animated: Bool
     ) {
-        let targetZoom = max(camera.zoom, 24)
-        let scale = fitScale(viewportSize: viewportSize) * targetZoom
-        let offsetX = user.point.x - scene.size.width / 2
-        let offsetY = user.point.y - scene.size.height / 2
-        let cosine = cos(camera.rotation)
-        let sine = sin(camera.rotation)
-        let rotatedX = offsetX * cosine - offsetY * sine
-        let rotatedY = offsetX * sine + offsetY * cosine
-        let requestedTranslation = CGSize(
-            width: -rotatedX * scale,
-            height: -rotatedY * scale
+        let geometry = cameraGeometry(viewportSize: viewportSize)
+        let bottomInset = locationFocusBottomInset + safeAreaBottomInset
+        let zoomOutFactor = MapCameraMath.zoomOutFactorToReveal(
+            location: user.point,
+            renderedBy: MapCameraMath.transform(camera: camera, geometry: geometry),
+            viewportSize: viewportSize,
+            bottomInset: bottomInset,
+            padding: MapCameraMath.locationMarkerViewportPadding
         )
+        let targetZoom = max(
+            MapCameraTuning.venue.zoomRange.lowerBound,
+            camera.zoom * zoomOutFactor
+        )
+        guard targetZoom < camera.zoom else { return }
+
         let visibleCenter = MapCameraMath.visibleViewportCenter(
             viewportSize: viewportSize,
-            bottomInset: locationFocusBottomInset + safeAreaBottomInset
+            bottomInset: bottomInset
         )
-        let viewportOffset = CGSize(
-            width: visibleCenter.x - viewportSize.width / 2,
-            height: visibleCenter.y - viewportSize.height / 2
-        )
-        let target = MapCameraMath.constrained(
-            MapCamera(
-                translation: CGSize(
-                    width: requestedTranslation.width + viewportOffset.width,
-                    height: requestedTranslation.height + viewportOffset.height
-                ),
-                zoom: targetZoom,
-                rotation: camera.rotation
-            ),
-            geometry: cameraGeometry(viewportSize: viewportSize),
-            tuning: .venue
+        let target = MapCameraMath.applyingGesture(
+            to: camera,
+            magnification: targetZoom / camera.zoom,
+            magnificationAnchor: visibleCenter,
+            rotationAnchor: visibleCenter,
+            geometry: geometry,
+            tuning: .venue,
+            allowsRubberBand: false
         )
         let updateCamera = {
             camera = target

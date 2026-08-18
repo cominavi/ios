@@ -68,6 +68,7 @@ struct MapCameraTuning: Equatable {
 
 enum MapCameraMath {
     static let compassAlignmentTolerance: CGFloat = .pi / 180
+    static let locationMarkerViewportPadding: CGFloat = 28
 
     /// The point that remains visible when bottom chrome, such as a map sheet,
     /// obscures part of the full rendering surface.
@@ -77,6 +78,79 @@ enum MapCameraMath {
     ) -> CGPoint {
         let visibleBottom = max(0, viewportSize.height - max(0, bottomInset))
         return CGPoint(x: viewportSize.width / 2, y: visibleBottom / 2)
+    }
+
+    /// Returns the largest zoom multiplier, no greater than one, that moves a
+    /// rendered location into the unobscured viewport, using the visible
+    /// viewport center as the stationary zoom anchor.
+    static func zoomOutFactorToReveal(
+        location: CGPoint,
+        renderedBy transform: CGAffineTransform,
+        viewportSize: CGSize,
+        bottomInset: CGFloat,
+        padding: CGFloat
+    ) -> CGFloat {
+        guard viewportSize.width > 0, viewportSize.height > 0 else { return 1 }
+
+        let visibleBottom = max(0, viewportSize.height - max(0, bottomInset))
+        let horizontalPadding = min(max(0, padding), viewportSize.width / 2)
+        let verticalPadding = min(max(0, padding), visibleBottom / 2)
+        let safeRect = CGRect(
+            x: horizontalPadding,
+            y: verticalPadding,
+            width: viewportSize.width - horizontalPadding * 2,
+            height: visibleBottom - verticalPadding * 2
+        )
+        let renderedLocation = location.applying(transform)
+        guard renderedLocation.x.isFinite, renderedLocation.y.isFinite else { return 1 }
+        guard !safeRect.contains(renderedLocation) else { return 1 }
+
+        let anchor = visibleViewportCenter(
+            viewportSize: viewportSize,
+            bottomInset: bottomInset
+        )
+        let delta = CGPoint(
+            x: renderedLocation.x - anchor.x,
+            y: renderedLocation.y - anchor.y
+        )
+        var factor: CGFloat = 1
+
+        if renderedLocation.x < safeRect.minX, delta.x < 0 {
+            factor = min(factor, (safeRect.minX - anchor.x) / delta.x)
+        } else if renderedLocation.x > safeRect.maxX, delta.x > 0 {
+            factor = min(factor, (safeRect.maxX - anchor.x) / delta.x)
+        }
+        if renderedLocation.y < safeRect.minY, delta.y < 0 {
+            factor = min(factor, (safeRect.minY - anchor.y) / delta.y)
+        } else if renderedLocation.y > safeRect.maxY, delta.y > 0 {
+            factor = min(factor, (safeRect.maxY - anchor.y) / delta.y)
+        }
+
+        return min(max(factor, 0), 1)
+    }
+
+    /// Projects SpriteKit scene coordinates into UIKit view coordinates for a
+    /// scaled and rotated camera.
+    static func spriteKitViewTransform(
+        viewportSize: CGSize,
+        cameraPosition: CGPoint,
+        cameraScale: CGFloat,
+        cameraRotation: CGFloat
+    ) -> CGAffineTransform {
+        guard cameraScale.isFinite, cameraScale > 0 else { return .identity }
+
+        let cosine = cos(cameraRotation) / cameraScale
+        let sine = sin(cameraRotation) / cameraScale
+        return CGAffineTransform(
+            a: cosine,
+            b: sine,
+            c: sine,
+            d: -cosine,
+            tx: viewportSize.width / 2 - cosine * cameraPosition.x
+                - sine * cameraPosition.y,
+            ty: viewportSize.height / 2 - sine * cameraPosition.x
+                + cosine * cameraPosition.y
+        )
     }
 
     /// Positions a SpriteKit camera so `scenePoint` renders at a requested

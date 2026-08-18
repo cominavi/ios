@@ -1839,28 +1839,45 @@ final class UnifiedBigSightScene: SKScene {
         }
         let campusPoint = user.point.applying(venue.transform)
         let userPosition = UnifiedMapProjection.scenePoint(fromCampus: campusPoint)
-        // One table remains comfortably legible while enough neighboring
-        // aisles stay visible for the person to orient themselves.
-        let targetScale = max(maximumCameraScale, minimumCameraScale / 52)
         let viewportSize = view?.bounds.size ?? size
         let effectiveBottomInset =
             locationFocusBottomInset
             + (view?.safeAreaInsets.bottom ?? 0)
+        let currentTransform = MapCameraMath.spriteKitViewTransform(
+            viewportSize: viewportSize,
+            cameraPosition: mapCamera.position,
+            cameraScale: mapCamera.xScale,
+            cameraRotation: mapCamera.zRotation
+        )
+        let zoomOutFactor = MapCameraMath.zoomOutFactorToReveal(
+            location: userPosition,
+            renderedBy: currentTransform,
+            viewportSize: viewportSize,
+            bottomInset: effectiveBottomInset,
+            padding: MapCameraMath.locationMarkerViewportPadding
+        )
+        let targetScale = min(
+            minimumCameraScale,
+            mapCamera.xScale / max(zoomOutFactor, 0.000_1)
+        )
+        guard targetScale > mapCamera.xScale else { return }
+
         let visibleCenter = MapCameraMath.visibleViewportCenter(
             viewportSize: viewportSize,
             bottomInset: effectiveBottomInset
         )
+        let anchoredScenePoint = visibleCenter.applying(currentTransform.inverted())
         let position = MapCameraMath.spriteKitCameraPosition(
-            focusing: userPosition,
+            focusing: anchoredScenePoint,
             at: visibleCenter,
             viewportSize: viewportSize,
             cameraScale: targetScale,
-            cameraRotation: -venue.rotation
+            cameraRotation: mapCamera.zRotation
         )
         animateCamera(
             position: position,
             scale: targetScale,
-            rotation: -venue.rotation,
+            rotation: mapCamera.zRotation,
             animated: animated
         )
     }
