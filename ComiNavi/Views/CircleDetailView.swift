@@ -474,7 +474,7 @@ struct CircleDetailView: View {
         circleHallMapName = hall.mapName
         circleAddress = ComiketSpaceAddress(
             day: location.day,
-            hallName: hall.name,
+            hallName: location.resolvedHallName(in: dataSource.comiket) ?? hall.name,
             blockName: block.name,
             spaceNumber: location.tableID.spaceNumber,
             subspace: isCombinedAB ? nil : location.subspace,

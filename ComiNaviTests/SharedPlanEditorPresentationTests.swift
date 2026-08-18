@@ -890,6 +890,20 @@ final class SharedPlanEditorPresentationTests: XCTestCase {
             hallOnly.dayAndLocation,
             String(localized: "Day 2 · West Halls")
         )
+
+        let exactEastHall = SharedPlanCircleIdentityPresentation(
+            circleName: "東館サークル",
+            penName: nil,
+            day: 1,
+            hallName: WhereAmIResolver.venueDisplayName(for: "東１"),
+            blockName: "Ａ",
+            spaceNumber: 1,
+            spaceNumberSub: 0
+        )
+        XCTAssertEqual(
+            exactEastHall.dayAndLocation,
+            String(localized: "Day 1 · East 1 Ａ01a")
+        )
     }
 
     func testEditorAccessibilityIdentifiersAreStableAndEntityScoped() {

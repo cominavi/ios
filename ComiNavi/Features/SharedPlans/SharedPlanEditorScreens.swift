@@ -785,10 +785,7 @@ struct SharedPlanEditorScreen: View {
             into: [SharedPlanCircleKey: String]()
         ) { hallNames, content in
             guard let location = locationsByPublicCircleID[content.key.wcID],
-                  let hallName = catalog.days
-                    .first(where: { $0.dayIndex == location.day })?
-                    .halls.first(where: { $0.externalMapId == location.mapID })?
-                    .name
+                  let hallName = location.resolvedHallName(in: catalog)
             else { return }
             hallNames[content.key] = WhereAmIResolver.venueDisplayName(for: hallName)
         }

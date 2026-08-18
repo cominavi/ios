@@ -261,17 +261,15 @@ enum SharedPlanExportLoader {
             let dayMetadata = day.flatMap { day in
                 event.days.first { $0.dayIndex == day }
             }
-            let venue = location.flatMap { location in
-                dayMetadata?.halls.first { $0.externalMapId == location.mapID }
-            }
-
             exportCircles[publicCircleID] = SharedPlanExportCatalogCircle(
                 publicCircleID: publicCircleID,
                 circleName: normalized(circle.circleName),
                 penName: optionalNormalized(circle.penName),
                 dayIndex: day,
                 daySymbol: dayMetadata.map(weekdaySymbol) ?? day.map(String.init) ?? "",
-                venue: normalized(venue?.name),
+                venue: ComiketSpaceAddress.compactHallName(
+                    location?.resolvedHallName(in: event) ?? ""
+                ),
                 blockName: blockID.flatMap { blockNames[$0] } ?? "",
                 spaceNumber: spaceNumber,
                 spaceSide: tableKey.map { combinedTables.contains($0) }
