@@ -63,6 +63,69 @@ final class ExploreModelTests: XCTestCase {
         )
     }
 
+    #if DEBUG
+        func testDefaultCatalogFilteringSkipsSortAndBookmarkWork() async throws {
+            let store = InMemoryUserPlanStore()
+            try await store.upsert(makeBookmark(color: .blue))
+            let model = ExploreModel(
+                circles: Array(fixtures.reversed()),
+                selectedDay: 1,
+                userPlanStore: store,
+                eventNumber: 108
+            )
+
+            await model.load()
+            await model.waitForDiscoveryIndex()
+
+            XCTAssertEqual(model.visibleCircles.map(\.id), [1, 2, 3])
+            XCTAssertEqual(
+                model.debugLastRecomputeWorkCounts.catalogComparatorCalls,
+                0
+            )
+            XCTAssertEqual(model.debugLastRecomputeWorkCounts.bookmarkLookups, 0)
+        }
+
+        func testClearFiltersBatchesEveryResetIntoOneRecompute() async {
+            let model = ExploreModel(circles: fixtures, selectedDay: 1)
+            await model.load()
+            await model.waitForDiscoveryIndex()
+
+            model.searchQuery = "Artist"
+            await model.waitForSearch()
+            model.sort = .latestShinagaki
+            model.discoveryMatchMode = .all
+            model.selectedGenreID = 10
+            model.selectedTag = "Cute"
+            model.selectedDiscoveryTermIDs = ["tag:cute"]
+            model.shinagakiFilter = .available
+            model.favoriteFilter = .saved
+            model.selectedFavoriteColors = [.blue]
+            model.attendanceFilter = .attending
+            model.spaceFilter = .combinedAB
+            let recomputeCountBeforeClear = model.debugLastRecomputeWorkCounts
+                .totalRecomputeInvocations
+
+            model.clearFilters()
+
+            XCTAssertNil(model.selectedGenreID)
+            XCTAssertNil(model.selectedTag)
+            XCTAssertTrue(model.selectedDiscoveryTermIDs.isEmpty)
+            XCTAssertEqual(model.shinagakiFilter, .all)
+            XCTAssertEqual(model.favoriteFilter, .all)
+            XCTAssertTrue(model.selectedFavoriteColors.isEmpty)
+            XCTAssertEqual(model.attendanceFilter, .all)
+            XCTAssertEqual(model.spaceFilter, .all)
+            XCTAssertEqual(model.searchQuery, "Artist")
+            XCTAssertEqual(model.sort, .latestShinagaki)
+            XCTAssertEqual(model.discoveryMatchMode, .all)
+            XCTAssertEqual(model.visibleCircles.map(\.id), [1, 2])
+            XCTAssertEqual(
+                model.debugLastRecomputeWorkCounts.totalRecomputeInvocations,
+                recomputeCountBeforeClear + 1
+            )
+        }
+    #endif
+
     func testGenreAndTagFiltersIntersect() async {
         let model = ExploreModel(circles: fixtures, selectedDay: 1)
         await model.load()
@@ -160,6 +223,22 @@ final class ExploreModelTests: XCTestCase {
         model.searchQuery = "Action"
         await model.waitForSearch()
         XCTAssertEqual(model.visibleCircles.map(\.id), [1])
+    }
+
+    func testActiveSearchKeepsCatalogOrderForEqualScores() async {
+        let model = ExploreModel(circles: Array(fixtures.reversed()), selectedDay: 1)
+        await model.load()
+
+        model.searchQuery = "Artist"
+        await model.waitForSearch()
+
+        XCTAssertEqual(model.visibleCircles.map(\.id), [1, 2])
+        #if DEBUG
+            XCTAssertGreaterThan(
+                model.debugLastRecomputeWorkCounts.catalogComparatorCalls,
+                0
+            )
+        #endif
     }
 
     func testSearchIncludesOCRTextAtLowerWeightThanCatalogMetadata() async {
@@ -444,6 +523,51 @@ final class ExploreModelTests: XCTestCase {
 
         model.spaceFilter = .singleSpace
         XCTAssertEqual(model.visibleCircles.map(\.id), [2])
+    }
+
+    func testCombinedABBookmarkUsesNewestMemberForColorFiltering() async throws {
+        var combined = fixtures[0]
+        let secondHalf = makeExploreCircle(
+            id: 5,
+            day: 1,
+            genreID: 10,
+            name: combined.displayName,
+            penName: "Artist One",
+            description: "Illustration books",
+            tags: ["Action"]
+        )
+        combined.memberCircles = [combined.circle, secondHalf.circle]
+        let store = InMemoryUserPlanStore()
+        try await store.upsert([
+            makeBookmark(
+                color: .blue,
+                publicCircleID: 1_001,
+                catalogCircleID: combined.circle.id,
+                modifiedAt: Date(timeIntervalSince1970: 1_000)
+            ),
+            makeBookmark(
+                color: .red,
+                publicCircleID: 1_005,
+                catalogCircleID: secondHalf.circle.id,
+                modifiedAt: Date(timeIntervalSince1970: 2_000)
+            ),
+        ])
+        let model = ExploreModel(
+            circles: [combined],
+            selectedDay: 1,
+            userPlanStore: store,
+            eventNumber: 108
+        )
+        await model.load()
+
+        XCTAssertEqual(model.bookmark(for: combined)?.color, .red)
+        model.selectedFavoriteColors = [.blue]
+        XCTAssertTrue(model.visibleCircles.isEmpty)
+        model.selectedFavoriteColors = [.red]
+        XCTAssertEqual(model.visibleCircles.map(\.id), [combined.id])
+        #if DEBUG
+            XCTAssertEqual(model.debugLastRecomputeWorkCounts.bookmarkLookups, 2)
+        #endif
     }
 
     func testAttendanceFilterUsesConfirmedAndWithdrawalClaims() async {
@@ -1115,6 +1239,23 @@ final class ExploreModelTests: XCTestCase {
         XCTAssertEqual(model.visibleCircles.map(\.id), [1])
     }
 
+    func testMissingDiscoveryTermsAreFalseForAnyAndAllMatching() async {
+        let model = ExploreModel(circles: fixtures, selectedDay: 1)
+        await model.load()
+        await model.waitForDiscoveryIndex()
+
+        model.toggleDiscoveryTerm("tag:action")
+        model.toggleDiscoveryTerm("tag:missing")
+        XCTAssertEqual(model.visibleCircles.map(\.id), [1])
+
+        model.discoveryMatchMode = .all
+        XCTAssertTrue(model.visibleCircles.isEmpty)
+
+        model.toggleDiscoveryTerm("tag:action")
+        model.discoveryMatchMode = .any
+        XCTAssertTrue(model.visibleCircles.isEmpty)
+    }
+
     func testChangingDayClearsDiscoveryInterestsAndRebuildsTheCloud() async {
         let model = ExploreModel(circles: fixtures, selectedDay: 1)
         await model.load()
@@ -1287,19 +1428,24 @@ final class ExploreModelTests: XCTestCase {
         )
     }
 
-    private func makeBookmark(color: BookmarkColor) -> MapBookmark {
+    private func makeBookmark(
+        color: BookmarkColor,
+        publicCircleID: Int = 1_001,
+        catalogCircleID: Int = 1,
+        modifiedAt: Date = Date(timeIntervalSince1970: 1_000)
+    ) -> MapBookmark {
         MapBookmark(
             eventNumber: 108,
-            publicCircleID: 1_001,
-            catalogCircleID: fixtures[0].id,
-            updateID: fixtures[0].circle.updateId,
+            publicCircleID: publicCircleID,
+            catalogCircleID: catalogCircleID,
+            updateID: catalogCircleID + 100,
             day: 1,
             mapID: 1,
             tableID: .init(blockID: 1, spaceNumber: 1),
             subspace: 0,
             color: color,
             memo: color == .memoOnly ? "memo without favorite" : "",
-            modifiedAt: Date(timeIntervalSince1970: 1_000),
+            modifiedAt: modifiedAt,
             syncState: .pendingUpsert
         )
     }

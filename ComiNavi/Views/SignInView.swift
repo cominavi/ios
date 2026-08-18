@@ -766,10 +766,15 @@ private struct ConventionFloorBackdrop: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(AppPowerPolicy.self) private var powerPolicy
     @State private var scene = ConventionFloorScene()
 
     private var isSimulationPaused: Bool {
-        accessibilityReduceMotion || scenePhase != .active
+        ConventionFloorBackdropPolicy.shouldPause(
+            accessibilityReduceMotion: accessibilityReduceMotion,
+            isSceneActive: scenePhase == .active,
+            isLowPowerModeEnabled: powerPolicy.pausesNonessentialBackdrop
+        )
     }
 
     var body: some View {
@@ -783,6 +788,7 @@ private struct ConventionFloorBackdrop: View {
             ],
             shouldRender: { _ in
                 UIApplication.shared.applicationState == .active
+                    && !powerPolicy.pausesNonessentialBackdrop
             }
         )
         .allowsHitTesting(false)
@@ -800,6 +806,16 @@ private struct ConventionFloorBackdrop: View {
         .onChange(of: colorScheme, initial: true) { _, newColorScheme in
             scene.setVeilColor(for: newColorScheme)
         }
+    }
+}
+
+enum ConventionFloorBackdropPolicy {
+    static func shouldPause(
+        accessibilityReduceMotion: Bool,
+        isSceneActive: Bool,
+        isLowPowerModeEnabled: Bool
+    ) -> Bool {
+        accessibilityReduceMotion || !isSceneActive || isLowPowerModeEnabled
     }
 }
 
@@ -2599,4 +2615,5 @@ private final class ConventionFloorScene: SKScene {
 #Preview {
     SignInView()
         .environment(\.locale, .init(identifier: "ja"))
+        .environment(AppPowerPolicy())
 }
