@@ -34,6 +34,12 @@ final class WhereAmITests: XCTestCase {
         XCTAssertEqual(address.canonicalText, "2日目 西2ホール あ12b")
     }
 
+    func testHallNameFormattingNormalizesWidthWhitespaceAndSuffixCentrally() {
+        XCTAssertEqual(ComiketSpaceAddress.compactHallName(" 東１ホール "), "東1")
+        XCTAssertEqual(ComiketSpaceAddress.canonicalHallName(" 東１ホール "), "東1ホール")
+        XCTAssertEqual(WhereAmIResolver.venueDisplayName(for: " 東１ホール "), "East 1")
+    }
+
     func testCombinedCircleAddressSupportsTwoLineDayAndVenuePresentation() {
         let address = ComiketSpaceAddress(
             day: 1,

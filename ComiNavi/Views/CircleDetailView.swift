@@ -359,13 +359,9 @@ struct CircleDetailView: View {
             let blockID = circle.blockId,
             let block = dataSource.comiket.blocks.first(where: { $0.externalBlockId == blockID })
         else { return }
-        let hallName = dataSource.comiket.days
-            .first(where: { $0.dayIndex == location.day })?
-            .halls.first(where: { $0.externalMapId == location.mapID })?
-            .name ?? "会場"
         circleAddress = ComiketSpaceAddress(
             day: location.day,
-            hallName: hallName,
+            hallName: location.resolvedHallName(in: dataSource.comiket) ?? "会場",
             blockName: block.name,
             spaceNumber: location.tableID.spaceNumber,
             subspace: isCombinedAB ? nil : location.subspace,

@@ -252,6 +252,23 @@ struct CatalogBookmarkLocation: Equatable, Sendable {
     let mapID: Int
     let tableID: CatalogMapTable.ID
     let subspace: Int
+    let hallName: String?
+
+    func resolvedHallName(in catalog: Comiket) -> String? {
+        if let exactHallName = Self.nonBlank(hallName) {
+            return exactHallName
+        }
+        let fallbackHallName = catalog.days
+            .first(where: { $0.dayIndex == day })?
+            .halls.first(where: { $0.externalMapId == mapID })?
+            .name
+        return Self.nonBlank(fallbackHallName)
+    }
+
+    private static func nonBlank(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == false ? trimmed : nil
+    }
 }
 
 struct CatalogMapViewport: Equatable, Sendable {
@@ -650,12 +667,14 @@ struct SQLiteMapCatalog: MapCatalog {
                            circle.blockId,
                            circle.spaceNo,
                            circle.spaceNoSub,
-                           layout.mapId
+                           layout.mapId,
+                           area.name AS hallName
                     FROM ComiketCircleWC circle
                     JOIN ComiketCircleExtend circleExtension ON circleExtension.id = circle.id
                     JOIN ComiketLayoutWC layout
                       ON layout.blockId = circle.blockId
                      AND layout.spaceNo = circle.spaceNo
+                    LEFT JOIN ComiketAreaWC area ON area.id = layout.hallId
                     WHERE circle.updateId IN (\(placeholders))
                     """,
                 arguments: arguments
@@ -677,7 +696,8 @@ struct SQLiteMapCatalog: MapCatalog {
                     day: day,
                     mapID: mapID,
                     tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
-                    subspace: row["spaceNoSub"] ?? 0
+                    subspace: row["spaceNoSub"] ?? 0,
+                    hallName: row["hallName"]
                 )
             }
         }
@@ -700,12 +720,14 @@ struct SQLiteMapCatalog: MapCatalog {
                            circle.blockId,
                            circle.spaceNo,
                            circle.spaceNoSub,
-                           layout.mapId
+                           layout.mapId,
+                           area.name AS hallName
                     FROM ComiketCircleWC circle
                     JOIN ComiketCircleExtend circleExtension ON circleExtension.id = circle.id
                     JOIN ComiketLayoutWC layout
                       ON layout.blockId = circle.blockId
                      AND layout.spaceNo = circle.spaceNo
+                    LEFT JOIN ComiketAreaWC area ON area.id = layout.hallId
                     WHERE circleExtension.WCId IN (\(placeholders))
                     """,
                 arguments: arguments
@@ -729,7 +751,8 @@ struct SQLiteMapCatalog: MapCatalog {
             day: day,
             mapID: mapID,
             tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
-            subspace: row["spaceNoSub"] ?? 0
+            subspace: row["spaceNoSub"] ?? 0,
+            hallName: row["hallName"]
         )
     }
 
@@ -911,7 +934,8 @@ struct FixtureMapCatalog: MapCatalog {
                     day: 1,
                     mapID: 1,
                     tableID: table.id,
-                    subspace: subspace
+                    subspace: subspace,
+                    hallName: table.hallName
                 )
             }
         }.filter { updateIDs.contains($0.updateID) }
@@ -928,7 +952,8 @@ struct FixtureMapCatalog: MapCatalog {
                     day: 1,
                     mapID: 1,
                     tableID: table.id,
-                    subspace: subspace
+                    subspace: subspace,
+                    hallName: table.hallName
                 )
             }
         }.filter { publicCircleIDs.contains($0.publicCircleID) }

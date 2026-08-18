@@ -102,6 +102,56 @@ final class MapCatalogSearchTests: XCTestCase {
         XCTAssertTrue(underscoreMatches.isEmpty)
     }
 
+    func testBookmarkLocationsRetainExactHallWithinCombinedMap() async throws {
+        let database = try makeBookmarkLocationDatabase()
+        let catalog = SQLiteMapCatalog(mainDatabase: database, imageDatabase: database)
+
+        let updateLocations = try await catalog.bookmarkLocations(updateIDs: [101, 102])
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: updateLocations.map { ($0.updateID, $0.hallName) })[101]!,
+            "東１"
+        )
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: updateLocations.map { ($0.updateID, $0.hallName) })[102]!,
+            "東2"
+        )
+
+        let publicLocations = try await catalog.bookmarkLocations(publicCircleIDs: [1001, 1002])
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: publicLocations.map {
+                ($0.publicCircleID, $0.hallName)
+            })[1001]!,
+            "東１"
+        )
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: publicLocations.map {
+                ($0.publicCircleID, $0.hallName)
+            })[1002]!,
+            "東2"
+        )
+        XCTAssertEqual(
+            publicLocations.sorted { $0.publicCircleID < $1.publicCircleID }
+                .map { ComiketSpaceAddress.canonicalHallName($0.hallName ?? "") },
+            ["東1ホール", "東2ホール"]
+        )
+
+        let broadMapEvent = makeCombinedMapEvent()
+        let eastOne = try XCTUnwrap(publicLocations.first { $0.publicCircleID == 1001 })
+        XCTAssertEqual(eastOne.resolvedHallName(in: broadMapEvent), "東１")
+
+        let legacyLocation = CatalogBookmarkLocation(
+            publicCircleID: 1003,
+            catalogCircleID: 3,
+            updateID: 103,
+            day: 1,
+            mapID: 101,
+            tableID: .init(blockID: 3, spaceNumber: 3),
+            subspace: 0,
+            hallName: nil
+        )
+        XCTAssertEqual(legacyLocation.resolvedHallName(in: broadMapEvent), "東123")
+    }
+
     private func makeCatalogDatabase() throws -> DatabaseQueue {
         let database = try DatabaseQueue()
         try database.write { database in
@@ -171,6 +221,66 @@ final class MapCatalogSearchTests: XCTestCase {
             )
         }
         return database
+    }
+
+    private func makeBookmarkLocationDatabase() throws -> DatabaseQueue {
+        let database = try DatabaseQueue()
+        try database.write { database in
+            try database.create(table: "ComiketCircleWC") { table in
+                table.column("id", .integer).primaryKey()
+                table.column("updateId", .integer).notNull()
+                table.column("day", .integer).notNull()
+                table.column("blockId", .integer).notNull()
+                table.column("spaceNo", .integer).notNull()
+                table.column("spaceNoSub", .integer).notNull()
+            }
+            try database.create(table: "ComiketCircleExtend") { table in
+                table.column("id", .integer).primaryKey()
+                table.column("WCId", .integer).notNull()
+            }
+            try database.create(table: "ComiketLayoutWC") { table in
+                table.column("blockId", .integer).notNull()
+                table.column("spaceNo", .integer).notNull()
+                table.column("mapId", .integer).notNull()
+                table.column("hallId", .integer)
+            }
+            try database.create(table: "ComiketAreaWC") { table in
+                table.column("id", .integer).primaryKey()
+                table.column("name", .text)
+            }
+            try database.execute(sql: """
+                INSERT INTO ComiketAreaWC(id, name) VALUES (11, '東１'), (12, '東2');
+                INSERT INTO ComiketLayoutWC(blockId, spaceNo, mapId, hallId)
+                VALUES (1, 1, 101, 11), (2, 2, 101, 12);
+                INSERT INTO ComiketCircleWC(id, updateId, day, blockId, spaceNo, spaceNoSub)
+                VALUES (1, 101, 1, 1, 1, 0), (2, 102, 1, 2, 2, 1);
+                INSERT INTO ComiketCircleExtend(id, WCId) VALUES (1, 1001), (2, 1002);
+                """)
+        }
+        return database
+    }
+
+    private func makeCombinedMapEvent() -> Comiket {
+        Comiket(
+            id: "108",
+            number: 108,
+            name: "コミックマーケット108",
+            cover: nil,
+            days: [UFDSchema.Day(
+                id: "108_1",
+                dayIndex: 1,
+                date: DateComponents(year: 2026, month: 8, day: 15),
+                halls: [UFDSchema.DayHall(
+                    id: "108_1_E123",
+                    name: "東123",
+                    mapName: "E123",
+                    externalMapId: 101,
+                    externalCorrespondingFloorId: 1,
+                    areas: []
+                )]
+            )],
+            blocks: []
+        )
     }
 
     private func makeExploreCircle() -> ExploreCircle {

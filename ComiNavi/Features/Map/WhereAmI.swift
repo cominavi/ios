@@ -76,16 +76,15 @@ struct ComiketSpaceAddress: Equatable, Sendable {
     }
 
     static func canonicalHallName(_ value: String) -> String {
-        let normalized = value.unicodeScalars.reduce(into: "") { result, scalar in
-            if (0xFF10...0xFF19).contains(scalar.value),
-                let asciiDigit = UnicodeScalar(scalar.value - 0xFEE0)
-            {
-                result.unicodeScalars.append(asciiDigit)
-            } else if scalar != " " {
-                result.unicodeScalars.append(scalar)
-            }
-        }
-        return normalized.hasSuffix("ホール") ? normalized : "\(normalized)ホール"
+        "\(compactHallName(value))ホール"
+    }
+
+    static func compactHallName(_ value: String) -> String {
+        let compact = value.folding(
+            options: [.widthInsensitive],
+            locale: Locale(identifier: "ja_JP")
+        ).filter { !$0.isWhitespace }
+        return compact.hasSuffix("ホール") ? String(compact.dropLast(3)) : compact
     }
 }
 
@@ -487,10 +486,8 @@ enum WhereAmIResolver {
     }
 
     static func venueDisplayName(for hallName: String) -> String {
-        let normalized = hallName.folding(
-            options: [.caseInsensitive, .widthInsensitive],
-            locale: Locale(identifier: "ja_JP")
-        )
+        let normalized = ComiketSpaceAddress.compactHallName(hallName)
+            .folding(options: [.caseInsensitive], locale: Locale(identifier: "ja_JP"))
         let digits = normalized.filter(\.isNumber)
         let range: String
         if let first = digits.first, let last = digits.last, digits.count > 1 {
