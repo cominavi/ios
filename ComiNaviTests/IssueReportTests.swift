@@ -87,6 +87,23 @@ final class IssueReportTests: XCTestCase {
         )
     }
 
+    func testPreparedScreenshotReusesOnePreviewImageAcrossModelUpdates() throws {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 48, height: 96))
+        let screenshot = renderer.pngData { context in
+            UIColor.systemIndigo.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 48, height: 96))
+        }
+        let model = IssueReportModel(context: fixtureContext(publicUserID: nil))
+
+        model.attachPreparedScreenshot(screenshot)
+        let preview = try XCTUnwrap(model.screenshotImage)
+        model.message = "Typing should not decode the screenshot again"
+
+        XCTAssertTrue(preview === model.screenshotImage)
+        model.removeScreenshot()
+        XCTAssertNil(model.screenshotImage)
+    }
+
     private func fixtureContext(publicUserID: String?) -> IssueReportContext {
         IssueReportContext(
             publicUserID: publicUserID,
