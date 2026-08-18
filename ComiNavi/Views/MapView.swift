@@ -2337,9 +2337,9 @@ private struct CircleMapDetailSheet: View {
     }
 
     private var circleGroups: [[CatalogMapCircle]] {
-        guard selection.circles.count == 2,
-            CatalogCirclePairing.sameIdentity(selection.circles[0], selection.circles[1])
-        else { return selection.circles.map { [$0] } }
+        guard CatalogCirclePairing.isCombinedAB(selection.circles) else {
+            return selection.circles.map { [$0] }
+        }
         return [selection.circles]
     }
 

@@ -207,7 +207,8 @@ struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
         hallName: String? = nil,
         blockName: String?,
         spaceNumber: Int?,
-        spaceNumberSub: Int?
+        spaceNumberSub: Int?,
+        isCombinedAB: Bool = false
     ) {
         let normalizedCircleName = circleName?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedPenName = penName?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -229,7 +230,12 @@ struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
                                 !normalizedBlockName.isEmpty,
                                 let spaceNumber
         {
-            "\(normalizedBlockName)\(String(format: "%02d", spaceNumber))\(spaceNumberSub == 1 ? "b" : "a")"
+            ComiketSpaceAddress.spaceCode(
+                blockName: normalizedBlockName,
+                spaceNumber: spaceNumber,
+                subspace: spaceNumberSub,
+                isCombinedAB: isCombinedAB
+            )
         } else {
             nil
         }

@@ -391,6 +391,12 @@ private enum SharedPlanEditorConfirmation: Identifiable {
     var id: String { "discard-recovery" }
 }
 
+private struct SharedPlanCatalogTableKey: Hashable {
+    let day: Int
+    let mapID: Int
+    let tableID: CatalogMapTable.ID
+}
+
 struct SharedPlanEditorScreen: View {
     let store: SharedPlanStore
     let currentUserID: String?
@@ -401,6 +407,7 @@ struct SharedPlanEditorScreen: View {
     @State private var confirmation: SharedPlanEditorConfirmation?
     @State private var catalogCircles: [SharedPlanCircleKey: CirclemsDataSchema.ComiketCircleWC] = [:]
     @State private var catalogHallNames: [SharedPlanCircleKey: String] = [:]
+    @State private var catalogCombinedABKeys: Set<SharedPlanCircleKey> = []
     @State private var favoriteBookmarksByPublicCircleID: [Int: MapBookmark] = [:]
     @State private var initialCircleNavigationPresented = false
     @State private var hasHandledInitialCircleNavigation = false
@@ -764,6 +771,7 @@ struct SharedPlanEditorScreen: View {
         else {
             catalogCircles = [:]
             catalogHallNames = [:]
+            catalogCombinedABKeys = []
             return
         }
 
@@ -789,9 +797,40 @@ struct SharedPlanEditorScreen: View {
             else { return }
             hallNames[content.key] = WhereAmIResolver.venueDisplayName(for: hallName)
         }
+        var combinedByTable: [SharedPlanCatalogTableKey: Bool] = [:]
+        for location in locations {
+            guard !Task.isCancelled else { return }
+            let tableKey = SharedPlanCatalogTableKey(
+                day: location.day,
+                mapID: location.mapID,
+                tableID: location.tableID
+            )
+            guard combinedByTable[tableKey] == nil else { continue }
+            let tableCircles = try? await catalogDataSource.mapCatalog.circles(
+                day: location.day,
+                tableID: location.tableID
+            )
+            combinedByTable[tableKey] = tableCircles.map {
+                CatalogCirclePairing.isCombinedAB($0)
+            } ?? false
+        }
+        let loadedCombinedABKeys: Set<SharedPlanCircleKey> = Set(
+            model.circles.compactMap { content -> SharedPlanCircleKey? in
+                guard let location = locationsByPublicCircleID[content.key.wcID] else {
+                    return nil
+                }
+                let tableKey = SharedPlanCatalogTableKey(
+                    day: location.day,
+                    mapID: location.mapID,
+                    tableID: location.tableID
+                )
+                return combinedByTable[tableKey] == true ? content.key : nil
+            }
+        )
         guard !Task.isCancelled else { return }
         catalogCircles = loaded
         catalogHallNames = loadedHallNames
+        catalogCombinedABKeys = loadedCombinedABKeys
     }
 
     private func observeFavoriteBookmarks() async {
@@ -837,7 +876,8 @@ struct SharedPlanEditorScreen: View {
             hallName: catalogHallNames[key],
             blockName: blockName,
             spaceNumber: catalogCircle?.spaceNo,
-            spaceNumberSub: catalogCircle?.spaceNoSub
+            spaceNumberSub: catalogCircle?.spaceNoSub,
+            isCombinedAB: catalogCombinedABKeys.contains(key)
         )
     }
 

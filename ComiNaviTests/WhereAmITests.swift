@@ -56,6 +56,27 @@ final class WhereAmITests: XCTestCase {
         XCTAssertEqual(address.canonicalText, "1日目 東7ホール Ａ34a+b")
     }
 
+    func testCentralSpaceCodeFormatterUsesExplicitCombinedABMarker() {
+        XCTAssertEqual(
+            ComiketSpaceAddress.spaceCode(
+                blockName: "あ",
+                spaceNumber: 39,
+                subspace: 0,
+                isCombinedAB: true
+            ),
+            "あ39a+b"
+        )
+        XCTAssertEqual(
+            ComiketSpaceAddress.spaceCode(
+                blockName: "あ",
+                spaceNumber: 39,
+                subspace: 1,
+                isCombinedAB: false
+            ),
+            "あ39b"
+        )
+    }
+
     func testKanaLayoutUsesGojūonColumnsAndVowelOrder() throws {
         let layout = WhereAmICharacterLayout.make(
             availableCharacters: ["よ", "き", "あ", "ゆ", "か", "や"]

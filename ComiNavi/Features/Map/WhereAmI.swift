@@ -43,9 +43,12 @@ struct ComiketSpaceAddress: Equatable, Sendable {
     }
 
     var spaceCode: String {
-        let number = String(format: "%02d", spaceNumber)
-        let side = isCombinedAB ? "a+b" : (subspace.map { $0 == 0 ? "a" : "b" } ?? "")
-        return "\(blockName)\(number)\(side)"
+        Self.spaceCode(
+            blockName: blockName,
+            spaceNumber: spaceNumber,
+            subspace: subspace,
+            isCombinedAB: isCombinedAB
+        )
     }
 
     var canonicalDayText: String { "\(day)日目" }
@@ -85,6 +88,17 @@ struct ComiketSpaceAddress: Equatable, Sendable {
             locale: Locale(identifier: "ja_JP")
         ).filter { !$0.isWhitespace }
         return compact.hasSuffix("ホール") ? String(compact.dropLast(3)) : compact
+    }
+
+    static func spaceCode(
+        blockName: String,
+        spaceNumber: Int,
+        subspace: Int?,
+        isCombinedAB: Bool
+    ) -> String {
+        let number = String(format: "%02d", spaceNumber)
+        let side = isCombinedAB ? "a+b" : (subspace.map { $0 == 0 ? "a" : "b" } ?? "")
+        return "\(blockName)\(number)\(side)"
     }
 }
 

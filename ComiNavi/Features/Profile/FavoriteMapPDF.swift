@@ -124,19 +124,29 @@ struct FavoriteMapPDFCircle: Identifiable, Sendable {
     let mapID: Int
     let tableID: CatalogMapTable.ID
     let subspace: Int
+    let hallName: String
     let blockName: String
     let spaceNumber: Int
+    let isCombinedAB: Bool
     let circleName: String
     let penName: String?
     let memo: String?
 
     var spaceCode: String {
-        let side = subspace == 1 ? "b" : "a"
-        return "\(blockName)\(String(format: "%02d", spaceNumber))\(side)"
+        ComiketSpaceAddress.spaceCode(
+            blockName: blockName,
+            spaceNumber: spaceNumber,
+            subspace: subspace,
+            isCombinedAB: isCombinedAB
+        )
+    }
+
+    var locationLabel: String {
+        "\(ComiketSpaceAddress.canonicalHallName(hallName)) \(spaceCode)"
     }
 
     var dayAndSpace: String {
-        String(localized: "Day \(day) · \(spaceCode)")
+        String(localized: "Day \(day) · \(locationLabel)")
     }
 }
 
@@ -201,9 +211,22 @@ enum FavoriteMapPDFLoader {
                 day: sceneID.day,
                 mapID: sceneID.mapID
             )
+            var combinedTableIDs: Set<CatalogMapTable.ID> = []
+            for tableID in Set(bookmarks.map(\.tableID)) {
+                let members = try await dataSource.mapCatalog.circles(
+                    day: sceneID.day,
+                    tableID: tableID
+                )
+                if CatalogCirclePairing.isCombinedAB(members) {
+                    combinedTableIDs.insert(tableID)
+                }
+            }
             var items = bookmarks.map { bookmark in
                 let circle = circlesByPublicID[bookmark.publicCircleID]
                 let table = scene.tableByID[bookmark.tableID]
+                let hallName = normalized(table?.hallName)
+                    ?? normalized(hallsByID[sceneID]?.name)
+                    ?? scene.name
                 let blockName = normalized(table?.blockName)
                 let circleName = normalized(circle?.circleName)
                 let penName = normalized(circle?.penName)
@@ -219,8 +242,10 @@ enum FavoriteMapPDFLoader {
                     mapID: bookmark.mapID,
                     tableID: bookmark.tableID,
                     subspace: bookmark.subspace,
+                    hallName: hallName,
                     blockName: blockName ?? "?",
                     spaceNumber: bookmark.tableID.spaceNumber,
+                    isCombinedAB: combinedTableIDs.contains(bookmark.tableID),
                     circleName: circleName ?? String(localized: "Unnamed circle"),
                     penName: penName,
                     memo: memo
@@ -584,10 +609,10 @@ enum FavoriteMapPDFRenderer {
 
     private static func drawCircleRow(_ circle: FavoriteMapPDFCircle, y: CGFloat) {
         let x = horizontalMargin
-        let widths: [CGFloat] = [34, 92, 224, 142, 293]
+        let widths: [CGFloat] = [34, 116, 212, 130, 293]
         let values = [
             String(circle.number),
-            circle.spaceCode,
+            circle.locationLabel,
             circle.circleName,
             circle.penName ?? "",
             circle.memo ?? "",

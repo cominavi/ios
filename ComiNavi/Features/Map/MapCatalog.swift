@@ -295,6 +295,40 @@ protocol MapCatalog: Sendable {
     func bookmarkLocations(publicCircleIDs: [Int]) async throws -> [CatalogBookmarkLocation]
 }
 
+extension MapCatalog {
+    func bookmarkLocationsBatched(updateIDs: [Int]) async throws -> [CatalogBookmarkLocation] {
+        try await bookmarkLocationsBatched(ids: updateIDs) { batch in
+            try await bookmarkLocations(updateIDs: batch)
+        }
+    }
+
+    func bookmarkLocationsBatched(
+        publicCircleIDs: [Int]
+    ) async throws -> [CatalogBookmarkLocation] {
+        try await bookmarkLocationsBatched(ids: publicCircleIDs) { batch in
+            try await bookmarkLocations(publicCircleIDs: batch)
+        }
+    }
+
+    private func bookmarkLocationsBatched(
+        ids: [Int],
+        load: ([Int]) async throws -> [CatalogBookmarkLocation]
+    ) async throws -> [CatalogBookmarkLocation] {
+        let uniqueIDs = Array(Set(ids))
+        guard !uniqueIDs.isEmpty else { return [] }
+
+        let batchSize = 900
+        var locations: [CatalogBookmarkLocation] = []
+        locations.reserveCapacity(uniqueIDs.count)
+        for start in stride(from: 0, to: uniqueIDs.count, by: batchSize) {
+            try Task.checkCancellation()
+            let end = min(start + batchSize, uniqueIDs.count)
+            locations.append(contentsOf: try await load(Array(uniqueIDs[start ..< end])))
+        }
+        return locations
+    }
+}
+
 struct SQLiteMapCatalog: MapCatalog {
     let mainDatabase: any DatabaseReader
     let imageDatabase: any DatabaseReader

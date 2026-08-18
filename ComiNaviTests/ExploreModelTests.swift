@@ -6,6 +6,34 @@ import XCTest
 
 @MainActor
 final class ExploreModelTests: XCTestCase {
+    func testLocationLabelRequiresHallAndUsesCombinedABMarker() {
+        var circle = makeExploreCircle(
+            id: 1,
+            day: 1,
+            genreID: 10,
+            name: "Circle",
+            penName: "Artist",
+            description: "Description",
+            tags: []
+        )
+        circle.memberCircles = [
+            circle.circle,
+            makeExploreCircle(
+                id: 2,
+                day: 1,
+                genreID: 10,
+                name: "Circle",
+                penName: "Artist",
+                description: "Description",
+                tags: []
+            ).circle,
+        ]
+
+        XCTAssertNil(circle.locationLabel)
+        circle.hallName = "東１"
+        XCTAssertEqual(circle.locationLabel, "東1ホール A01a+b")
+    }
+
     func testDaySelectionFiltersTheEntireExploreCollection() async {
         let model = ExploreModel(circles: fixtures, selectedDay: 1)
         await model.load()
