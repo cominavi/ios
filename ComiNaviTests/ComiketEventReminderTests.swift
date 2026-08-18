@@ -23,9 +23,23 @@ final class ComiketEventReminderTests: XCTestCase {
         XCTAssertEqual(requests.first?.day, 1)
         XCTAssertEqual(
             requests.last?.identifier,
-            "cominavi.event-reminder.c108.day2.circle-close.15m"
+            "cominavi.event-reminder.c108.day2.circle-close.120m"
         )
-        XCTAssertEqual(requests.last?.fireDate, try date("2026-08-16T06:45:00Z"))
+        XCTAssertEqual(requests.last?.fireDate, try date("2026-08-16T05:00:00Z"))
+    }
+
+    func testCircleCloseDefaultsToFourteenHundredOnBothDays() throws {
+        let requests = ComiketEventReminderCatalog.requests(
+            for: [.circleClose],
+            now: try date("2026-08-09T00:00:00Z")
+        )
+
+        XCTAssertEqual(requests.map(\.timing), [.twoHoursBefore, .twoHoursBefore])
+        XCTAssertEqual(requests.map(\.fireDate), [
+            try date("2026-08-15T05:00:00Z"),
+            try date("2026-08-16T05:00:00Z"),
+        ])
+        XCTAssertTrue(requests.allSatisfy { $0.identifier.hasSuffix(".120m") })
     }
 
     func testPlanSupportsAtEventAndIndependentAdvanceTimings() throws {
@@ -138,9 +152,45 @@ final class ComiketEventReminderTests: XCTestCase {
         XCTAssertTrue(store.isEnabled(.earlyEntry))
         XCTAssertTrue(store.isEnabled(.circleClose))
         XCTAssertEqual(store.timing(for: .earlyEntry), .fifteenMinutesBefore)
-        XCTAssertEqual(store.timing(for: .circleClose), .fifteenMinutesBefore)
+        XCTAssertEqual(store.timing(for: .circleClose), .twoHoursBefore)
         XCTAssertTrue(store.selectedTimings.isEmpty)
         XCTAssertNotNil(defaults.data(forKey: "comiket.event-reminders.c108.settings.v2"))
+    }
+
+    func testExplicitCircleCloseTimingSurvivesRelaunchAndRescheduling() async throws {
+        let suiteName = "ComiketEventReminderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(
+            [ComiketReminderKind.circleClose.rawValue],
+            forKey: "comiket.event-reminders.c108.enabled-kinds.v1"
+        )
+        let scheduler = ReminderSchedulerSpy(
+            authorization: .authorized(timeSensitiveEnabled: true)
+        )
+        let now = try date("2026-08-09T00:00:00Z")
+        let store = ComiketReminderStore(
+            scheduler: scheduler,
+            defaults: defaults,
+            now: { now }
+        )
+
+        await store.setTiming(.atEvent, for: .circleClose)
+
+        let reopened = ComiketReminderStore(
+            scheduler: scheduler,
+            defaults: defaults,
+            now: { now }
+        )
+        await reopened.refresh()
+
+        XCTAssertEqual(reopened.timing(for: .circleClose), .atEvent)
+        let requests = await scheduler.latestRequests()
+        XCTAssertEqual(requests.map(\.fireDate), [
+            try date("2026-08-15T07:00:00Z"),
+            try date("2026-08-16T07:00:00Z"),
+        ])
+        XCTAssertTrue(requests.allSatisfy { $0.identifier.hasSuffix(".0m") })
     }
 
     func testTimingChoicePersistsWhileReminderIsDisabled() async throws {
@@ -276,7 +326,7 @@ final class ComiketEventReminderTests: XCTestCase {
 
         await store.setTiming(.atEvent, for: .circleClose)
 
-        XCTAssertEqual(store.timing(for: .circleClose), .fifteenMinutesBefore)
+        XCTAssertEqual(store.timing(for: .circleClose), .twoHoursBefore)
         XCTAssertNotNil(store.errorMessage)
     }
 

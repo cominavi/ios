@@ -41,7 +41,10 @@ enum ComiketReminderKind: String, CaseIterable, Identifiable, Sendable {
     }
 
     var defaultTiming: ComiketReminderTiming {
-        .fifteenMinutesBefore
+        switch self {
+        case .circleClose: .twoHoursBefore
+        case .earlyEntry, .amEntry, .pmEntry: .fifteenMinutesBefore
+        }
     }
 
     func notificationTimeLabel(for timing: ComiketReminderTiming) -> String {
