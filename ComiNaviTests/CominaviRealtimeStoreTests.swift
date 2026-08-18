@@ -57,12 +57,13 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         )
         try Data("not a directory".utf8).write(to: blockedDirectory)
 
-        let restored = try await FileCominaviRealtimeCacheStore(
+        let loadResult = try await FileCominaviRealtimeCacheStore(
             directory: blockedDirectory,
             legacyDirectory: legacyDirectory
-        ).load(eventNumber: 108)
+        ).loadResult(eventNumber: 108)
 
-        XCTAssertEqual(restored, payload)
+        XCTAssertEqual(loadResult?.data, payload)
+        XCTAssertEqual(loadResult?.requiresRewrite, true)
     }
 
     func testKeepsNewestHeadAndConvertsRealtimeArtworkAndAttendance() async throws {
@@ -208,6 +209,95 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         XCTAssertEqual(resumedCursors, [3])
         XCTAssertEqual(current?.posts.map(\.id), ["current"])
         XCTAssertEqual(current?.attendanceClaims.map(\.status), [.withdrawn])
+    }
+
+    func testUnchangedCachedSnapshotIsNotReencodedOrRewritten() async throws {
+        let cache = InMemoryRealtimeCacheStore()
+        let seedStore = CominaviRealtimeStore(
+            client: RealtimeFetchingStub(pages: [
+                CominaviRealtimeUpdatePage(updates: [], hasMore: false),
+            ]),
+            cacheStore: cache
+        )
+        try await seedStore.refresh(eventNumber: 108, minimumInterval: 0)
+        let initialSaveCount = await cache.saveCount()
+        XCTAssertEqual(initialSaveCount, 1, "The first empty snapshot is still durable")
+        await cache.resetSaveCount()
+
+        let client = RealtimeFetchingStub(pages: [
+            CominaviRealtimeUpdatePage(updates: [], hasMore: false),
+        ])
+        let store = CominaviRealtimeStore(client: client, cacheStore: cache)
+        try await store.refresh(eventNumber: 108, minimumInterval: 0)
+        await store.waitForRevalidation(eventNumber: 108)
+
+        let unchangedSaveCount = await cache.saveCount()
+        let initialRequestCount = await client.requestCount()
+        XCTAssertEqual(unchangedSaveCount, 0)
+        XCTAssertEqual(initialRequestCount, 1)
+
+        try await store.refresh(eventNumber: 108, minimumInterval: 60)
+        let throttledRequestCount = await client.requestCount()
+        XCTAssertEqual(
+            throttledRequestCount,
+            1,
+            "A no-op refresh must still advance the refresh throttle"
+        )
+    }
+
+    func testChangedCachedSnapshotIsWrittenOnce() async throws {
+        let cache = InMemoryRealtimeCacheStore()
+        let seedStore = CominaviRealtimeStore(
+            client: RealtimeFetchingStub(pages: [
+                CominaviRealtimeUpdatePage(updates: [], hasMore: false),
+            ]),
+            cacheStore: cache
+        )
+        try await seedStore.refresh(eventNumber: 108, minimumInterval: 0)
+        await cache.resetSaveCount()
+
+        let client = RealtimeFetchingStub(pages: [
+            CominaviRealtimeUpdatePage(
+                updates: [try update(
+                    cursor: 1,
+                    stateKind: "presence",
+                    stateValue: "open",
+                    occurredAt: "2026-08-15T03:00:00Z"
+                )],
+                hasMore: false
+            ),
+        ])
+        let store = CominaviRealtimeStore(client: client, cacheStore: cache)
+        try await store.refresh(eventNumber: 108, minimumInterval: 0)
+        await store.waitForRevalidation(eventNumber: 108)
+
+        let changedSaveCount = await cache.saveCount()
+        XCTAssertEqual(changedSaveCount, 1)
+    }
+
+    func testUnchangedCacheIsRewrittenWhenDurableMigrationIsRequired() async throws {
+        let cache = InMemoryRealtimeCacheStore()
+        let seedStore = CominaviRealtimeStore(
+            client: RealtimeFetchingStub(pages: [
+                CominaviRealtimeUpdatePage(updates: [], hasMore: false),
+            ]),
+            cacheStore: cache
+        )
+        try await seedStore.refresh(eventNumber: 108, minimumInterval: 0)
+        await cache.resetSaveCount()
+        await cache.requireRewriteOnNextLoad()
+
+        let store = CominaviRealtimeStore(
+            client: RealtimeFetchingStub(pages: [
+                CominaviRealtimeUpdatePage(updates: [], hasMore: false),
+            ]),
+            cacheStore: cache
+        )
+        try await store.refresh(eventNumber: 108, minimumInterval: 0)
+        await store.waitForRevalidation(eventNumber: 108)
+
+        let saveCount = await cache.saveCount()
+        XCTAssertEqual(saveCount, 1)
     }
 
     func testDiskSnapshotIsReturnedWhileNetworkRevalidates() async throws {
@@ -929,9 +1019,17 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         )
         let cursors = await client.requestedCursors()
         let revisions = await client.requestedTagRevisions()
+        let saveCount = await cache.saveCount()
+        let cachedData = await cache.load(eventNumber: 108)
+        let rewrittenData = try XCTUnwrap(cachedData)
+        let rewrittenJSON = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: rewrittenData) as? [String: Any]
+        )
         XCTAssertNil(restored)
         XCTAssertEqual(cursors, [0])
         XCTAssertEqual(revisions, [CominaviCircleTagOverlay.absentRevision])
+        XCTAssertEqual(saveCount, 1)
+        XCTAssertEqual(rewrittenJSON["version"] as? Int, 3)
     }
 
     func testPublicationResetDropsLegacyBlueCivetTargetBeforeRevalidationCompletes() async throws {
@@ -1534,14 +1632,24 @@ private struct LegacyRealtimeCacheSnapshot: Encodable {
 private actor InMemoryRealtimeCacheStore: CominaviRealtimeCachePersisting {
     private var dataByEvent: [Int: Data] = [:]
     private var saves = 0
+    private var rewriteRequired = false
 
     func load(eventNumber: Int) -> Data? {
         dataByEvent[eventNumber]
     }
 
+    func loadResult(eventNumber: Int) -> CominaviRealtimeCacheLoad? {
+        guard let data = dataByEvent[eventNumber] else { return nil }
+        return CominaviRealtimeCacheLoad(
+            data: data,
+            requiresRewrite: rewriteRequired
+        )
+    }
+
     func save(_ data: Data, eventNumber: Int) {
         dataByEvent[eventNumber] = data
         saves += 1
+        rewriteRequired = false
     }
 
     func saveCount() -> Int {
@@ -1550,5 +1658,9 @@ private actor InMemoryRealtimeCacheStore: CominaviRealtimeCachePersisting {
 
     func resetSaveCount() {
         saves = 0
+    }
+
+    func requireRewriteOnNextLoad() {
+        rewriteRequired = true
     }
 }
