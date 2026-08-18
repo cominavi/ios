@@ -1051,6 +1051,7 @@ private struct ConventionFloorBackdrop: View {
     @Environment(\.accessibilityVoiceOverEnabled) private var accessibilityVoiceOverEnabled
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(AppPowerPolicy.self) private var powerPolicy
     @State private var scene = ConventionFloorScene()
     @State private var isIdle = false
 
@@ -1060,8 +1061,11 @@ private struct ConventionFloorBackdrop: View {
         $0.hasPrefix("-cominavi-ui-testing")
     }
 
+    /// Low Power Mode also gets the still floor, and the live floor returns
+    /// as soon as Low Power Mode turns off.
     private var usesStaticFloor: Bool {
         accessibilityReduceMotion || accessibilityVoiceOverEnabled || Self.isUITesting
+            || powerPolicy.pausesNonessentialBackdrop
     }
 
     private var isSimulationPaused: Bool {
@@ -3005,6 +3009,7 @@ private final class ConventionFloorScene: SKScene {
 #Preview("First launch") {
     SignInView(reason: .firstLaunch)
         .environment(\.locale, .init(identifier: "ja"))
+        .environment(AppPowerPolicy())
 }
 
 #Preview("Session expired") {
@@ -3014,4 +3019,5 @@ private final class ConventionFloorScene: SKScene {
             displayName: "Comike Fan"
         )
     )
+    .environment(AppPowerPolicy())
 }

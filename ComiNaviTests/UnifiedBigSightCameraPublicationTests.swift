@@ -62,6 +62,26 @@ final class UnifiedBigSightCameraPublicationTests: XCTestCase {
         withExtendedLifetime(coordinator) {}
     }
 
+    @MainActor
+    func testEnablingReducedMotionStopsAnActiveCameraAnimation() {
+        let renderer = UnifiedBigSightScene(campus: makeGridAlignedCampus())
+        let host = UnifiedMapHostView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        host.layoutIfNeeded()
+        host.mapView.presentScene(renderer)
+
+        renderer.animatedZoom(
+            by: 2,
+            around: CGPoint(x: 195, y: 422),
+            in: host.mapView
+        )
+
+        XCTAssertTrue(renderer.hasActiveCameraAnimation)
+
+        renderer.reduceMotion = true
+
+        XCTAssertFalse(renderer.hasActiveCameraAnimation)
+    }
+
     private func makeGridAlignedCampus() -> BigSightCampusScene {
         let scene = CatalogMapScene(
             id: .init(day: 1, mapID: 1),

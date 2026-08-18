@@ -10,6 +10,7 @@ final class WhereAmILocationService: NSObject {
     private(set) var headingDegrees: Double?
     private(set) var isUpdatingLocation = false
     private(set) var isUpdatingHeading = false
+    private(set) var isLowPowerModeEnabled: Bool
 
     @ObservationIgnored private let manager: CLLocationManager
     @ObservationIgnored private let simulated: Bool
@@ -17,11 +18,13 @@ final class WhereAmILocationService: NSObject {
     @ObservationIgnored private var wantsHeadingUpdates = false
 
     init(
+        locationManager: CLLocationManager = CLLocationManager(),
         simulatedReading: WhereAmILocationReading? = nil,
         simulatedHeading: Double? = nil,
-        simulatedAuthorizationStatus: CLAuthorizationStatus? = nil
+        simulatedAuthorizationStatus: CLAuthorizationStatus? = nil,
+        isLowPowerModeEnabled: Bool = false
     ) {
-        manager = CLLocationManager()
+        manager = locationManager
         simulated =
             simulatedReading != nil || simulatedHeading != nil
             || simulatedAuthorizationStatus != nil
@@ -30,16 +33,21 @@ final class WhereAmILocationService: NSObject {
             ?? (simulated ? .authorizedWhenInUse : manager.authorizationStatus)
         latestReading = simulatedReading
         headingDegrees = simulatedHeading
+        self.isLowPowerModeEnabled = isLowPowerModeEnabled
         super.init()
 
         if !simulated {
             manager.delegate = self
         }
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.distanceFilter = 4
-        manager.headingFilter = 2
+        applyPowerPolicy()
         manager.activityType = .otherNavigation
         manager.pausesLocationUpdatesAutomatically = true
+    }
+
+    func updatePowerPolicy(isLowPowerModeEnabled: Bool) {
+        guard self.isLowPowerModeEnabled != isLowPowerModeEnabled else { return }
+        self.isLowPowerModeEnabled = isLowPowerModeEnabled
+        applyPowerPolicy()
     }
 
     func start(
@@ -124,6 +132,18 @@ final class WhereAmILocationService: NSObject {
     private func stopHeadingUpdates() {
         manager.stopUpdatingHeading()
         isUpdatingHeading = false
+    }
+
+    private func applyPowerPolicy() {
+        if isLowPowerModeEnabled {
+            manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+            manager.distanceFilter = 25
+            manager.headingFilter = 15
+        } else {
+            manager.desiredAccuracy = kCLLocationAccuracyBest
+            manager.distanceFilter = 4
+            manager.headingFilter = 2
+        }
     }
 
     private func acceptAuthorization(_ status: CLAuthorizationStatus) {

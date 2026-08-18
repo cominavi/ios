@@ -878,4 +878,5 @@ private struct AccountDeletionPendingView: View {
 
 #Preview {
     EntryView()
+        .environment(AppPowerPolicy())
 }

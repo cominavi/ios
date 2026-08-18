@@ -162,6 +162,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppPowerPolicy.self) private var powerPolicy
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -204,9 +205,10 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     private func update(host: UnifiedMapHostView, renderer: UnifiedBigSightScene) {
         let appearance = UnifiedMapAppearance(colorScheme)
         host.updateAppearance(appearance)
+        host.frameRateCap = powerPolicy.mapFrameRateCap
         renderer.updateAppearance(appearance)
         renderer.onViewportChange = onViewportChange
-        renderer.reduceMotion = reduceMotion
+        renderer.reduceMotion = reduceMotion || powerPolicy.suppressesNonessentialAnimation
         renderer.update(
             campus: campus,
             scope: scope,
@@ -714,11 +716,23 @@ final class UnifiedMapHostView: UIView {
         NotificationCenter.default.removeObserver(self)
     }
 
+    /// The Low Power Mode frame-rate cap, or nil for the screen maximum.
+    var frameRateCap: Int? {
+        didSet {
+            guard frameRateCap != oldValue else { return }
+            applyPreferredFrameRate()
+        }
+    }
+
+    private func applyPreferredFrameRate() {
+        guard let screen = window?.windowScene?.screen else { return }
+        let maximum = screen.maximumFramesPerSecond
+        mapView.preferredFramesPerSecond = frameRateCap.map { min(max(1, $0), maximum) } ?? maximum
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        if let screen = window?.windowScene?.screen {
-            mapView.preferredFramesPerSecond = screen.maximumFramesPerSecond
-        }
+        applyPreferredFrameRate()
         synchronizeBasemapFromScene()
         updateReservedChrome()
 
@@ -1495,7 +1509,13 @@ final class UnifiedBigSightScene: SKScene {
     var onViewportChange: ((CatalogMapViewport) -> Void)?
     var onCameraChange: (() -> Void)?
     var onSemanticScopeChange: ((MapScreenModel.Scope, Int?) -> Void)?
-    var reduceMotion = false
+    var reduceMotion = false {
+        didSet {
+            guard reduceMotion, reduceMotion != oldValue else { return }
+            mapCamera.removeAllActions()
+            endGesture()
+        }
+    }
 
     private var campus: BigSightCampusScene
     private var appearance: UnifiedMapAppearance
@@ -1574,6 +1594,7 @@ final class UnifiedBigSightScene: SKScene {
     private static let searchUnmatchedVenueAlpha: CGFloat = 0.35
 
     var cameraRotation: CGFloat { mapCamera.zRotation }
+    var hasActiveCameraAnimation: Bool { mapCamera.hasActions() }
     var gridAlignedCameraRotation: CGFloat { campus.gridAlignedCameraRotation }
     var cameraCampusCenter: CGPoint {
         UnifiedMapProjection.campusPoint(fromScene: mapCamera.position)
