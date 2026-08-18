@@ -222,9 +222,26 @@ final class RemoteImagePipelineTests: XCTestCase {
             RemoteImagePipeline.configureCaches()
         }
 
+        XCTAssertEqual(
+            RemoteImageCacheCategory.shinagaki.memoryCostLimitBytes,
+            64 * 1_024 * 1_024
+        )
+        XCTAssertEqual(
+            RemoteImageCacheCategory.circleArtwork.memoryCostLimitBytes,
+            32 * 1_024 * 1_024
+        )
+        XCTAssertEqual(
+            RemoteImageCacheCategory.profileImages.memoryCostLimitBytes,
+            16 * 1_024 * 1_024
+        )
+
         RemoteImagePipeline.configureCaches(defaults: defaults)
         for category in RemoteImageCacheCategory.allCases {
             let cache = RemoteImagePipeline.cache(for: category)
+            XCTAssertEqual(
+                cache.memoryStorage.config.totalCostLimit,
+                category.memoryCostLimitBytes
+            )
             switch cache.diskStorage.config.expiration {
             case .never:
                 break

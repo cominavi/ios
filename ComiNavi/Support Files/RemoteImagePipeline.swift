@@ -18,6 +18,18 @@ enum RemoteImageCacheCategory: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Kingfisher defaults every custom cache to one quarter of physical RAM.
+    /// These category-specific ceilings keep the three caches from competing
+    /// for most of the device's memory while disk cache hits remain available.
+    var memoryCostLimitBytes: Int {
+        let mebibytes: Int = switch self {
+        case .shinagaki: 64
+        case .circleArtwork: 32
+        case .profileImages: 16
+        }
+        return mebibytes * 1_024 * 1_024
+    }
+
     fileprivate var cacheName: String {
         "cominavi.remote-images.\(rawValue).v1"
     }
@@ -70,6 +82,7 @@ enum RemoteImagePipeline {
     static func configureCaches(defaults: UserDefaults = .standard) {
         for category in RemoteImageCacheCategory.allCases {
             let cache = cache(for: category)
+            cache.memoryStorage.config.totalCostLimit = category.memoryCostLimitBytes
             cache.diskStorage.config.expiration = .never
             cache.diskStorage.config.sizeLimit = configuredLimit(
                 for: category,
