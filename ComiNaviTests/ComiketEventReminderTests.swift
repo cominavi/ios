@@ -14,12 +14,51 @@ final class ComiketEventReminderTests: XCTestCase {
         )
 
         XCTAssertEqual(requests.count, 8)
-        XCTAssertEqual(requests.first?.identifier, "cominavi.event-reminder.c108.day1.early-entry")
+        XCTAssertEqual(
+            requests.first?.identifier,
+            "cominavi.event-reminder.c108.day1.early-entry.15m"
+        )
         XCTAssertEqual(requests.first?.fireDate, try date("2026-08-15T01:15:00Z"))
         XCTAssertEqual(requests.first?.kind, .earlyEntry)
         XCTAssertEqual(requests.first?.day, 1)
-        XCTAssertEqual(requests.last?.identifier, "cominavi.event-reminder.c108.day2.circle-close")
+        XCTAssertEqual(
+            requests.last?.identifier,
+            "cominavi.event-reminder.c108.day2.circle-close.15m"
+        )
         XCTAssertEqual(requests.last?.fireDate, try date("2026-08-16T06:45:00Z"))
+    }
+
+    func testPlanSupportsAtEventAndIndependentAdvanceTimings() throws {
+        let requests = ComiketEventReminderCatalog.requests(
+            for: [.earlyEntry, .pmEntry],
+            timings: [
+                .earlyEntry: .atEvent,
+                .pmEntry: .thirtyMinutesBefore,
+            ],
+            now: try date("2026-08-09T00:00:00Z")
+        )
+
+        let dayOneEarlyEntry = try XCTUnwrap(
+            requests.first { $0.day == 1 && $0.kind == .earlyEntry }
+        )
+        XCTAssertEqual(dayOneEarlyEntry.timing, .atEvent)
+        XCTAssertEqual(dayOneEarlyEntry.fireDate, try date("2026-08-15T01:30:00Z"))
+        XCTAssertEqual(
+            dayOneEarlyEntry.identifier,
+            "cominavi.event-reminder.c108.day1.early-entry.0m"
+        )
+        XCTAssertTrue(dayOneEarlyEntry.body.hasPrefix("Now ·"))
+
+        let dayOnePMEntry = try XCTUnwrap(
+            requests.first { $0.day == 1 && $0.kind == .pmEntry }
+        )
+        XCTAssertEqual(dayOnePMEntry.timing, .thirtyMinutesBefore)
+        XCTAssertEqual(dayOnePMEntry.fireDate, try date("2026-08-15T03:00:00Z"))
+        XCTAssertEqual(
+            dayOnePMEntry.identifier,
+            "cominavi.event-reminder.c108.day1.pm-entry.30m"
+        )
+        XCTAssertTrue(dayOnePMEntry.body.hasPrefix("In 30 minutes ·"))
     }
 
     func testPlanNeverSchedulesMilestonesThatAlreadyPassed() throws {
@@ -82,6 +121,94 @@ final class ComiketEventReminderTests: XCTestCase {
         XCTAssertTrue(reopened.isEnabled(.earlyEntry))
     }
 
+    func testLegacyEnabledKindsMigrateWithoutCreatingExplicitTimingOverrides() throws {
+        let suiteName = "ComiketEventReminderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(
+            [ComiketReminderKind.earlyEntry.rawValue, ComiketReminderKind.circleClose.rawValue],
+            forKey: "comiket.event-reminders.c108.enabled-kinds.v1"
+        )
+
+        let store = ComiketReminderStore(
+            scheduler: ReminderSchedulerSpy(authorization: .denied),
+            defaults: defaults
+        )
+
+        XCTAssertTrue(store.isEnabled(.earlyEntry))
+        XCTAssertTrue(store.isEnabled(.circleClose))
+        XCTAssertEqual(store.timing(for: .earlyEntry), .fifteenMinutesBefore)
+        XCTAssertEqual(store.timing(for: .circleClose), .fifteenMinutesBefore)
+        XCTAssertTrue(store.selectedTimings.isEmpty)
+        XCTAssertNotNil(defaults.data(forKey: "comiket.event-reminders.c108.settings.v2"))
+    }
+
+    func testTimingChoicePersistsWhileReminderIsDisabled() async throws {
+        let suiteName = "ComiketEventReminderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let scheduler = ReminderSchedulerSpy(authorization: .denied)
+        let store = ComiketReminderStore(scheduler: scheduler, defaults: defaults)
+
+        await store.setTiming(.oneHourBefore, for: .amEntry)
+
+        XCTAssertEqual(store.timing(for: .amEntry), .oneHourBefore)
+        let reopened = ComiketReminderStore(scheduler: scheduler, defaults: defaults)
+        XCTAssertEqual(reopened.timing(for: .amEntry), .oneHourBefore)
+    }
+
+    func testTimingChangeReplacesRequestsWithTimingSpecificIdentifiers() async throws {
+        let suiteName = "ComiketEventReminderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let scheduler = ReminderSchedulerSpy(
+            authorization: .authorized(timeSensitiveEnabled: true)
+        )
+        let now = try date("2026-08-09T00:00:00Z")
+        let store = ComiketReminderStore(
+            scheduler: scheduler,
+            defaults: defaults,
+            now: { now }
+        )
+
+        await store.setEnabled(true, for: .earlyEntry)
+        await store.setTiming(.atEvent, for: .earlyEntry)
+
+        let replacements = await scheduler.replacementHistory()
+        XCTAssertEqual(replacements.count, 2)
+        XCTAssertTrue(replacements[0].allSatisfy { $0.identifier.hasSuffix(".15m") })
+        XCTAssertTrue(replacements[1].allSatisfy { $0.identifier.hasSuffix(".0m") })
+        XCTAssertEqual(replacements[1].map(\.fireDate), [
+            try date("2026-08-15T01:30:00Z"),
+            try date("2026-08-16T01:30:00Z"),
+        ])
+    }
+
+    func testRefreshReschedulesMilestonesAfterClockRollback() async throws {
+        let suiteName = "ComiketEventReminderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let clock = TestClock(now: try date("2026-08-15T02:00:00Z"))
+        let scheduler = ReminderSchedulerSpy(
+            authorization: .authorized(timeSensitiveEnabled: true)
+        )
+        let store = ComiketReminderStore(
+            scheduler: scheduler,
+            defaults: defaults,
+            now: { clock.current() }
+        )
+
+        await store.setEnabled(true, for: .earlyEntry)
+        let requestsBeforeRollback = await scheduler.latestRequests()
+        XCTAssertEqual(requestsBeforeRollback.map(\.day), [2])
+
+        clock.set(try date("2026-08-14T00:00:00Z"))
+        await store.refresh()
+
+        let requestsAfterRollback = await scheduler.latestRequests()
+        XCTAssertEqual(requestsAfterRollback.map(\.day), [1, 2])
+    }
+
     func testDeniedPermissionDoesNotEnableReminder() async throws {
         let suiteName = "ComiketEventReminderTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
@@ -133,6 +260,26 @@ final class ComiketEventReminderTests: XCTestCase {
         XCTAssertFalse(reopened.isEnabled(.circleClose))
     }
 
+    func testSchedulingFailureRollsBackOptimisticTiming() async throws {
+        let suiteName = "ComiketEventReminderTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(
+            [ComiketReminderKind.circleClose.rawValue],
+            forKey: "comiket.event-reminders.c108.enabled-kinds.v1"
+        )
+        let scheduler = ReminderSchedulerSpy(
+            authorization: .authorized(timeSensitiveEnabled: true),
+            replacementError: ReminderSchedulerTestError.replacementFailed
+        )
+        let store = ComiketReminderStore(scheduler: scheduler, defaults: defaults)
+
+        await store.setTiming(.atEvent, for: .circleClose)
+
+        XCTAssertEqual(store.timing(for: .circleClose), .fifteenMinutesBefore)
+        XCTAssertNotNil(store.errorMessage)
+    }
+
     private func date(_ value: String) throws -> Date {
         try XCTUnwrap(ISO8601DateFormatter().date(from: value))
     }
@@ -174,8 +321,29 @@ private actor ReminderSchedulerSpy: ComiketNotificationScheduling {
     func latestRequests() -> [ComiketReminderRequest] {
         replacements.last ?? []
     }
+
+    func replacementHistory() -> [[ComiketReminderRequest]] {
+        replacements
+    }
 }
 
 private enum ReminderSchedulerTestError: Error {
     case replacementFailed
+}
+
+private final class TestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var now: Date
+
+    init(now: Date) {
+        self.now = now
+    }
+
+    func current() -> Date {
+        lock.withLock { now }
+    }
+
+    func set(_ date: Date) {
+        lock.withLock { now = date }
+    }
 }

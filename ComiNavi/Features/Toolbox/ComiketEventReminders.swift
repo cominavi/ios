@@ -40,13 +40,18 @@ enum ComiketReminderKind: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var notificationTitle: String {
-        switch self {
-        case .earlyEntry: String(localized: "Early Entry starts in 15 minutes")
-        case .amEntry: String(localized: "AM Entry starts in 15 minutes")
-        case .pmEntry: String(localized: "PM Entry starts in 15 minutes")
-        case .circleClose: String(localized: "Circle spaces close in 15 minutes")
-        }
+    var defaultTiming: ComiketReminderTiming {
+        .fifteenMinutesBefore
+    }
+
+    func notificationTimeLabel(for timing: ComiketReminderTiming) -> String {
+        let eventMinutes = eventHour * 60 + eventMinute
+        let notificationMinutes = eventMinutes - timing.rawValue
+        return String(
+            format: "%02d:%02d",
+            notificationMinutes / 60,
+            notificationMinutes % 60
+        )
     }
 
     var notificationDetail: String {
@@ -63,11 +68,43 @@ enum ComiketReminderKind: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+enum ComiketReminderTiming: Int, CaseIterable, Codable, Identifiable, Sendable {
+    case atEvent = 0
+    case fifteenMinutesBefore = 15
+    case thirtyMinutesBefore = 30
+    case oneHourBefore = 60
+    case twoHoursBefore = 120
+
+    var id: Int { rawValue }
+    var leadTime: TimeInterval { TimeInterval(rawValue * 60) }
+
+    var pickerLabel: LocalizedStringResource {
+        switch self {
+        case .atEvent: "At event time"
+        case .fifteenMinutesBefore: "15 minutes before"
+        case .thirtyMinutesBefore: "30 minutes before"
+        case .oneHourBefore: "1 hour before"
+        case .twoHoursBefore: "2 hours before"
+        }
+    }
+
+    var notificationLeadLabel: String {
+        switch self {
+        case .atEvent: String(localized: "Now")
+        case .fifteenMinutesBefore: String(localized: "In 15 minutes")
+        case .thirtyMinutesBefore: String(localized: "In 30 minutes")
+        case .oneHourBefore: String(localized: "In 1 hour")
+        case .twoHoursBefore: String(localized: "In 2 hours")
+        }
+    }
+}
+
 struct ComiketReminderRequest: Equatable, Sendable {
     let identifier: String
     let eventNumber: Int
     let day: Int
     let kind: ComiketReminderKind
+    let timing: ComiketReminderTiming
     let fireDate: Date
     let title: String
     let body: String
@@ -75,7 +112,6 @@ struct ComiketReminderRequest: Equatable, Sendable {
 
 enum ComiketEventReminderCatalog {
     static let eventNumber = 108
-    static let leadTime: TimeInterval = 15 * 60
     static let officialScheduleURL = URL(
         string: "https://www.comiket.co.jp/info-a/TAFO/C108TAFO/ticket.html"
     )!
@@ -94,10 +130,12 @@ enum ComiketEventReminderCatalog {
 
     static func requests(
         for enabledKinds: Set<ComiketReminderKind>,
+        timings: [ComiketReminderKind: ComiketReminderTiming] = [:],
         now: Date = Date()
     ) -> [ComiketReminderRequest] {
         eventDays.flatMap { eventDay in
             enabledKinds.compactMap { kind in
+                let timing = timings[kind] ?? kind.defaultTiming
                 let components = DateComponents(
                     timeZone: tokyoCalendar.timeZone,
                     year: eventDay.year,
@@ -108,7 +146,7 @@ enum ComiketEventReminderCatalog {
                 )
                 guard let eventDate = tokyoCalendar.date(from: components) else { return nil }
 
-                let fireDate = eventDate.addingTimeInterval(-leadTime)
+                let fireDate = eventDate.addingTimeInterval(-timing.leadTime)
                 guard fireDate > now else { return nil }
 
                 let dayLabel = String.localizedStringWithFormat(
@@ -116,21 +154,30 @@ enum ComiketEventReminderCatalog {
                     eventDay.day
                 )
                 return ComiketReminderRequest(
-                    identifier: requestIdentifier(day: eventDay.day, kind: kind),
+                    identifier: requestIdentifier(
+                        day: eventDay.day,
+                        kind: kind,
+                        timing: timing
+                    ),
                     eventNumber: eventNumber,
                     day: eventDay.day,
                     kind: kind,
+                    timing: timing,
                     fireDate: fireDate,
-                    title: kind.notificationTitle,
-                    body: "\(dayLabel) · \(kind.timeLabel) · \(kind.notificationDetail)"
+                    title: String(localized: kind.title),
+                    body: "\(timing.notificationLeadLabel) · \(dayLabel) · \(kind.timeLabel) · \(kind.notificationDetail)"
                 )
             }
         }
         .sorted { $0.fireDate < $1.fireDate }
     }
 
-    static func requestIdentifier(day: Int, kind: ComiketReminderKind) -> String {
-        "\(SystemComiketNotificationScheduler.requestPrefix).c108.day\(day).\(kind.rawValue)"
+    static func requestIdentifier(
+        day: Int,
+        kind: ComiketReminderKind,
+        timing: ComiketReminderTiming
+    ) -> String {
+        "\(SystemComiketNotificationScheduler.requestPrefix).c108.day\(day).\(kind.rawValue).\(timing.rawValue)m"
     }
 }
 
@@ -200,6 +247,7 @@ struct SystemComiketNotificationScheduler: ComiketNotificationScheduling {
             "event": reminder.eventNumber,
             "day": reminder.day,
             "kind": reminder.kind.rawValue,
+            "lead_minutes": reminder.timing.rawValue,
         ]
 
         let calendar = ComiketEventReminderCatalog.tokyoCalendar
@@ -233,6 +281,7 @@ final class ComiketReminderStore {
     private(set) var state: State = .checking
     private(set) var errorMessage: String?
     private(set) var enabledKinds: Set<ComiketReminderKind>
+    private(set) var selectedTimings: [ComiketReminderKind: ComiketReminderTiming]
 
     @ObservationIgnored private let scheduler: any ComiketNotificationScheduling
     @ObservationIgnored private let defaults: UserDefaults
@@ -240,6 +289,7 @@ final class ComiketReminderStore {
     @ObservationIgnored private var updateRevision = 0
 
     private static let enabledKindsKey = "comiket.event-reminders.c108.enabled-kinds.v1"
+    private static let settingsKey = "comiket.event-reminders.c108.settings.v2"
 
     init(
         scheduler: any ComiketNotificationScheduling = SystemComiketNotificationScheduler(),
@@ -249,12 +299,20 @@ final class ComiketReminderStore {
         self.scheduler = scheduler
         self.defaults = defaults
         self.now = now
-        let persisted = Set(defaults.stringArray(forKey: Self.enabledKindsKey) ?? [])
-        enabledKinds = Set(ComiketReminderKind.allCases.filter { persisted.contains($0.rawValue) })
+        let settings = Self.loadSettings(from: defaults)
+        enabledKinds = settings.enabledKinds
+        selectedTimings = settings.selectedTimings
+        if settings.needsMigration {
+            persistSelection()
+        }
     }
 
     func isEnabled(_ kind: ComiketReminderKind) -> Bool {
         enabledKinds.contains(kind)
+    }
+
+    func timing(for kind: ComiketReminderKind) -> ComiketReminderTiming {
+        selectedTimings[kind] ?? kind.defaultTiming
     }
 
     func refresh() async {
@@ -272,6 +330,18 @@ final class ComiketReminderStore {
         let mutation = applyOptimisticSelection(enabled, for: kind)
         Task { [weak self] in
             await self?.finishSelection(mutation)
+        }
+    }
+
+    func setTiming(_ timing: ComiketReminderTiming, for kind: ComiketReminderKind) async {
+        let mutation = applyOptimisticTiming(timing, for: kind)
+        await finishTimingSelection(mutation)
+    }
+
+    func setTimingOptimistically(_ timing: ComiketReminderTiming, for kind: ComiketReminderKind) {
+        let mutation = applyOptimisticTiming(timing, for: kind)
+        Task { [weak self] in
+            await self?.finishTimingSelection(mutation)
         }
     }
 
@@ -304,6 +374,31 @@ final class ComiketReminderStore {
         )
     }
 
+    private func applyOptimisticTiming(
+        _ timing: ComiketReminderTiming,
+        for kind: ComiketReminderKind
+    ) -> ReminderTimingMutation {
+        AppTrack.userIntent(
+            .eventReminderChanged,
+            data: [
+                "event_number": ComiketEventReminderCatalog.eventNumber,
+                "kind": kind.rawValue,
+                "enabled": enabledKinds.contains(kind),
+                "lead_minutes": timing.rawValue,
+            ]
+        )
+        updateRevision += 1
+        errorMessage = nil
+        let previousSelectedTimings = selectedTimings
+        selectedTimings[kind] = timing
+        persistSelection()
+        return ReminderTimingMutation(
+            revision: updateRevision,
+            kind: kind,
+            previousSelectedTimings: previousSelectedTimings
+        )
+    }
+
     private func finishSelection(_ mutation: ReminderSelectionMutation) async {
         do {
             var authorization = await scheduler.authorization()
@@ -330,6 +425,23 @@ final class ComiketReminderStore {
         }
     }
 
+    private func finishTimingSelection(_ mutation: ReminderTimingMutation) async {
+        do {
+            let authorization = await scheduler.authorization()
+            guard mutation.revision == updateRevision else { return }
+            state = state(for: authorization)
+            guard enabledKinds.contains(mutation.kind), case .authorized = authorization else {
+                return
+            }
+            try await scheduleSelection()
+        } catch {
+            guard mutation.revision == updateRevision else { return }
+            selectedTimings = mutation.previousSelectedTimings
+            persistSelection()
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func dismissError() {
         errorMessage = nil
     }
@@ -345,14 +457,62 @@ final class ComiketReminderStore {
     private func scheduleSelection() async throws {
         while true {
             let scheduledRevision = updateRevision
-            let requests = ComiketEventReminderCatalog.requests(for: enabledKinds, now: now())
+            let timings = Dictionary(
+                uniqueKeysWithValues: enabledKinds.map { ($0, timing(for: $0)) }
+            )
+            let requests = ComiketEventReminderCatalog.requests(
+                for: enabledKinds,
+                timings: timings,
+                now: now()
+            )
             try await scheduler.replaceOwnedRequests(with: requests)
             guard scheduledRevision != updateRevision else { return }
         }
     }
 
     private func persistSelection() {
-        defaults.set(enabledKinds.map(\.rawValue).sorted(), forKey: Self.enabledKindsKey)
+        let settings = PersistedReminderSettings(
+            enabledKinds: enabledKinds.map(\.rawValue).sorted(),
+            selectedTimings: Dictionary(
+                uniqueKeysWithValues: selectedTimings.map { ($0.key.rawValue, $0.value.rawValue) }
+            )
+        )
+        guard let data = try? JSONEncoder().encode(settings) else { return }
+        defaults.set(data, forKey: Self.settingsKey)
+    }
+
+    private static func loadSettings(from defaults: UserDefaults) -> LoadedReminderSettings {
+        if let data = defaults.data(forKey: settingsKey),
+           let persisted = try? JSONDecoder().decode(PersistedReminderSettings.self, from: data)
+        {
+            let enabledValues = Set(persisted.enabledKinds)
+            let enabledKinds = Set(
+                ComiketReminderKind.allCases.filter { enabledValues.contains($0.rawValue) }
+            )
+            let selectedTimings: [ComiketReminderKind: ComiketReminderTiming] = Dictionary(
+                uniqueKeysWithValues: persisted.selectedTimings.compactMap { entry in
+                    let (rawKind, rawTiming) = entry
+                    guard let kind = ComiketReminderKind(rawValue: rawKind),
+                          let timing = ComiketReminderTiming(rawValue: rawTiming)
+                    else { return nil }
+                    return (kind, timing)
+                }
+            )
+            return LoadedReminderSettings(
+                enabledKinds: enabledKinds,
+                selectedTimings: selectedTimings,
+                needsMigration: false
+            )
+        }
+
+        let legacyValues = Set(defaults.stringArray(forKey: enabledKindsKey) ?? [])
+        return LoadedReminderSettings(
+            enabledKinds: Set(
+                ComiketReminderKind.allCases.filter { legacyValues.contains($0.rawValue) }
+            ),
+            selectedTimings: [:],
+            needsMigration: !legacyValues.isEmpty
+        )
     }
 
     private func state(for authorization: ComiketNotificationAuthorization) -> State {
@@ -365,9 +525,26 @@ final class ComiketReminderStore {
     }
 }
 
+private struct PersistedReminderSettings: Codable {
+    let enabledKinds: [String]
+    let selectedTimings: [String: Int]
+}
+
+private struct LoadedReminderSettings {
+    let enabledKinds: Set<ComiketReminderKind>
+    let selectedTimings: [ComiketReminderKind: ComiketReminderTiming]
+    let needsMigration: Bool
+}
+
 private struct ReminderSelectionMutation: Sendable {
     let revision: Int
     let enabled: Bool
     let kind: ComiketReminderKind
     let previousEnabledKinds: Set<ComiketReminderKind>
+}
+
+private struct ReminderTimingMutation: Sendable {
+    let revision: Int
+    let kind: ComiketReminderKind
+    let previousSelectedTimings: [ComiketReminderKind: ComiketReminderTiming]
 }
