@@ -6,7 +6,12 @@ import Observation
 @Observable
 final class SharedPlanStore {
     private(set) var plans: [SharedPlan] = [] {
-        didSet { publishEditorProjectionChanges(for: Set(oldValue.map(\.id) + plans.map(\.id))) }
+        didSet {
+            publishEditorProjectionChanges(for: Self.changedPlanIDs(
+                from: Dictionary(uniqueKeysWithValues: oldValue.map { ($0.id, $0) }),
+                to: Dictionary(uniqueKeysWithValues: plans.map { ($0.id, $0) })
+            ))
+        }
     }
     private(set) var pendingRESTWrites: [SharedPlanRESTWrite] = [] {
         didSet {
@@ -24,7 +29,10 @@ final class SharedPlanStore {
     }
     private(set) var documentSnapshots: [String: SharedPlanDocumentSnapshot] = [:] {
         didSet {
-            publishEditorProjectionChanges(for: Set(oldValue.keys).union(documentSnapshots.keys))
+            publishEditorProjectionChanges(for: Self.changedPlanIDs(
+                from: oldValue,
+                to: documentSnapshots
+            ))
         }
     }
     private(set) var archivedRecoveries: [UUID: ArchivedSharedPlanRecovery] = [:] {
@@ -39,7 +47,12 @@ final class SharedPlanStore {
         didSet { publishEditorProjectionChanges(for: Set(oldValue.keys).union(syncStatuses.keys)) }
     }
     private(set) var localEditLimits: [String: SharedPlanLocalEditLimit] = [:] {
-        didSet { publishEditorProjectionChanges(for: Set(oldValue.keys).union(localEditLimits.keys)) }
+        didSet {
+            publishEditorProjectionChanges(for: Self.changedPlanIDs(
+                from: oldValue,
+                to: localEditLimits
+            ))
+        }
     }
     private(set) var membersByPlanID: [String: [SharedPlanMember]] = [:] {
         didSet { publishEditorProjectionChanges(for: Set(oldValue.keys).union(membersByPlanID.keys)) }
@@ -3256,6 +3269,14 @@ final class SharedPlanStore {
         plans.sort(by: Self.planOrder)
     }
 
+    nonisolated private static func changedPlanIDs<Value: Equatable>(
+        from oldValues: [String: Value],
+        to newValues: [String: Value]
+    ) -> Set<String> {
+        let candidates = Set(oldValues.keys).union(newValues.keys)
+        return candidates.filter { oldValues[$0] != newValues[$0] }
+    }
+
     private func publishEditorProjectionChanges(for planIDs: Set<String>) {
         for planID in planIDs where Self.isCanonicalUUIDString(planID) {
             let generation = (editorProjectionGenerations[planID] ?? 0) &+ 1
@@ -3627,11 +3648,9 @@ final class SharedPlanStore {
         planID: String,
         snapshot: SharedPlanDocumentSnapshot?
     ) {
-        guard let snapshot else {
-            localEditLimits[planID] = nil
-            return
-        }
-        localEditLimits[planID] = snapshot.localEditLimit
+        let limit = snapshot?.localEditLimit
+        guard localEditLimits[planID] != limit else { return }
+        localEditLimits[planID] = limit
     }
 
     private func scheduleTransientOutboxRetry() {

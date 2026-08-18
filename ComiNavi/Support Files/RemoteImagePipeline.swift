@@ -1,3 +1,4 @@
+import ImageIO
 import Kingfisher
 import UIKit
 
@@ -138,19 +139,10 @@ enum RemoteImagePipeline {
     static func imageData(
         for url: URL,
         category: RemoteImageCacheCategory,
-        cacheKey: String? = nil
+        cacheKey: String? = nil,
+        downloader: ImageDownloader? = nil
     ) async -> Data? {
         let resolvedCacheKey = cacheKey ?? url.absoluteString
-        if let cachedData = await diskCachedImageData(
-            forKey: resolvedCacheKey,
-            category: category
-        ) {
-            return cachedData
-        }
-
-        // A memory-only entry can still be the exact image the user sees.
-        // Encoding it gives Save/Share a reliable offline fallback without
-        // attempting a network refresh.
         if let cachedData = await cachedImageData(
             forKey: resolvedCacheKey,
             category: category
@@ -161,7 +153,8 @@ enum RemoteImagePipeline {
         guard let dataProvider = await result(
             for: url,
             category: category,
-            cacheKey: resolvedCacheKey
+            cacheKey: resolvedCacheKey,
+            downloader: downloader
         )?.data else { return nil }
         return await Task.detached(priority: .utility) {
             dataProvider()
@@ -173,8 +166,16 @@ enum RemoteImagePipeline {
         category: RemoteImageCacheCategory
     ) async -> Data? {
         let diskStorage = cache(for: category).diskStorage
-        return await Task.detached(priority: .utility) {
-            try? diskStorage.value(forKey: key)
+        return await Task.detached(priority: .utility) { () -> Data? in
+            guard let data = try? diskStorage.value(forKey: key) else { return nil }
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+                  CGImageSourceGetCount(source) > 0,
+                  CGImageSourceCopyPropertiesAtIndex(source, 0, nil) != nil
+            else {
+                try? diskStorage.remove(forKey: key)
+                return nil
+            }
+            return data
         }.value
     }
 
@@ -182,10 +183,19 @@ enum RemoteImagePipeline {
         forKey key: String,
         category: RemoteImageCacheCategory
     ) async -> Data? {
-        guard let image = try? await cache(for: category).retrieveImage(
+        if let cachedData = await diskCachedImageData(
             forKey: key,
-            options: [.diskCacheExpiration(.never)]
-        ).image else { return nil }
+            category: category
+        ) {
+            return cachedData
+        }
+
+        // A memory-only entry can still be the exact image the user sees.
+        // Encoding it gives Save/Share a reliable offline fallback without
+        // attempting a network refresh.
+        guard let image = cache(for: category).retrieveImageInMemoryCache(
+            forKey: key
+        ) else { return nil }
         return await encodedPNGData(for: image)
     }
 

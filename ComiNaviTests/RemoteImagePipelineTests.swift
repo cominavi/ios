@@ -109,6 +109,99 @@ final class RemoteImagePipelineTests: XCTestCase {
     }
 
     @MainActor
+    func testCachedImageDataPreservesExactJPEGDiskBytes() async throws {
+        RemoteImagePipeline.configureCaches()
+
+        let key = "test-jpeg-\(UUID().uuidString)"
+        let renderedImage = UIGraphicsImageRenderer(
+            size: CGSize(width: 19, height: 11)
+        ).image { context in
+            UIColor.systemOrange.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 19, height: 11))
+        }
+        let data = try XCTUnwrap(renderedImage.jpegData(compressionQuality: 0.79))
+        let cache = RemoteImagePipeline.cache(for: .profileImages)
+
+        try await cache.storeToDisk(data, forKey: key, expiration: .never)
+        cache.clearMemoryCache()
+
+        XCTAssertEqual(cache.imageCachedType(forKey: key), .disk)
+        let loadedData = await RemoteImagePipeline.cachedImageData(
+            forKey: key,
+            category: .profileImages
+        )
+        XCTAssertEqual(loadedData, data)
+
+        try await cache.removeImage(forKey: key)
+    }
+
+    @MainActor
+    func testCachedImageDataRejectsCorruptDiskBytes() async throws {
+        RemoteImagePipeline.configureCaches()
+
+        let key = "test-corrupt-\(UUID().uuidString)"
+        let corruptData = Data("not an image".utf8)
+        let cache = RemoteImagePipeline.cache(for: .profileImages)
+
+        try await cache.storeToDisk(corruptData, forKey: key, expiration: .never)
+        cache.clearMemoryCache()
+
+        XCTAssertEqual(cache.imageCachedType(forKey: key), .disk)
+        let loadedData = await RemoteImagePipeline.cachedImageData(
+            forKey: key,
+            category: .profileImages
+        )
+        XCTAssertNil(loadedData)
+        XCTAssertEqual(cache.imageCachedType(forKey: key), .none)
+    }
+
+    @MainActor
+    func testImageDataReplacesCorruptDiskEntryFromNetwork() async throws {
+        RemoteImagePipeline.configureCaches()
+
+        let url = try XCTUnwrap(
+            URL(string: "https://remote-image-pipeline.test/\(UUID().uuidString).png")
+        )
+        let key = url.absoluteString
+        let data = makePNG()
+        let cache = RemoteImagePipeline.cache(for: .profileImages)
+        let downloader = ImageDownloader(name: "RemoteImagePipelineTests-\(UUID())")
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RemoteImagePipelineURLProtocol.self]
+        downloader.sessionConfiguration = configuration
+        RemoteImagePipelineURLProtocol.setResponseData(data, for: url)
+        defer {
+            RemoteImagePipelineURLProtocol.setResponseData(nil, for: url)
+            cache.clearMemoryCache()
+        }
+
+        try await cache.storeToDisk(
+            Data("not an image".utf8),
+            forKey: key,
+            expiration: .never
+        )
+        cache.clearMemoryCache()
+        XCTAssertEqual(cache.imageCachedType(forKey: key), .disk)
+
+        let loadedData = await RemoteImagePipeline.imageData(
+            for: url,
+            category: .profileImages,
+            downloader: downloader
+        )
+
+        XCTAssertEqual(loadedData, data)
+        cache.clearMemoryCache()
+        XCTAssertEqual(cache.imageCachedType(forKey: key), .disk)
+        let replacedData = await RemoteImagePipeline.cachedImageData(
+            forKey: key,
+            category: .profileImages
+        )
+        XCTAssertEqual(replacedData, data)
+
+        try await cache.removeImage(forKey: key)
+    }
+
+    @MainActor
     func testImageDataUsesVisibleMemoryCacheWithoutNetwork() async throws {
         RemoteImagePipeline.configureCaches()
 
