@@ -6,7 +6,7 @@ Regenerate them from the archived production data with:
 
 ```sh
 Scripts/prepare-demo-catalog.sh \
-  "/Volumes/Backup of MacBook Pro/Users/galvingao/Projects/ComiNavi/productiondata"
+  /absolute/path/to/archived-productiondata
 ```
 
 The main database retains the complete C104 catalog. The image database retains every circle cut and all shared images (cover art, venue maps, and genre overlays), so Demo data exercises the same image-loading behavior as a downloaded catalog.

@@ -1,8 +1,11 @@
-# Map modernization
+# Map modernization architecture record
 
-## Current evidence
+Status: implemented. The baseline and measurements below are retained as a
+historical design record; current behavior is defined by the source and tests.
 
-The C104 catalog contains 6,093 physical table placements, 23,858 circle records, and roughly 97 MB of circle-cut image blobs. The existing startup path reads every circle and writes every image blob to a separate PNG before the user can use the app. The current map then ignores the coordinate tables and displays one bitmap inside a UIKit scroll view.
+## Baseline evidence before modernization
+
+The C104 catalog contains 6,093 physical table placements, 23,858 circle records, and roughly 97 MB of circle-cut image blobs. Before this work, startup read every circle, extracted every image blob to a separate PNG, and displayed one map bitmap in a UIKit scroll view instead of using the official coordinate tables.
 
 The official layout coordinates use the high-resolution map coordinate system. For example, the East 1–3 map is 4,680 × 1,680 map units and each physical table is 40 × 40 units. `layout` determines which half contains the `a` circle:
 
@@ -11,7 +14,7 @@ The official layout coordinates use the high-resolution map coordinate system. F
 - `3`: right
 - `4`: top
 
-## Target modules
+## Architectural boundaries
 
 1. **Catalog repository** — a deep interface over the read-only main and image databases. It returns Sendable domain values and keeps GRDB, joins, query cancellation, and blob loading local.
 2. **Map screen model** — a `@MainActor @Observable` owner for day, venue, loading, selection, search, and overlay state. It never owns database records.
@@ -20,14 +23,16 @@ The official layout coordinates use the high-resolution map coordinate system. F
 
 The repository seam has two adapters from the start: SQLite for the app and an in-memory fixture for deterministic UI tests.
 
-## Delivery sequence
+## Original delivery sequence
 
-1. Replace the static map with the full-screen vector table scene, inertial pan/zoom/rotation, circle hit testing, and a lazy detail sheet.
-2. Query visible circle summaries after camera motion settles; fetch image blobs only above the seven-table zoom threshold and evict decoded images outside the viewport.
-3. Add indexed search and highlights. If the official database cannot satisfy the query efficiently, build a small derived FTS/R-tree cache keyed by the catalog digest.
-4. Add genre, bookmark, destination-pin, and color overlays to the same renderer without duplicating geometry.
-5. Move bookmarks and sync state into the user plan store, with deterministic conflict and ordering tests.
-6. Profile a representative long session on a physical device and enforce CPU, memory, hitch, and background-work budgets.
+The modernization was delivered in this order:
+
+1. Replaced the static map with the full-screen vector table scene, inertial pan/zoom/rotation, circle hit testing, and a lazy detail sheet.
+2. Queried visible circle summaries after camera motion settled; fetched image blobs only above the seven-table zoom threshold and evicted decoded images outside the viewport.
+3. Added indexed search and highlights backed by a small derived FTS/R-tree cache keyed by the catalog digest.
+4. Added genre, bookmark, destination-pin, and color overlays to the same renderer without duplicating geometry.
+5. Moved bookmarks and sync state into the user plan store, with deterministic conflict and ordering tests.
+6. Profiled simulator behavior. Representative physical-device Energy Log and long-session thermal validation remain release qualification work.
 
 ## Performance invariants
 
@@ -49,7 +54,7 @@ The repository seam has two adapters from the start: SQLite for the app and an i
 - `BookmarkSyncCoordinator` merges remote Circle.ms favorites without overwriting pending local mutations, then flushes upserts and tombstones. Local interaction never waits for the network.
 - The app and test targets compile in Swift 6 mode. Shared app-shell state uses Observation; typed Sendable request and response models replace `[String: Any]` at Alamofire concurrency boundaries.
 
-## Verification snapshot
+## C104 verification snapshot
 
 - The C104 derived cache contains 23,858 placements and 23,858 FTS documents.
 - A real authenticated probe returned 594 placements for a representative viewport and 18 matches for a Japanese trigram query.

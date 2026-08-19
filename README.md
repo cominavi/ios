@@ -50,8 +50,9 @@ authentication and loading catalog data requires the upstream services listed ab
 `Scripts/issue-real-environment-session.sh` runs the backend-owned production
 Circle.ms OAuth flow on the laptop, reuses the protected browser state when it
 is still valid, and writes a real ComiNavi access/refresh session under the
-repository-level `.real-env` directory. It does not enable the legacy provider
-token handoff and does not add a test-session issuer to the production service.
+parent ComiNavi workspace's `.real-env` directory (one level above this iOS
+checkout). It does not enable the legacy provider token handoff and does not
+add a test-session issuer to the production service.
 
 Keep `credentials.yaml` and every `.real-env` credential file at mode `0600`.
 The script normally does not need the password after the first successful
@@ -95,13 +96,13 @@ COMINAVI_E2E_INSTALL_SESSION=1 \
 
 The first run opens a headed browser for account selection or consent. The
 protected Google browser state is then retained at
-`.real-env/google-browser-state.json`, with its isolated Chrome profile under
-`.real-env/google-chrome-profile`. Both stay within this repository's protected
-`.real-env` directory, so later runs can normally issue a new ComiNavi session
-without entering the Google password again. The invitation is read from
-`.real-env/shared-plan-invitation.json`, and the resulting ComiNavi access/refresh
-session is stored at
-`.real-env/google-recipient-service-session.json`; every file remains mode
+`../.real-env/google-browser-state.json`, with its isolated Chrome profile under
+`../.real-env/google-chrome-profile`. Both stay within the parent workspace's
+protected `.real-env` directory, so later runs can normally issue a new
+ComiNavi session without entering the Google password again. The invitation is
+read from `../.real-env/shared-plan-invitation.json`, and the resulting
+ComiNavi access/refresh session is stored at
+`../.real-env/google-recipient-service-session.json`; every file remains mode
 `0600`. Google provider tokens are temporary and are never installed into the
 app or committed. The production executable still has no environment-token
 login path: the existing opt-in XCTest host validates and writes the ComiNavi
@@ -120,8 +121,8 @@ same public user and token lifetime, atomically replaces the protected session
 file, and removes its temporary app-container copy. For automation that is
 already controlling a signed-in normal Chrome profile, the issuer also accepts
 `COMINAVI_E2E_EXTERNAL_BROWSER_HANDOFF_DIR` pointing to a mode-`0700`
-subdirectory of `.real-env`; authorization URLs and callbacks remain mode
-`0600` and are removed after the one-time exchange.
+subdirectory of the parent workspace's `.real-env`; authorization URLs and
+callbacks remain mode `0600` and are removed after the one-time exchange.
 
 Once distinct owner and recipient ComiNavi sessions are available, run the
 complete two-member production acceptance without installing either identity

@@ -10,7 +10,7 @@ primary language and English (U.S.) is the secondary localization.
 | --- | --- |
 | Bundle ID | `llc.mikunet.cominavi` |
 | Version | `1.0` |
-| Prepared build | `2026080501` |
+| Build | Read `CURRENT_PROJECT_VERSION` from the TestFlight build settings at submission time |
 | Primary language | Japanese |
 | Category | Navigation |
 | Secondary category | Reference |
@@ -25,9 +25,10 @@ primary language and English (U.S.) is the secondary localization.
 | Release | Manual after approval |
 | Phased release | Off for 1.0 |
 
-The support, marketing, and privacy URLs were publicly reachable on
-2026-08-04. The standard Apple EULA is sufficient; the app has no purchases,
-subscriptions, ads, or custom license agreement.
+Verify the support, marketing, and privacy URLs immediately before submission;
+this repository does not record their live availability. The standard Apple
+EULA is sufficient; the app has no purchases, subscriptions, ads, or custom
+license agreement.
 
 ## Age rating answers
 
@@ -62,8 +63,9 @@ own behavior and Sentry, PostHog, Circle.ms, and cominavi.net processing.
 
 | Data type | Purpose | Linked to user | Tracking |
 | --- | --- | --- | --- |
-| Name (Circle.ms display name) | Analytics | Yes | No |
-| User ID (Circle.ms account ID) | App Functionality, Analytics | Yes | No |
+| Name (ComiNavi profile display name) | App Functionality, Analytics | Yes | No |
+| Email Address (provider identity or optional issue-report contact) | App Functionality | Yes | No |
+| User ID (ComiNavi public user ID) | App Functionality, Analytics | Yes | No |
 | Other User Content (favorite metadata, notes, and X posts shared to ComiNavi) | App Functionality | Yes | No |
 | Product Interaction | Analytics | Yes after sign-in | No |
 | Other Usage Data | Analytics | Yes after sign-in | No |
@@ -74,13 +76,16 @@ own behavior and Sentry, PostHog, Circle.ms, and cominavi.net processing.
 
 Do not select location as collected. Location and heading are processed on the
 device while Where Am I is open and are not retained or sent to the operator.
-Do not select email address: Circle.ms handles the sign-in page and ComiNavi does
-not receive the user's Circle.ms email or password.
+Circle.ms handles its own sign-in page, so ComiNavi does not receive the user's
+Circle.ms email or password. Email Address must still be declared because a
+Google or Apple identity can include an email address and issue reports accept
+an optional contact email that is sent to Sentry.
 
-The app privacy manifest now matches the production behavior where
-`AppTrack.user` attaches the Circle.ms user ID and display name to Sentry and
-identifies the same user in PostHog. If that identification is removed before
-release, the linked-data answers and manifest can be reduced accordingly.
+Keep these answers and `ComiNavi/PrivacyInfo.xcprivacy` aligned with the shipped
+authentication, profile, feedback, analytics, and diagnostics behavior. Do not
+copy an earlier submission's answers without comparing them to those code
+paths. If user identification is removed before release, the linked-data
+answers and manifest can be reduced accordingly.
 
 ## Screenshots
 
@@ -120,25 +125,41 @@ The `upload_metadata` lane uploads metadata, screenshots, age rating, and review
 information. It explicitly does not upload a binary or submit the version for
 review.
 
-For App Store Connect API-key authentication, set `ASC_KEY_ID`, `ASC_ISSUER_ID`,
-and `ASC_KEY_FILEPATH`. The `.p8` file must stay outside this repository. If no
-API key is configured, Fastlane will request an authenticated Apple account.
+The lane requires App Store Connect API-key authentication. Set `ASC_KEY_ID`,
+`ASC_ISSUER_ID`, and `ASC_KEY_FILEPATH`; the `.p8` file must stay outside this
+repository or at the ignored default path. See
+[`docs/development-setup.md`](../docs/development-setup.md#app-store-connect-and-testflight)
+for the Ruby, Bundler, and key setup.
 
 ```sh
-cd /Users/galvin/repos/cominavi/ios
-fastlane ios upload_metadata
+FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios upload_metadata
 ```
 
-Before the final submission, confirm in App Store Connect that build
-`1.0 (2026080501)` has finished processing, select it for version 1.0, set
-content rights to **Uses Third-Party Content**, publish the privacy answers,
-and run App Review precheck. Submit manually only after those checks pass.
+Before the final submission, inspect the current build settings and live App
+Store Connect state:
 
-## Release blockers that metadata cannot resolve
+```sh
+xcodebuild \
+  -project ComiNavi.xcodeproj \
+  -scheme ComiNavi-TestFlight \
+  -configuration TestFlight \
+  -destination 'generic/platform=iOS' \
+  -showBuildSettings | \
+  awk '$1 == "MARKETING_VERSION" || $1 == "CURRENT_PROJECT_VERSION"'
 
-- App Store Connect authentication is not available in the current browser or
-  shell session, so the live app record and build processing state are not yet
-  verified.
+FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios asc_inventory
+```
+
+Confirm that the intended build has finished processing, select it for the
+matching App Store version, set content rights to **Uses Third-Party Content**,
+publish the privacy answers, and run App Review precheck. Submit manually only
+after those checks pass.
+
+## Pre-submission checks not encoded in metadata
+
+- Reconcile `ComiNavi/PrivacyInfo.xcprivacy` with the table above. The current
+  manifest does not declare Email Address even though provider identities and
+  optional issue-report contacts can contain one.
 - The App Review contact phone number and a dedicated review account must be
   supplied securely.
 - The operator must confirm it has permission to redistribute Circle.ms catalog

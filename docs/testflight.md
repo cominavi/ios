@@ -21,14 +21,16 @@ Fastlane and its transitive dependencies are pinned by `Gemfile.lock`. The
 checked-in configuration contains only the key ID and issuer ID. The private
 `.p8` key is ignored by Git and must remain local.
 
-Install the locked Ruby dependencies before running a lane:
+Install a maintained Ruby and the locked dependencies before running a lane.
+Do not use macOS's system Ruby 2.6; follow the
+[first-time development setup](development-setup.md#app-store-connect-and-testflight),
+then run:
 
 ```sh
-bundle install
+bundle _2.7.2_ install
 ```
 
-The checked-in lockfile uses Fastlane 2.232.2 and Bundler 2.7.2. The existing
-Home Manager Fastlane package provides the same Fastlane version on this Mac.
+The checked-in lockfile uses Fastlane 2.232.2 and Bundler 2.7.2.
 
 The default key location is `fastlane/AuthKey_672X4QRBR9.p8`. Keep it readable
 only by your account:
@@ -112,20 +114,36 @@ IPA_PATH=/absolute/path/to/ComiNavi.ipa \
   bundle exec fastlane ios upload_external_ipa
 ```
 
-If the build is already uploaded, submit it without uploading another binary:
+Read the version and build number from the TestFlight build settings:
+
+```sh
+BUILD_SETTINGS="$(xcodebuild \
+  -project ComiNavi.xcodeproj \
+  -scheme ComiNavi-TestFlight \
+  -configuration TestFlight \
+  -destination 'generic/platform=iOS' \
+  -showBuildSettings)"
+
+APP_VERSION="$(printf '%s\n' "${BUILD_SETTINGS}" | \
+  awk '$1 == "MARKETING_VERSION" { print $3; exit }')"
+BUILD_NUMBER="$(printf '%s\n' "${BUILD_SETTINGS}" | \
+  awk '$1 == "CURRENT_PROJECT_VERSION" { print $3; exit }')"
+```
+
+If that build is already uploaded, submit it without uploading another binary:
 
 ```sh
 FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios submit_external \
-  app_version:1.0 \
-  build_number:2026081202
+  app_version:"${APP_VERSION}" \
+  build_number:"${BUILD_NUMBER}"
 ```
 
 Check an external build without modifying App Store Connect:
 
 ```sh
 FASTLANE_SKIP_UPDATE_CHECK=1 bundle exec fastlane ios check_external \
-  app_version:1.0 \
-  build_number:2026081202
+  app_version:"${APP_VERSION}" \
+  build_number:"${BUILD_NUMBER}"
 ```
 
 `TESTFLIGHT_EXTERNAL_GROUP`, `CHANGELOG_JA`, and `CHANGELOG_EN_US` can override
@@ -192,5 +210,7 @@ Xcode Cloud installs the pinned CLI version automatically. Configure
 archive fails with an actionable build error if the CLI is missing,
 unauthenticated, or cannot finish processing the debug symbols.
 
-Build `1.0 (2026081607)` is the current prepared TestFlight build. Increase
-`CURRENT_PROJECT_VERSION` for every subsequent upload.
+`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in
+`ComiNavi.xcodeproj/project.pbxproj` are authoritative. Inspect them with the
+build-settings command above and increase `CURRENT_PROJECT_VERSION` before
+every upload.
