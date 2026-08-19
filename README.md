@@ -4,18 +4,21 @@ ComiNavi is an iPhone and iPad client for browsing Circle.ms catalog data.
 
 ## Requirements
 
-- Xcode 16 or later
+- Xcode 26.6 or later
 - iOS 18 or later
+- Git LFS
 - An Apple development team for device builds
 - Active Circle.ms authentication and Comiket production access for signed-in features
 
 Swift Package Manager dependencies are resolved automatically from
 `ComiNavi.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`.
 
+For a new machine, start with the complete [first-time iOS development setup](docs/development-setup.md).
+
 ## Operations preflight
 
-Before building, publishing, or operating the C108 crawler, run the workspace
-doctor:
+Before publishing, running real-environment acceptance, or operating the C108
+crawler, run the workspace doctor:
 
 ```sh
 Scripts/cominavi-ops doctor
@@ -27,6 +30,10 @@ latest crawler state without mutating remote services. Use `--local` to skip
 remote account checks. `status` and `wait` expose a shared machine-readable
 contract for crawler and TestFlight operations; see
 [`docs/operations.md`](docs/operations.md).
+
+The full doctor intentionally checks release and sibling-repository
+capabilities. It is not a prerequisite for the credential-free Simulator build
+in the first-time setup guide.
 
 ## Run locally
 
