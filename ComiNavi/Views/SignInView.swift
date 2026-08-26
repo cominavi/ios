@@ -561,15 +561,22 @@ final class SignInViewModel: NSObject, ObservableObject,
 }
 
 struct SignInView: View {
+    private static let demoUnlockTapCount = 10
+
     @ScaledMetric(relativeTo: .title) private var logoSize = 60.0
     @StateObject private var vm = SignInViewModel()
+    @State private var logoTapCount = 0
+    @State private var isDemoDataUnlocked = false
+    private let onUseDemoData: (() -> Void)?
     private let googleInvitation: SharedPlanInvitationInbox.Pending?
     private let googleSpecialEntry: Bool
 
     init(
+        onUseDemoData: (() -> Void)? = nil,
         googleInvitation: SharedPlanInvitationInbox.Pending? = nil,
         googleSpecialEntry: Bool = false
     ) {
+        self.onUseDemoData = onUseDemoData
         self.googleInvitation = googleInvitation
         self.googleSpecialEntry = googleSpecialEntry
     }
@@ -586,6 +593,19 @@ struct SignInView: View {
 
                     loginButton
                         .padding(.top, loginButtonTopPadding)
+
+                    if isDemoDataUnlocked, let onUseDemoData {
+                        Button(action: onUseDemoData) {
+                            LucideLabel("Continue with demo data", icon: "externaldrive")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.roundedRectangle(radius: 16))
+                        .disabled(vm.state == .authenticating)
+                        .padding(.top, 12)
+                        .accessibilityIdentifier("sign-in-demo-data")
+                    }
 
                     if let googleInvitation {
                         if GoogleSignInConfiguration.load() != nil {
@@ -657,7 +677,18 @@ struct SignInView: View {
         LogoShape()
             .foregroundStyle(.primary)
             .frame(width: logoSize, height: logoSize)
+            .contentShape(.rect)
+            .onTapGesture(perform: recordLogoTap)
             .accessibilityLabel("ComiNavi")
+            .accessibilityIdentifier("sign-in-logo")
+    }
+
+    private func recordLogoTap() {
+        guard onUseDemoData != nil, !isDemoDataUnlocked else { return }
+        logoTapCount += 1
+        if logoTapCount >= Self.demoUnlockTapCount {
+            isDemoDataUnlocked = true
+        }
     }
 
     private var hero: some View {

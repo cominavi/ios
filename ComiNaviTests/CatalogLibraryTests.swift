@@ -355,7 +355,6 @@ final class CatalogLibraryTests: XCTestCase {
         )
     }
 
-    #if DEBUG || COMINAVI_STAGING
     func testDemoSourceReturnsDirectLocalDatabaseConfiguration() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("cominavi-demo-source-\(UUID().uuidString)", isDirectory: true)
@@ -377,7 +376,30 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertNil(configuration.tagCatalogPayloadSHA256)
     }
 
-    func testDemoModeCannotBeSelectedWhenItWasNotExplicitlyEnabledForAutomation() {
+    func testDemoSourceDownloadsImmutableReviewCatalog() async throws {
+        let baseURL = try XCTUnwrap(URL(string: "https://example.com/review-demo/c104/v2"))
+        let configuration = try await DemoCatalogSource(remoteBaseURL: baseURL)
+            .configuration(for: DemoCatalogSource.c104)
+
+        XCTAssertEqual(
+            configuration.main.origin,
+            .remote(baseURL.appendingPathComponent("main.sqlite.gz"))
+        )
+        XCTAssertEqual(
+            configuration.image.origin,
+            .remote(baseURL.appendingPathComponent("images.sqlite.gz"))
+        )
+        XCTAssertEqual(
+            configuration.main.digest,
+            "caf7b90c8afa825db4c432bf74d243f5"
+        )
+        XCTAssertEqual(
+            configuration.image.digest,
+            "4f346666881db2656b3b60b099440d95"
+        )
+    }
+
+    func testDemoModeCanBeSelectedForAppReview() {
         let service = CatalogServiceStub(
             eventListResponse: eventListResponse(
                 events: [.init(eventID: 190, eventNumber: 104)],
@@ -391,20 +413,22 @@ final class CatalogLibraryTests: XCTestCase {
 
         library.selectMode(.demo)
 
-        XCTAssertEqual(library.mode, .circlems)
+        XCTAssertEqual(library.mode, .demo)
         XCTAssertEqual(library.phase, .idle)
         XCTAssertNil(library.dataSource)
-        XCTAssertNil(
-            defaults.string(forKey: "CatalogLibrary.mode.\(AppEnvironment.current.storageNamespace)")
+        XCTAssertEqual(
+            defaults.string(forKey: "CatalogLibrary.mode.\(AppEnvironment.current.storageNamespace)"),
+            CatalogDataMode.demo.rawValue
         )
     }
 
-    func testBundledDemoCatalogOpensThroughCatalogDataSource() async throws {
+    func testBundledDemoCatalogFixtureOpensThroughCatalogDataSource() async throws {
         try? DirectoryManager.shared.removeCachesFor(
             eventID: DemoCatalogSource.c104.id,
             comiketId: String(DemoCatalogSource.c104.number)
         )
-        let configuration = try await DemoCatalogSource().configuration(for: DemoCatalogSource.c104)
+        let configuration = try await bundledDemoCatalogSource()
+            .configuration(for: DemoCatalogSource.c104)
         let dataSource = CirclemsDataSource(configuration: configuration)
 
         for _ in 0 ..< 300 {
@@ -481,17 +505,22 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertNil(dataSource.bookmarkSyncCoordinator)
     }
 
-    func testNonProductionBuildIncludesCominaviWithDebugCatalogModes() {
+    func testCatalogLibraryIncludesReviewDemoMode() {
         let library = CatalogLibrary(initialMode: .circlems)
 
+        #if DEBUG || COMINAVI_STAGING
+        let expectedModes: Set<CatalogDataMode> = [.cominavi, .circlems, .demo]
+        #else
+        let expectedModes: Set<CatalogDataMode> = [.cominavi, .demo]
+        #endif
         XCTAssertEqual(
             Set(library.availableModes),
-            [.cominavi, .circlems]
+            expectedModes
         )
     }
 
     func testSwitchingCatalogKeepsReadyDataSourceVisibleUntilReplacementIsReady() async throws {
-        let baseConfiguration = try await DemoCatalogSource().configuration(
+        let baseConfiguration = try await bundledDemoCatalogSource().configuration(
             for: DemoCatalogSource.c104
         )
         let firstEvent = DemoCatalogSource.c104
@@ -531,8 +560,6 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertEqual(library.dataSource?.readiness, .ready)
         XCTAssertFalse(library.dataSource === originalDataSource)
     }
-    #endif
-
     private func isolatedDefaults() -> (defaults: UserDefaults, suiteName: String) {
         let suiteName = "net.cominavi.tests.catalog-library.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -553,6 +580,13 @@ final class CatalogLibraryTests: XCTestCase {
             ),
             status: "success"
         )
+    }
+
+    private func bundledDemoCatalogSource() throws -> DemoCatalogSource {
+        let mainURL = try XCTUnwrap(
+            CatalogResourceLocator.url(named: "demo-c104-main.sqlite")
+        )
+        return DemoCatalogSource(resourceDirectory: mainURL.deletingLastPathComponent())
     }
 
     private func waitForFailure(in library: CatalogLibrary) async throws {
@@ -580,7 +614,6 @@ final class CatalogLibraryTests: XCTestCase {
     }
 }
 
-#if DEBUG || COMINAVI_STAGING
 private struct MultiEventDemoCatalogSource: CatalogSource {
     let mode = CatalogDataMode.demo
     let events: [CatalogEvent]
@@ -603,7 +636,6 @@ private struct MultiEventDemoCatalogSource: CatalogSource {
         )
     }
 }
-#endif
 
 private actor CatalogServiceStub: CatalogEventServicing {
     let eventListResponse: CirclemsAPI.EventListResponse

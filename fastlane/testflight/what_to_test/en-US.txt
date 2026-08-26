@@ -1,1 +1,1 @@
-Fixes a crash that could occur on launch when Shared Plans reopened before the catalog finished loading. Also includes custom favorite color labels and immediate map updates.
+Adds an App Review demo mode. Tap the ComiNavi logo 10 times on the sign-in screen, then choose “Continue with demo data” to download and explore a C104 sample catalog without a Circle.ms account.

@@ -1553,7 +1553,12 @@ final class UnifiedBigSightMapTests: XCTestCase {
 
     @MainActor
     func testC104VenueAndDaySelectionRetainUnifiedCampusScene() async throws {
-        let configuration = try await DemoCatalogSource().configuration(for: DemoCatalogSource.c104)
+        let mainURL = try XCTUnwrap(
+            CatalogResourceLocator.url(named: "demo-c104-main.sqlite")
+        )
+        let configuration = try await DemoCatalogSource(
+            resourceDirectory: mainURL.deletingLastPathComponent()
+        ).configuration(for: DemoCatalogSource.c104)
         let dataSource = CirclemsDataSource(configuration: configuration)
         for _ in 0..<300 {
             if dataSource.readiness == .ready { break }

@@ -1,11 +1,13 @@
-ComiNavi requires a Circle.ms account because the production build does not include demo data. Use the account entered in the App Review Sign-In Information fields.
+No account is required for App Review. A hidden demo entry is provided on the initial sign-in screen so reviewers can inspect the app without a Circle.ms account.
 
-Review flow:
-1. Launch the app and tap “Circle.msでログイン” / “Sign in with Circle.ms.”
-2. Sign in with the supplied review account and approve the requested catalog, favorite, and user-information permissions.
-3. Select an available event catalog. The initial main and image database download can be approximately 350 MB, so Wi-Fi is recommended.
-4. Use Explore to search and browse circles. Open a circle to inspect its placement and available shinagaki information.
-5. Use Map to view placements, save circles, color-code favorites, and pin a destination.
+Demo review flow:
+1. Launch the app and remain on the initial sign-in screen.
+2. Tap the ComiNavi logo at the top of the screen 10 times.
+3. Tap “Continue with demo data.”
+4. The app downloads an approximately 43 MB compressed C104 sample catalog. Please allow the download to finish; Wi-Fi is recommended.
+5. The catalog opens automatically. Use Explore to search and browse circles, open a circle to inspect its placement and available shinagaki information, and use Map to view placements, save circles, color-code favorites, and pin a destination.
 6. “Where Am I” requests location only when opened. Permission is optional; the venue area can be selected manually.
+
+The ordinary Circle.ms sign-in button remains available for users who have an account, but it is not required for this review flow.
 
 There are no purchases or subscriptions. The app is an unofficial client and uses third-party Circle.ms catalog content. Some catalog entries may reference mature or R18 works; the submitted age rating is conservatively overridden to 18+. Explicit graphic sexual content is not intentionally displayed.

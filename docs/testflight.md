@@ -8,10 +8,12 @@ bundle identifier, `llc.mikunet.cominavi`. The legacy identifier
 cannot be used for this deployment. It connects to the Circle.ms production
 OAuth and API services. The app contains only the public OAuth client ID; the
 client secret is stored in the `cominavi.net` Worker and used there for code and
-refresh-token exchange. The debug-only demo catalog mode is not compiled into
-this build, and its bundled SQLite fixtures are excluded from the app. The
-optional C108 crawl enrichment remains available to the live Circle.ms catalog;
-there is no standalone crawl catalog mode.
+refresh-token exchange. The App Review demo catalog can be unlocked by tapping
+the ComiNavi logo ten times on the initial sign-in screen. Its SQLite fixtures
+are excluded from the app; the compressed sample catalog downloads on demand
+from the public ComiNavi service. The optional C108 crawl enrichment remains
+available to the live Circle.ms catalog; there is no standalone crawl catalog
+mode.
 
 ## Fastlane
 

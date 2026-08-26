@@ -4,10 +4,7 @@ import Observation
 enum CatalogDataMode: String, CaseIterable, Hashable, Sendable {
     case cominavi
     case circlems
-
-    #if DEBUG || COMINAVI_STAGING
     case demo
-    #endif
 
     var displayName: String {
         switch self {
@@ -15,10 +12,8 @@ enum CatalogDataMode: String, CaseIterable, Hashable, Sendable {
             "ComiNavi"
         case .circlems:
             "Circle.ms"
-        #if DEBUG || COMINAVI_STAGING
         case .demo:
             String(localized: "Demo data")
-        #endif
         }
     }
 
@@ -197,15 +192,22 @@ struct CirclemsCatalogSource: CatalogSource {
     }
 }
 
-#if DEBUG || COMINAVI_STAGING
 struct DemoCatalogSource: CatalogSource {
     static let c104 = CatalogEvent(id: 190, number: 104)
+    static let remoteBaseURL = URL(
+        string: "https://cominavi.net/api/v2/review-demo/catalogs/c104/v2"
+    )!
 
     let mode = CatalogDataMode.demo
     private let resourceDirectory: URL?
+    private let remoteBaseURL: URL
 
-    init(resourceDirectory: URL? = nil) {
+    init(
+        resourceDirectory: URL? = nil,
+        remoteBaseURL: URL = Self.remoteBaseURL
+    ) {
         self.resourceDirectory = resourceDirectory
+        self.remoteBaseURL = remoteBaseURL
     }
 
     func availableEvents() async throws -> [CatalogEvent] {
@@ -220,22 +222,44 @@ struct DemoCatalogSource: CatalogSource {
             throw CatalogLibraryError.demoEventUnavailable
         }
 
-        let mainURL = try resourceURL(named: "demo-c104-main.sqlite")
-        let imageURL = try resourceURL(named: "demo-c104-images.sqlite")
+        let main = try databaseConfiguration(
+            localName: "demo-c104-main.sqlite",
+            remoteName: "main.sqlite.gz",
+            localDigest: "b30db58d09de7095fbeba0e6132565928327388975c4c0940e6f3ed63219f146",
+            remoteDigest: "caf7b90c8afa825db4c432bf74d243f5"
+        )
+        let image = try databaseConfiguration(
+            localName: "demo-c104-images.sqlite",
+            remoteName: "images.sqlite.gz",
+            localDigest: "98c3a14c99d01a63c82200b3f5c59c702c4ee4782f5f886cd050f85bb04229c8",
+            remoteDigest: "4f346666881db2656b3b60b099440d95"
+        )
         return CatalogDataSourceConfiguration(
             eventID: event.id,
             eventNumber: event.number,
-            main: .init(
-                digest: "b30db58d09de7095fbeba0e6132565928327388975c4c0940e6f3ed63219f146",
-                origin: .local(mainURL)
-            ),
-            image: .init(
-                digest: "98c3a14c99d01a63c82200b3f5c59c702c4ee4782f5f886cd050f85bb04229c8",
-                origin: .local(imageURL)
-            ),
+            main: main,
+            image: image,
             enrichment: nil,
             allowsBookmarkSync: false,
             allowsRemoteMetadata: false
+        )
+    }
+
+    private func databaseConfiguration(
+        localName: String,
+        remoteName: String,
+        localDigest: String,
+        remoteDigest: String
+    ) throws -> CatalogDatabaseConfiguration {
+        guard resourceDirectory != nil else {
+            return CatalogDatabaseConfiguration(
+                digest: remoteDigest,
+                origin: .remote(remoteBaseURL.appendingPathComponent(remoteName))
+            )
+        }
+        return CatalogDatabaseConfiguration(
+            digest: localDigest,
+            origin: .local(try resourceURL(named: localName))
         )
     }
 
@@ -249,8 +273,6 @@ struct DemoCatalogSource: CatalogSource {
         return url
     }
 }
-
-#endif
 
 enum CatalogResourceLocator {
     static func url(
@@ -315,16 +337,10 @@ final class CatalogLibrary {
     ) {
         var sources: [CatalogDataMode: any CatalogSource] = [
             .cominavi: CominaviCatalogSource(),
+            .demo: DemoCatalogSource(),
         ]
         #if DEBUG || COMINAVI_STAGING
         sources[.circlems] = CirclemsCatalogSource(service: service)
-        if initialMode == .demo
-            || ProcessInfo.processInfo.arguments.contains("-cominavi-demo-data")
-        {
-            // The bundled catalog is a deterministic automation fixture, not
-            // an end-user data source.
-            sources[.demo] = DemoCatalogSource()
-        }
         #endif
         self.sources = sources
         self.defaults = defaults
@@ -661,7 +677,7 @@ enum CatalogLibraryError: LocalizedError {
             String(localized: "Circle.ms returned an invalid catalog link.")
         case .demoEventUnavailable:
             String(localized: "This event is not included in the demo catalog.")
-        case .missingDemoDatabase(let name):
+        case .missingDemoDatabase:
             String(
                 localized: "The demo catalog is unavailable. Please choose another catalog."
             )

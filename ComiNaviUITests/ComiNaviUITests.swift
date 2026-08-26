@@ -1152,14 +1152,35 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testSignInDoesNotOfferDemoDataOrSourceControls() throws {
+    func testTenLogoTapsUnlockDemoCatalogWithoutAuthentication() throws {
         let app = XCUIApplication()
-        app.launchArguments.append("-cominavi-ui-testing-show-sign-in")
+        app.launchArguments += [
+            "-cominavi-ui-testing-show-sign-in",
+            "-AppleLanguages", "(en)",
+            "-AppleLocale", "en_US",
+        ]
         app.launch()
 
         XCTAssertTrue(app.buttons["Login via circle.ms"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["sign-in-demo-data"].exists)
         XCTAssertFalse(app.otherElements["sign-in-circlems-environment"].exists)
+
+        let logo = app.descendants(matching: .any)["sign-in-logo"]
+        XCTAssertTrue(logo.waitForExistence(timeout: 5))
+        for _ in 0..<9 {
+            logo.tap()
+        }
+        XCTAssertFalse(app.buttons["sign-in-demo-data"].exists)
+
+        logo.tap()
+        let demoButton = app.buttons["sign-in-demo-data"]
+        XCTAssertTrue(demoButton.waitForExistence(timeout: 2))
+        XCTAssertEqual(demoButton.label, "Continue with demo data")
+        demoButton.tap()
+
+        XCTAssertTrue(
+            app.buttons["global-event-day-banner"].waitForExistence(timeout: 120)
+        )
+        XCTAssertFalse(app.buttons["Login via circle.ms"].exists)
     }
 
     @MainActor

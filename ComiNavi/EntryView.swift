@@ -65,11 +65,9 @@ struct EntryView: View {
                 return true
             }
         #endif
-        #if DEBUG || COMINAVI_STAGING
-            if catalogLibrary.mode == .demo {
-                return false
-            }
-        #endif
+        if catalogLibrary.mode == .demo {
+            return false
+        }
         if googleSpecialEntryActive {
             return true
         }
@@ -472,6 +470,10 @@ struct EntryView: View {
             )
         case .signIn:
             SignInView(
+                onUseDemoData: {
+                    leaveForcedSignIn()
+                    catalogLibrary.selectMode(.demo)
+                },
                 googleInvitation: invitationInbox.isGoogleEntryEligible
                     ? invitationInbox.pending
                     : nil,
@@ -678,6 +680,12 @@ struct EntryView: View {
             case unexpectedImage
         }
     #endif
+
+    private func leaveForcedSignIn() {
+        #if DEBUG
+            isForcingSignInForTesting = false
+        #endif
+    }
 
     @MainActor
     private func receiveGoogleSpecialEntry(_ url: URL) -> Bool {
