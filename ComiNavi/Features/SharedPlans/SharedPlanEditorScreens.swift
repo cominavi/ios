@@ -1885,19 +1885,32 @@ private struct SharedPlanActionRowLabel: View {
 private struct SharedPlanPurchasesHeader: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private var layout: AnyLayout {
-        dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-            : AnyLayout(HStackLayout(alignment: .center))
+    var body: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            stackedHeader
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    title.fixedSize()
+                    Spacer(minLength: 8)
+                    SharedPlanPurchaseStageLegend().fixedSize()
+                }
+                stackedHeader
+            }
+        }
     }
 
-    var body: some View {
-        layout {
-            Text("Purchases")
-                .font(.title3.weight(.bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
+    private var title: some View {
+        Text("Purchases")
+            .font(.title3.weight(.bold))
+    }
+
+    private var stackedHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            title
             SharedPlanPurchaseStageLegend()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
