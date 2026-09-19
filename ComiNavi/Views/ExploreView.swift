@@ -315,6 +315,7 @@ private struct ExploreLoadingScreen: View {
 
 private struct ExploreSearchField: View {
     let model: ExploreModel
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         @Bindable var model = model
@@ -332,6 +333,8 @@ private struct ExploreSearchField: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .submitLabel(.search)
+            .focused($isSearchFocused)
+            .onSubmit { isSearchFocused = false }
             .accessibilityIdentifier("explore-search-field")
 
             if !model.searchQuery.isEmpty {

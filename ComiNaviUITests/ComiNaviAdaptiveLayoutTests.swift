@@ -33,6 +33,13 @@ final class ComiNaviAdaptiveLayoutTests: XCTestCase {
     }
 
     @MainActor
+    private func scrollUpSlightly(_ app: XCUIApplication) {
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.75))
+            .press(forDuration: 0.05, thenDragTo:
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5)))
+    }
+
+    @MainActor
     func testPrimaryScreensAndSearchRetainStateAcrossRotation() throws {
         let app = launch(["-cominavi-demo-data"])
         defer { XCUIDevice.shared.orientation = .portrait }
@@ -63,7 +70,7 @@ final class ComiNaviAdaptiveLayoutTests: XCTestCase {
         XCTAssertEqual(search.value as? String, "duo continuity")
 
         search.typeText("\n")
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.keyboards.element(boundBy: 0).waitForNonExistence(timeout: 5))
         tab("Profile", in: app).tap()
         XCTAssertTrue(app.navigationBars["Profile"].waitForExistence(timeout: 5))
         capture(app, "duo-profile-portrait")
@@ -121,22 +128,22 @@ final class ComiNaviAdaptiveLayoutTests: XCTestCase {
         capture(app, "duo-purchases-accessibility")
         let progress = app.buttons["shared-plan-editor-need-progress-10000000-0000-4000-8000-000000000001"]
         for _ in 0..<4 {
-            if progress.isHittable { break }
-            app.swipeUp()
+            if app.frame.insetBy(dx: 0, dy: 80).contains(progress.frame) { break }
+            scrollUpSlightly(app)
         }
         XCTAssertTrue(progress.isHittable)
         progress.tap()
         XCTAssertTrue(app.navigationBars["Purchase progress"].waitForExistence(timeout: 5))
         let requested = app.steppers["Requested, 2"]
         for _ in 0..<4 where !requested.exists {
-            app.swipeUp()
+            scrollUpSlightly(app)
         }
         XCTAssertTrue(requested.exists)
         let bought = app.steppers["Bought, 0"]
         let increment = bought.buttons["Increment"]
         for _ in 0..<4 {
-            if increment.exists && increment.isHittable { break }
-            app.swipeUp()
+            if increment.exists && app.frame.insetBy(dx: 0, dy: 80).contains(increment.frame) { break }
+            scrollUpSlightly(app)
         }
         XCTAssertTrue(increment.isHittable)
         increment.tap()

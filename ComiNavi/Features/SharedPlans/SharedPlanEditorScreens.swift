@@ -2248,28 +2248,34 @@ private struct SharedPlanQuantityControl: View {
     let range: ClosedRange<Int>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if dynamicTypeSize.isAccessibilitySize {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.body.weight(.medium))
+                control
             }
-            Stepper(value: $quantity, in: range) {
-                HStack {
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Text(title)
-                            .font(.body.weight(.medium))
-                        Spacer(minLength: 8)
-                    }
-                    Text(quantity, format: .number)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel(Text(verbatim: dynamicTypeSize.isAccessibilitySize
-                            ? "\(title), \(quantity.formatted())"
-                            : quantity.formatted()))
-                }
-            }
-            .accessibilityValue(quantity.formatted())
+        } else {
+            control
         }
+    }
+
+    private var control: some View {
+        Stepper(value: $quantity, in: range) {
+            HStack {
+                if !dynamicTypeSize.isAccessibilitySize {
+                    Text(title)
+                        .font(.body.weight(.medium))
+                    Spacer(minLength: 8)
+                }
+                Text(quantity, format: .number)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(Text(verbatim: dynamicTypeSize.isAccessibilitySize
+                        ? "\(title), \(quantity.formatted())"
+                        : quantity.formatted()))
+            }
+        }
+        .accessibilityValue(quantity.formatted())
     }
 }
 
@@ -2488,10 +2494,10 @@ private struct SharedPlanPurchaseProgressSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { presentedSheet = nil }
+                    Button("Cancel", systemImage: "xmark") { presentedSheet = nil }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
+                    Button("Save", systemImage: "checkmark", action: save)
                         .disabled(!canSave)
                 }
             }
@@ -2801,7 +2807,7 @@ private struct SharedPlanPurchaseProgressPreviewSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done", systemImage: "checkmark") { dismiss() }
                 }
             }
         }
