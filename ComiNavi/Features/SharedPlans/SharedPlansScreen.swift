@@ -127,6 +127,7 @@ struct SharedPlansScreen: View {
             primaryPlanID = storedPlanID
             hasLoadedPrimaryPreference = true
             reconcilePrimaryPlan()
+            guard currentUserID != nil else { return }
             await store.refresh()
             reconcilePrimaryPlan()
         }

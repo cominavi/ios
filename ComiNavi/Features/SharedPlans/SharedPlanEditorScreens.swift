@@ -2004,10 +2004,12 @@ private struct SharedPlanNeedEditorRow: View {
         layout {
             VStack(alignment: .leading, spacing: 5) {
                 ZStack(alignment: .topLeading) {
-                    Text(verbatim: " \n ")
-                        .font(.headline)
-                        .hidden()
-                        .accessibilityHidden(true)
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Text(verbatim: " \n ")
+                            .font(.headline)
+                            .hidden()
+                            .accessibilityHidden(true)
+                    }
 
                     Text(displayItemName)
                         .font(.headline)
@@ -2240,22 +2242,34 @@ private struct SharedPlanNeedEditorRow: View {
 }
 
 private struct SharedPlanQuantityControl: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let title: String
     @Binding var quantity: Int
     let range: ClosedRange<Int>
 
     var body: some View {
-        Stepper(value: $quantity, in: range) {
-            HStack {
+        VStack(alignment: .leading, spacing: 6) {
+            if dynamicTypeSize.isAccessibilitySize {
                 Text(title)
                     .font(.body.weight(.medium))
-                Spacer(minLength: 8)
-                Text(quantity, format: .number)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
             }
+            Stepper(value: $quantity, in: range) {
+                HStack {
+                    if !dynamicTypeSize.isAccessibilitySize {
+                        Text(title)
+                            .font(.body.weight(.medium))
+                        Spacer(minLength: 8)
+                    }
+                    Text(quantity, format: .number)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(Text(verbatim: dynamicTypeSize.isAccessibilitySize
+                            ? "\(title), \(quantity.formatted())"
+                            : quantity.formatted()))
+                }
+            }
+            .accessibilityValue(quantity.formatted())
         }
-        .accessibilityValue(quantity.formatted())
     }
 }
 
@@ -2438,6 +2452,7 @@ private struct SharedPlanPurchaseProgressForm: View {
 }
 
 private struct SharedPlanPurchaseProgressSheet: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Bindable var model: SharedPlanEditorModel
     let store: SharedPlanStore
     let circle: SharedPlanCircleKey
@@ -2481,7 +2496,7 @@ private struct SharedPlanPurchaseProgressSheet: View {
                 }
             }
         }
-        .presentationDetents([.fraction(0.62)])
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.fraction(0.62), .large])
     }
 
     private var canSave: Bool {
@@ -2764,6 +2779,7 @@ struct SharedPlanPurchaseUITestSurface: View {
 
 private struct SharedPlanPurchaseProgressPreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let edit: SharedPlanPurchaseProgressEdit
     @State private var requestedQuantity: Int
     @State private var boughtQuantity: Int
@@ -2789,7 +2805,7 @@ private struct SharedPlanPurchaseProgressPreviewSheet: View {
                 }
             }
         }
-        .presentationDetents([.fraction(0.62)])
+        .presentationDetents(dynamicTypeSize.isAccessibilitySize ? [.large] : [.fraction(0.62), .large])
     }
 }
 #endif
