@@ -150,7 +150,6 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             onLocate: onLocate
         )
         host.mapView.presentScene(renderer)
-        host.mapView.preferredFramesPerSecond = UIScreen.main.maximumFramesPerSecond
         host.mapView.ignoresSiblingOrder = true
         host.mapView.shouldCullNonVisibleNodes = true
         host.mapView.isAsynchronous = true
@@ -580,6 +579,9 @@ final class UnifiedMapHostView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        if let screen = window?.windowScene?.screen {
+            mapView.preferredFramesPerSecond = screen.maximumFramesPerSecond
+        }
         synchronizeBasemapFromScene()
 
         // SpriteKit applies `.resizeFill` after the SKView receives its final

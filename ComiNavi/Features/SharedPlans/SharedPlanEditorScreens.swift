@@ -1648,12 +1648,7 @@ private struct SharedPlanCircleEditorScreen: View {
 
     private func needsSection(_ content: SharedPlanCircleContent) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center) {
-                Text("Purchases")
-                    .font(.title3.weight(.bold))
-                Spacer()
-                SharedPlanPurchaseStageLegend()
-            }
+            SharedPlanPurchasesHeader()
 
             if content.needs.isEmpty {
                 Text("No purchase requests yet")
@@ -1887,9 +1882,36 @@ private struct SharedPlanActionRowLabel: View {
     }
 }
 
-private struct SharedPlanPurchaseStageLegend: View {
+private struct SharedPlanPurchasesHeader: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var layout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .center))
+    }
+
     var body: some View {
-        HStack(spacing: 8) {
+        layout {
+            Text("Purchases")
+                .font(.title3.weight(.bold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            SharedPlanPurchaseStageLegend()
+        }
+    }
+}
+
+private struct SharedPlanPurchaseStageLegend: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var layout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 8))
+    }
+
+    var body: some View {
+        layout {
             stage("Requested", color: .secondary)
             stage("Assigned", color: .orange)
             stage("Bought", color: .green)
@@ -1970,9 +1992,16 @@ private struct SharedPlanNeedEditorRow: View {
     let onDelete: () -> Void
 
     @ScaledMetric(relativeTo: .body) private var avatarSize = 60.0
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var layout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(spacing: 8))
+    }
 
     var body: some View {
-        HStack(spacing: 8) {
+        layout {
             VStack(alignment: .leading, spacing: 5) {
                 ZStack(alignment: .topLeading) {
                     Text(verbatim: " \n ")
@@ -1982,7 +2011,8 @@ private struct SharedPlanNeedEditorRow: View {
 
                     Text(displayItemName)
                         .font(.headline)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -2016,7 +2046,7 @@ private struct SharedPlanNeedEditorRow: View {
                     progressBar
                 }
             }
-            .frame(width: 102, alignment: .leading)
+            .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 102, alignment: .leading)
 
             ScrollView(.horizontal) {
                 HStack(alignment: .center, spacing: 8) {
@@ -2038,7 +2068,7 @@ private struct SharedPlanNeedEditorRow: View {
                     Button("Remove request", role: .destructive, action: onDelete)
                 } label: {
                     LucideIcon("ellipsis", size: 22)
-                        .frame(width: 28, height: 44)
+                        .frame(width: 44, height: 44)
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
@@ -2699,12 +2729,7 @@ struct SharedPlanPurchaseUITestSurface: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("Purchases")
-                            .font(.title3.weight(.bold))
-                        Spacer()
-                        SharedPlanPurchaseStageLegend()
-                    }
+                    SharedPlanPurchasesHeader()
                     ForEach(needs) { need in
                         SharedPlanNeedEditorRow(
                             need: need,

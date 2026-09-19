@@ -338,6 +338,48 @@ final class ShinagakiArtworkLayoutTests: XCTestCase {
     }
 
     @MainActor
+    func testZoomedArtworkKeepsItsFocusAcrossRepeatedDisplayResizes() throws {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 1000, height: 1400))
+            .image { context in
+                UIColor.white.setFill()
+                context.fill(CGRect(x: 0, y: 0, width: 1000, height: 1400))
+            }
+        let view = ShinagakiZoomScrollView(frame: CGRect(x: 0, y: 0, width: 390, height: 700))
+        view.configure(image: image, accessibilityLabel: "Resize test artwork")
+        view.layoutIfNeeded()
+        let imageView = try XCTUnwrap(view.subviews.first {
+            $0.accessibilityIdentifier == "shinagaki-zoom-image"
+        })
+        let focus = CGPoint(x: 500, y: 700)
+        view.toggleZoom(at: focus, animated: false)
+        let scale = view.zoomScale
+
+        for size in [CGSize(width: 744, height: 700), CGSize(width: 700, height: 390),
+                     CGSize(width: 390, height: 700)] {
+            view.frame.size = size
+            view.setNeedsLayout()
+            view.layoutIfNeeded()
+            let point = view.convert(focus, from: imageView)
+            XCTAssertEqual(point.x, view.bounds.midX, accuracy: 1)
+            XCTAssertEqual(point.y, view.bounds.midY, accuracy: 1)
+            XCTAssertEqual(view.zoomScale, scale, accuracy: 0.001)
+        }
+    }
+
+    @MainActor
+    func testFittedArtworkRefitsWhenTheDisplayChangesSize() {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 1000, height: 1400))
+            .image { _ in }
+        let view = ShinagakiZoomScrollView(frame: CGRect(x: 0, y: 0, width: 390, height: 700))
+        view.configure(image: image, accessibilityLabel: "Fitted artwork")
+        view.layoutIfNeeded()
+        view.frame.size = CGSize(width: 744, height: 700)
+        view.layoutIfNeeded()
+        XCTAssertEqual(view.zoomScale, 0.5, accuracy: 0.001)
+        XCTAssertEqual(view.zoomScale, view.minimumZoomScale, accuracy: 0.001)
+    }
+
+    @MainActor
     func testNativeZoomViewStartsFittedAndAllowsSixTimesZoom() throws {
         let image = UIGraphicsImageRenderer(
             size: CGSize(width: 210, height: 297)

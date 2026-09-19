@@ -29,7 +29,7 @@ struct CatalogIndependentContentView: View {
             }
 
             Tab(
-                "共有プラン",
+                "Shared Plans",
                 image: LucideIcon.assetName(for: "list-checks"),
                 value: .plans
             ) {
@@ -279,7 +279,7 @@ private struct CatalogContentView: View {
                     }
 
                     Tab(
-                        "共有プラン",
+                        "Shared Plans",
                         image: LucideIcon.assetName(for: "list-checks"),
                         value: .plans
                     ) {

@@ -62,6 +62,10 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
         )
         collectionView.accessibilityIdentifier = "explore-gallery"
         collectionView.accessibilityLabel = String(localized: "Circle gallery")
+        collectionView.registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) {
+            (view: ExploreTouchCancellingCollectionView, _: UITraitCollection) in
+            view.setNeedsLayout()
+        }
 
         let pinch = UIPinchGestureRecognizer(
             target: context.coordinator,
@@ -127,8 +131,11 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             if let collectionView = collectionView as? ExploreTouchCancellingCollectionView {
                 collectionView.onBoundsSizeChange = { [weak self, weak collectionView] in
                     guard let self, let collectionView else { return }
+                    self.measuredHeaderSize = nil
                     self.applyAdaptiveColumnCountIfNeeded(in: collectionView)
                     self.refreshVisibleArtworkIfNeeded(in: collectionView)
+                    collectionView.collectionViewLayout.invalidateLayout()
+                    collectionView.reconfigureItems(at: collectionView.indexPathsForVisibleItems)
                 }
             }
             applyAdaptiveColumnCountIfNeeded(in: collectionView)
@@ -246,8 +253,12 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             if renderedCardDetail == .artworkOnly {
                 return CGSize(width: width, height: artworkHeight)
             }
-            let penNameHeight = UIFont.preferredFont(forTextStyle: .caption2).lineHeight
-            let titleHeight = UIFont.preferredFont(forTextStyle: .subheadline).lineHeight
+            let penNameHeight = UIFont.preferredFont(
+                forTextStyle: .caption2, compatibleWith: collectionView.traitCollection
+            ).lineHeight
+            let titleHeight = UIFont.preferredFont(
+                forTextStyle: .subheadline, compatibleWith: collectionView.traitCollection
+            ).lineHeight
             let hasLocation = renderedCardDetail == .full
                 && circleIndex(for: indexPath) != nil
             let locationHeight = hasLocation
@@ -272,11 +283,18 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             let spacing = flowLayout?.minimumInteritemSpacing ?? 12
             let sectionInset = flowLayout?.sectionInset ?? .zero
             let horizontalInsets = sectionInset.left + sectionInset.right
-            let availableWidth = max(collectionView.bounds.width - horizontalInsets, 1)
+            let availableWidth = max(contentWidth(in: collectionView) - horizontalInsets, 1)
             let totalSpacing = spacing * max(columnCount - 1, 0)
             return max(
                 floor((availableWidth - totalSpacing) / columnCount * 100) / 100 - 0.01,
                 1
+            )
+        }
+
+        private func contentWidth(in collectionView: UICollectionView) -> CGFloat {
+            ExploreGalleryZoomGeometry.availableWidth(
+                collectionView.bounds.width,
+                adjustedInsets: collectionView.adjustedContentInset
             )
         }
 
@@ -553,7 +571,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             let spacing = flowLayout?.minimumInteritemSpacing ?? 12
             let sectionInset = flowLayout?.sectionInset ?? .zero
             let horizontalInsets = sectionInset.left + sectionInset.right
-            let availableWidth = max(collectionView.bounds.width - horizontalInsets, 1)
+            let availableWidth = max(contentWidth(in: collectionView) - horizontalInsets, 1)
             let itemWidth = max(
                 floor(
                     (availableWidth - spacing * CGFloat(max(columns - 1, 0)))
@@ -562,10 +580,10 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                 1
             )
             let targetColumn = (0..<columns).min { lhs, rhs in
-                let lhsCenter = sectionInset.left
+                let lhsCenter = collectionView.adjustedContentInset.left + sectionInset.left
                     + itemWidth / 2
                     + CGFloat(lhs) * (itemWidth + spacing)
-                let rhsCenter = sectionInset.left
+                let rhsCenter = collectionView.adjustedContentInset.left + sectionInset.left
                     + itemWidth / 2
                     + CGFloat(rhs) * (itemWidth + spacing)
                 return abs(lhsCenter - viewportX) < abs(rhsCenter - viewportX)
@@ -635,7 +653,9 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
         ) {
             guard usesAdaptiveInitialColumns, collectionView.bounds.width > 0 else { return }
             let preferredColumns = ExploreGalleryZoomGeometry.preferredInitialColumnCount(
-                for: collectionView.bounds.width
+                for: contentWidth(in: collectionView),
+                isAccessibilityCategory: collectionView.traitCollection
+                    .preferredContentSizeCategory.isAccessibilityCategory
             )
             guard preferredColumns != columnCount else { return }
 
@@ -660,15 +680,24 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
 final class ExploreTouchCancellingCollectionView: UICollectionView {
     var onBoundsSizeChange: (() -> Void)?
     private var lastLaidOutBoundsSize = CGSize.zero
+    private var lastLaidOutInsets = UIEdgeInsets.zero
+    private var lastLaidOutContentSizeCategory: UIContentSizeCategory?
 
     override func layoutSubviews() {
         let previousSize = lastLaidOutBoundsSize
+        let previousInsets = lastLaidOutInsets
+        let previousCategory = lastLaidOutContentSizeCategory
         super.layoutSubviews()
 
         let currentSize = bounds.size
         guard currentSize.width > 0, currentSize.height > 0 else { return }
         lastLaidOutBoundsSize = currentSize
-        guard previousSize != currentSize else { return }
+        lastLaidOutInsets = adjustedContentInset
+        lastLaidOutContentSizeCategory = traitCollection.preferredContentSizeCategory
+        guard previousSize != currentSize
+            || previousInsets != lastLaidOutInsets
+            || previousCategory != lastLaidOutContentSizeCategory
+        else { return }
 
         Task { @MainActor [weak self] in
             self?.onBoundsSizeChange?()

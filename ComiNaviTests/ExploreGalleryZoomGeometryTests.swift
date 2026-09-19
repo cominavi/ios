@@ -54,6 +54,49 @@ final class ExploreGalleryZoomGeometryTests: XCTestCase {
         )
     }
 
+    func testAsymmetricInsetsDetermineUsableGalleryWidth() {
+        let insets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 88)
+        let width = ExploreGalleryZoomGeometry.availableWidth(744, adjustedInsets: insets)
+        XCTAssertEqual(width, 644)
+        XCTAssertEqual(ExploreGalleryZoomGeometry.preferredInitialColumnCount(for: width), 2)
+        XCTAssertEqual(
+            ExploreGalleryZoomGeometry.availableWidth(50, adjustedInsets: insets), 1
+        )
+    }
+
+    func testAccessibilityDensityKeepsCardsReadableAcrossResizing() {
+        for width: CGFloat in [320, 466, 678, 800] {
+            XCTAssertEqual(
+                ExploreGalleryZoomGeometry.preferredInitialColumnCount(
+                    for: width, isAccessibilityCategory: true
+                ), 1
+            )
+        }
+        XCTAssertEqual(
+            ExploreGalleryZoomGeometry.preferredInitialColumnCount(
+                for: 1100, isAccessibilityCategory: true
+            ), 2
+        )
+    }
+
+    @MainActor
+    func testCollectionReportsInsetChangesWithoutResizing() async {
+        let view = ExploreTouchCancellingCollectionView(
+            frame: CGRect(x: 0, y: 0, width: 744, height: 600),
+            collectionViewLayout: UICollectionViewFlowLayout()
+        )
+        var count = 0
+        view.onBoundsSizeChange = { count += 1 }
+        view.layoutIfNeeded()
+        await Task.yield()
+        let initialCount = count
+        view.contentInset.right = 88
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        await Task.yield()
+        XCTAssertGreaterThan(count, initialCount)
+    }
+
     func testPlaceholderPhaseKeepsTheAnchoredItemInItsTargetColumn() {
         XCTAssertEqual(
             ExploreGalleryZoomGeometry.leadingPlaceholderCount(

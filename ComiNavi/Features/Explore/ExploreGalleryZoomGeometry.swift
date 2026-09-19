@@ -25,7 +25,13 @@ enum ExploreGalleryZoomGeometry {
         } ?? columns
     }
 
-    static func preferredInitialColumnCount(for width: CGFloat) -> CGFloat {
+    static func preferredInitialColumnCount(
+        for width: CGFloat,
+        isAccessibilityCategory: Bool = false
+    ) -> CGFloat {
+        if isAccessibilityCategory {
+            return width >= 900 ? 2 : 1
+        }
         if width >= 1_100 {
             return 4
         }
@@ -33,6 +39,10 @@ enum ExploreGalleryZoomGeometry {
             return 3
         }
         return 2
+    }
+
+    static func availableWidth(_ width: CGFloat, adjustedInsets: UIEdgeInsets) -> CGFloat {
+        max(width - adjustedInsets.left - adjustedInsets.right, 1)
     }
 
     static func leadingPlaceholderCount(

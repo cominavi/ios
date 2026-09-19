@@ -235,7 +235,7 @@ struct ShinagakiLightbox: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
+        GeometryReader { _ in
             ZStack {
                 Color.black
                     .ignoresSafeArea()
@@ -259,7 +259,7 @@ struct ShinagakiLightbox: View {
                         maxHeight: .infinity,
                         alignment: .topLeading
                     )
-                    .padding(.top, proxy.safeAreaInsets.top + 8)
+                    .padding(.top, 8)
                     .padding(.leading, 16)
 
                 Button {
@@ -275,7 +275,7 @@ struct ShinagakiLightbox: View {
                 .accessibilityLabel("Close")
                 .accessibilityIdentifier("shinagaki-lightbox-close")
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.top, proxy.safeAreaInsets.top + 8)
+                .padding(.top, 8)
                 .padding(.trailing, 16)
 
                 if pages.count > 1 {
@@ -303,7 +303,7 @@ struct ShinagakiLightbox: View {
                             maxHeight: .infinity,
                             alignment: .bottom
                         )
-                        .padding(.bottom, proxy.safeAreaInsets.bottom + 16)
+                        .padding(.bottom, 16)
                 }
             }
         }
@@ -692,6 +692,7 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
     private var displayedImage: UIImage?
     private var imageDisplaySize = CGSize.zero
     private var lastViewportSize = CGSize.zero
+    private var lastViewportImagePoint: CGPoint?
     private var hasAppliedInitialScale = false
     private var programmaticZoom: ProgrammaticZoom?
     private let zoomPercentFormatter: NumberFormatter = {
@@ -761,11 +762,18 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
         zoomImageView.frame = CGRect(origin: .zero, size: imageDisplaySize)
         contentSize = imageDisplaySize
         lastViewportSize = .zero
+        lastViewportImagePoint = nil
         hasAppliedInitialScale = false
         setNeedsLayout()
     }
 
     override func layoutSubviews() {
+        // UIScrollView can clamp its offset before layout receives new bounds.
+        // Retain the last stable focus instead of deriving it after that clamp.
+        let resizeFocus: CGPoint? = hasAppliedInitialScale
+            && bounds.size != lastViewportSize
+            && zoomScale > minimumZoomScale + 0.01
+            ? lastViewportImagePoint : nil
         super.layoutSubviews()
 
         let viewportSize = bounds.size
@@ -798,12 +806,22 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
         }
 
         centerImageIfNeeded()
+        if let resizeFocus {
+            programmaticZoom = nil
+            centerImagePointInViewport(resizeFocus)
+        }
+        lastViewportImagePoint = imagePointAtViewportCenter()
         updateAccessibilityZoomValue()
         updatePanGestureAvailability()
     }
 
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         zoomImageView
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard hasAppliedInitialScale, bounds.size == lastViewportSize else { return }
+        lastViewportImagePoint = imagePointAtViewportCenter()
     }
 
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
