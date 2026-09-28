@@ -460,4 +460,5 @@ private struct CatalogLoadingEventPicker: View {
 
 #Preview {
     ContentView()
+        .environment(AppPowerPolicy())
 }

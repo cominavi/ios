@@ -478,6 +478,38 @@ final class WhereAmITests: XCTestCase {
         XCTAssertEqual(service.headingDegrees, 144)
     }
 
+    @MainActor
+    func testLocationServiceAppliesAndRestoresLowPowerManagerSettings() {
+        let manager = CLLocationManager()
+        let service = WhereAmILocationService(
+            locationManager: manager,
+            simulatedAuthorizationStatus: .authorizedWhenInUse
+        )
+
+        XCTAssertEqual(manager.desiredAccuracy, kCLLocationAccuracyBest)
+        XCTAssertEqual(manager.distanceFilter, 4)
+        XCTAssertEqual(manager.headingFilter, 2)
+        service.start(locationUpdates: true, headingUpdates: true)
+
+        service.updatePowerPolicy(isLowPowerModeEnabled: true)
+
+        XCTAssertTrue(service.isLowPowerModeEnabled)
+        XCTAssertTrue(service.isUpdatingLocation)
+        XCTAssertTrue(service.isUpdatingHeading)
+        XCTAssertEqual(manager.desiredAccuracy, kCLLocationAccuracyNearestTenMeters)
+        XCTAssertEqual(manager.distanceFilter, 25)
+        XCTAssertEqual(manager.headingFilter, 15)
+
+        service.updatePowerPolicy(isLowPowerModeEnabled: false)
+
+        XCTAssertFalse(service.isLowPowerModeEnabled)
+        XCTAssertTrue(service.isUpdatingLocation)
+        XCTAssertTrue(service.isUpdatingHeading)
+        XCTAssertEqual(manager.desiredAccuracy, kCLLocationAccuracyBest)
+        XCTAssertEqual(manager.distanceFilter, 4)
+        XCTAssertEqual(manager.headingFilter, 2)
+    }
+
     func testVenueNamesAreReadableAcrossCatalogGenerations() {
         XCTAssertEqual(WhereAmIResolver.venueDisplayName(for: "東123"), "East 1–3")
         XCTAssertEqual(WhereAmIResolver.venueDisplayName(for: "東456"), "East 4–6")
