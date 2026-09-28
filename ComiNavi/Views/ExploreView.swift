@@ -1054,11 +1054,13 @@ struct ExploreGalleryCard: View {
 
                     if detail == .full {
                         HStack(spacing: 6) {
-                            Text(circle.spaceLabel)
-                                .font(.caption.monospaced().weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .layoutPriority(1)
+                            if let locationLabel = circle.locationLabel {
+                                Text(locationLabel)
+                                    .font(.caption.monospaced().weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .layoutPriority(1)
+                            }
 
                             Spacer(minLength: 0)
 
@@ -1075,7 +1077,7 @@ struct ExploreGalleryCard: View {
     }
 
     private var accessibilityLabel: String {
-        [circle.penName, circle.displayName, circle.spaceLabel, favoriteAccessibilityLabel]
+        [circle.penName, circle.displayName, circle.locationLabel, favoriteAccessibilityLabel]
             .compactMap { $0 }
             .joined(separator: ", ")
     }
@@ -1219,11 +1221,13 @@ struct ExploreCircleRow: View {
                     .truncationMode(.tail)
 
                 HStack(spacing: 6) {
-                    Text(circle.spaceLabel)
-                        .font(.caption.monospaced().weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .layoutPriority(1)
+                    if let locationLabel = circle.locationLabel {
+                        Text(locationLabel)
+                            .font(.caption.monospaced().weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .layoutPriority(1)
+                    }
 
                     Spacer(minLength: 0)
 

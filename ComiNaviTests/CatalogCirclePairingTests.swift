@@ -11,6 +11,7 @@ final class CatalogCirclePairingTests: XCTestCase {
 
         XCTAssertEqual(groups.count, 1)
         XCTAssertEqual(groups[0].map(\.id), [1, 2])
+        XCTAssertTrue(CatalogCirclePairing.isCombinedAB([a, b]))
     }
 
     func testDifferentCirclesAtTheSameTableRemainIndependent() {
@@ -20,6 +21,7 @@ final class CatalogCirclePairingTests: XCTestCase {
         let groups = CatalogCirclePairing.groups(circles: [a, b], extensionsByCircleID: [:])
 
         XCTAssertEqual(groups.map { $0.map(\.id) }, [[1], [2]])
+        XCTAssertFalse(CatalogCirclePairing.isCombinedAB([a, b]))
     }
 
     func testSharedPortalIdentityCanPairSpellingVariants() {

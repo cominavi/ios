@@ -60,7 +60,6 @@ struct CircleDetailView: View {
                 CircleDetailHeader(
                     circle: circle,
                     dataSource: dataSource,
-                    spaceLabel: spaceLabel,
                     favoriteColor: planModel.selectedColor,
                     address: circleAddress,
                     isOpeningMap: isOpeningMap,
@@ -260,29 +259,14 @@ struct CircleDetailView: View {
         )
     }
 
-    private var spaceLabel: String? {
-        guard let blockID = circle.blockId,
-              let block = dataSource.comiket.blocks.first(where: {
-                  $0.externalBlockId == blockID
-              }),
-              let spaceNumber = circle.spaceNo
-        else { return nil }
-
-        let side = isCombinedAB ? "a+b" : (circle.spaceNoSub == 1 ? "b" : "a")
-        return "\(block.name)\(String(format: "%02d", spaceNumber))\(side)"
-    }
-
     private var navigationSubtitle: String? {
         if let circleAddress {
             return circleAddress.navigationSubtitle
         }
-        if let day = circle.day, let spaceLabel {
-            return String(localized: "Day \(day) · \(spaceLabel)")
-        }
         if let day = circle.day {
             return String(localized: "Day \(day)")
         }
-        return spaceLabel
+        return nil
     }
 
     private var externalLinks: [CircleExternalLink] {
@@ -359,13 +343,9 @@ struct CircleDetailView: View {
             let blockID = circle.blockId,
             let block = dataSource.comiket.blocks.first(where: { $0.externalBlockId == blockID })
         else { return }
-        let hallName = dataSource.comiket.days
-            .first(where: { $0.dayIndex == location.day })?
-            .halls.first(where: { $0.externalMapId == location.mapID })?
-            .name ?? "会場"
         circleAddress = ComiketSpaceAddress(
             day: location.day,
-            hallName: hallName,
+            hallName: location.resolvedHallName(in: dataSource.comiket) ?? "会場",
             blockName: block.name,
             spaceNumber: location.tableID.spaceNumber,
             subspace: isCombinedAB ? nil : location.subspace,
@@ -515,7 +495,6 @@ private extension URL {
 private struct CircleDetailHeader: View {
     let circle: CirclemsDataSchema.ComiketCircleWC
     let dataSource: CirclemsDataSource
-    let spaceLabel: String?
     let favoriteColor: BookmarkColor?
     let address: ComiketSpaceAddress?
     let isOpeningMap: Bool
@@ -546,8 +525,8 @@ private struct CircleDetailHeader: View {
                 }
             }
 
-            if let spaceLabel {
-                locationRow(spaceLabel: spaceLabel)
+            if let address {
+                locationRow(address: address)
             }
         }
         .task(id: circle.id) {
@@ -659,7 +638,7 @@ private struct CircleDetailHeader: View {
         externalLinks.filter { $0.kind != .xProfile }
     }
 
-    private func locationRow(spaceLabel: String) -> some View {
+    private func locationRow(address: ComiketSpaceAddress) -> some View {
         HStack(spacing: 8) {
             Button(action: onOpenMap) {
                 HStack(alignment: .top, spacing: 10) {
@@ -668,14 +647,12 @@ private struct CircleDetailHeader: View {
                         .padding(.top, 2)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        if let day = address?.day ?? circle.day {
-                            Text("Day \(day)")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.secondary)
-                                .accessibilityIdentifier("circle-location-day")
-                        }
+                        Text("Day \(address.day)")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("circle-location-day")
 
-                        Text(verbatim: address?.venueLocationText ?? spaceLabel)
+                        Text(verbatim: address.venueLocationText)
                             .font(.headline.monospaced().weight(.semibold))
                             .foregroundStyle(Color.accentColor)
                             .fixedSize(horizontal: false, vertical: true)
@@ -696,24 +673,22 @@ private struct CircleDetailHeader: View {
             .accessibilityHint("Shows this circle on the map")
             .accessibilityIdentifier("circle-location-map-button")
 
-            if let address {
-                Button {
-                    copy(address)
-                } label: {
-                    LucideIcon(copiedLocation ? "checkmark" : "doc.on.doc", size: 20)
-                        .foregroundStyle(copiedLocation ? .green : Color.accentColor)
-                        .frame(width: 44, height: 44)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Copy circle location")
-                .accessibilityValue(
-                    copiedLocation ? Text("Copied") : Text(verbatim: "")
-                )
-                .accessibilityHint("Copies \(address.canonicalText)")
-                .accessibilityIdentifier("circle-location-copy-button")
-                .animation(.default, value: copiedLocation)
+            Button {
+                copy(address)
+            } label: {
+                LucideIcon(copiedLocation ? "checkmark" : "doc.on.doc", size: 20)
+                    .foregroundStyle(copiedLocation ? .green : Color.accentColor)
+                    .frame(width: 44, height: 44)
+                    .contentShape(.rect)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Copy circle location")
+            .accessibilityValue(
+                copiedLocation ? Text("Copied") : Text(verbatim: "")
+            )
+            .accessibilityHint("Copies \(address.canonicalText)")
+            .accessibilityIdentifier("circle-location-copy-button")
+            .animation(.default, value: copiedLocation)
         }
         .padding(.leading, 12)
         .padding(.trailing, 4)

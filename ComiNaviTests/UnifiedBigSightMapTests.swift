@@ -19,7 +19,8 @@ final class UnifiedBigSightMapTests: XCTestCase {
             day: 1,
             mapID: venue.id,
             tableID: table.id,
-            subspace: 0
+            subspace: 0,
+            hallName: table.hallName
         )
 
         renderer.update(

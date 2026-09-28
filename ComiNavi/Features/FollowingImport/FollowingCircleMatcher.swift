@@ -10,6 +10,7 @@ struct FollowingImportedCircle: Identifiable, Sendable {
   let circles: [CirclemsDataSchema.ComiketCircleWC]
   let publicCircleIDsByCatalogID: [Int: Int]
   let sources: [ImportedCircleSource]
+  var hallName: String? = nil
 
   var id: Int { publicCircleIDsByCatalogID.values.min() ?? circles[0].id }
   var circle: CirclemsDataSchema.ComiketCircleWC { circles[0] }

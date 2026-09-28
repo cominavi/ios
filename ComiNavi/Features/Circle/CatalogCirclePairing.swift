@@ -1,6 +1,23 @@
 import Foundation
 
 enum CatalogCirclePairing {
+    static func isCombinedAB(
+        _ circles: [CirclemsDataSchema.ComiketCircleWC],
+        extensionsByCircleID: [Int: CirclemsDataSchema.ComiketCircleExtend] = [:]
+    ) -> Bool {
+        guard circles.count == 2 else { return false }
+        return sameIdentity(
+            circles[0],
+            circles[1],
+            lhsExtension: extensionsByCircleID[circles[0].id],
+            rhsExtension: extensionsByCircleID[circles[1].id]
+        )
+    }
+
+    static func isCombinedAB(_ circles: [CatalogMapCircle]) -> Bool {
+        circles.count == 2 && sameIdentity(circles[0], circles[1])
+    }
+
     static func groups(
         circles: [CirclemsDataSchema.ComiketCircleWC],
         extensionsByCircleID: [Int: CirclemsDataSchema.ComiketCircleExtend]

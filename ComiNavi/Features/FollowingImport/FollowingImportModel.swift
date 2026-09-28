@@ -356,8 +356,22 @@ final class FollowingImportModel {
                 extensions: catalogExtensions
             )
         }.value
+        let locations = try await dataSource.mapCatalog.bookmarkLocationsBatched(
+            publicCircleIDs: resolvedCircles.flatMap { $0.publicCircleIDsByCatalogID.values }
+        )
+        let locationsByPublicCircleID = Dictionary(
+            locations.map { ($0.publicCircleID, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let bookmarks = try await dataSource.userPlanStore.allBookmarks(eventNumber: eventNumber)
-        importedCircles = resolvedCircles
+        importedCircles = resolvedCircles.map { importedCircle in
+            var importedCircle = importedCircle
+            importedCircle.hallName = importedCircle.publicCircleIDsByCatalogID.values
+                .compactMap { locationsByPublicCircleID[$0] }
+                .compactMap { $0.resolvedHallName(in: dataSource.comiket) }
+                .first
+            return importedCircle
+        }
         favoriteColorsByPublicID = Dictionary(
             bookmarks.compactMap { bookmark in
                 bookmark.isFavorite ? (bookmark.publicCircleID, bookmark.color) : nil

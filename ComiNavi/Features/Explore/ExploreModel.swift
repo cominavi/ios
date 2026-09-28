@@ -155,6 +155,7 @@ struct ExploreCircle: Identifiable {
     var memberCircles: [CirclemsDataSchema.ComiketCircleWC] = []
     let genreName: String?
     let blockName: String
+    var hallName: String? = nil
     var tags: [String]
     var enrichment: CatalogCircleEnrichment? = nil
 
@@ -180,8 +181,17 @@ struct ExploreCircle: Identifiable {
 
     var spaceLabel: String {
         guard let number = circle.spaceNo, number > 0 else { return blockName }
-        let side = isCombinedAB ? "a+b" : (circle.spaceNoSub == 1 ? "b" : "a")
-        return "\(blockName)\(String(format: "%02d", number))\(side)"
+        return ComiketSpaceAddress.spaceCode(
+            blockName: blockName,
+            spaceNumber: number,
+            subspace: circle.spaceNoSub,
+            isCombinedAB: isCombinedAB
+        )
+    }
+
+    var locationLabel: String? {
+        guard let hallName = hallName?.nilIfBlank else { return nil }
+        return "\(ComiketSpaceAddress.canonicalHallName(hallName)) \(spaceLabel)"
     }
 
     var preferredCoverURLs: [URL] {
@@ -215,6 +225,7 @@ struct ExploreCircle: Identifiable {
             circle.bookName,
             circle.description,
             genreName,
+            hallName,
             blockName,
             tags.joined(separator: " "),
             enrichment?.searchableText,
@@ -537,6 +548,11 @@ final class ExploreModel {
         )
         guard !Task.isCancelled, revision == loadRevision else { return }
 
+        let locations = (try? await dataSource.mapCatalog.bookmarkLocationsBatched(
+            updateIDs: circles.compactMap(\.updateId)
+        )) ?? []
+        guard !Task.isCancelled, revision == loadRevision else { return }
+
         let genrePairs: [(Int, String)] = genres.compactMap { genre in
             guard let name = genre.name?.nilIfBlank else { return nil }
             return (genre.id, name)
@@ -546,6 +562,10 @@ final class ExploreModel {
             ($0.externalBlockId, $0.name)
         })
         let extensionsByCircleID = Dictionary(uniqueKeysWithValues: extensions.map { ($0.id, $0) })
+        let locationsByCatalogCircleID = Dictionary(
+            locations.map { ($0.catalogCircleID, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let pairedCircles = CatalogCirclePairing.groups(
             circles: circles,
             extensionsByCircleID: extensionsByCircleID
@@ -565,6 +585,9 @@ final class ExploreModel {
                 memberCircles: memberCircles,
                 genreName: circle.genreId.flatMap { genresByID[$0] },
                 blockName: circle.blockId.flatMap { blocksByID[$0] } ?? "",
+                hallName: locationsByCatalogCircleID[circle.id]?.resolvedHallName(
+                    in: dataSource.comiket
+                ),
                 tags: enrichment?.tagLabels ?? [],
                 enrichment: enrichment
             )

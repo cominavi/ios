@@ -486,13 +486,19 @@ private struct FollowingImportedCircleRow: View {
               let block = dataSource.comiket.blocks.first(where: {
                   $0.externalBlockId == blockID
               }),
-              let spaceNumber = importedCircle.circle.spaceNo
+              let spaceNumber = importedCircle.circle.spaceNo,
+              let hallName = importedCircle.hallName?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !hallName.isEmpty
         else { return nil }
-        let side = importedCircle.isCombinedAB
-            ? "a+b"
-            : (importedCircle.circle.spaceNoSub == 1 ? "b" : "a")
-        let day = String(localized: "Day \(importedCircle.circle.day ?? 0)")
-        return "\(day) · \(block.name)\(String(format: "%02d", spaceNumber))\(side)"
+        return ComiketSpaceAddress(
+            day: importedCircle.circle.day ?? 0,
+            hallName: hallName,
+            blockName: block.name,
+            spaceNumber: spaceNumber,
+            subspace: importedCircle.circle.spaceNoSub,
+            isCombinedAB: importedCircle.isCombinedAB
+        ).navigationSubtitle
     }
 
     private var displayName: String {
