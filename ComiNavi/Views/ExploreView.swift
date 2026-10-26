@@ -125,26 +125,26 @@ struct ExploreView<EventDayHeader: View>: View {
                     .accessibilityIdentifier("explore-filter-button")
                     .id(activeFilterCount)
 
-                    Button {
-                        model.layout = model.layout == .gallery ? .list : .gallery
-                    } label: {
-                        LucideLabel("Layout", icon: model.layout.systemImage)
-                    }
-                    .accessibilityValue(model.layout.title)
-                    .accessibilityIdentifier("explore-layout-button")
-
+                    // Layout and sort are both "how results look", so they
+                    // share one labeled menu instead of two ambiguous glyphs.
                     Menu {
-                        Picker("Sort", selection: $model.sort) {
-                            ForEach(ExploreSort.allCases) { sort in
-                                LucideLabel(resource: sort.title, icon: sort.systemImage)
-                                    .tag(sort)
+                        Picker("Layout", selection: $model.layout) {
+                            ForEach(ExploreLayout.allCases) { layout in
+                                LucideLabel(verbatim: layout.title, icon: layout.systemImage)
+                                    .tag(layout)
                             }
                         }
+                        .pickerStyle(.inline)
+
+                        ExploreSortPicker(selection: $model.sort)
+                            .pickerStyle(.inline)
                     } label: {
-                        LucideLabel("Sort", icon: "chevron.up.chevron.down")
+                        LucideLabel("View options", icon: "slider.horizontal.3")
                     }
-                    .accessibilityValue(Text(model.sort.title))
-                    .accessibilityIdentifier("explore-sort-button")
+                    .accessibilityLabel(
+                        Text("View options, \(model.layout.title), \(Text(model.sort.title))")
+                    )
+                    .accessibilityIdentifier("explore-view-options-button")
                 }
             }
             .sheet(isPresented: $showsFilters) {
