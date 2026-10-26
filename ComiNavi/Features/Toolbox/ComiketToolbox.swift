@@ -51,6 +51,36 @@ struct ComiketToolboxResource: Identifiable, Sendable {
             case .publicAgency: "Public agency"
             }
         }
+
+        /// The publisher that owns `url`, judged from its host and, for shared
+        /// social hosts, the account in the first path component.
+        static func expected(for url: URL) -> Authority? {
+            guard let host = url.host()?.lowercased() else { return nil }
+
+            func isDomain(_ domain: String) -> Bool {
+                host == domain || host.hasSuffix(".\(domain)")
+            }
+
+            if isDomain("x.com") || isDomain("posfie.com") {
+                guard let account = url.pathComponents.dropFirst().first?
+                    .lowercased()
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+                else { return nil }
+                switch account {
+                case "comiketofficial", "comiket_intl", "comiket_cosplay": return .comiket
+                case "circlems": return .circlems
+                default: return nil
+                }
+            }
+            if isDomain("comiket.co.jp") { return .comiket }
+            if isDomain("circle.ms") { return .circlems }
+            if isDomain("bigsight.jp") { return .bigSight }
+            if ["twr.co.jp", "yurikamome.co.jp", "tokyo-brt.co.jp", "tobus.jp"].contains(where: isDomain) {
+                return .transitOperator
+            }
+            if isDomain("go.jp") { return .publicAgency }
+            return nil
+        }
     }
 
     let id: String
@@ -443,7 +473,7 @@ enum ComiketToolboxCatalog {
             .travel,
             "Haneda airport limousine bus",
             "Extra service runs between Haneda Airport and Tokyo Big Sight on August 15–16.",
-            .bigSight,
+            .comiket,
             "navigation",
             "https://x.com/comiketofficial/status/2087798510016208907",
             "haneda airport limousine bus 羽田空港 リムジンバス 臨時便",
@@ -578,14 +608,20 @@ enum ComiketToolboxCatalog {
         _ searchTerms: String,
         eventNumber: Int? = nil
     ) -> ComiketToolboxResource {
-        ComiketToolboxResource(
+        let resourceURL = makeURL(url)
+        // The authority label tells people whose word a link is, so it must match the host.
+        assert(
+            ComiketToolboxResource.Authority.expected(for: resourceURL) == authority,
+            "Toolbox resource \(id) has authority \(authority) but links to \(resourceURL)"
+        )
+        return ComiketToolboxResource(
             id: id,
             category: category,
             title: title,
             summary: summary,
             authority: authority,
             icon: icon,
-            url: makeURL(url),
+            url: resourceURL,
             searchTerms: searchTerms,
             eventNumber: eventNumber
         )

@@ -188,6 +188,8 @@ private struct ToolboxResourcesScreen: View {
 private struct ToolboxReminderSection: View {
     let store: ComiketReminderStore
     let edition: ComiketToolboxEdition
+    /// Grows with Dynamic Type so the times stay aligned without clipping.
+    @ScaledMetric(relativeTo: .body) private var timeColumnWidth = 50.0
 
     private var needsSettingsButton: Bool {
         switch store.state {
@@ -210,7 +212,7 @@ private struct ToolboxReminderSection: View {
                         .font(.headline)
                 }
 
-                Text("Get a Time Sensitive alert 15 minutes before selected milestones.")
+                Text("Get a Time Sensitive alert 15 minutes before each selected time, on both event days.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -230,15 +232,10 @@ private struct ToolboxReminderSection: View {
                         HStack(alignment: .firstTextBaseline, spacing: 12) {
                             Text(verbatim: kind.timeLabel)
                                 .font(.body.monospacedDigit().weight(.semibold))
-                                .frame(width: 50, alignment: .leading)
+                                .frame(minWidth: timeColumnWidth, alignment: .leading)
 
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(kind.title)
-                                    .font(.body)
-                                Text("Both days · 15 min before")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                            Text(kind.title)
+                                .font(.body)
                         }
                     }
                     // A milestone whose fire dates have all passed cannot schedule anything.
@@ -391,7 +388,8 @@ private struct ToolboxQuickAccess: View {
                 ToolboxActionRow(
                     title: "Transit to Tokyo Big Sight",
                     detail: "Open current public-transit directions in Maps.",
-                    icon: "navigation"
+                    icon: "navigation",
+                    accessory: .externalLink
                 )
             }
             .buttonStyle(.plain)
@@ -411,8 +409,9 @@ private struct ToolboxQuickAccess: View {
             } label: {
                 ToolboxActionRow(
                     title: copiedVenue ? "Venue copied" : "Copy venue and map link",
-                    detail: "Share a destination without claiming an indoor route.",
-                    icon: copiedVenue ? "check" : "copy"
+                    detail: "Copies the address and an Apple Maps link.",
+                    icon: copiedVenue ? "check" : "copy",
+                    accessory: .none
                 )
             }
             .buttonStyle(.plain)
@@ -422,9 +421,16 @@ private struct ToolboxQuickAccess: View {
 }
 
 private struct ToolboxActionRow: View {
+    /// What the trailing glyph promises: leaving the app, or nothing for in-place actions.
+    enum Accessory {
+        case none
+        case externalLink
+    }
+
     let title: LocalizedStringResource
     let detail: LocalizedStringResource
     let icon: String
+    let accessory: Accessory
 
     var body: some View {
         HStack(spacing: 13) {
@@ -443,8 +449,10 @@ private struct ToolboxActionRow: View {
 
             Spacer(minLength: 8)
 
-            LucideIcon("chevron-right", size: 15)
-                .foregroundStyle(.tertiary)
+            if accessory == .externalLink {
+                LucideIcon("external-link", size: 14)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
@@ -546,7 +554,7 @@ private struct ToolboxResourceRow: View {
         .padding(.vertical, 3)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Opens the official website")
+        .accessibilityHint("Opens in browser")
     }
 }
 
