@@ -421,7 +421,7 @@ enum ComiketToolboxCatalog {
             "rinkai-line",
             .travel,
             "Rinkai Line schedules",
-            "Expect severe crowding and possible entry controls at Kokusai-tenjijo Station around 13:00–18:00 on both days.",
+            "Timetables and extra trains for Kokusai-tenjijo Station.",
             .transitOperator,
             "calendar-clock",
             "https://www.twr.co.jp/route/tabid/102/Default.aspx",
@@ -431,7 +431,7 @@ enum ComiketToolboxCatalog {
             "yurikamome-c108",
             .travel,
             "Yurikamome C108 timetable",
-            "Expect severe crowding and possible entry controls at Tokyo Big Sight Station around 13:00–18:00 on both days.",
+            "Extra C108 trains and timetables for Tokyo Big Sight Station.",
             .transitOperator,
             "calendar-clock",
             "https://www.yurikamome.co.jp/company/news/bbee2796dd59429f6aa22fb274f5ace8_1.pdf",
@@ -619,7 +619,7 @@ enum ComiketChecklistCatalog {
             "Charge both before leaving and save key information offline.", "radio-tower"),
         item(
             "water-salt", "Water and electrolytes",
-            "Bring enough to drink before entering the East area.", "briefcase-medical"),
+            "Carry enough to drink for the whole day.", "briefcase-medical"),
         item(
             "heat", "Heat protection", "Pack a hat, sunscreen, cooling items, and a towel.",
             "triangle-alert"),

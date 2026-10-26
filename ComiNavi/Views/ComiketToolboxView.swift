@@ -1,63 +1,104 @@
 import SwiftUI
 import UIKit
 
+/// The Toolbox hub: venue quick actions first, then the selected event's notices,
+/// then links to the checklist, reminders, and official links.
 struct ComiketToolboxView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var checklistStore: ComiketChecklistStore
     @State private var reminderStore: ComiketReminderStore
     @State private var searchText = ""
     @State private var copiedVenue = false
+    @State private var isNoticeExpanded = true
+    private let event: CatalogEvent?
 
     @MainActor
     init(
+        event: CatalogEvent? = nil,
         checklistStore: ComiketChecklistStore = ComiketChecklistStore(),
         reminderStore: ComiketReminderStore = ComiketReminderStore()
     ) {
+        self.event = event
         _checklistStore = State(initialValue: checklistStore)
         _reminderStore = State(initialValue: reminderStore)
     }
 
-    private var visibleSections: [ComiketToolboxSection] {
-        ComiketToolboxCatalog.sections(matching: searchText)
+    /// Re-evaluated on every render, so event-specific content disappears once
+    /// the edition's validity window ends even if the screen stays open.
+    private var edition: ComiketToolboxEdition? {
+        ComiketToolboxEdition.current(forEventNumber: event?.number)
     }
 
-    private var liveSection: ComiketToolboxSection? {
-        visibleSections.first { $0.category == .live }
+    private var showsReminders: Bool {
+        edition?.eventNumber == ComiketEventReminderCatalog.eventNumber
     }
 
-    private var nonLiveSections: [ComiketToolboxSection] {
-        visibleSections.filter { $0.category != .live }
+    private var searchResults: [ComiketToolboxSection] {
+        ComiketToolboxCatalog.sections(for: edition, matching: searchText)
     }
 
     var body: some View {
         List {
             if searchText.isEmpty {
-                C108ToolboxNotice()
-                ToolboxReminderSection(store: reminderStore)
                 ToolboxQuickAccess(copiedVenue: $copiedVenue)
-                if let liveSection {
-                    ToolboxResourceSectionView(section: liveSection)
+
+                if let edition {
+                    ToolboxEditionNotice(edition: edition, isExpanded: $isNoticeExpanded)
+                } else {
+                    ToolboxNoEditionNotice(event: event)
                 }
-                ToolboxChecklistSection(store: checklistStore)
-                ForEach(nonLiveSections) { section in
-                    ToolboxResourceSectionView(section: section)
+
+                Section {
+                    NavigationLink {
+                        ToolboxChecklistScreen(store: checklistStore)
+                    } label: {
+                        LabeledContent {
+                            Text(
+                                verbatim:
+                                    "\(checklistStore.completedCount)/\(ComiketChecklistCatalog.items.count)"
+                            )
+                            .monospacedDigit()
+                        } label: {
+                            LucideLabel(resource: "Day-of checklist", icon: "list-checks")
+                        }
+                    }
+                    .accessibilityIdentifier("toolbox-open-checklist")
+
+                    if let edition, showsReminders {
+                        NavigationLink {
+                            ToolboxReminderScreen(store: reminderStore, edition: edition)
+                        } label: {
+                            LucideLabel(resource: "Event reminders", icon: "calendar-clock")
+                        }
+                        .accessibilityIdentifier("toolbox-open-reminders")
+                    }
+
+                    NavigationLink {
+                        ToolboxResourcesScreen(
+                            sections: ComiketToolboxCatalog.sections(for: edition)
+                        )
+                    } label: {
+                        LucideLabel(resource: "Official links", icon: "globe")
+                    }
+                    .accessibilityIdentifier("toolbox-open-official-links")
                 }
             } else {
-                ForEach(visibleSections) { section in
+                ForEach(searchResults) { section in
                     ToolboxResourceSectionView(section: section)
                 }
             }
         }
         .overlay {
-            if !searchText.isEmpty, visibleSections.isEmpty {
+            if !searchText.isEmpty, searchResults.isEmpty {
                 ContentUnavailableView.search(text: searchText)
             }
         }
+        .modifier(ToolboxReadableWidth())
         .navigationTitle("Toolbox")
         .searchable(
             text: $searchText,
             placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Search official resources"
+            prompt: "Search official links"
         )
         .task {
             await reminderStore.refresh()
@@ -77,8 +118,76 @@ struct ComiketToolboxView: View {
     }
 }
 
+/// Keeps grouped lists at a readable column width in regular width instead of
+/// stretching rows across the whole iPad screen.
+private struct ToolboxReadableWidth: ViewModifier {
+    private static let maxContentWidth: CGFloat = 680
+    private static let minimumMargin: CGFloat = 20
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var containerWidth: CGFloat = 0
+
+    private var horizontalMargin: CGFloat? {
+        guard horizontalSizeClass == .regular else { return nil }
+        return max(Self.minimumMargin, (containerWidth - Self.maxContentWidth) / 2)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .contentMargins(.horizontal, horizontalMargin, for: .scrollContent)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                containerWidth = width
+            }
+    }
+}
+
+private struct ToolboxChecklistScreen: View {
+    let store: ComiketChecklistStore
+
+    var body: some View {
+        List {
+            ToolboxChecklistSection(store: store)
+        }
+        .modifier(ToolboxReadableWidth())
+        .navigationTitle("Day-of checklist")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct ToolboxReminderScreen: View {
+    let store: ComiketReminderStore
+    let edition: ComiketToolboxEdition
+
+    var body: some View {
+        List {
+            ToolboxReminderSection(store: store, edition: edition)
+        }
+        .modifier(ToolboxReadableWidth())
+        .navigationTitle("Event reminders")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct ToolboxResourcesScreen: View {
+    let sections: [ComiketToolboxSection]
+
+    var body: some View {
+        List {
+            ForEach(sections) { section in
+                ToolboxResourceSectionView(section: section)
+            }
+        }
+        .modifier(ToolboxReadableWidth())
+        .navigationTitle("Official links")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 private struct ToolboxReminderSection: View {
     let store: ComiketReminderStore
+    let edition: ComiketToolboxEdition
 
     private var needsSettingsButton: Bool {
         switch store.state {
@@ -97,7 +206,7 @@ private struct ToolboxReminderSection: View {
                 HStack(spacing: 9) {
                     LucideIcon("calendar-clock", size: 20)
                         .foregroundStyle(.orange)
-                    Text("C108 event reminders")
+                    Text("\(edition.shortName) event reminders")
                         .font(.headline)
                     Spacer()
                     Text("Local only")
@@ -156,7 +265,10 @@ private struct ToolboxReminderSection: View {
                 Text(
                     "Your choices are saved. Delivery still follows your iOS notification settings."
                 )
-                Link("Official C108 admission schedule", destination: ComiketEventReminderCatalog.officialScheduleURL)
+                Link(
+                    "Official \(edition.shortName) admission schedule",
+                    destination: edition.reminderScheduleURL
+                )
             }
         }
     }
@@ -201,36 +313,67 @@ private struct ToolboxResourceSectionView: View {
     }
 }
 
-private struct C108ToolboxNotice: View {
+/// The selected edition's dated notices, collapsible so the hub links stay close.
+private struct ToolboxEditionNotice: View {
+    let edition: ComiketToolboxEdition
+    @Binding var isExpanded: Bool
+
     var body: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
+            DisclosureGroup(isExpanded: $isExpanded) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(edition.notices) { notice in
+                        HStack(alignment: .firstTextBaseline, spacing: 9) {
+                            Circle()
+                                .fill(.orange)
+                                .frame(width: 5, height: 5)
+                                .accessibilityHidden(true)
+                            Text(notice.text)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(
+                        "Checked against official posts on \(edition.verifiedAt, format: .dateTime.year().month().day()). Check live notices again before you travel."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+                .accessibilityElement(children: .combine)
+            } label: {
                 HStack(spacing: 10) {
                     LucideIcon("circle-alert", size: 20)
                         .foregroundStyle(.orange)
-                    Text("C108 right now")
+                    Text("\(edition.shortName) notices")
                         .font(.headline)
                 }
-
-                ForEach(C108ToolboxNoticeCatalog.notices) { notice in
-                    HStack(alignment: .firstTextBaseline, spacing: 9) {
-                        Circle()
-                            .fill(.orange)
-                            .frame(width: 5, height: 5)
-                        Text(notice.text)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Text(
-                    "Checked against official posts through August 13. Always recheck live notices before travel."
-                )
-                .font(.caption)
-                .foregroundStyle(.tertiary)
             }
-            .padding(.vertical, 4)
-            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("toolbox-edition-notice")
+        }
+    }
+}
+
+/// Shown instead of notices and reminders when no edition matches the selected
+/// event or the matching edition has ended.
+private struct ToolboxNoEditionNotice: View {
+    let event: CatalogEvent?
+
+    var body: some View {
+        Section {
+            Label {
+                if let event {
+                    Text("Event notices and reminders for \(event.shortName) are not available.")
+                } else {
+                    Text("Event notices and reminders are not available.")
+                }
+            } icon: {
+                LucideIcon("info", size: 18)
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("toolbox-no-edition")
         }
     }
 }
