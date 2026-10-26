@@ -42,7 +42,6 @@ struct MapView: View {
     @State private var model: MapScreenModel
     @State private var showsWhereAmI = false
     @State private var showsDestinationPicker = false
-    @State private var showsCircleSearch = false
     @State private var showsCurrentLocation = false
     @State private var opensWhereAmIAfterSheet = false
     @State private var locationMode: MapLocationMode = .manual
@@ -148,8 +147,8 @@ struct MapView: View {
                 model: model,
                 eventDaySelector: eventDaySelector,
                 visibleMapLayers: visibleMapLayersBinding,
-                onFindCircle: {
-                    showsCircleSearch = true
+                onGoToSpace: {
+                    showsDestinationPicker = true
                 }
             )
             .padding(.horizontal, 14)
@@ -295,6 +294,9 @@ struct MapView: View {
                 dataSource: dataSource,
                 eventNumber: model.eventNumber,
                 mapID: model.selectedMapID,
+                onPinDestination: {
+                    model.pinSelectionAsDestination()
+                },
                 onOpenDetail: { circle, shouldExpandSheet in
                     model.select(circle: circle)
                     if shouldExpandSheet {
@@ -350,11 +352,6 @@ struct MapView: View {
         }
         .sheet(isPresented: $showsDestinationPicker) {
             DestinationPickerView(mapModel: model)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showsCircleSearch) {
-            CircleSearchPickerView(mapModel: model, days: model.days)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -706,7 +703,7 @@ private struct MapControlPanel: View {
     let model: MapScreenModel
     let eventDaySelector: CatalogEventDayBanner?
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
-    let onFindCircle: () -> Void
+    let onGoToSpace: () -> Void
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -714,7 +711,7 @@ private struct MapControlPanel: View {
         VStack(alignment: .leading, spacing: 8) {
             selectors
             if model.isSearchPresented {
-                MapSearchField(model: model, onFindByLocation: onFindCircle)
+                MapSearchField(model: model, onGoToSpace: onGoToSpace)
             }
         }
         .frame(maxWidth: 760, alignment: .leading)
@@ -802,7 +799,7 @@ private struct MapLocationControls: View {
                         Button {
                             onFindTable()
                         } label: {
-                            LucideLabel("Find a Circle", icon: "mappin.and.ellipse")
+                            LucideLabel("Go to Another Space", icon: "mappin.and.ellipse")
                         }
 
                         Divider()
@@ -894,8 +891,8 @@ private struct MapLocationControls: View {
     }
 
     private var destinationLabel: String {
-        destination.map { String(localized: "Table \($0.spaceCode)") }
-            ?? String(localized: "Find a Circle")
+        destination.map { String(localized: "Destination \($0.address.formatted(.short))") }
+            ?? String(localized: "Go to Space")
     }
 
     private var destinationIcon: some View {
@@ -906,7 +903,7 @@ private struct MapLocationControls: View {
     }
 
     private var destinationHint: String {
-        String(localized: "Choose a circle and pin it on the map")
+        String(localized: "Shows actions for the pinned space")
     }
 
     private func copy(_ destination: MapDestination) {
@@ -1275,7 +1272,7 @@ private struct MapLayerMenu: View {
 
 private struct MapSearchField: View {
     let model: MapScreenModel
-    let onFindByLocation: () -> Void
+    let onGoToSpace: () -> Void
     @State private var text = ""
     @State private var showsResults = true
     @FocusState private var isFocused: Bool
@@ -1347,16 +1344,16 @@ private struct MapSearchField: View {
 
             Button {
                 isFocused = false
-                onFindByLocation()
+                onGoToSpace()
             } label: {
-                LucideLabel("Find a circle by table location", icon: "mappin.and.ellipse")
+                LucideLabel("Go to a space by block and number", icon: "mappin.and.ellipse")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
-            .tint(.accentColor)
+            .tint(.primary)
             .accessibilityHint("Choose the event day, block letter, and space number")
-            .accessibilityIdentifier("map-location-search-button")
+            .accessibilityIdentifier("map-go-to-space-button")
         }
         .onAppear {
             text = model.searchQuery
@@ -2458,6 +2455,7 @@ private struct CircleMapDetailSheet: View {
     let dataSource: CirclemsDataSource?
     let eventNumber: Int
     let mapID: Int
+    let onPinDestination: () -> Void
     let onOpenDetail: (CatalogMapCircle, Bool) -> Void
 
     var body: some View {
@@ -2477,6 +2475,7 @@ private struct CircleMapDetailSheet: View {
                     } else {
                         circleSummaries
                         locationCard
+                        pinDestinationButton
                     }
                 }
                 .padding()
@@ -2550,6 +2549,19 @@ private struct CircleMapDetailSheet: View {
         .accessibilityLabel("Copy \(selection.selectedAddress.canonicalText)")
         .accessibilityHint("Copies the venue-aware circle address and a ComiNavi link")
         .accessibilityIdentifier("map-circle-address-copy")
+    }
+
+    private var pinDestinationButton: some View {
+        Button {
+            onPinDestination()
+        } label: {
+            LucideLabel("Pin as Destination", icon: "mappin.and.ellipse")
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 50)
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityHint("Keeps this space marked on the map until you clear it")
+        .accessibilityIdentifier("map-circle-pin-destination")
     }
 
     private var circleSummaries: some View {

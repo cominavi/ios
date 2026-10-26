@@ -396,9 +396,11 @@ final class MapScreenModel {
         }
     }
 
-    func whereAmIVenues() async throws -> [WhereAmIVenueOption] {
-        let day = selectedDay
-        let halls = halls
+    /// Venue options for `day`, or for the selected day when `nil`. Only the
+    /// selected day's campus replaces the map's campus scene.
+    func whereAmIVenues(day requestedDay: Int? = nil) async throws -> [WhereAmIVenueOption] {
+        let day = requestedDay ?? selectedDay
+        let halls = days.first(where: { $0.dayIndex == day })?.halls ?? []
         var scenes: [Int: CatalogMapScene] = [:]
         var firstError: Error?
 
@@ -432,8 +434,11 @@ final class MapScreenModel {
         else {
             throw MapScreenError.missingCampusVenues
         }
-        guard selectedDay == day else { throw CancellationError() }
-        campusScene = campus
+        if selectedDay == day {
+            campusScene = campus
+        } else if requestedDay == nil {
+            throw CancellationError()
+        }
         let hallsByMapID = Dictionary(uniqueKeysWithValues: halls.map { ($0.externalMapId, $0) })
         return campus.venues.map { placement in
             WhereAmIVenueOption(
@@ -721,13 +726,47 @@ final class MapScreenModel {
 
     /// Opens a search result, switching day and hall first when needed.
     func select(_ result: SearchResult) {
-        if result.day != selectedDay {
-            select(day: result.day)
+        open(
+            table: result.table,
+            mapID: result.mapID,
+            day: result.day,
+            preferredSubspace: result.subspace
+        )
+    }
+
+    /// Shows the circle sheet for a table on any day and hall. The day and
+    /// hall switch first so the sheet and the map agree.
+    func open(table: CatalogMapTable, mapID: Int, day: Int, preferredSubspace: Int) {
+        if day != selectedDay {
+            select(day: day)
         }
-        if scope != .venue || selectedMapID != result.mapID {
-            select(mapID: result.mapID)
+        if scope != .venue || selectedMapID != mapID {
+            select(mapID: mapID)
         }
-        select(table: result.table, preferredSubspace: result.subspace)
+        select(table: table, preferredSubspace: preferredSubspace)
+    }
+
+    /// Pins the space in the open circle sheet as the walking destination.
+    func pinSelectionAsDestination() {
+        guard let selection else { return }
+        let table = selection.table
+        let placement =
+            campusScene?.venues.first { venue in
+                venue.scene.id.day == selectedDay && venue.scene.tableByID[table.id] == table
+            } ?? standalonePlacement(mapID: selectedMapID, table: table)
+        guard let placement else { return }
+        let venue = WhereAmIVenueOption(
+            displayName: halls.first(where: { $0.externalMapId == placement.id })
+                .map(BigSightVenue.localizedHallName(for:))
+                ?? placement.kind.displayName,
+            placement: placement
+        )
+        show(
+            WhereAmIResolver.destination(
+                at: table,
+                in: venue,
+                subspace: selection.selectedAddress.subspace
+            ))
     }
 
     private func spaceCodeResults(
