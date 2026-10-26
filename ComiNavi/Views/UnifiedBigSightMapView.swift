@@ -387,9 +387,23 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     }
 }
 
+/// Load state of the MapLibre street basemap underneath the venue overlay.
+/// The venue overlay never depends on it, so `.unavailable` only explains
+/// the missing street context.
+enum UnifiedBasemapState: Equatable {
+    case loading
+    case ready
+    case unavailable
+}
+
 @MainActor
 final class UnifiedMapHostView: UIView {
+    /// Fallback only. Both appearances bundle their style so the map never
+    /// needs the network before it can draw the venue context.
     private static let openStreetMapStyleURL = URL(string: "https://americanamap.org/style.json")!
+    /// Tiles that have not rendered by then are treated as unreachable. The
+    /// state still returns to `.ready` if MapLibre completes a render later.
+    private static let basemapLoadTimeout: TimeInterval = 10
     private static let ambientCacheConfiguration: Void = {
         let cacheSize = UInt(150 * 1_024 * 1_024)
         let logger = Logger(
@@ -415,6 +429,11 @@ final class UnifiedMapHostView: UIView {
     private var lastBasemapCamera: UnifiedBasemapCamera?
     private var appearance: UnifiedMapAppearance
     private var compassState = CompassState.north
+    private let basemapStatusChip = MapStatusChip(
+        text: String(localized: "Street map unavailable offline. The venue map still works.")
+    )
+    private var basemapTimeoutWorkItem: DispatchWorkItem?
+    private(set) var basemapState = UnifiedBasemapState.loading
 
     private enum CompassState: Equatable {
         case north
@@ -437,6 +456,7 @@ final class UnifiedMapHostView: UIView {
         basemapView.logoView.isHidden = true
         basemapView.attributionButton.isHidden = true
         basemapView.compassView.isHidden = true
+        basemapView.delegate = self
         addSubview(basemapView)
 
         mapView.translatesAutoresizingMaskIntoConstraints = false
@@ -517,6 +537,11 @@ final class UnifiedMapHostView: UIView {
         dataAttributionButton.showsMenuAsPrimaryAction = true
         addSubview(dataAttributionButton)
 
+        basemapStatusChip.accessibilityIdentifier = "map-basemap-status"
+        basemapStatusChip.isHidden = true
+        basemapStatusChip.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(basemapStatusChip)
+
         let dataAttributionTrailingConstraint = dataAttributionButton.trailingAnchor.constraint(
             equalTo: safeAreaLayoutGuide.trailingAnchor,
             constant: -MapChromeLayout.attributionTrailingInset(showsCompass: true)
@@ -550,7 +575,23 @@ final class UnifiedMapHostView: UIView {
                 equalTo: safeAreaLayoutGuide.bottomAnchor,
                 constant: -10
             ),
+            basemapStatusChip.leadingAnchor.constraint(
+                equalTo: safeAreaLayoutGuide.leadingAnchor,
+                constant: MapChromeLayout.edgeInset
+            ),
+            basemapStatusChip.trailingAnchor.constraint(
+                lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor,
+                constant: -MapChromeLayout.edgeInset
+            ),
+            // Sit above the bottom control row so the chip never covers the
+            // compass, location buttons, or attribution.
+            basemapStatusChip.bottomAnchor.constraint(
+                equalTo: safeAreaLayoutGuide.bottomAnchor,
+                constant: -(MapChromeLayout.edgeInset + MapChromeLayout.controlSize
+                    + MapChromeLayout.controlSpacing)
+            ),
         ])
+        beginBasemapLoad()
 
         let center = NotificationCenter.default
         center.addObserver(
@@ -598,8 +639,37 @@ final class UnifiedMapHostView: UIView {
         backgroundColor = appearance.palette.mapBackground
         applyChromeAppearance()
         basemapView.styleURL = Self.styleURL(for: appearance)
+        beginBasemapLoad()
         lastBasemapCamera = nil
         applyRequestedBasemapCamera()
+    }
+
+    private func beginBasemapLoad() {
+        basemapTimeoutWorkItem?.cancel()
+        // Keep showing `.unavailable` across a style swap while offline; a
+        // successful render clears it.
+        if basemapState != .unavailable { setBasemapState(.loading) }
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self, self.basemapState == .loading else { return }
+            self.setBasemapState(.unavailable)
+        }
+        basemapTimeoutWorkItem = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.basemapLoadTimeout, execute: timeout)
+    }
+
+    fileprivate func setBasemapState(_ state: UnifiedBasemapState) {
+        if state != .loading {
+            basemapTimeoutWorkItem?.cancel()
+            basemapTimeoutWorkItem = nil
+        }
+        guard state != basemapState else { return }
+        basemapState = state
+        let isHidden = state != .unavailable
+        guard basemapStatusChip.isHidden != isHidden else { return }
+        basemapStatusChip.isHidden = isHidden
+        if !isHidden {
+            UIAccessibility.post(notification: .announcement, argument: basemapStatusChip.text)
+        }
     }
 
     @objc private func didEnterBackground() {
@@ -693,25 +763,27 @@ final class UnifiedMapHostView: UIView {
     }
 
     private static func styleURL(for appearance: UnifiedMapAppearance) -> URL {
-        guard appearance == .dark else { return openStreetMapStyleURL }
+        let name = appearance == .dark ? "AmericanaDark" : "AmericanaLight"
         if let direct = Bundle.main.url(
-            forResource: "AmericanaDark",
+            forResource: name,
             withExtension: "json",
             subdirectory: "MapStyles"
-        ) ?? Bundle.main.url(forResource: "AmericanaDark", withExtension: "json") {
+        ) ?? Bundle.main.url(forResource: name, withExtension: "json") {
             return direct
         }
-        guard let resourceURL = Bundle.main.resourceURL,
+        let fileName = "\(name).json"
+        if let resourceURL = Bundle.main.resourceURL,
             let enumerator = FileManager.default.enumerator(
                 at: resourceURL,
                 includingPropertiesForKeys: [.isRegularFileKey],
                 options: [.skipsHiddenFiles]
             )
-        else { return openStreetMapStyleURL }
-        for case let url as URL in enumerator where url.lastPathComponent == "AmericanaDark.json" {
-            return url
+        {
+            for case let url as URL in enumerator where url.lastPathComponent == fileName {
+                return url
+            }
         }
-        assertionFailure("Missing bundled AmericanaDark.json map style")
+        assertionFailure("Missing bundled \(fileName) map style")
         return openStreetMapStyleURL
     }
 
@@ -757,6 +829,87 @@ final class UnifiedMapHostView: UIView {
             guard let url = URL(string: url) else { return }
             UIApplication.shared.open(url)
         }
+    }
+}
+
+extension UnifiedMapHostView: MLNMapViewDelegate {
+    nonisolated func mapViewDidFinishLoadingMap(_ mapView: MLNMapView) {
+        Task { @MainActor [weak self] in
+            self?.setBasemapState(.ready)
+        }
+    }
+
+    nonisolated func mapViewDidFinishRenderingMap(
+        _ mapView: MLNMapView,
+        fullyRendered: Bool
+    ) {
+        // Partial renders happen while tiles stream in; only a full render
+        // proves the street tiles are reachable.
+        guard fullyRendered else { return }
+        Task { @MainActor [weak self] in
+            self?.setBasemapState(.ready)
+        }
+    }
+
+    nonisolated func mapViewDidFailLoadingMap(_ mapView: MLNMapView, withError error: Error) {
+        Task { @MainActor [weak self] in
+            self?.setBasemapState(.unavailable)
+        }
+    }
+}
+
+/// A compact material chip for passive map status text. It never intercepts
+/// touches, so the map stays fully interactive underneath it.
+final class MapStatusChip: UIView {
+    private let effectView = UIVisualEffectView(
+        effect: UIBlurEffect(style: .systemThinMaterial)
+    )
+    private let label = UILabel()
+
+    var text: String {
+        get { label.text ?? "" }
+        set {
+            label.text = newValue
+            accessibilityLabel = newValue
+        }
+    }
+
+    init(text: String) {
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
+        isAccessibilityElement = true
+        accessibilityTraits = .staticText
+
+        effectView.translatesAutoresizingMaskIntoConstraints = false
+        effectView.layer.cornerRadius = 12
+        effectView.layer.cornerCurve = .continuous
+        effectView.clipsToBounds = true
+        addSubview(effectView)
+
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .preferredFont(forTextStyle: .footnote)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .label
+        label.numberOfLines = 0
+        effectView.contentView.addSubview(label)
+
+        NSLayoutConstraint.activate([
+            effectView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            effectView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            effectView.topAnchor.constraint(equalTo: topAnchor),
+            effectView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            label.leadingAnchor.constraint(equalTo: effectView.contentView.leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(
+                equalTo: effectView.contentView.trailingAnchor, constant: -12),
+            label.topAnchor.constraint(equalTo: effectView.contentView.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: effectView.contentView.bottomAnchor, constant: -8),
+        ])
+        self.text = text
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }
 
