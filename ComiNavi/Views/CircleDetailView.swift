@@ -11,10 +11,14 @@ struct CircleDetailView: View {
     @State private var details: CatalogCircleDetails?
     @State private var extensionsByCircleID: [Int: CirclemsDataSchema.ComiketCircleExtend] = [:]
     @State private var circleAddress: ComiketSpaceAddress?
+    @State private var circleHallMapName: String?
     @State private var isShowingDataSources = false
     @State private var isOpeningMap = false
     @State private var planModel: CircleUserPlanModel
     @State private var isShowingSharedPlanRequest = false
+    @State private var isShowingSignIn = false
+    @State private var headerHeight: CGFloat = 0
+    @State private var isHeaderScrolledAway = false
 
     init(
         circle: CirclemsDataSchema.ComiketCircleWC,
@@ -63,10 +67,27 @@ struct CircleDetailView: View {
                     spaceLabel: spaceLabel,
                     favoriteColor: planModel.selectedColor,
                     address: circleAddress,
+                    dayDateText: dayDateText,
+                    hallGloss: hallGloss,
+                    canOpenMap: circle.updateId != nil,
                     isOpeningMap: isOpeningMap,
                     onOpenMap: openOnMap,
                     externalLinks: externalLinks,
                     xProfile: xProfile
+                )
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    headerHeight = height
+                }
+
+                CircleDetailActionRow(
+                    isFavorite: planModel.isFavorite,
+                    isFavoriteUnavailable: isFavoriteUnavailable,
+                    sharedPlanAvailability: sharedPlanAvailability,
+                    onToggleFavorite: { planModel.toggleFavorite() },
+                    onAddToSharedPlan: { isShowingSharedPlanRequest = true },
+                    onSignIn: { isShowingSignIn = true }
                 )
 
                 if AppData.profileStore.isIdentityVerified,
@@ -127,10 +148,23 @@ struct CircleDetailView: View {
                     }
                 }
 
+                if isMissingCommunityDetails {
+                    LucideLabel("No item list or tags for this circle yet.", icon: "info.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(
+                            Color(uiColor: .secondarySystemGroupedBackground),
+                            in: .rect(cornerRadius: 16)
+                        )
+                        .accessibilityIdentifier("circle-detail-empty-state")
+                }
+
                 Button {
                     isShowingDataSources = true
                 } label: {
-                    LucideLabel("Sources", icon: "info.circle")
+                    LucideLabel("Data sources", icon: "info.circle")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -144,11 +178,20 @@ struct CircleDetailView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 20)
         }
+        // The header already shows the name and address, so the bar repeats
+        // them only once the header has scrolled out of view.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            headerHeight > 0
+                && geometry.contentOffset.y + geometry.contentInsets.top > headerHeight
+        } action: { _, isScrolledAway in
+            isHeaderScrolledAway = isScrolledAway
+        }
         .background(Color(uiColor: .systemGroupedBackground))
         .modifier(
             CircleDetailNavigationTitle(
                 title: circle.circleName.nonBlank ?? String(localized: "Circle"),
-                subtitle: navigationSubtitle
+                subtitle: navigationSubtitle,
+                isVisible: isHeaderScrolledAway
             )
         )
         .navigationBarTitleDisplayMode(.inline)
@@ -166,8 +209,20 @@ struct CircleDetailView: View {
                 .accessibilityValue(planModel.isFavorite ? "In favorites" : "Not in favorites")
                 .accessibilityHint("Adds or removes this circle from your favorites")
                 .accessibilityAddTraits(planModel.isFavorite ? .isSelected : [])
+                .disabled(isFavoriteUnavailable)
                 .accessibilityIdentifier("circle-favorite-button")
             }
+        }
+        // Observed here rather than in the favorite settings section, which
+        // only exists after a favorite succeeds, so a failed first toggle
+        // still reports why the star reverted.
+        .onChange(of: planModel.saveState) { _, state in
+            guard case .failed(let message) = state else { return }
+            AppToast.showError(
+                String(localized: "Could not save circle"),
+                subtitle: message
+            )
+            planModel.dismissSaveError()
         }
         .sheet(isPresented: $isShowingDataSources) {
             CircleDetailDataSourcesSheet(
@@ -176,6 +231,15 @@ struct CircleDetailView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $isShowingSignIn) {
+            SignInView()
+                .presentationDragIndicator(.visible)
+        }
+        .onChange(of: AppData.profileStore.isIdentityVerified) { _, isVerified in
+            if isVerified {
+                isShowingSignIn = false
+            }
         }
         .sheet(isPresented: $isShowingSharedPlanRequest) {
             if let key = sharedPlanCircleKey,
@@ -197,6 +261,7 @@ struct CircleDetailView: View {
         }
         .task(id: circle.id) {
             circleAddress = nil
+            circleHallMapName = nil
             await loadCircleAddress()
         }
         .task(id: circle.id) {
@@ -235,6 +300,28 @@ struct CircleDetailView: View {
         .accessibilityIdentifier("circle-detail-screen")
     }
 
+    /// Disables favorite controls only once details have loaded, so the
+    /// star stays usable while the public circle ID is still resolving.
+    private var isFavoriteUnavailable: Bool {
+        details != nil && planModel.isFavoriteUnavailable && !planModel.isFavorite
+    }
+
+    private var sharedPlanAvailability: CircleDetailActionRow.SharedPlanAvailability {
+        guard AppData.profileStore.isIdentityVerified,
+              AppData.profileStore.profile?.id != nil
+        else { return .signedOut }
+        return sharedPlanCircleKey == nil ? .unavailable : .available
+    }
+
+    /// True once details have loaded and the circle has no tags, item list
+    /// or About text, so the page explains the gap instead of ending blank.
+    private var isMissingCommunityDetails: Bool {
+        details != nil
+            && combinedTags.isEmpty
+            && shinagakiPosts.isEmpty
+            && !hasAboutInformation
+    }
+
     private var hasAboutInformation: Bool {
         circle.bookName.nonBlank != nil
             || circle.description.nonBlank != nil
@@ -270,6 +357,35 @@ struct CircleDetailView: View {
 
         let side = isCombinedAB ? "a+b" : (circle.spaceNoSub == 1 ? "b" : "a")
         return "\(block.name)\(String(format: "%02d", spaceNumber))\(side)"
+    }
+
+    /// The calendar date of the circle's day, such as "Sun, Aug 11", shown
+    /// next to "Day 1" so attendees do not have to map day numbers to dates.
+    private var dayDateText: String? {
+        guard let dayIndex = circleAddress?.day ?? circle.day,
+              let components = dataSource.comiket.days
+                  .first(where: { $0.dayIndex == dayIndex })?.date
+        else { return nil }
+
+        var calendar = Calendar(identifier: .gregorian)
+        if let timeZone = components.timeZone {
+            calendar.timeZone = timeZone
+        }
+        guard let date = calendar.date(from: components) else { return nil }
+
+        var style = CatalogDateFormatting.abbreviated(for: date, calendar: calendar)
+        style.timeZone = calendar.timeZone
+        return date.formatted(style)
+    }
+
+    /// An English gloss such as "West Halls 1–2" under the canonical Japanese
+    /// hall text. Japanese readers already read the canonical text, so the
+    /// gloss is omitted for them.
+    private var hallGloss: String? {
+        guard let circleHallMapName,
+              Bundle.main.preferredLocalizations.first?.hasPrefix("ja") != true
+        else { return nil }
+        return CircleHallGloss.text(forMapName: circleHallMapName)
     }
 
     private var navigationSubtitle: String? {
@@ -344,7 +460,13 @@ struct CircleDetailView: View {
                     tableID: location.tableID,
                     subspace: location.subspace
                 )
-            else { return }
+            else {
+                AppToast.showError(
+                    String(localized: "Couldn't find this booth on the map"),
+                    subtitle: nil
+                )
+                return
+            }
 
             AppData.sharedLocationInbox.receive(url: sharedLocation.url)
         }
@@ -357,15 +479,17 @@ struct CircleDetailView: View {
         ),
             let location = locations.first(where: { $0.catalogCircleID == circle.id }),
             let blockID = circle.blockId,
-            let block = dataSource.comiket.blocks.first(where: { $0.externalBlockId == blockID })
+            let block = dataSource.comiket.blocks.first(where: { $0.externalBlockId == blockID }),
+            // Without a hall the canonical address would be incomplete, so
+            // the card keeps showing the plain space label instead.
+            let hall = dataSource.comiket.days
+                .first(where: { $0.dayIndex == location.day })?
+                .halls.first(where: { $0.externalMapId == location.mapID })
         else { return }
-        let hallName = dataSource.comiket.days
-            .first(where: { $0.dayIndex == location.day })?
-            .halls.first(where: { $0.externalMapId == location.mapID })?
-            .name ?? "会場"
+        circleHallMapName = hall.mapName
         circleAddress = ComiketSpaceAddress(
             day: location.day,
-            hallName: hallName,
+            hallName: hall.name,
             blockName: block.name,
             spaceNumber: location.tableID.spaceNumber,
             subspace: isCombinedAB ? nil : location.subspace,
@@ -389,22 +513,36 @@ private struct CircleXProfile {
 private struct CircleXProfileRow: View {
     let profile: CircleXProfile
     var avatarSize: CGFloat = 40
+    /// Leads with the handle when the display name only repeats a name that
+    /// is already visible, such as the pen name in the header.
+    var prefersHandle = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             CircleXProfileAvatar(url: profile.avatarURL, size: avatarSize)
 
             VStack(alignment: .leading, spacing: 1) {
-                DimmedCircleDisplayName(displayName: profile.displayName)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                if prefersHandle {
+                    Text(verbatim: "@\(profile.handle)")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
 
-                Text(verbatim: "@\(profile.handle)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    Text(verbatim: "X")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    DimmedCircleDisplayName(displayName: profile.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Text(verbatim: "@\(profile.handle)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .layoutPriority(1)
@@ -414,8 +552,9 @@ private struct CircleXProfileRow: View {
                 .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: profile.displayName))
-        .accessibilityValue(Text(verbatim: "@\(profile.handle)"))
+        .accessibilityLabel(
+            Text("X profile, \(profile.displayName), @\(profile.handle)")
+        )
     }
 }
 
@@ -518,6 +657,9 @@ private struct CircleDetailHeader: View {
     let spaceLabel: String?
     let favoriteColor: BookmarkColor?
     let address: ComiketSpaceAddress?
+    let dayDateText: String?
+    let hallGloss: String?
+    let canOpenMap: Bool
     let isOpeningMap: Bool
     let onOpenMap: () -> Void
     let externalLinks: [CircleExternalLink]
@@ -528,8 +670,10 @@ private struct CircleDetailHeader: View {
     @State private var isShowingLightbox = false
     @State private var copiedLocation = false
     @State private var copyGeneration = 0
-    @ScaledMetric(relativeTo: .title) private var artworkWidth = 154.0
+    @ScaledMetric(relativeTo: .title) private var compactArtworkWidth = 154.0
+    @ScaledMetric(relativeTo: .title) private var regularArtworkWidth = 230.0
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
@@ -559,19 +703,26 @@ private struct CircleDetailHeader: View {
             }.value
             didFailLoadingImage = image == nil
         }
-        .sheet(isPresented: $isShowingLightbox) {
+        .fullScreenCover(isPresented: $isShowingLightbox) {
             if let image {
                 ShinagakiLightbox(
                     image: image,
-                    accessibilityLabel: String(localized: "Circle cover for \(displayName)")
+                    accessibilityLabel: String(localized: "Circle cut for \(displayName)")
                 )
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.black)
+                .dismissesOnDownwardDrag()
+                .presentationBackground(.clear)
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("circle-detail-header")
+    }
+
+    private var isRegularWidth: Bool { horizontalSizeClass == .regular }
+
+    /// iPad gets a larger cut; the identity column is capped so the X row
+    /// and link chips do not stretch across the readable-width column.
+    private var artworkWidth: CGFloat {
+        isRegularWidth ? regularArtworkWidth : compactArtworkWidth
     }
 
     private func artwork(width: CGFloat) -> some View {
@@ -584,7 +735,7 @@ private struct CircleDetailHeader: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Circle cover for \(displayName)")
+                .accessibilityLabel("Circle cut for \(displayName)")
                 .accessibilityHint("Opens the image viewer")
                 .accessibilityIdentifier("circle-cover-lightbox-button")
             } else {
@@ -628,7 +779,10 @@ private struct CircleDetailHeader: View {
 
             if let xProfile {
                 Link(destination: xProfile.url) {
-                    CircleXProfileRow(profile: xProfile)
+                    CircleXProfileRow(
+                        profile: xProfile,
+                        prefersHandle: xProfile.displayName == circle.penName.nonBlank
+                    )
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
                         .background(
@@ -652,7 +806,7 @@ private struct CircleDetailHeader: View {
                 CircleDetailExternalLinksRow(links: otherExternalLinks)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: isRegularWidth ? 380 : .infinity, alignment: .leading)
     }
 
     private var otherExternalLinks: [CircleExternalLink] {
@@ -660,41 +814,20 @@ private struct CircleDetailHeader: View {
     }
 
     private func locationRow(spaceLabel: String) -> some View {
-        HStack(spacing: 8) {
-            Button(action: onOpenMap) {
-                HStack(alignment: .top, spacing: 10) {
-                    LucideIcon("mappin.and.ellipse", size: 20)
-                        .foregroundStyle(Color.accentColor)
-                        .padding(.top, 2)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        if let day = address?.day ?? circle.day {
-                            Text("Day \(day)")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.secondary)
-                                .accessibilityIdentifier("circle-location-day")
-                        }
-
-                        Text(verbatim: address?.venueLocationText ?? spaceLabel)
-                            .font(.headline.monospaced().weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("circle-location-venue")
-                    }
-
-                    if isOpeningMap {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(.top, 12)
-                    }
+        HStack(spacing: 4) {
+            if canOpenMap {
+                Button(action: onOpenMap) {
+                    locationSummary(spaceLabel: spaceLabel, showsMapAffordance: true)
+                        .contentShape(.rect)
                 }
-                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                .contentShape(.rect)
+                .buttonStyle(.plain)
+                .disabled(isOpeningMap)
+                .accessibilityHint("Shows this circle on the map")
+                .accessibilityIdentifier("circle-location-map-button")
+            } else {
+                locationSummary(spaceLabel: spaceLabel, showsMapAffordance: false)
+                    .accessibilityElement(children: .combine)
             }
-            .buttonStyle(.plain)
-            .disabled(isOpeningMap)
-            .accessibilityHint("Shows this circle on the map")
-            .accessibilityIdentifier("circle-location-map-button")
 
             if let address {
                 Button {
@@ -717,9 +850,83 @@ private struct CircleDetailHeader: View {
         }
         .padding(.leading, 12)
         .padding(.trailing, 4)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: .rect(cornerRadius: 12))
+        .background(
+            Color(uiColor: .secondarySystemGroupedBackground),
+            in: .rect(cornerRadius: 12)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(uiColor: .separator).opacity(0.24), lineWidth: 0.5)
+        }
+    }
+
+    /// The day, canonical venue text and optional map affordance. The venue
+    /// stays in `.primary`; the accent is reserved for the pin and the
+    /// "Show on map" affordance so the text keeps full contrast.
+    @ViewBuilder
+    private func locationSummary(
+        spaceLabel: String,
+        showsMapAffordance: Bool
+    ) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 10))
+
+        layout {
+            HStack(alignment: .top, spacing: 10) {
+                LucideIcon("mappin.and.ellipse", size: 20)
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if let day = address?.day ?? circle.day {
+                        Group {
+                            if let dayDateText {
+                                Text("Day \(day) · \(dayDateText)")
+                            } else {
+                                Text("Day \(day)")
+                            }
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("circle-location-day")
+                    }
+
+                    Text(verbatim: address?.venueLocationText ?? spaceLabel)
+                        .font(.headline.monospaced().weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("circle-location-venue")
+
+                    if let hallGloss {
+                        Text(verbatim: hallGloss)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if showsMapAffordance {
+                Group {
+                    if isOpeningMap {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        HStack(spacing: 4) {
+                            Text("Show on map")
+                            LucideIcon("chevron.forward", size: 14)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                    }
+                }
+                .frame(minHeight: 44)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
     }
 
     private func copy(_ address: ComiketSpaceAddress) {
@@ -740,6 +947,132 @@ private struct CircleDetailHeader: View {
     }
 }
 
+/// The persistent primary actions under the header. "Show on map" is the
+/// location card above, so this row holds the favorite and shared plan
+/// actions and stays visible even when the circle has no enrichment.
+private struct CircleDetailActionRow: View {
+    enum SharedPlanAvailability {
+        case available
+        case unavailable
+        case signedOut
+    }
+
+    let isFavorite: Bool
+    let isFavoriteUnavailable: Bool
+    let sharedPlanAvailability: SharedPlanAvailability
+    let onToggleFavorite: () -> Void
+    let onAddToSharedPlan: () -> Void
+    let onSignIn: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    favoriteButton
+                    sharedPlanButton
+                }
+
+                VStack(spacing: 10) {
+                    favoriteButton
+                    sharedPlanButton
+                }
+            }
+
+            if let caption {
+                Text(caption)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("circle-detail-actions")
+    }
+
+    private var favoriteButton: some View {
+        Button(action: onToggleFavorite) {
+            LucideLabel(
+                isFavorite ? "Favorited" : "Favorite",
+                icon: isFavorite ? "star.fill" : "star"
+            )
+        }
+        .buttonStyle(CircleDetailActionButtonStyle(isProminent: isFavorite))
+        .disabled(isFavoriteUnavailable)
+        .accessibilityHint("Adds or removes this circle from your favorites")
+        .accessibilityAddTraits(isFavorite ? .isSelected : [])
+        .accessibilityIdentifier("circle-favorite-action")
+    }
+
+    private var sharedPlanButton: some View {
+        Button {
+            switch sharedPlanAvailability {
+            case .available:
+                onAddToSharedPlan()
+            case .signedOut:
+                onSignIn()
+            case .unavailable:
+                break
+            }
+        } label: {
+            LucideLabel("Add to shared plan", icon: "cart.fill")
+        }
+        .buttonStyle(CircleDetailActionButtonStyle(isProminent: false))
+        .disabled(sharedPlanAvailability == .unavailable)
+        .accessibilityHint(Text(sharedPlanHint))
+        .accessibilityIdentifier("circle-shared-plan-action")
+    }
+
+    private var sharedPlanHint: LocalizedStringKey {
+        sharedPlanAvailability == .signedOut
+            ? "Opens sign-in"
+            : "Adds a purchase request for this circle to a shared plan"
+    }
+
+    private var caption: LocalizedStringKey? {
+        if sharedPlanAvailability == .signedOut {
+            return "Sign in to add requests"
+        }
+        if isFavoriteUnavailable {
+            return "Favorites aren't available for this circle."
+        }
+        return nil
+    }
+}
+
+/// A labeled action button. The prominent variant uses the lime fill behind
+/// dark text; the plain variant matches the grouped cards on the page.
+private struct CircleDetailActionButtonStyle: ButtonStyle {
+    let isProminent: Bool
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(isProminent ? Color.onAccentFill : Color.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(
+                isProminent
+                    ? Color.accentFill
+                    : Color(uiColor: .secondarySystemGroupedBackground),
+                in: .rect(cornerRadius: 12)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        Color(uiColor: .separator).opacity(isProminent ? 0 : 0.24),
+                        lineWidth: 0.5
+                    )
+            }
+            .contentShape(.rect(cornerRadius: 12))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.45)
+    }
+}
+
 private struct CircleDetailExternalLinksRow: View {
     let links: [CircleExternalLink]
 
@@ -748,20 +1081,27 @@ private struct CircleDetailExternalLinksRow: View {
             HStack(spacing: 10) {
                 ForEach(links) { link in
                     Link(destination: link.url) {
-                        CircleExternalLinkIcon(kind: link.kind)
-                            .frame(width: 44, height: 44)
-                            .background(
-                                Color(uiColor: .secondarySystemGroupedBackground),
-                                in: Circle()
-                            )
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        Color(uiColor: .separator).opacity(0.24),
-                                        lineWidth: 0.5
-                                    )
-                            }
-                            .contentShape(Circle())
+                        HStack(spacing: 6) {
+                            CircleExternalLinkIcon(kind: link.kind)
+                            Text(link.title)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .background(
+                            Color(uiColor: .secondarySystemGroupedBackground),
+                            in: .capsule
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color(uiColor: .separator).opacity(0.24),
+                                    lineWidth: 0.5
+                                )
+                        }
+                        .contentShape(.capsule)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text(link.title))
@@ -784,13 +1124,14 @@ private struct CircleDetailExternalLinksRow: View {
             Group {
                 switch kind {
                 case .xProfile:
-                    IconifyBrandIcon("x", size: 19)
+                    IconifyBrandIcon("x", size: 15)
                 case .pixiv:
-                    IconifyBrandIcon("pixiv", size: 21)
+                    IconifyBrandIcon("pixiv", size: 17)
                 case .website:
-                    LucideIcon("globe", size: 20)
+                    LucideIcon("globe", size: 16)
                 case .circlems:
-                    LucideIcon("person.2.crop.square.stack", size: 20)
+                    // A catalog record, not a group of people.
+                    LucideIcon("doc.richtext", size: 16)
                 }
             }
             .foregroundStyle(.primary)
@@ -900,14 +1241,6 @@ private struct CircleUserPlanSection: View {
             }
         }
         .accessibilityIdentifier("circle-user-plan-section")
-        .onChange(of: model.saveState) { _, state in
-            guard case .failed(let message) = state else { return }
-            AppToast.showError(
-                String(localized: "Could not save circle"),
-                subtitle: message
-            )
-            model.dismissSaveError()
-        }
         .onDisappear {
             model.flushMemo()
         }
@@ -934,33 +1267,32 @@ private struct CirclePlanColorButton: View {
 private struct CircleDetailNavigationTitle: ViewModifier {
     let title: String
     let subtitle: String?
+    let isVisible: Bool
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *), let subtitle {
-            content
-                .navigationTitle(title)
-                .navigationSubtitle(subtitle)
-        } else if let subtitle {
-            content
-                .navigationTitle(String())
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        CircleDetailPrincipalTitle(
-                            title: title,
-                            subtitle: subtitle
-                        )
-                    }
+        // `navigationTitle` keeps the back menu and the VoiceOver screen
+        // title; the principal item controls what the bar shows. Using the
+        // principal item on every OS also avoids the extra subtitle row that
+        // `navigationSubtitle` adds on iPad.
+        content
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    CircleDetailPrincipalTitle(
+                        title: title,
+                        subtitle: subtitle
+                    )
+                    .opacity(isVisible ? 1 : 0)
+                    .accessibilityHidden(!isVisible)
+                    .animation(.easeOut(duration: 0.15), value: isVisible)
                 }
-        } else {
-            content.navigationTitle(title)
-        }
+            }
     }
 }
 
 private struct CircleDetailPrincipalTitle: View {
     let title: String
-    let subtitle: String
+    let subtitle: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -968,10 +1300,12 @@ private struct CircleDetailPrincipalTitle: View {
                 .font(.headline)
                 .lineLimit(1)
 
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -1088,7 +1422,7 @@ private struct CircleDetailDataSourcesSheet: View {
         let postEvidence = (details?.enrichment?.posts ?? []).map {
             CatalogXEvidence(
                 id: "shinagaki:\($0.id)",
-                title: "Shinagaki post",
+                title: "Item list post",
                 url: $0.postURL,
                 authorHandle: $0.authorHandle
             )
@@ -1323,7 +1657,7 @@ private struct CircleDetailTagsSection: View {
                         LucideLabel(verbatim: tag, icon: "tag")
                             .font(.subheadline.weight(.semibold))
                             .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
+                            .truncationMode(.tail)
                             .padding(.horizontal, 10)
                             .frame(minHeight: 44)
                             .background(Color.accentColor.opacity(0.12), in: .capsule)
@@ -1337,6 +1671,9 @@ private struct CircleDetailTagsSection: View {
     }
 }
 
+/// Wraps tag chips into rows. A chip wider than the container is measured
+/// against the container width, so its label truncates instead of pushing
+/// past the card edge.
 private struct CircleTagFlowLayout: Layout {
     let spacing: CGFloat
 
@@ -1354,34 +1691,42 @@ private struct CircleTagFlowLayout: Layout {
         subviews: Subviews,
         cache: inout ()
     ) {
-        for (index, point) in arrangement(width: bounds.width, subviews: subviews).points.enumerated() {
+        let arrangement = arrangement(width: bounds.width, subviews: subviews)
+        for (index, frame) in arrangement.frames.enumerated() {
             subviews[index].place(
-                at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y),
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
                 anchor: .topLeading,
-                proposal: .unspecified
+                proposal: ProposedViewSize(frame.size)
             )
         }
     }
 
-    private func arrangement(width: CGFloat, subviews: Subviews) -> (size: CGSize, points: [CGPoint]) {
-        var points: [CGPoint] = []
+    private func arrangement(
+        width: CGFloat,
+        subviews: Subviews
+    ) -> (size: CGSize, frames: [CGRect]) {
+        var frames: [CGRect] = []
         var x: CGFloat = 0
         var y: CGFloat = 0
         var rowHeight: CGFloat = 0
         var usedWidth: CGFloat = 0
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            var size = subview.sizeThatFits(.unspecified)
+            if size.width > width {
+                size = subview.sizeThatFits(ProposedViewSize(width: width, height: nil))
+                size.width = min(size.width, width)
+            }
             if x > 0, x + size.width > width {
                 x = 0
                 y += rowHeight + spacing
                 rowHeight = 0
             }
-            points.append(CGPoint(x: x, y: y))
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
             usedWidth = max(usedWidth, x - spacing)
         }
-        return (CGSize(width: min(usedWidth, width), height: y + rowHeight), points)
+        return (CGSize(width: min(usedWidth, width), height: y + rowHeight), frames)
     }
 }
 
@@ -1390,8 +1735,16 @@ private struct CircleDetailShinagakiSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Shinagaki")
-                .font(.title3.weight(.bold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Item list")
+                    .font(.title3.weight(.bold))
+
+                Text("Shinagaki: the circle's items and prices")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
 
             ShinagakiMatchNotice()
 
@@ -1457,7 +1810,7 @@ private struct ShinagakiPostCard: View {
                     postID: post.id,
                     media: displayableMedia,
                     accessibilityLabel: String(
-                        localized: "Shinagaki image by \(post.authorHandle)"
+                        localized: "Item list image by \(post.authorHandle)"
                     )
                 )
             }
@@ -1480,7 +1833,7 @@ private struct ShinagakiPostCard: View {
                 Spacer(minLength: 8)
 
                 Link(destination: post.postURL) {
-                    LucideLabel("Open shinagaki on X", icon: "arrow.up.right")
+                    LucideLabel("Open item list on X", icon: "arrow.up.right")
                         .font(.subheadline.weight(.semibold))
                         .frame(minHeight: 44)
                 }
@@ -1627,7 +1980,7 @@ private struct ShinagakiConfidenceSheet: View {
                     confidenceRow(
                         title: "Post confidence",
                         confidence: postConfidence,
-                        explanation: "How strongly the public X post appears to be a shinagaki post."
+                        explanation: "How strongly the public X post appears to be an item list post."
                     )
                     confidenceRow(
                         title: "Placement confidence",
@@ -1832,11 +2185,10 @@ private struct ShinagakiMediaGallery: View {
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .scrollIndicators(.hidden)
         .accessibilityIdentifier("shinagaki-media-gallery")
-        .sheet(item: $presentation) { presentation in
+        .fullScreenCover(item: $presentation) { presentation in
             ShinagakiLightbox(presentation: presentation)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.black)
+                .dismissesOnDownwardDrag()
+                .presentationBackground(.clear)
         }
     }
 
@@ -1881,6 +2233,28 @@ private struct ShinagakiMediaGallery: View {
         }
     }
 #endif
+
+/// Builds an English gloss for a Big Sight hall from its catalog map name,
+/// for example "W12" becomes "West Halls 1–2" and "E7" becomes "East Hall 7".
+private enum CircleHallGloss {
+    static func text(forMapName mapName: String) -> String? {
+        guard let direction = mapName.uppercased().first else { return nil }
+        let numbers = mapName.dropFirst().compactMap(\.wholeNumberValue)
+        guard let first = numbers.first, let last = numbers.last else { return nil }
+
+        let isSingleHall = first == last
+        let range = isSingleHall ? "\(first)" : "\(first)–\(last)"
+        switch (direction, isSingleHall) {
+        case ("E", true): return String(localized: "East Hall \(range)")
+        case ("E", false): return String(localized: "East Halls \(range)")
+        case ("W", true): return String(localized: "West Hall \(range)")
+        case ("W", false): return String(localized: "West Halls \(range)")
+        case ("S", true): return String(localized: "South Hall \(range)")
+        case ("S", false): return String(localized: "South Halls \(range)")
+        default: return nil
+        }
+    }
+}
 
 private extension Optional where Wrapped == String {
     var nonBlank: String? {

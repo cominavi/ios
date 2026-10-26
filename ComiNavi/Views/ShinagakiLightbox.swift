@@ -194,6 +194,9 @@ struct ShinagakiLightbox: View {
     @State private var imageActionTask: Task<Void, Never>?
     @State private var sharePresentation: ShinagakiSharePresentation?
     @State private var imageActionAlert: ShinagakiLightboxAlert?
+    @State private var zoomedPageIDs: Set<ShinagakiLightboxPage.ID> = []
+    @State private var dismissDragOffset: CGFloat = 0
+    private var isDragToDismissEnabled = false
 
     init(
         image: UIImage,
@@ -238,20 +241,32 @@ struct ShinagakiLightbox: View {
         GeometryReader { _ in
             ZStack {
                 Color.black
+                    .opacity(backdropOpacity)
                     .ignoresSafeArea()
 
                 TabView(selection: $selectedPageID) {
                     ForEach(pages) { page in
-                        ShinagakiLightboxPageView(page: page)
-                            .tag(page.id)
-                            .accessibilityIdentifier(
-                                "shinagaki-lightbox-page-\(page.id)"
-                            )
+                        ShinagakiLightboxPageView(page: page) { isZoomed in
+                            if isZoomed {
+                                zoomedPageIDs.insert(page.id)
+                            } else {
+                                zoomedPageIDs.remove(page.id)
+                            }
+                        }
+                        .tag(page.id)
+                        .accessibilityIdentifier(
+                            "shinagaki-lightbox-page-\(page.id)"
+                        )
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .accessibilityIdentifier("shinagaki-lightbox")
                 .ignoresSafeArea()
+                .offset(y: dismissDragOffset)
+                .simultaneousGesture(
+                    dismissDragGesture,
+                    including: canDragToDismiss ? .all : .subviews
+                )
 
                 imageActionControls
                     .frame(
@@ -307,7 +322,9 @@ struct ShinagakiLightbox: View {
                 }
             }
         }
-        .background(Color.black)
+        // A drag-to-dismiss presentation uses a clear presentation background,
+        // so the backdrop above fades to reveal the screen underneath.
+        .background(isDragToDismissEnabled ? Color.clear : Color.black)
         // Keep the dark controls local to the lightbox. `preferredColorScheme`
         // is a presentation-level preference and can change the presenting
         // app's appearance while this sheet is shown.
@@ -341,6 +358,49 @@ struct ShinagakiLightbox: View {
         .accessibilityAction(.escape) {
             dismiss()
         }
+    }
+
+    /// Lets a full-screen presentation close with a downward drag, as a
+    /// sheet would. Pass `.presentationBackground(.clear)` with it so the
+    /// presenting screen shows through while the image follows the finger.
+    func dismissesOnDownwardDrag() -> Self {
+        var copy = self
+        copy.isDragToDismissEnabled = true
+        return copy
+    }
+
+    private var canDragToDismiss: Bool {
+        isDragToDismissEnabled && !zoomedPageIDs.contains(selectedPageID)
+    }
+
+    private var backdropOpacity: Double {
+        1 - min(Double(dismissDragOffset) / 600, 0.5)
+    }
+
+    private var dismissDragGesture: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onChanged { value in
+                let translation = value.translation
+                // Horizontal drags page through the TabView; only a
+                // mostly-downward drag moves the image.
+                guard translation.height > 0,
+                      abs(translation.height) > abs(translation.width)
+                else {
+                    if dismissDragOffset != 0 { dismissDragOffset = 0 }
+                    return
+                }
+                dismissDragOffset = translation.height
+            }
+            .onEnded { value in
+                guard dismissDragOffset > 0 else { return }
+                if dismissDragOffset > 120 || value.predictedEndTranslation.height > 320 {
+                    dismiss()
+                } else {
+                    withAnimation(.spring(duration: 0.25)) {
+                        dismissDragOffset = 0
+                    }
+                }
+            }
     }
 
     private var imageActionControls: some View {
@@ -604,12 +664,17 @@ struct ShinagakiShareSheet: UIViewControllerRepresentable {
 
 private struct ShinagakiLightboxPageView: View {
     let page: ShinagakiLightboxPage
+    let onZoomStateChange: (Bool) -> Void
 
     @State private var image: UIImage?
     @State private var didFail = false
 
-    init(page: ShinagakiLightboxPage) {
+    init(
+        page: ShinagakiLightboxPage,
+        onZoomStateChange: @escaping (Bool) -> Void = { _ in }
+    ) {
         self.page = page
+        self.onZoomStateChange = onZoomStateChange
         _image = State(initialValue: page.image)
     }
 
@@ -618,7 +683,8 @@ private struct ShinagakiLightboxPageView: View {
             if let image {
                 ZoomableShinagakiImage(
                     image: image,
-                    accessibilityLabel: page.accessibilityLabel
+                    accessibilityLabel: page.accessibilityLabel,
+                    onZoomStateChange: onZoomStateChange
                 )
             } else if didFail {
                 LucideContentUnavailableView(
@@ -660,9 +726,11 @@ private struct ShinagakiLightboxPageView: View {
 private struct ZoomableShinagakiImage: UIViewRepresentable {
     let image: UIImage
     let accessibilityLabel: String
+    let onZoomStateChange: (Bool) -> Void
 
     func makeUIView(context: Context) -> ShinagakiZoomScrollView {
         let scrollView = ShinagakiZoomScrollView()
+        scrollView.onZoomStateChange = onZoomStateChange
         scrollView.configure(
             image: image,
             accessibilityLabel: accessibilityLabel
@@ -674,6 +742,7 @@ private struct ZoomableShinagakiImage: UIViewRepresentable {
         _ scrollView: ShinagakiZoomScrollView,
         context: Context
     ) {
+        scrollView.onZoomStateChange = onZoomStateChange
         scrollView.configure(
             image: image,
             accessibilityLabel: accessibilityLabel
@@ -688,7 +757,12 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
         let targetScale: CGFloat
     }
 
+    /// Called when the image moves between its fitted and zoomed states, so
+    /// the lightbox can turn drag-to-dismiss off while the image pans.
+    var onZoomStateChange: ((Bool) -> Void)?
+
     private let zoomImageView = UIImageView()
+    private var isZoomed = false
     private var displayedImage: UIImage?
     private var imageDisplaySize = CGSize.zero
     private var lastViewportSize = CGSize.zero
@@ -1023,7 +1097,15 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
     }
 
     private func updatePanGestureAvailability() {
-        panGestureRecognizer.isEnabled = zoomScale > minimumZoomScale + 0.01
+        let zoomed = zoomScale > minimumZoomScale + 0.01
+        panGestureRecognizer.isEnabled = zoomed
+        guard zoomed != isZoomed else { return }
+        isZoomed = zoomed
+        // Defer so SwiftUI state never changes inside a layout pass.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isZoomed == zoomed else { return }
+            self.onZoomStateChange?(zoomed)
+        }
     }
 
     private static func displaySize(for image: UIImage) -> CGSize {
