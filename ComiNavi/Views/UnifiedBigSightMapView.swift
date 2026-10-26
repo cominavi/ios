@@ -128,6 +128,11 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     let onSelectTable: (CatalogMapTable, Int) -> Void
     let onSelectLocatedUser: () -> Void
     let onLocate: (Int, CGPoint, CatalogMapTable, Int) -> Void
+    /// Measured map chrome, so camera fits frame content in the uncovered
+    /// area. When `nil`, the renderer estimates the chrome from the safe area.
+    var overviewChromeInsets: MapViewportInsets? = nil
+    /// Frames a campus target once per request `id`.
+    var cameraFitRequest: MapCameraFitRequest? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
@@ -191,7 +196,9 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             locatedUser: locatedUser,
             destination: destination,
             visibleMapLayers: visibleMapLayers,
-            locationFocusBottomInset: locationFocusBottomInset
+            locationFocusBottomInset: locationFocusBottomInset,
+            overviewInsets: overviewChromeInsets,
+            cameraFitRequest: cameraFitRequest
         )
         host.updateBasemap(camera: renderer.basemapCamera)
         host.updateAccessibility(renderer: renderer, scope: scope)
@@ -264,6 +271,11 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
                 rotation: renderer.cameraRotation,
                 gridAlignedRotation: renderer.gridAlignedCameraRotation
             )
+            host.onActivateVenue = { [weak self, weak renderer] mapID in
+                guard let self else { return }
+                renderer?.requestVenue(mapID)
+                self.onSelectVenue(mapID)
+            }
         }
 
         func updateCallbacks(
@@ -387,9 +399,23 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     }
 }
 
+/// Load state of the MapLibre street basemap underneath the venue overlay.
+/// The venue overlay never depends on it, so `.unavailable` only explains
+/// the missing street context.
+enum UnifiedBasemapState: Equatable {
+    case loading
+    case ready
+    case unavailable
+}
+
 @MainActor
 final class UnifiedMapHostView: UIView {
+    /// Fallback only. Both appearances bundle their style so the map never
+    /// needs the network before it can draw the venue context.
     private static let openStreetMapStyleURL = URL(string: "https://americanamap.org/style.json")!
+    /// Tiles that have not rendered by then are treated as unreachable. The
+    /// state still returns to `.ready` if MapLibre completes a render later.
+    private static let basemapLoadTimeout: TimeInterval = 10
     private static let ambientCacheConfiguration: Void = {
         let cacheSize = UInt(150 * 1_024 * 1_024)
         let logger = Logger(
@@ -408,13 +434,31 @@ final class UnifiedMapHostView: UIView {
     let basemapView: MLNMapView
     let mapView = SKView(frame: .zero)
     let compassButton = MapCompassButton(type: .system)
-    private let dataAttributionButton = UIButton(type: .system)
+    private let dataAttributionButton = MapAttributionButton(type: .system)
     private let campusAccessibilityProxy = UIView(frame: .zero)
     private let venueAccessibilityProxy = UIView(frame: .zero)
     private var requestedBasemapCamera: UnifiedBasemapCamera?
     private var lastBasemapCamera: UnifiedBasemapCamera?
     private var appearance: UnifiedMapAppearance
     private var compassState = CompassState.north
+    private let basemapStatusChip = MapStatusChip(
+        text: String(localized: "Street map unavailable offline. The venue map still works.")
+    )
+    private let campusHintChip = MapStatusChip(
+        text: String(localized: "Tap a hall to open its floor map")
+    )
+    private let statusChipStack = UIStackView()
+    private let venueAccessibilityContainer = UIView(frame: .zero)
+    private var venueAccessibilityElements: [Int: MapVenueAccessibilityElement] = [:]
+    private var basemapTimeoutWorkItem: DispatchWorkItem?
+    /// Opens a hall from its VoiceOver button, matching a tap on the badge.
+    var onActivateVenue: ((Int) -> Void)?
+    private static let campusHintSeenKey = "map.campusHallHint.seen"
+    /// Cached because accessibility refreshes on every camera frame.
+    private var hasSeenCampusHint = UserDefaults.standard.bool(
+        forKey: UnifiedMapHostView.campusHintSeenKey
+    )
+    private(set) var basemapState = UnifiedBasemapState.loading
 
     private enum CompassState: Equatable {
         case north
@@ -437,6 +481,11 @@ final class UnifiedMapHostView: UIView {
         basemapView.logoView.isHidden = true
         basemapView.attributionButton.isHidden = true
         basemapView.compassView.isHidden = true
+        basemapView.delegate = self
+        // MapLibre exposes its own zoom slider, compass, and attribution
+        // elements even when they are visually hidden. The SpriteKit canvas
+        // already describes the map, so the basemap stays silent.
+        basemapView.accessibilityElementsHidden = true
         addSubview(basemapView)
 
         mapView.translatesAutoresizingMaskIntoConstraints = false
@@ -446,6 +495,14 @@ final class UnifiedMapHostView: UIView {
         mapView.isAccessibilityElement = true
         mapView.accessibilityIdentifier = "unified-map-canvas"
         addSubview(mapView)
+
+        // Holds one button element per visible hall badge, read right after
+        // the canvas itself.
+        venueAccessibilityContainer.translatesAutoresizingMaskIntoConstraints = false
+        venueAccessibilityContainer.backgroundColor = .clear
+        venueAccessibilityContainer.isUserInteractionEnabled = false
+        venueAccessibilityContainer.isAccessibilityElement = false
+        addSubview(venueAccessibilityContainer)
 
         for proxy in [campusAccessibilityProxy, venueAccessibilityProxy] {
             proxy.translatesAutoresizingMaskIntoConstraints = false
@@ -459,9 +516,11 @@ final class UnifiedMapHostView: UIView {
                 proxy.bottomAnchor.constraint(equalTo: bottomAnchor),
             ])
         }
-        campusAccessibilityProxy.isAccessibilityElement = true
+        // The proxies keep their scope-specific identifiers for automation,
+        // but VoiceOver reads only `mapView` so the canvas is announced once.
+        campusAccessibilityProxy.isAccessibilityElement = false
         campusAccessibilityProxy.accessibilityIdentifier = "campus-map-canvas"
-        venueAccessibilityProxy.isAccessibilityElement = true
+        venueAccessibilityProxy.isAccessibilityElement = false
         venueAccessibilityProxy.accessibilityIdentifier = "interactive-map-canvas"
 
         var configuration = UIButton.Configuration.filled()
@@ -481,19 +540,25 @@ final class UnifiedMapHostView: UIView {
             UIConfigurationTextAttributesTransformer {
                 incoming in
                 var outgoing = incoming
-                outgoing.font = .systemFont(ofSize: 8, weight: .regular)
+                // Caption 2 follows Dynamic Type; the cap keeps the credit on
+                // one line beside the bottom controls at accessibility sizes.
+                outgoing.font = UIFontMetrics(forTextStyle: .caption2).scaledFont(
+                    for: .systemFont(ofSize: 11, weight: .regular),
+                    maximumPointSize: 17
+                )
                 return outgoing
             }
         attributionConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 1,
-            leading: 3,
-            bottom: 1,
-            trailing: 3
+            top: 3,
+            leading: 6,
+            bottom: 3,
+            trailing: 6
         )
         dataAttributionButton.configuration = attributionConfiguration
         dataAttributionButton.contentHorizontalAlignment = .trailing
         dataAttributionButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.72)
-        dataAttributionButton.layer.cornerRadius = 4
+        dataAttributionButton.layer.cornerRadius = 6
+        dataAttributionButton.layer.cornerCurve = .continuous
         dataAttributionButton.accessibilityLabel = String(localized: "Map data attribution")
         dataAttributionButton.accessibilityValue =
             "OpenStreetMap, OpenStreetMap US, OpenMapTiles, and MapLibre"
@@ -516,6 +581,19 @@ final class UnifiedMapHostView: UIView {
         )
         dataAttributionButton.showsMenuAsPrimaryAction = true
         addSubview(dataAttributionButton)
+
+        campusHintChip.accessibilityIdentifier = "map-campus-hint"
+        campusHintChip.isHidden = true
+        basemapStatusChip.accessibilityIdentifier = "map-basemap-status"
+        basemapStatusChip.isHidden = true
+        statusChipStack.axis = .vertical
+        statusChipStack.alignment = .leading
+        statusChipStack.spacing = MapChromeLayout.controlSpacing
+        statusChipStack.isUserInteractionEnabled = false
+        statusChipStack.translatesAutoresizingMaskIntoConstraints = false
+        statusChipStack.addArrangedSubview(campusHintChip)
+        statusChipStack.addArrangedSubview(basemapStatusChip)
+        addSubview(statusChipStack)
 
         let dataAttributionTrailingConstraint = dataAttributionButton.trailingAnchor.constraint(
             equalTo: safeAreaLayoutGuide.trailingAnchor,
@@ -550,7 +628,27 @@ final class UnifiedMapHostView: UIView {
                 equalTo: safeAreaLayoutGuide.bottomAnchor,
                 constant: -10
             ),
+            venueAccessibilityContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
+            venueAccessibilityContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
+            venueAccessibilityContainer.topAnchor.constraint(equalTo: topAnchor),
+            venueAccessibilityContainer.bottomAnchor.constraint(equalTo: bottomAnchor),
+            statusChipStack.leadingAnchor.constraint(
+                equalTo: safeAreaLayoutGuide.leadingAnchor,
+                constant: MapChromeLayout.edgeInset
+            ),
+            statusChipStack.trailingAnchor.constraint(
+                lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor,
+                constant: -MapChromeLayout.edgeInset
+            ),
+            // Sit above the bottom control row so the chips never cover the
+            // compass, location buttons, or attribution.
+            statusChipStack.bottomAnchor.constraint(
+                equalTo: safeAreaLayoutGuide.bottomAnchor,
+                constant: -(MapChromeLayout.edgeInset + MapChromeLayout.controlSize
+                    + MapChromeLayout.controlSpacing)
+            ),
         ])
+        beginBasemapLoad()
 
         let center = NotificationCenter.default
         center.addObserver(
@@ -598,8 +696,37 @@ final class UnifiedMapHostView: UIView {
         backgroundColor = appearance.palette.mapBackground
         applyChromeAppearance()
         basemapView.styleURL = Self.styleURL(for: appearance)
+        beginBasemapLoad()
         lastBasemapCamera = nil
         applyRequestedBasemapCamera()
+    }
+
+    private func beginBasemapLoad() {
+        basemapTimeoutWorkItem?.cancel()
+        // Keep showing `.unavailable` across a style swap while offline; a
+        // successful render clears it.
+        if basemapState != .unavailable { setBasemapState(.loading) }
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self, self.basemapState == .loading else { return }
+            self.setBasemapState(.unavailable)
+        }
+        basemapTimeoutWorkItem = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.basemapLoadTimeout, execute: timeout)
+    }
+
+    fileprivate func setBasemapState(_ state: UnifiedBasemapState) {
+        if state != .loading {
+            basemapTimeoutWorkItem?.cancel()
+            basemapTimeoutWorkItem = nil
+        }
+        guard state != basemapState else { return }
+        basemapState = state
+        let isHidden = state != .unavailable
+        guard basemapStatusChip.isHidden != isHidden else { return }
+        basemapStatusChip.isHidden = isHidden
+        if !isHidden {
+            UIAccessibility.post(notification: .announcement, argument: basemapStatusChip.text)
+        }
     }
 
     @objc private func didEnterBackground() {
@@ -693,25 +820,27 @@ final class UnifiedMapHostView: UIView {
     }
 
     private static func styleURL(for appearance: UnifiedMapAppearance) -> URL {
-        guard appearance == .dark else { return openStreetMapStyleURL }
+        let name = appearance == .dark ? "AmericanaDark" : "AmericanaLight"
         if let direct = Bundle.main.url(
-            forResource: "AmericanaDark",
+            forResource: name,
             withExtension: "json",
             subdirectory: "MapStyles"
-        ) ?? Bundle.main.url(forResource: "AmericanaDark", withExtension: "json") {
+        ) ?? Bundle.main.url(forResource: name, withExtension: "json") {
             return direct
         }
-        guard let resourceURL = Bundle.main.resourceURL,
+        let fileName = "\(name).json"
+        if let resourceURL = Bundle.main.resourceURL,
             let enumerator = FileManager.default.enumerator(
                 at: resourceURL,
                 includingPropertiesForKeys: [.isRegularFileKey],
                 options: [.skipsHiddenFiles]
             )
-        else { return openStreetMapStyleURL }
-        for case let url as URL in enumerator where url.lastPathComponent == "AmericanaDark.json" {
-            return url
+        {
+            for case let url as URL in enumerator where url.lastPathComponent == fileName {
+                return url
+            }
         }
-        assertionFailure("Missing bundled AmericanaDark.json map style")
+        assertionFailure("Missing bundled \(fileName) map style")
         return openStreetMapStyleURL
     }
 
@@ -750,6 +879,66 @@ final class UnifiedMapHostView: UIView {
         activeProxy.accessibilityLabel = mapView.accessibilityLabel
         activeProxy.accessibilityHint = mapView.accessibilityHint
         activeProxy.accessibilityValue = mapView.accessibilityValue
+        updateVenueAccessibilityElements(renderer: renderer, scope: scope)
+        updateCampusHint(scope: scope)
+    }
+
+    /// Exposes each visible hall badge as a button so VoiceOver users can open
+    /// a hall from the campus overview without the venue menu.
+    private func updateVenueAccessibilityElements(
+        renderer: UnifiedBigSightScene,
+        scope: MapScreenModel.Scope
+    ) {
+        let targets = scope == .campus ? renderer.venueBadgeTargets() : []
+        let minimumSide = MapChromeLayout.controlSize
+        var elements: [MapVenueAccessibilityElement] = []
+        for target in targets {
+            let element =
+                venueAccessibilityElements[target.venueID]
+                ?? MapVenueAccessibilityElement(accessibilityContainer: venueAccessibilityContainer)
+            venueAccessibilityElements[target.venueID] = element
+            element.accessibilityLabel = target.title
+            element.accessibilityHint = String(localized: "Opens the floor map for this hall.")
+            element.accessibilityTraits = .button
+            element.accessibilityIdentifier = "map-venue-badge-\(target.venueID)"
+            element.accessibilityFrameInContainerSpace = target.frame.insetBy(
+                dx: min(0, (target.frame.width - minimumSide) / 2),
+                dy: min(0, (target.frame.height - minimumSide) / 2)
+            )
+            let venueID = target.venueID
+            element.onActivate = { [weak self] in
+                self?.onActivateVenue?(venueID)
+            }
+            elements.append(element)
+        }
+        // Read badges top to bottom, then leading to trailing.
+        elements.sort { lhs, rhs in
+            let left = lhs.accessibilityFrameInContainerSpace
+            let right = rhs.accessibilityFrameInContainerSpace
+            if abs(left.midY - right.midY) > minimumSide / 2 {
+                return left.midY < right.midY
+            }
+            return left.midX < right.midX
+        }
+        let currentIDs = (venueAccessibilityContainer.accessibilityElements ?? [])
+            .map { ($0 as? MapVenueAccessibilityElement)?.accessibilityIdentifier }
+        venueAccessibilityContainer.accessibilityElements = elements
+        if currentIDs != elements.map(\.accessibilityIdentifier) {
+            UIAccessibility.post(notification: .layoutChanged, argument: nil)
+        }
+    }
+
+    /// Shows "Tap a hall to open its floor map" on the campus overview until
+    /// the attendee opens a hall for the first time.
+    private func updateCampusHint(scope: MapScreenModel.Scope) {
+        if scope == .venue, !hasSeenCampusHint {
+            hasSeenCampusHint = true
+            UserDefaults.standard.set(true, forKey: Self.campusHintSeenKey)
+        }
+        let isHidden = scope != .campus || hasSeenCampusHint
+        if campusHintChip.isHidden != isHidden {
+            campusHintChip.isHidden = isHidden
+        }
     }
 
     private func attributionAction(title: String, url: String) -> UIAction {
@@ -757,6 +946,111 @@ final class UnifiedMapHostView: UIView {
             guard let url = URL(string: url) else { return }
             UIApplication.shared.open(url)
         }
+    }
+}
+
+/// The map data credit stays visually compact, but accepts touches across a
+/// full 44-point target around its label.
+final class MapAttributionButton: UIButton {
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        let minimumSide = MapChromeLayout.controlSize
+        let target = bounds.insetBy(
+            dx: min(0, (bounds.width - minimumSide) / 2),
+            dy: min(0, (bounds.height - minimumSide) / 2)
+        )
+        return target.contains(point)
+    }
+}
+
+/// A hall badge drawn by SpriteKit, exposed to VoiceOver as a button.
+final class MapVenueAccessibilityElement: UIAccessibilityElement {
+    var onActivate: (() -> Void)?
+
+    override func accessibilityActivate() -> Bool {
+        guard let onActivate else { return false }
+        onActivate()
+        return true
+    }
+}
+
+extension UnifiedMapHostView: MLNMapViewDelegate {
+    nonisolated func mapViewDidFinishLoadingMap(_ mapView: MLNMapView) {
+        Task { @MainActor [weak self] in
+            self?.setBasemapState(.ready)
+        }
+    }
+
+    nonisolated func mapViewDidFinishRenderingMap(
+        _ mapView: MLNMapView,
+        fullyRendered: Bool
+    ) {
+        // Partial renders happen while tiles stream in; only a full render
+        // proves the street tiles are reachable.
+        guard fullyRendered else { return }
+        Task { @MainActor [weak self] in
+            self?.setBasemapState(.ready)
+        }
+    }
+
+    nonisolated func mapViewDidFailLoadingMap(_ mapView: MLNMapView, withError error: Error) {
+        Task { @MainActor [weak self] in
+            self?.setBasemapState(.unavailable)
+        }
+    }
+}
+
+/// A compact material chip for passive map status text. It never intercepts
+/// touches, so the map stays fully interactive underneath it.
+final class MapStatusChip: UIView {
+    private let effectView = UIVisualEffectView(
+        effect: UIBlurEffect(style: .systemThinMaterial)
+    )
+    private let label = UILabel()
+
+    var text: String {
+        get { label.text ?? "" }
+        set {
+            label.text = newValue
+            accessibilityLabel = newValue
+        }
+    }
+
+    init(text: String) {
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
+        isAccessibilityElement = true
+        accessibilityTraits = .staticText
+
+        effectView.translatesAutoresizingMaskIntoConstraints = false
+        effectView.layer.cornerRadius = 12
+        effectView.layer.cornerCurve = .continuous
+        effectView.clipsToBounds = true
+        addSubview(effectView)
+
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .preferredFont(forTextStyle: .footnote)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .label
+        label.numberOfLines = 0
+        effectView.contentView.addSubview(label)
+
+        NSLayoutConstraint.activate([
+            effectView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            effectView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            effectView.topAnchor.constraint(equalTo: topAnchor),
+            effectView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            label.leadingAnchor.constraint(equalTo: effectView.contentView.leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(
+                equalTo: effectView.contentView.trailingAnchor, constant: -12),
+            label.topAnchor.constraint(equalTo: effectView.contentView.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: effectView.contentView.bottomAnchor, constant: -8),
+        ])
+        self.text = text
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }
 
@@ -957,6 +1251,17 @@ final class UnifiedBigSightScene: SKScene {
         let minimumZoom: CGFloat
         let labelMinimumZoom: CGFloat
         let maximumZoom: CGFloat
+        /// Side of the square or round backing, in screen points.
+        let badgeSize: CGFloat
+        let venueID: Int?
+    }
+
+    /// The on-screen footprint of a hall badge and its title, in the SKView's
+    /// coordinate space.
+    struct VenueBadgeTarget: Equatable {
+        let venueID: Int
+        let title: String
+        let frame: CGRect
     }
 
     private static let darkArtworkShader = SKShader(
@@ -999,6 +1304,15 @@ final class UnifiedBigSightScene: SKScene {
     private var minimumCameraScale: CGFloat = 1
     private var maximumCameraScale: CGFloat = 0.01
     private var hasFittedInitialCamera = false
+    /// True while the camera still shows the fitted campus overview. A size
+    /// change then fits the overview again; after any pan, zoom, rotation,
+    /// or focus, the user's camera stays where it is.
+    private var isShowingOverviewFit = false
+    private var overviewInsets: MapViewportInsets?
+    private var lastCameraFitRequestID: UUID?
+    /// The overview never opens closer than this, so it stays clear of the
+    /// 2.4x threshold at which the campus drills into a hall.
+    private static let maximumOverviewZoomFactor: CGFloat = 2
     private var lastCameraPosition = CGPoint(x: CGFloat.infinity, y: CGFloat.infinity)
     private var lastCameraScale: CGFloat = .infinity
     private var lastCameraRotation: CGFloat = .infinity
@@ -1115,8 +1429,6 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     var accessibilitySummary: String {
-        let bearing = Double(normalizedRotation(mapCamera.zRotation) * 180 / .pi)
-            .formatted(.number.precision(.fractionLength(1)))
         let zoom = Double(zoomFactor).formatted(.number.precision(.fractionLength(1)))
         var summary: String
         if scope == .campus {
@@ -1137,17 +1449,20 @@ final class UnifiedBigSightScene: SKScene {
             summary = String(localized: "\(summary), destination \(destinationSummary)")
         }
         #if DEBUG
-            var debugSummary = String(
-                localized:
+            // Raw camera numbers mean nothing to a VoiceOver user. UI tests
+            // opt in to them explicitly to observe camera changes.
+            if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-map-diagnostics") {
+                let bearing = Double(normalizedRotation(mapCamera.zRotation) * 180 / .pi)
+                    .formatted(.number.precision(.fractionLength(1)))
+                var debugSummary =
                     "\(summary), camera offset \(mapCamera.position.x) \(mapCamera.position.y), bearing \(bearing) degrees"
-            )
-            if let locatedUserHeading {
-                debugSummary += ", user heading \(Int(locatedUserHeading.rounded())) degrees"
+                if let locatedUserHeading {
+                    debugSummary += ", user heading \(Int(locatedUserHeading.rounded())) degrees"
+                }
+                return debugSummary
             }
-            return debugSummary
-        #else
-            return summary
         #endif
+        return summary
     }
 
     init(campus: BigSightCampusScene, appearance: UnifiedMapAppearance = .light) {
@@ -1224,8 +1539,16 @@ final class UnifiedBigSightScene: SKScene {
         locatedUser: LocatedMapUser?,
         destination: MapDestination? = nil,
         visibleMapLayers: Set<BigSightMapLayer> = BigSightMapLayer.defaultVisible,
-        locationFocusBottomInset: CGFloat = 0
+        locationFocusBottomInset: CGFloat = 0,
+        overviewInsets: MapViewportInsets? = nil,
+        cameraFitRequest: MapCameraFitRequest? = nil
     ) {
+        if overviewInsets != self.overviewInsets {
+            self.overviewInsets = overviewInsets
+            if hasFittedInitialCamera, isShowingOverviewFit, self.scope == .campus {
+                focusCampus(animated: false)
+            }
+        }
         if self.campus.id != campus.id {
             self.campus = campus
             lastDynamicFingerprint = nil
@@ -1306,9 +1629,14 @@ final class UnifiedBigSightScene: SKScene {
         } else if shouldFocusLocatedUser, let locatedUser {
             focus(on: locatedUser, animated: true)
         }
+        if let cameraFitRequest, cameraFitRequest.id != lastCameraFitRequestID {
+            lastCameraFitRequestID = cameraFitRequest.id
+            fitCamera(to: cameraFitRequest.target, searchMatches: searchMatches)
+        }
     }
 
     func beginGesture() {
+        isShowingOverviewFit = false
         mapCamera.removeAllActions()
     }
 
@@ -1388,6 +1716,7 @@ final class UnifiedBigSightScene: SKScene {
             gridAlignedRotation: gridAlignedCameraRotation
         )
         mapCamera.removeAction(forKey: "compass-rotation")
+        isShowingOverviewFit = false
 
         if reduceMotion {
             mapCamera.zRotation = targetRotation
@@ -1701,8 +2030,16 @@ final class UnifiedBigSightScene: SKScene {
                 layer: nil,
                 minimumZoom: 0,
                 labelMinimumZoom: 0,
-                maximumZoom: 12
+                maximumZoom: 12,
+                badgeSize: UnifiedMapMarkerMetrics.backingSize(
+                    for: venue.kind.icon,
+                    iconSize: UnifiedMapMarkerMetrics.venueIconSize
+                ),
+                venueID: venue.id
             ))
+        // Hall titles must stay readable where a neighboring badge overlaps
+        // them, so they draw above every marker backing.
+        venueMarker.label.zPosition = 30
         markerRoot.addChild(venueMarker.node)
 
         if venue.scene.artwork == nil {
@@ -1744,7 +2081,12 @@ final class UnifiedBigSightScene: SKScene {
                 layer: facility.layer,
                 minimumZoom: facility.minimumZoom,
                 labelMinimumZoom: presentation.labelMinimumZoom,
-                maximumZoom: isInsideVenue ? facility.maximumZoom : .infinity
+                maximumZoom: isInsideVenue ? facility.maximumZoom : .infinity,
+                badgeSize: UnifiedMapMarkerMetrics.backingSize(
+                    for: facility.kind.icon,
+                    iconSize: UnifiedMapMarkerMetrics.facilityIconSize(for: facility.kind)
+                ),
+                venueID: nil
             ))
         markerRoot.addChild(marker.node)
     }
@@ -1790,14 +2132,24 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func fitCameraIfNeeded(force: Bool) {
-        guard size.width > 1, size.height > 1, force || !hasFittedInitialCamera else { return }
+        guard size.width > 1, size.height > 1 else { return }
         let bounds = UnifiedMapProjection.sceneBounds(fromCampus: campus.bounds)
+        // The zoom-out limit always follows the current viewport, even when
+        // the user's camera is kept.
         minimumCameraScale = max(
             bounds.width / (size.width * 0.86), bounds.height / (size.height * 0.76))
         maximumCameraScale = max(minimumCameraScale / 180, 0.006)
-        mapCamera.position = CGPoint(x: bounds.midX, y: bounds.midY)
-        mapCamera.setScale(minimumCameraScale)
+        let refitsOverview = isShowingOverviewFit && scope == .campus
+        guard force || !hasFittedInitialCamera || refitsOverview else {
+            clampCamera()
+            applyLevelOfDetail()
+            return
+        }
+        let fit = campusOverviewFit()
+        mapCamera.position = fit.position
+        mapCamera.setScale(fit.scale)
         mapCamera.zRotation = 0
+        isShowingOverviewFit = true
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-rotated-camera") {
                 mapCamera.zRotation = .pi / 4
@@ -1808,12 +2160,112 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func focusCampus(animated: Bool) {
-        let bounds = UnifiedMapProjection.sceneBounds(fromCampus: campus.bounds)
+        let fit = campusOverviewFit()
         animateCamera(
-            position: CGPoint(x: bounds.midX, y: bounds.midY),
-            scale: minimumCameraScale,
+            position: fit.position,
+            scale: fit.scale,
             rotation: 0,
             animated: animated
+        )
+        isShowingOverviewFit = true
+    }
+
+    /// Chrome that covers the map edges. MapView can report measured insets;
+    /// until it does, estimate the event banner and hall selector at the top
+    /// and the control row at the bottom.
+    private var effectiveOverviewInsets: MapViewportInsets {
+        if let overviewInsets { return overviewInsets }
+        let safeArea = view?.safeAreaInsets ?? .zero
+        return MapViewportInsets(
+            top: safeArea.top + 96,
+            left: safeArea.left + MapChromeLayout.edgeInset,
+            bottom: safeArea.bottom + MapChromeLayout.edgeInset + MapChromeLayout.controlSize
+                + MapChromeLayout.controlSpacing,
+            right: safeArea.right + MapChromeLayout.edgeInset
+        )
+    }
+
+    /// The halls and the stations attendees walk from, in scene coordinates.
+    /// `campus.bounds` also holds every facility and footway, which leaves
+    /// the halls small on a large screen such as iPad.
+    private var campusOverviewSceneRect: CGRect {
+        var rect = campus.venues.reduce(CGRect.null) { $0.union($1.bounds) }
+        for facility in campus.facilities where facility.kind == .train {
+            rect = rect.union(CGRect(origin: facility.center, size: CGSize(width: 1, height: 1)))
+        }
+        return UnifiedMapProjection.sceneBounds(fromCampus: rect.isNull ? campus.bounds : rect)
+    }
+
+    private func campusOverviewFit() -> MapCameraFit {
+        let rect = campusOverviewSceneRect
+        let closestScale = minimumCameraScale / Self.maximumOverviewZoomFactor
+        return MapCameraMath.spriteKitCameraFit(
+            sceneRect: rect,
+            viewportSize: size,
+            insets: effectiveOverviewInsets,
+            padding: MapCameraMath.locationMarkerViewportPadding,
+            scaleRange: min(closestScale, minimumCameraScale)...minimumCameraScale
+        )
+            ?? MapCameraFit(
+                position: CGPoint(x: rect.midX, y: rect.midY),
+                scale: minimumCameraScale
+            )
+    }
+
+    private func fitCamera(
+        to target: MapCameraFitRequest.Target,
+        searchMatches: [CatalogMapSearchMatch]
+    ) {
+        switch target {
+        case .campusOverview:
+            focusCampus(animated: true)
+        case .layer(let layer):
+            let rect = campus.facilities
+                .filter { $0.layer == layer }
+                .reduce(CGRect.null) {
+                    $0.union(CGRect(origin: $1.center, size: CGSize(width: 1, height: 1)))
+                }
+            fitCamera(toCampusRect: rect, rotation: mapCamera.zRotation)
+        case .searchMatches:
+            let venuesByMapID = Dictionary(uniqueKeysWithValues: campus.venues.map { ($0.id, $0) })
+            var rect = CGRect.null
+            var matchedVenues: [Int: BigSightVenuePlacement] = [:]
+            for match in searchMatches {
+                guard let venue = venuesByMapID[match.mapID],
+                    let table = venue.scene.tableByID[match.tableID]
+                else { continue }
+                let local = subspaceRect(table: table, subspace: match.subspace, scene: venue.scene)
+                rect = rect.union(local.applying(venue.transform))
+                matchedVenues[venue.id] = venue
+            }
+            // Matches in one hall read best in that hall's own orientation.
+            let rotation =
+                matchedVenues.count == 1
+                ? -(matchedVenues.values.first?.rotation ?? 0)
+                : mapCamera.zRotation
+            fitCamera(toCampusRect: rect, rotation: rotation)
+        }
+    }
+
+    private func fitCamera(toCampusRect rect: CGRect, rotation: CGFloat) {
+        guard !rect.isNull else { return }
+        let closestScale = max(maximumCameraScale, minimumCameraScale / 45)
+        guard
+            let fit = MapCameraMath.spriteKitCameraFit(
+                sceneRect: UnifiedMapProjection.sceneBounds(fromCampus: rect),
+                viewportSize: size,
+                insets: effectiveOverviewInsets,
+                padding: MapCameraMath.locationMarkerViewportPadding,
+                cameraRotation: rotation,
+                scaleRange: min(closestScale, minimumCameraScale)...minimumCameraScale
+            )
+        else { return }
+        animateCamera(
+            position: fit.position,
+            scale: fit.scale,
+            rotation: rotation,
+            animated: true,
+            updatesSemanticScope: true
         )
     }
 
@@ -1900,15 +2352,21 @@ final class UnifiedBigSightScene: SKScene {
         )
     }
 
-    private func animateCamera(position: CGPoint, scale: CGFloat, rotation: CGFloat, animated: Bool)
-    {
+    private func animateCamera(
+        position: CGPoint,
+        scale: CGFloat,
+        rotation: CGFloat,
+        animated: Bool,
+        updatesSemanticScope: Bool = false
+    ) {
         mapCamera.removeAllActions()
+        isShowingOverviewFit = false
         let duration = animated && !reduceMotion ? 0.42 : 0
         guard duration > 0 else {
             mapCamera.position = position
             mapCamera.setScale(scale)
             mapCamera.zRotation = rotation
-            endGesture(updateSemanticScope: false)
+            endGesture(updateSemanticScope: updatesSemanticScope)
             return
         }
         let group = SKAction.group([
@@ -1918,7 +2376,7 @@ final class UnifiedBigSightScene: SKScene {
         ])
         group.timingMode = .easeInEaseOut
         mapCamera.run(group) { [weak self] in
-            self?.endGesture(updateSemanticScope: false)
+            self?.endGesture(updateSemanticScope: updatesSemanticScope)
         }
     }
 
@@ -2006,6 +2464,100 @@ final class UnifiedBigSightScene: SKScene {
         }
         for child in userRoot.children {
             child.setScale(mapCamera.xScale)
+        }
+        layoutVenueMarkerLabels()
+    }
+
+    /// Places each hall title on the first side of its badge that does not
+    /// overlap another hall badge or an already placed title, and hides the
+    /// title when no side is clear. East 1–3 and East 4–6 sit close enough
+    /// at overview zoom that the default below-badge title otherwise falls
+    /// under the neighboring badge.
+    private func layoutVenueMarkerLabels() {
+        guard view != nil else { return }
+        let visibleMarkers = venueMarkers.filter { !$0.node.isHidden }
+        let badgeRects = visibleMarkers.map(badgeViewRect)
+        var placedLabelRects: [CGRect] = []
+        for (index, marker) in visibleMarkers.enumerated() {
+            guard marker.label.alpha > 0 else { continue }
+            let center = markerViewCenter(marker)
+            let labelSize = marker.label.frame.size
+            let clearance = marker.badgeSize / 2 + 3
+            // Screen-space offsets, y down: below, above, trailing, leading.
+            let candidates = [
+                CGPoint(x: 0, y: clearance + labelSize.height / 2),
+                CGPoint(x: 0, y: -(clearance + labelSize.height / 2)),
+                CGPoint(x: clearance + labelSize.width / 2, y: 0),
+                CGPoint(x: -(clearance + labelSize.width / 2), y: 0),
+            ]
+            var placement: (offset: CGPoint, rect: CGRect)?
+            for offset in candidates {
+                let rect = CGRect(
+                    x: center.x + offset.x - labelSize.width / 2,
+                    y: center.y + offset.y - labelSize.height / 2,
+                    width: labelSize.width,
+                    height: labelSize.height
+                )
+                let hitsBadge = badgeRects.indices.contains { otherIndex in
+                    otherIndex != index && badgeRects[otherIndex].intersects(rect)
+                }
+                if !hitsBadge, !placedLabelRects.contains(where: { $0.intersects(rect) }) {
+                    placement = (offset, rect)
+                    break
+                }
+            }
+            guard let placement else {
+                marker.label.isHidden = true
+                continue
+            }
+            // The marker is scaled and rotated to stay screen-upright, so one
+            // local unit is one screen point with the y axis pointing up.
+            marker.label.position = CGPoint(x: placement.offset.x, y: -placement.offset.y)
+            marker.label.isHidden = false
+            placedLabelRects.append(placement.rect)
+        }
+    }
+
+    private func markerViewCenter(_ marker: ScreenSpaceMarker) -> CGPoint {
+        convertPoint(toView: marker.node.convert(.zero, to: self))
+    }
+
+    private func badgeViewRect(_ marker: ScreenSpaceMarker) -> CGRect {
+        let center = markerViewCenter(marker)
+        return CGRect(
+            x: center.x - marker.badgeSize / 2,
+            y: center.y - marker.badgeSize / 2,
+            width: marker.badgeSize,
+            height: marker.badgeSize
+        )
+    }
+
+    /// Hall badges that are currently drawn, with frames that cover the badge
+    /// and its visible title. The host exposes each one as a VoiceOver button.
+    func venueBadgeTargets() -> [VenueBadgeTarget] {
+        guard view != nil else { return [] }
+        return venueMarkers.compactMap { marker in
+            guard let venueID = marker.venueID,
+                !marker.node.isHidden,
+                marker.node.alpha > 0.05
+            else { return nil }
+            var frame = badgeViewRect(marker)
+            if !marker.label.isHidden {
+                let center = markerViewCenter(marker)
+                let size = marker.label.frame.size
+                frame = frame.union(
+                    CGRect(
+                        x: center.x + marker.label.position.x - size.width / 2,
+                        y: center.y - marker.label.position.y - size.height / 2,
+                        width: size.width,
+                        height: size.height
+                    ))
+            }
+            return VenueBadgeTarget(
+                venueID: venueID,
+                title: marker.label.text ?? "",
+                frame: frame
+            )
         }
     }
 

@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 
 struct MapCamera: Equatable {
     var translation: CGSize = .zero
@@ -64,6 +65,44 @@ struct MapCameraTuning: Equatable {
         maximumRotationVelocity: 0,
         rotationVelocityInfluence: 0
     )
+}
+
+/// Screen area covered by map chrome (banners, selectors, bottom controls),
+/// in points from each edge of the map view, safe area included.
+struct MapViewportInsets: Equatable, Sendable {
+    var top: CGFloat
+    var left: CGFloat
+    var bottom: CGFloat
+    var right: CGFloat
+
+    static let zero = MapViewportInsets(top: 0, left: 0, bottom: 0, right: 0)
+}
+
+/// A one-shot request to frame part of the campus. A new `id` frames the
+/// same target again, for example after the user panned away.
+struct MapCameraFitRequest: Equatable, Sendable {
+    enum Target: Equatable, Sendable {
+        /// Halls and stations, the initial campus view.
+        case campusOverview
+        /// Every facility in one optional map layer.
+        case layer(BigSightMapLayer)
+        /// Every space that matches the active search.
+        case searchMatches
+    }
+
+    let id: UUID
+    let target: Target
+
+    init(_ target: Target, id: UUID = UUID()) {
+        self.id = id
+        self.target = target
+    }
+}
+
+/// A SpriteKit camera position and scale, in scene units per screen point.
+struct MapCameraFit: Equatable {
+    let position: CGPoint
+    let scale: CGFloat
 }
 
 enum MapCameraMath {
@@ -180,6 +219,77 @@ enum MapCameraMath {
             x: scenePoint.x - sceneOffset.x,
             y: scenePoint.y - sceneOffset.y
         )
+    }
+
+    /// Fits a scene-space rectangle into the part of the viewport that chrome
+    /// does not cover, for a camera with the given rotation. Returns `nil`
+    /// when the viewport or rectangle is degenerate.
+    ///
+    /// When the insets leave less than 40% of either viewport side, the
+    /// insets are ignored so a short landscape view still frames the content.
+    /// `scaleRange` clamps the result, and the clamped scale still centers
+    /// the rectangle in the free area.
+    static func spriteKitCameraFit(
+        sceneRect: CGRect,
+        viewportSize: CGSize,
+        insets: MapViewportInsets,
+        padding: CGFloat,
+        cameraRotation: CGFloat = 0,
+        scaleRange: ClosedRange<CGFloat>? = nil
+    ) -> MapCameraFit? {
+        guard viewportSize.width > 1, viewportSize.height > 1,
+            !sceneRect.isNull, !sceneRect.isInfinite,
+            sceneRect.width > 0 || sceneRect.height > 0
+        else { return nil }
+
+        var visible = CGRect(
+            x: insets.left,
+            y: insets.top,
+            width: viewportSize.width - insets.left - insets.right,
+            height: viewportSize.height - insets.top - insets.bottom
+        )
+        if visible.width < viewportSize.width * 0.4 || visible.height < viewportSize.height * 0.4 {
+            visible = CGRect(origin: .zero, size: viewportSize)
+        }
+        let available = visible.insetBy(
+            dx: min(max(0, padding), visible.width / 4),
+            dy: min(max(0, padding), visible.height / 4)
+        )
+
+        // Measure the rectangle as the rotated camera sees it at one scene
+        // unit per point, then scale so that extent fits the free area.
+        let center = CGPoint(x: sceneRect.midX, y: sceneRect.midY)
+        let unitTransform = spriteKitViewTransform(
+            viewportSize: viewportSize,
+            cameraPosition: center,
+            cameraScale: 1,
+            cameraRotation: cameraRotation
+        )
+        let corners = [
+            CGPoint(x: sceneRect.minX, y: sceneRect.minY),
+            CGPoint(x: sceneRect.maxX, y: sceneRect.minY),
+            CGPoint(x: sceneRect.minX, y: sceneRect.maxY),
+            CGPoint(x: sceneRect.maxX, y: sceneRect.maxY),
+        ].map { $0.applying(unitTransform) }
+        let extentWidth = (corners.map(\.x).max() ?? 0) - (corners.map(\.x).min() ?? 0)
+        let extentHeight = (corners.map(\.y).max() ?? 0) - (corners.map(\.y).min() ?? 0)
+        var scale = max(
+            extentWidth / max(available.width, 1),
+            extentHeight / max(available.height, 1)
+        )
+        if let scaleRange {
+            scale = min(scaleRange.upperBound, max(scaleRange.lowerBound, scale))
+        }
+        guard scale.isFinite, scale > 0 else { return nil }
+
+        let position = spriteKitCameraPosition(
+            focusing: center,
+            at: CGPoint(x: visible.midX, y: visible.midY),
+            viewportSize: viewportSize,
+            cameraScale: scale,
+            cameraRotation: cameraRotation
+        )
+        return MapCameraFit(position: position, scale: scale)
     }
 
     /// The north indicator rotates with map content so its tip continues to
