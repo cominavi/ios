@@ -503,8 +503,8 @@ enum ComiketToolboxCatalog {
         resource(
             "comiket-heatstroke",
             .safety,
-            "Official C108 heatstroke guidance",
-            "Hydration, rest, cooling, warning signs, and C108-specific precautions.",
+            "Official heatstroke guidance",
+            "Hydration, rest, cooling, and the warning signs to watch for.",
             .comiket,
             "briefcase-medical",
             "https://www.comiket.co.jp/info-a/Heatstroke.html",
