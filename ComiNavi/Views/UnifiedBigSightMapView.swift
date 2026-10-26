@@ -454,6 +454,8 @@ final class UnifiedMapHostView: UIView {
     /// Opens a hall from its VoiceOver button, matching a tap on the badge.
     var onActivateVenue: ((Int) -> Void)?
     private static let campusHintSeenKey = "map.campusHallHint.seen"
+    /// Cached because accessibility refreshes on every camera frame.
+    private var hasSeenCampusHint = UserDefaults.standard.bool(forKey: campusHintSeenKey)
     private(set) var basemapState = UnifiedBasemapState.loading
 
     private enum CompassState: Equatable {
@@ -927,11 +929,11 @@ final class UnifiedMapHostView: UIView {
     /// Shows "Tap a hall to open its floor map" on the campus overview until
     /// the attendee opens a hall for the first time.
     private func updateCampusHint(scope: MapScreenModel.Scope) {
-        let defaults = UserDefaults.standard
-        if scope == .venue, !defaults.bool(forKey: Self.campusHintSeenKey) {
-            defaults.set(true, forKey: Self.campusHintSeenKey)
+        if scope == .venue, !hasSeenCampusHint {
+            hasSeenCampusHint = true
+            UserDefaults.standard.set(true, forKey: Self.campusHintSeenKey)
         }
-        let isHidden = scope != .campus || defaults.bool(forKey: Self.campusHintSeenKey)
+        let isHidden = scope != .campus || hasSeenCampusHint
         if campusHintChip.isHidden != isHidden {
             campusHintChip.isHidden = isHidden
         }
