@@ -87,17 +87,7 @@ struct ExploreView<EventDayHeader: View>: View {
                 if model.isLoading, model.allCircles.isEmpty {
                     ExploreLoadingScreen()
                 } else if model.visibleCircles.isEmpty {
-                    ContentUnavailableView {
-                        LucideLabel("No circles found", icon: "sparkle.magnifyingglass")
-                    } description: {
-                        Text(emptyMessage)
-                    } actions: {
-                        if activeFilterCount > 0 {
-                            Button("Clear filters") {
-                                model.clearFilters()
-                            }
-                        }
-                    }
+                    emptyResults
                 } else {
                     results
                 }
@@ -253,11 +243,28 @@ struct ExploreView<EventDayHeader: View>: View {
             | (showsDiscoveryCloud ? 4 : 0)
     }
 
-    private var emptyMessage: String {
-        if !model.searchQuery.isEmpty {
-            return String(localized: "Try another search or clear a filter.")
+    /// Keeps the chips and tag cloud that produced the empty result on
+    /// screen, so the attendee can remove one filter instead of all of them.
+    private var emptyResults: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                scrollingHeader(horizontalPadding: ExploreLayoutMetrics.horizontalContentInset)
+
+                ContentUnavailableView {
+                    LucideLabel("No circles found", icon: "sparkle.magnifyingglass")
+                } description: {
+                    Text("No circles match your search and filters.")
+                } actions: {
+                    if activeFilterCount > 0 {
+                        Button("Clear filters") {
+                            model.clearFilters()
+                        }
+                    }
+                }
+                .padding(.vertical, 24)
+            }
         }
-        return String(localized: "No circles match the selected filters and interests.")
+        .scrollDismissesKeyboard(.interactively)
     }
 
     private func presentGalleryZoomOnboardingIfNeeded() {
