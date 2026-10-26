@@ -670,8 +670,10 @@ private struct CircleDetailHeader: View {
     @State private var isShowingLightbox = false
     @State private var copiedLocation = false
     @State private var copyGeneration = 0
-    @ScaledMetric(relativeTo: .title) private var artworkWidth = 154.0
+    @ScaledMetric(relativeTo: .title) private var compactArtworkWidth = 154.0
+    @ScaledMetric(relativeTo: .title) private var regularArtworkWidth = 230.0
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
@@ -701,19 +703,26 @@ private struct CircleDetailHeader: View {
             }.value
             didFailLoadingImage = image == nil
         }
-        .sheet(isPresented: $isShowingLightbox) {
+        .fullScreenCover(isPresented: $isShowingLightbox) {
             if let image {
                 ShinagakiLightbox(
                     image: image,
                     accessibilityLabel: String(localized: "Circle cover for \(displayName)")
                 )
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.black)
+                .dismissesOnDownwardDrag()
+                .presentationBackground(.clear)
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("circle-detail-header")
+    }
+
+    private var isRegularWidth: Bool { horizontalSizeClass == .regular }
+
+    /// iPad gets a larger cut; the identity column is capped so the X row
+    /// and link chips do not stretch across the readable-width column.
+    private var artworkWidth: CGFloat {
+        isRegularWidth ? regularArtworkWidth : compactArtworkWidth
     }
 
     private func artwork(width: CGFloat) -> some View {
@@ -797,7 +806,7 @@ private struct CircleDetailHeader: View {
                 CircleDetailExternalLinksRow(links: otherExternalLinks)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: isRegularWidth ? 380 : .infinity, alignment: .leading)
     }
 
     private var otherExternalLinks: [CircleExternalLink] {
@@ -2157,11 +2166,10 @@ private struct ShinagakiMediaGallery: View {
         .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         .scrollIndicators(.hidden)
         .accessibilityIdentifier("shinagaki-media-gallery")
-        .sheet(item: $presentation) { presentation in
+        .fullScreenCover(item: $presentation) { presentation in
             ShinagakiLightbox(presentation: presentation)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.black)
+                .dismissesOnDownwardDrag()
+                .presentationBackground(.clear)
         }
     }
 
