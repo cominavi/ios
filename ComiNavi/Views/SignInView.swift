@@ -794,31 +794,77 @@ struct SignInView: View {
 }
 
 private struct ConventionFloorBackdrop: View {
+    /// The live crowd simulation stops after this long so an unattended sign-in
+    /// screen does not keep the GPU busy.
+    private static let idleTimeout: Duration = .seconds(20)
+
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var accessibilityVoiceOverEnabled
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @State private var scene = ConventionFloorScene()
+    @State private var isIdle = false
+
+    /// UI tests read the accessibility tree and capture screenshots, so they
+    /// always receive the deterministic static floor.
+    private static let isUITesting = ProcessInfo.processInfo.arguments.contains {
+        $0.hasPrefix("-cominavi-ui-testing")
+    }
+
+    private var usesStaticFloor: Bool {
+        accessibilityReduceMotion || accessibilityVoiceOverEnabled || Self.isUITesting
+    }
 
     private var isSimulationPaused: Bool {
-        accessibilityReduceMotion || scenePhase != .active
+        isIdle || scenePhase != .active
     }
 
     var body: some View {
-        SpriteView(
-            scene: scene,
-            preferredFramesPerSecond: 30,
-            options: [
-                .allowsTransparency,
-                .ignoresSiblingOrder,
-                .shouldCullNonVisibleNodes,
-            ],
-            shouldRender: { _ in
-                UIApplication.shared.applicationState == .active
+        Group {
+            if usesStaticFloor {
+                StaticConventionFloor()
+            } else {
+                liveFloor
             }
-        )
+        }
         .allowsHitTesting(false)
+        // SpriteKit publishes every node to the accessibility tree. Collapse the
+        // backdrop into one ignored element before hiding it.
+        .accessibilityElement(children: .ignore)
         .accessibilityHidden(true)
         .ignoresSafeArea()
+    }
+
+    private var liveFloor: some View {
+        GeometryReader { proxy in
+            SpriteView(
+                scene: scene,
+                preferredFramesPerSecond: 20,
+                options: [
+                    .allowsTransparency,
+                    .ignoresSiblingOrder,
+                    .shouldCullNonVisibleNodes,
+                ],
+                shouldRender: { _ in
+                    !isIdle && UIApplication.shared.applicationState == .active
+                }
+            )
+            .task(
+                id: IdleTimerKey(
+                    isActive: scenePhase == .active,
+                    colorScheme: colorScheme,
+                    width: proxy.size.width,
+                    height: proxy.size.height
+                )
+            ) {
+                // Any change that needs a fresh frame restarts the idle timer.
+                isIdle = false
+                guard scenePhase == .active else { return }
+                try? await Task.sleep(for: Self.idleTimeout)
+                guard !Task.isCancelled else { return }
+                isIdle = true
+            }
+        }
         .onAppear {
             scene.setSimulationPaused(isSimulationPaused)
         }
@@ -830,6 +876,79 @@ private struct ConventionFloorBackdrop: View {
         }
         .onChange(of: colorScheme, initial: true) { _, newColorScheme in
             scene.setVeilColor(for: newColorScheme)
+        }
+    }
+
+    private struct IdleTimerKey: Hashable {
+        let isActive: Bool
+        let colorScheme: ColorScheme
+        let width: CGFloat
+        let height: CGFloat
+    }
+}
+
+/// A still drawing of the booth grid for VoiceOver, Reduce Motion and UI tests.
+/// It uses the same proportions as `ConventionFloorScene` without SpriteKit.
+private struct StaticConventionFloor: View {
+    var body: some View {
+        Canvas { context, size in
+            let tableShortSide = min(max(size.width / 72, 4.6), 6.4)
+            let tableLongSide = tableShortSide * 2.65
+            let tableSpacing = tableShortSide * 0.32
+            let tablesPerBank = 10
+            let blockWidth = tableLongSide * 2 + tableShortSide * 2
+            let bankLength =
+                CGFloat(tablesPerBank) * tableLongSide
+                + CGFloat(tablesPerBank - 1) * tableSpacing
+            let blockHeight = bankLength + tableShortSide * 2
+            let horizontalStride = blockWidth + tableLongSide * 1.2
+            let verticalStride = blockHeight + tableLongSide * 3.25
+
+            let diagonal = (size.width * size.width + size.height * size.height).squareRoot()
+            var path = Path()
+            var blockY = -diagonal / 2 - verticalStride
+            while blockY < diagonal / 2 + verticalStride {
+                var blockX = -diagonal / 2 - horizontalStride
+                while blockX < diagonal / 2 + horizontalStride {
+                    let rightBankX = blockX + blockWidth - tableShortSide
+                    for table in 0..<tablesPerBank {
+                        let tableY =
+                            blockY + tableShortSide
+                            + CGFloat(table) * (tableLongSide + tableSpacing)
+                        for x in [blockX, rightBankX] {
+                            path.addRect(
+                                CGRect(
+                                    x: x,
+                                    y: tableY,
+                                    width: tableShortSide,
+                                    height: tableLongSide
+                                )
+                            )
+                        }
+                    }
+                    let endCapX = blockX + tableShortSide
+                    for endY in [blockY, blockY + blockHeight - tableShortSide] {
+                        path.addRect(
+                            CGRect(
+                                x: endCapX,
+                                y: endY,
+                                width: tableLongSide * 2,
+                                height: tableShortSide
+                            )
+                        )
+                    }
+                    blockX += horizontalStride
+                }
+                blockY += verticalStride
+            }
+
+            context.translateBy(x: size.width / 2, y: size.height / 2)
+            context.rotate(by: .radians(.pi / 12))
+            context.stroke(
+                path,
+                with: .color(Color(uiColor: .secondaryLabel).opacity(0.22)),
+                lineWidth: 1.45
+            )
         }
     }
 }
@@ -1052,6 +1171,9 @@ private final class ConventionFloorScene: SKScene {
 
     override func didMove(to view: SKView) {
         view.isOpaque = false
+        view.isAccessibilityElement = false
+        view.accessibilityElementsHidden = true
+        view.accessibilityElements = []
         rebuildFloor()
     }
 
@@ -1077,6 +1199,10 @@ private final class ConventionFloorScene: SKScene {
     }
 
     private func configureScene() {
+        // The backdrop is decorative. Keep the scene and its thousands of
+        // nodes out of the accessibility tree.
+        isAccessibilityElement = false
+        accessibilityElements = []
         backgroundColor = .clear
         scaleMode = .resizeFill
         anchorPoint = .zero
