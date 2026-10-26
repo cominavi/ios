@@ -264,6 +264,11 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
                 rotation: renderer.cameraRotation,
                 gridAlignedRotation: renderer.gridAlignedCameraRotation
             )
+            host.onActivateVenue = { [weak self, weak renderer] mapID in
+                guard let self else { return }
+                renderer?.requestVenue(mapID)
+                self.onSelectVenue(mapID)
+            }
         }
 
         func updateCallbacks(
@@ -432,7 +437,16 @@ final class UnifiedMapHostView: UIView {
     private let basemapStatusChip = MapStatusChip(
         text: String(localized: "Street map unavailable offline. The venue map still works.")
     )
+    private let campusHintChip = MapStatusChip(
+        text: String(localized: "Tap a hall to open its floor map")
+    )
+    private let statusChipStack = UIStackView()
+    private let venueAccessibilityContainer = UIView(frame: .zero)
+    private var venueAccessibilityElements: [Int: MapVenueAccessibilityElement] = [:]
     private var basemapTimeoutWorkItem: DispatchWorkItem?
+    /// Opens a hall from its VoiceOver button, matching a tap on the badge.
+    var onActivateVenue: ((Int) -> Void)?
+    private static let campusHintSeenKey = "map.campusHallHint.seen"
     private(set) var basemapState = UnifiedBasemapState.loading
 
     private enum CompassState: Equatable {
@@ -470,6 +484,14 @@ final class UnifiedMapHostView: UIView {
         mapView.isAccessibilityElement = true
         mapView.accessibilityIdentifier = "unified-map-canvas"
         addSubview(mapView)
+
+        // Holds one button element per visible hall badge, read right after
+        // the canvas itself.
+        venueAccessibilityContainer.translatesAutoresizingMaskIntoConstraints = false
+        venueAccessibilityContainer.backgroundColor = .clear
+        venueAccessibilityContainer.isUserInteractionEnabled = false
+        venueAccessibilityContainer.isAccessibilityElement = false
+        addSubview(venueAccessibilityContainer)
 
         for proxy in [campusAccessibilityProxy, venueAccessibilityProxy] {
             proxy.translatesAutoresizingMaskIntoConstraints = false
@@ -543,10 +565,18 @@ final class UnifiedMapHostView: UIView {
         dataAttributionButton.showsMenuAsPrimaryAction = true
         addSubview(dataAttributionButton)
 
+        campusHintChip.accessibilityIdentifier = "map-campus-hint"
+        campusHintChip.isHidden = true
         basemapStatusChip.accessibilityIdentifier = "map-basemap-status"
         basemapStatusChip.isHidden = true
-        basemapStatusChip.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(basemapStatusChip)
+        statusChipStack.axis = .vertical
+        statusChipStack.alignment = .leading
+        statusChipStack.spacing = MapChromeLayout.controlSpacing
+        statusChipStack.isUserInteractionEnabled = false
+        statusChipStack.translatesAutoresizingMaskIntoConstraints = false
+        statusChipStack.addArrangedSubview(campusHintChip)
+        statusChipStack.addArrangedSubview(basemapStatusChip)
+        addSubview(statusChipStack)
 
         let dataAttributionTrailingConstraint = dataAttributionButton.trailingAnchor.constraint(
             equalTo: safeAreaLayoutGuide.trailingAnchor,
@@ -581,17 +611,21 @@ final class UnifiedMapHostView: UIView {
                 equalTo: safeAreaLayoutGuide.bottomAnchor,
                 constant: -10
             ),
-            basemapStatusChip.leadingAnchor.constraint(
+            venueAccessibilityContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
+            venueAccessibilityContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
+            venueAccessibilityContainer.topAnchor.constraint(equalTo: topAnchor),
+            venueAccessibilityContainer.bottomAnchor.constraint(equalTo: bottomAnchor),
+            statusChipStack.leadingAnchor.constraint(
                 equalTo: safeAreaLayoutGuide.leadingAnchor,
                 constant: MapChromeLayout.edgeInset
             ),
-            basemapStatusChip.trailingAnchor.constraint(
+            statusChipStack.trailingAnchor.constraint(
                 lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor,
                 constant: -MapChromeLayout.edgeInset
             ),
-            // Sit above the bottom control row so the chip never covers the
+            // Sit above the bottom control row so the chips never cover the
             // compass, location buttons, or attribution.
-            basemapStatusChip.bottomAnchor.constraint(
+            statusChipStack.bottomAnchor.constraint(
                 equalTo: safeAreaLayoutGuide.bottomAnchor,
                 constant: -(MapChromeLayout.edgeInset + MapChromeLayout.controlSize
                     + MapChromeLayout.controlSpacing)
@@ -828,6 +862,66 @@ final class UnifiedMapHostView: UIView {
         activeProxy.accessibilityLabel = mapView.accessibilityLabel
         activeProxy.accessibilityHint = mapView.accessibilityHint
         activeProxy.accessibilityValue = mapView.accessibilityValue
+        updateVenueAccessibilityElements(renderer: renderer, scope: scope)
+        updateCampusHint(scope: scope)
+    }
+
+    /// Exposes each visible hall badge as a button so VoiceOver users can open
+    /// a hall from the campus overview without the venue menu.
+    private func updateVenueAccessibilityElements(
+        renderer: UnifiedBigSightScene,
+        scope: MapScreenModel.Scope
+    ) {
+        let targets = scope == .campus ? renderer.venueBadgeTargets() : []
+        let minimumSide = MapChromeLayout.controlSize
+        var elements: [MapVenueAccessibilityElement] = []
+        for target in targets {
+            let element =
+                venueAccessibilityElements[target.venueID]
+                ?? MapVenueAccessibilityElement(accessibilityContainer: venueAccessibilityContainer)
+            venueAccessibilityElements[target.venueID] = element
+            element.accessibilityLabel = target.title
+            element.accessibilityHint = String(localized: "Opens the floor map for this hall.")
+            element.accessibilityTraits = .button
+            element.accessibilityIdentifier = "map-venue-badge-\(target.venueID)"
+            element.accessibilityFrameInContainerSpace = target.frame.insetBy(
+                dx: min(0, (target.frame.width - minimumSide) / 2),
+                dy: min(0, (target.frame.height - minimumSide) / 2)
+            )
+            let venueID = target.venueID
+            element.onActivate = { [weak self] in
+                self?.onActivateVenue?(venueID)
+            }
+            elements.append(element)
+        }
+        // Read badges top to bottom, then leading to trailing.
+        elements.sort { lhs, rhs in
+            let left = lhs.accessibilityFrameInContainerSpace
+            let right = rhs.accessibilityFrameInContainerSpace
+            if abs(left.midY - right.midY) > minimumSide / 2 {
+                return left.midY < right.midY
+            }
+            return left.midX < right.midX
+        }
+        let currentIDs = (venueAccessibilityContainer.accessibilityElements ?? [])
+            .map { ($0 as? MapVenueAccessibilityElement)?.accessibilityIdentifier }
+        venueAccessibilityContainer.accessibilityElements = elements
+        if currentIDs != elements.map(\.accessibilityIdentifier) {
+            UIAccessibility.post(notification: .layoutChanged, argument: nil)
+        }
+    }
+
+    /// Shows "Tap a hall to open its floor map" on the campus overview until
+    /// the attendee opens a hall for the first time.
+    private func updateCampusHint(scope: MapScreenModel.Scope) {
+        let defaults = UserDefaults.standard
+        if scope == .venue, !defaults.bool(forKey: Self.campusHintSeenKey) {
+            defaults.set(true, forKey: Self.campusHintSeenKey)
+        }
+        let isHidden = scope != .campus || defaults.bool(forKey: Self.campusHintSeenKey)
+        if campusHintChip.isHidden != isHidden {
+            campusHintChip.isHidden = isHidden
+        }
     }
 
     private func attributionAction(title: String, url: String) -> UIAction {
@@ -835,6 +929,17 @@ final class UnifiedMapHostView: UIView {
             guard let url = URL(string: url) else { return }
             UIApplication.shared.open(url)
         }
+    }
+}
+
+/// A hall badge drawn by SpriteKit, exposed to VoiceOver as a button.
+final class MapVenueAccessibilityElement: UIAccessibilityElement {
+    var onActivate: (() -> Void)?
+
+    override func accessibilityActivate() -> Bool {
+        guard let onActivate else { return false }
+        onActivate()
+        return true
     }
 }
 
