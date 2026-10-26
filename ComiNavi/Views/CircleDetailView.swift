@@ -164,7 +164,7 @@ struct CircleDetailView: View {
                 Button {
                     isShowingDataSources = true
                 } label: {
-                    LucideLabel("Sources", icon: "info.circle")
+                    LucideLabel("Data sources", icon: "info.circle")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -707,7 +707,7 @@ private struct CircleDetailHeader: View {
             if let image {
                 ShinagakiLightbox(
                     image: image,
-                    accessibilityLabel: String(localized: "Circle cover for \(displayName)")
+                    accessibilityLabel: String(localized: "Circle cut for \(displayName)")
                 )
                 .dismissesOnDownwardDrag()
                 .presentationBackground(.clear)
@@ -735,7 +735,7 @@ private struct CircleDetailHeader: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Circle cover for \(displayName)")
+                .accessibilityLabel("Circle cut for \(displayName)")
                 .accessibilityHint("Opens the image viewer")
                 .accessibilityIdentifier("circle-cover-lightbox-button")
             } else {
@@ -1422,7 +1422,7 @@ private struct CircleDetailDataSourcesSheet: View {
         let postEvidence = (details?.enrichment?.posts ?? []).map {
             CatalogXEvidence(
                 id: "shinagaki:\($0.id)",
-                title: "Shinagaki post",
+                title: "Item list post",
                 url: $0.postURL,
                 authorHandle: $0.authorHandle
             )
@@ -1724,8 +1724,16 @@ private struct CircleDetailShinagakiSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Shinagaki")
-                .font(.title3.weight(.bold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Item list")
+                    .font(.title3.weight(.bold))
+
+                Text("Shinagaki: the circle's items and prices")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
 
             ShinagakiMatchNotice()
 
@@ -1791,7 +1799,7 @@ private struct ShinagakiPostCard: View {
                     postID: post.id,
                     media: displayableMedia,
                     accessibilityLabel: String(
-                        localized: "Shinagaki image by \(post.authorHandle)"
+                        localized: "Item list image by \(post.authorHandle)"
                     )
                 )
             }
@@ -1814,7 +1822,7 @@ private struct ShinagakiPostCard: View {
                 Spacer(minLength: 8)
 
                 Link(destination: post.postURL) {
-                    LucideLabel("Open shinagaki on X", icon: "arrow.up.right")
+                    LucideLabel("Open item list on X", icon: "arrow.up.right")
                         .font(.subheadline.weight(.semibold))
                         .frame(minHeight: 44)
                 }
@@ -1961,7 +1969,7 @@ private struct ShinagakiConfidenceSheet: View {
                     confidenceRow(
                         title: "Post confidence",
                         confidence: postConfidence,
-                        explanation: "How strongly the public X post appears to be a shinagaki post."
+                        explanation: "How strongly the public X post appears to be an item list post."
                     )
                     confidenceRow(
                         title: "Placement confidence",
