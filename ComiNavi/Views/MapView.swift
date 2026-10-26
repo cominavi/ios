@@ -1232,7 +1232,7 @@ private struct MapLayerMenu: View {
 
     private var availableQuickViews: [MapQuickView] {
         MapQuickView.allCases.filter { quickView in
-            quickView.requiredLayer.map(availableLayers.contains) ?? true
+            quickView.requiredLayer.map { availableLayers.contains($0) } ?? true
         }
     }
 

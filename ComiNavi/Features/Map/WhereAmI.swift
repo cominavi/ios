@@ -154,7 +154,7 @@ struct ComiketSpaceCodeQuery: Equatable, Sendable {
         direction: BigSightVenue.Direction?
     ) -> Self? {
         var rest = value
-        guard let block = rest.first, block.isLetter else { return nil }
+        guard let first = rest.first, let block = blockCharacter(first) else { return nil }
         rest.removeFirst()
 
         let digits = rest.prefix(while: { $0.isASCII && $0.isNumber })
@@ -176,7 +176,7 @@ struct ComiketSpaceCodeQuery: Equatable, Sendable {
         return Self(
             day: day,
             direction: direction,
-            blockName: String(block),
+            blockName: block,
             spaceNumber: spaceNumber,
             subspace: subspace
         )
@@ -190,6 +190,24 @@ struct ComiketSpaceCodeQuery: Equatable, Sendable {
         return ignoringCase
             ? folded.lowercased() == blockName.lowercased()
             : folded == blockName
+    }
+
+    /// Comiket blocks are Latin letters or kana; kanji such as 西 never are.
+    /// Half-width katakana is widened so "ｼ01" finds block シ.
+    private static func blockCharacter(_ character: Character) -> String? {
+        guard character.unicodeScalars.count == 1,
+            let scalar = character.unicodeScalars.first
+        else {
+            return nil
+        }
+        switch scalar.value {
+        case 0x41...0x5A, 0x61...0x7A, 0x3041...0x309F, 0x30A1...0x30FA:
+            return String(character)
+        case 0xFF66...0xFF9D:
+            return String(character).applyingTransform(.fullwidthToHalfwidth, reverse: true)
+        default:
+            return nil
+        }
     }
 
     private static func consumeDay(from rest: inout Substring) -> Int? {
@@ -234,7 +252,7 @@ struct ComiketSpaceCodeQuery: Equatable, Sendable {
     private static func foldingFullWidthASCII(_ value: String) -> String {
         String(
             String.UnicodeScalarView(
-                value.unicodeScalars.map { scalar in
+                value.unicodeScalars.map { scalar -> Unicode.Scalar in
                     if (0xFF01...0xFF5E).contains(scalar.value),
                         let ascii = UnicodeScalar(scalar.value - 0xFEE0)
                     {
