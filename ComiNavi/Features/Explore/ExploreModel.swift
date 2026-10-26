@@ -400,7 +400,11 @@ final class ExploreModel {
     private(set) var tagFacets: [ExploreTagFacet] = []
     private(set) var shinagakiCircleCount = 0
     private(set) var highConfidenceShinagakiCircleCount = 0
+    /// The most-used tags for the selected day, shown as one-tap shortcuts.
     private(set) var discoveryTerms: [ExploreDiscoveryTerm] = []
+    /// Every tag for the selected day, for the filter sheet's tag list. Both
+    /// lists share `selectedDiscoveryTermIDs`, the only multi-tag state.
+    private(set) var allDiscoveryTerms: [ExploreDiscoveryTerm] = []
     private(set) var isDiscoveryLoading = false
     private(set) var isLoading = false
     private(set) var tagState: TagState = .idle
@@ -470,6 +474,11 @@ final class ExploreModel {
 
     var catalogDataSource: CirclemsDataSource? {
         dataSource
+    }
+
+    /// True on a tag page, where one tag scopes every result.
+    var hasFixedTag: Bool {
+        fixedTag != nil
     }
 
     var isResolvingFixedTag: Bool {
@@ -663,7 +672,7 @@ final class ExploreModel {
                 systemImage: "tag"
             ))
         }
-        for term in discoveryTerms where selectedDiscoveryTermIDs.contains(term.id) {
+        for term in allDiscoveryTerms where selectedDiscoveryTermIDs.contains(term.id) {
             filters.append(ExploreActiveFilter(
                 kind: .discoveryTerm(term.id),
                 title: term.title,
@@ -1241,12 +1250,15 @@ final class ExploreModel {
         }
         discoveryTask = Task { [documents] in
             let index = await Task.detached(priority: .userInitiated) {
-                ExploreDiscoveryIndexBuilder.build(from: documents)
+                ExploreDiscoveryIndexBuilder.build(from: documents, tagLimit: .max)
             }.value
             guard !Task.isCancelled, revision == discoveryRevision else { return }
 
             discoveryIndex = index
-            discoveryTerms = index.terms
+            allDiscoveryTerms = index.terms
+            discoveryTerms = Array(
+                index.terms.prefix(ExploreDiscoveryIndexBuilder.popularTagLimit)
+            )
             selectedDiscoveryTermIDs.formIntersection(index.terms.map(\.id))
             isDiscoveryLoading = false
             recomputeVisibleCircles()

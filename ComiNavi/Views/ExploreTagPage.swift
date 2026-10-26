@@ -70,21 +70,26 @@ struct ExploreTagPage: View {
         }
         .searchable(text: $model.searchQuery, prompt: "Search within this tag")
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     showsFilters = true
                 } label: {
-                    HStack(spacing: 5) {
-                        LucideIcon("slider.horizontal.3")
-                        if activeFilterCount > 0 {
-                            Text(activeFilterCount, format: .number)
-                                .font(.caption.monospacedDigit().weight(.bold))
-                        }
-                    }
+                    ExploreFilterButtonLabel(activeFilterCount: activeFilterCount)
                 }
-                .accessibilityLabel("Filters")
-                .accessibilityValue("\(activeFilterCount) active")
+                .accessibilityLabel(
+                    ExploreFilterButtonLabel.accessibilityLabel(for: activeFilterCount)
+                )
                 .accessibilityIdentifier("circle-tag-filters")
+                .id(activeFilterCount)
+
+                Menu {
+                    ExploreSortPicker(selection: $model.sort)
+                        .pickerStyle(.inline)
+                } label: {
+                    LucideLabel("Sort", icon: model.sort.systemImage)
+                }
+                .accessibilityLabel(Text("Sort, \(Text(model.sort.title))"))
+                .accessibilityIdentifier("circle-tag-sort")
             }
         }
         .task(id: tag) {
@@ -97,13 +102,10 @@ struct ExploreTagPage: View {
                 .presentationBackground(.black)
         }
         .sheet(isPresented: $showsFilters) {
-            ExploreTagFilterSheet(
+            ExploreFilterSheet(
                 model: model,
-                dataSource: dataSource,
                 favoriteColorLabelStore: favoriteColorLabelStore
             )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
         .onDisappear {
             lightboxController.cancelPendingLoad()
@@ -112,13 +114,7 @@ struct ExploreTagPage: View {
     }
 
     private var activeFilterCount: Int {
-        (model.selectedGenreID == nil ? 0 : 1)
-            + (model.shinagakiFilter == .all ? 0 : 1)
-            + (model.favoriteFilter == .all ? 0 : 1)
-            + (model.selectedFavoriteColors.isEmpty ? 0 : 1)
-            + (model.attendanceFilter == .all ? 0 : 1)
-            + (model.spaceFilter == .all ? 0 : 1)
-            + (model.sort == .catalog ? 0 : 1)
+        model.activeFilters.count
     }
 
     private func openLightbox(_ circle: ExploreCircle) {
@@ -219,132 +215,3 @@ private struct ExploreTagCircleLink: View {
         }
     }
 #endif
-
-private struct ExploreTagFilterSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let model: ExploreModel
-    let dataSource: CirclemsDataSource
-    let favoriteColorLabelStore: FavoriteColorLabelStore
-
-    var body: some View {
-        @Bindable var model = model
-
-        NavigationStack {
-            Form {
-                Section("Catalog") {
-                    ExploreExpandedFilterField(title: "Day") {
-                        ExploreFilterFlowLayout {
-                            ForEach(dataSource.comiket.days, id: \.dayIndex) { day in
-                                ExploreFilterChoice(
-                                    isSelected: model.selectedDay == day.dayIndex,
-                                    action: { model.select(day: day.dayIndex) }
-                                ) {
-                                    Text("Day \(day.dayIndex)")
-                                }
-                            }
-                        }
-                    }
-
-                    Picker("Genre", selection: $model.selectedGenreID) {
-                        Text("All genres").tag(Int?.none)
-                        ForEach(model.genreFacets) { genre in
-                            Text("\(genre.name) (\(genre.count))").tag(Int?.some(genre.id))
-                        }
-                    }
-
-                    ExploreExpandedFilterField(title: "Shinagaki") {
-                        ExploreFilterFlowLayout {
-                            ForEach(ExploreShinagakiFilter.allCases) { filter in
-                                ExploreFilterChoice(
-                                    isSelected: model.shinagakiFilter == filter,
-                                    action: { model.shinagakiFilter = filter }
-                                ) {
-                                    Text(filter.title)
-                                }
-                            }
-                        }
-                    }
-
-                    ExploreExpandedFilterField(title: "Attendance") {
-                        ExploreFilterFlowLayout {
-                            ForEach(ExploreAttendanceFilter.allCases) { filter in
-                                ExploreFilterChoice(
-                                    isSelected: model.attendanceFilter == filter,
-                                    action: { model.attendanceFilter = filter }
-                                ) {
-                                    Text(filter.title)
-                                }
-                            }
-                        }
-                    }
-
-                    ExploreExpandedFilterField(title: "Space") {
-                        ExploreFilterFlowLayout {
-                            ForEach(ExploreSpaceFilter.allCases) { filter in
-                                ExploreFilterChoice(
-                                    isSelected: model.spaceFilter == filter,
-                                    action: { model.spaceFilter = filter }
-                                ) {
-                                    Text(filter.title)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Section("Your plan") {
-                    ExploreExpandedFilterField(title: "Saved") {
-                        ExploreFilterFlowLayout {
-                            ForEach(ExploreFavoriteFilter.allCases) { filter in
-                                ExploreFilterChoice(
-                                    isSelected: model.favoriteFilter == filter,
-                                    action: { model.favoriteFilter = filter }
-                                ) {
-                                    Text(filter.title)
-                                }
-                            }
-                        }
-                    }
-
-                    ExploreFavoriteColorFilter(
-                        selection: $model.selectedFavoriteColors,
-                        colorLabelStore: favoriteColorLabelStore
-                    )
-                }
-
-                Section("Order") {
-                    ExploreExpandedFilterField(title: "Sort") {
-                        ExploreFilterFlowLayout {
-                            ForEach(ExploreSort.allCases) { sort in
-                                ExploreFilterChoice(
-                                    isSelected: model.sort == sort,
-                                    action: { model.sort = sort }
-                                ) {
-                                    Text(sort.title)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Filter circles")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Reset") {
-                        model.selectedGenreID = nil
-                        model.shinagakiFilter = .all
-                        model.favoriteFilter = .all
-                        model.selectedFavoriteColors = []
-                        model.attendanceFilter = .all
-                        model.spaceFilter = .all
-                        model.sort = .catalog
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-}

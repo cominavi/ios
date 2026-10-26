@@ -57,9 +57,12 @@ enum ExploreDiscoveryIndexBuilder {
         let circleIDs: Set<Int>
     }
 
+    /// How many tags the Explore cloud shows as shortcuts.
+    static let popularTagLimit = 12
+
     static func build(
         from documents: [ExploreDiscoveryDocument],
-        tagLimit: Int = 12
+        tagLimit: Int = popularTagLimit
     ) -> ExploreDiscoveryIndex {
         guard !documents.isEmpty else { return .empty }
 
