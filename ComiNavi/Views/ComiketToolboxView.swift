@@ -1,62 +1,105 @@
 import SwiftUI
 import UIKit
 
+/// The Toolbox hub: venue quick actions first, then the selected event's notices,
+/// then links to the checklist, reminders, and official links.
 struct ComiketToolboxView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var checklistStore: ComiketChecklistStore
     @State private var reminderStore: ComiketReminderStore
     @State private var searchText = ""
     @State private var copiedVenue = false
+    @State private var isNoticeExpanded = true
+    private let event: CatalogEvent?
 
     @MainActor
     init(
+        event: CatalogEvent? = nil,
         checklistStore: ComiketChecklistStore = ComiketChecklistStore(),
         reminderStore: ComiketReminderStore = ComiketReminderStore()
     ) {
+        self.event = event
         _checklistStore = State(initialValue: checklistStore)
         _reminderStore = State(initialValue: reminderStore)
     }
 
-    private var visibleSections: [ComiketToolboxSection] {
-        ComiketToolboxCatalog.sections(matching: searchText)
+    /// Re-evaluated on every render, so event-specific content disappears once
+    /// the edition's validity window ends even if the screen stays open.
+    private var edition: ComiketToolboxEdition? {
+        ComiketToolboxEdition.current(forEventNumber: event?.number)
     }
 
-    private var liveSection: ComiketToolboxSection? {
-        visibleSections.first { $0.category == .live }
+    private var showsReminders: Bool {
+        edition?.eventNumber == ComiketEventReminderCatalog.eventNumber
     }
 
-    private var nonLiveSections: [ComiketToolboxSection] {
-        visibleSections.filter { $0.category != .live }
+    private var searchResults: [ComiketToolboxSection] {
+        ComiketToolboxCatalog.sections(for: edition, matching: searchText)
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                if searchText.isEmpty {
-                    C108ToolboxNotice()
-                    ToolboxReminderSection(store: reminderStore)
-                    ToolboxQuickAccess(copiedVenue: $copiedVenue)
-                    if let liveSection {
-                        ToolboxResourceSectionView(section: liveSection)
-                    }
-                    ToolboxChecklistSection(store: checklistStore)
-                    ForEach(nonLiveSections) { section in
-                        ToolboxResourceSectionView(section: section)
-                    }
+        List {
+            if searchText.isEmpty {
+                ToolboxQuickAccess(copiedVenue: $copiedVenue)
+
+                if let edition {
+                    ToolboxEditionNotice(edition: edition, isExpanded: $isNoticeExpanded)
                 } else {
-                    ForEach(visibleSections) { section in
-                        ToolboxResourceSectionView(section: section)
+                    ToolboxNoEditionNotice(event: event)
+                }
+
+                Section {
+                    NavigationLink {
+                        ToolboxChecklistScreen(store: checklistStore)
+                    } label: {
+                        LabeledContent {
+                            Text(
+                                verbatim:
+                                    "\(checklistStore.completedCount)/\(ComiketChecklistCatalog.items.count)"
+                            )
+                            .monospacedDigit()
+                        } label: {
+                            LucideLabel(resource: "Day-of checklist", icon: "list-checks")
+                        }
                     }
+                    .accessibilityIdentifier("toolbox-open-checklist")
+
+                    if let edition, showsReminders {
+                        NavigationLink {
+                            ToolboxReminderScreen(store: reminderStore, edition: edition)
+                        } label: {
+                            LucideLabel(resource: "Event reminders", icon: "calendar-clock")
+                        }
+                        .accessibilityIdentifier("toolbox-open-reminders")
+                    }
+
+                    NavigationLink {
+                        ToolboxResourcesScreen(
+                            sections: ComiketToolboxCatalog.sections(for: edition)
+                        )
+                    } label: {
+                        LucideLabel(resource: "Official links", icon: "globe")
+                    }
+                    .accessibilityIdentifier("toolbox-open-official-links")
+                }
+            } else {
+                ForEach(searchResults) { section in
+                    ToolboxResourceSectionView(section: section)
                 }
             }
-            .overlay {
-                if !searchText.isEmpty, visibleSections.isEmpty {
-                    ContentUnavailableView.search(text: searchText)
-                }
-            }
-            .navigationTitle("Toolbox")
-            .searchable(text: $searchText, prompt: "Search official resources")
         }
+        .overlay {
+            if !searchText.isEmpty, searchResults.isEmpty {
+                ContentUnavailableView.search(text: searchText)
+            }
+        }
+        .modifier(ToolboxReadableWidth())
+        .navigationTitle("Toolbox")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search official links"
+        )
         .task {
             await reminderStore.refresh()
         }
@@ -75,8 +118,78 @@ struct ComiketToolboxView: View {
     }
 }
 
+/// Keeps grouped lists at a readable column width in regular width instead of
+/// stretching rows across the whole iPad screen.
+private struct ToolboxReadableWidth: ViewModifier {
+    private static let maxContentWidth: CGFloat = 680
+    private static let minimumMargin: CGFloat = 20
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var containerWidth: CGFloat = 0
+
+    private var horizontalMargin: CGFloat? {
+        guard horizontalSizeClass == .regular else { return nil }
+        return max(Self.minimumMargin, (containerWidth - Self.maxContentWidth) / 2)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .contentMargins(.horizontal, horizontalMargin, for: .scrollContent)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                containerWidth = width
+            }
+    }
+}
+
+private struct ToolboxChecklistScreen: View {
+    let store: ComiketChecklistStore
+
+    var body: some View {
+        List {
+            ToolboxChecklistSection(store: store)
+        }
+        .modifier(ToolboxReadableWidth())
+        .navigationTitle("Day-of checklist")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct ToolboxReminderScreen: View {
+    let store: ComiketReminderStore
+    let edition: ComiketToolboxEdition
+
+    var body: some View {
+        List {
+            ToolboxReminderSection(store: store, edition: edition)
+        }
+        .modifier(ToolboxReadableWidth())
+        .navigationTitle("Event reminders")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct ToolboxResourcesScreen: View {
+    let sections: [ComiketToolboxSection]
+
+    var body: some View {
+        List {
+            ForEach(sections) { section in
+                ToolboxResourceSectionView(section: section)
+            }
+        }
+        .modifier(ToolboxReadableWidth())
+        .navigationTitle("Official links")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 private struct ToolboxReminderSection: View {
     let store: ComiketReminderStore
+    let edition: ComiketToolboxEdition
+    /// Grows with Dynamic Type so the times stay aligned without clipping.
+    @ScaledMetric(relativeTo: .body) private var timeColumnWidth = 50.0
 
     private var needsSettingsButton: Bool {
         switch store.state {
@@ -95,66 +208,67 @@ private struct ToolboxReminderSection: View {
                 HStack(spacing: 9) {
                     LucideIcon("calendar-clock", size: 20)
                         .foregroundStyle(.orange)
-                    Text("C108 event reminders")
+                    Text("\(edition.shortName) event reminders")
                         .font(.headline)
-                    Spacer()
-                    Text("Local only")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(.secondary.opacity(0.1), in: .capsule)
                 }
 
-                Text("Get a Time Sensitive alert 15 minutes before selected milestones.")
+                Text("Get a Time Sensitive alert 15 minutes before each selected time, on both event days.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .padding(.vertical, 3)
             .accessibilityElement(children: .combine)
 
-            ForEach(ComiketReminderKind.allCases) { kind in
-                Toggle(
-                    isOn: Binding(
-                        get: { store.isEnabled(kind) },
-                        set: { enabled in
-                            store.setEnabledOptimistically(enabled, for: kind)
-                        }
-                    )
-                ) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(verbatim: kind.timeLabel)
-                            .font(.body.monospacedDigit().weight(.semibold))
-                            .frame(width: 50, alignment: .leading)
+            if store.isSchedulable {
+                ForEach(ComiketReminderKind.allCases) { kind in
+                    Toggle(
+                        isOn: Binding(
+                            get: { store.isEnabled(kind) },
+                            set: { enabled in
+                                store.setEnabledOptimistically(enabled, for: kind)
+                            }
+                        )
+                    ) {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(verbatim: kind.timeLabel)
+                                .font(.body.monospacedDigit().weight(.semibold))
+                                .frame(minWidth: timeColumnWidth, alignment: .leading)
 
-                        VStack(alignment: .leading, spacing: 2) {
                             Text(kind.title)
                                 .font(.body)
-                            Text("Both days · 15 min before")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
                         }
                     }
+                    // A milestone whose fire dates have all passed cannot schedule anything.
+                    .disabled(!store.hasFutureFireDate(for: kind))
+                    .accessibilityIdentifier("toolbox-reminder-\(kind.rawValue)")
                 }
-                .accessibilityIdentifier("toolbox-reminder-\(kind.rawValue)")
-            }
 
-            reminderStatus
+                reminderStatus
 
-            if needsSettingsButton {
-                Button("Open notification settings") {
-                    guard let url = URL(string: UIApplication.openNotificationSettingsURLString)
-                    else { return }
-                    UIApplication.shared.open(url)
+                if needsSettingsButton {
+                    Button("Open notification settings") {
+                        guard let url = URL(string: UIApplication.openNotificationSettingsURLString)
+                        else { return }
+                        UIApplication.shared.open(url)
+                    }
+                    .accessibilityIdentifier("toolbox-reminder-open-settings")
                 }
-                .accessibilityIdentifier("toolbox-reminder-open-settings")
+            } else {
+                Text("Reminders for \(edition.shortName) have ended.")
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("toolbox-reminders-ended")
             }
         } footer: {
             VStack(alignment: .leading, spacing: 5) {
-                Text(
-                    "Your choices are saved. Delivery still follows your iOS notification settings."
+                if store.isSchedulable {
+                    Text(
+                        "Reminders are set on this device only. Delivery follows your iOS notification settings."
+                    )
+                }
+                Link(
+                    "Official \(edition.shortName) admission schedule",
+                    destination: edition.reminderScheduleURL
                 )
-                Link("Official C108 admission schedule", destination: ComiketEventReminderCatalog.officialScheduleURL)
             }
         }
     }
@@ -199,36 +313,67 @@ private struct ToolboxResourceSectionView: View {
     }
 }
 
-private struct C108ToolboxNotice: View {
+/// The selected edition's dated notices, collapsible so the hub links stay close.
+private struct ToolboxEditionNotice: View {
+    let edition: ComiketToolboxEdition
+    @Binding var isExpanded: Bool
+
     var body: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
+            DisclosureGroup(isExpanded: $isExpanded) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(edition.notices) { notice in
+                        HStack(alignment: .firstTextBaseline, spacing: 9) {
+                            Circle()
+                                .fill(.orange)
+                                .frame(width: 5, height: 5)
+                                .accessibilityHidden(true)
+                            Text(notice.text)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Text(
+                        "Checked against official posts on \(edition.verifiedAt, format: .dateTime.year().month().day()). Check live notices again before you travel."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+                .accessibilityElement(children: .combine)
+            } label: {
                 HStack(spacing: 10) {
                     LucideIcon("circle-alert", size: 20)
                         .foregroundStyle(.orange)
-                    Text("C108 right now")
+                    Text("\(edition.shortName) notices")
                         .font(.headline)
                 }
-
-                ForEach(C108ToolboxNoticeCatalog.notices) { notice in
-                    HStack(alignment: .firstTextBaseline, spacing: 9) {
-                        Circle()
-                            .fill(.orange)
-                            .frame(width: 5, height: 5)
-                        Text(notice.text)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Text(
-                    "Checked against official posts through August 13. Always recheck live notices before travel."
-                )
-                .font(.caption)
-                .foregroundStyle(.tertiary)
             }
-            .padding(.vertical, 4)
-            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("toolbox-edition-notice")
+        }
+    }
+}
+
+/// Shown instead of notices and reminders when no edition matches the selected
+/// event or the matching edition has ended.
+private struct ToolboxNoEditionNotice: View {
+    let event: CatalogEvent?
+
+    var body: some View {
+        Section {
+            Label {
+                if let event {
+                    Text("Event notices and reminders for \(event.shortName) are not available.")
+                } else {
+                    Text("Event notices and reminders are not available.")
+                }
+            } icon: {
+                LucideIcon("info", size: 18)
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("toolbox-no-edition")
         }
     }
 }
@@ -243,7 +388,8 @@ private struct ToolboxQuickAccess: View {
                 ToolboxActionRow(
                     title: "Transit to Tokyo Big Sight",
                     detail: "Open current public-transit directions in Maps.",
-                    icon: "navigation"
+                    icon: "navigation",
+                    accessory: .externalLink
                 )
             }
             .buttonStyle(.plain)
@@ -263,8 +409,9 @@ private struct ToolboxQuickAccess: View {
             } label: {
                 ToolboxActionRow(
                     title: copiedVenue ? "Venue copied" : "Copy venue and map link",
-                    detail: "Share a destination without claiming an indoor route.",
-                    icon: copiedVenue ? "check" : "copy"
+                    detail: "Copies the address and an Apple Maps link.",
+                    icon: copiedVenue ? "check" : "copy",
+                    accessory: .none
                 )
             }
             .buttonStyle(.plain)
@@ -274,9 +421,16 @@ private struct ToolboxQuickAccess: View {
 }
 
 private struct ToolboxActionRow: View {
+    /// What the trailing glyph promises: leaving the app, or nothing for in-place actions.
+    enum Accessory {
+        case none
+        case externalLink
+    }
+
     let title: LocalizedStringResource
     let detail: LocalizedStringResource
     let icon: String
+    let accessory: Accessory
 
     var body: some View {
         HStack(spacing: 13) {
@@ -295,8 +449,10 @@ private struct ToolboxActionRow: View {
 
             Spacer(minLength: 8)
 
-            LucideIcon("chevron-right", size: 15)
-                .foregroundStyle(.tertiary)
+            if accessory == .externalLink {
+                LucideIcon("external-link", size: 14)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
@@ -310,32 +466,8 @@ private struct ToolboxChecklistSection: View {
         ComiketChecklistCatalog.items
     }
 
-    private var progress: Double {
-        guard !items.isEmpty else { return 0 }
-        return Double(store.completedCount) / Double(items.count)
-    }
-
     var body: some View {
         Section {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack {
-                    Text("Day-of checklist")
-                        .font(.headline)
-                    Spacer()
-                    Text(verbatim: "\(store.completedCount)/\(items.count)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-
-                ProgressView(value: progress)
-                    .tint(progress == 1 ? .green : Color.accentColor)
-                    .accessibilityLabel("Checklist progress")
-                    .accessibilityValue(
-                        Text(verbatim: "\(store.completedCount)/\(items.count)")
-                    )
-            }
-            .padding(.vertical, 3)
-
             ForEach(items) { item in
                 let isCompleted = store.isCompleted(item)
                 Button {
@@ -366,9 +498,10 @@ private struct ToolboxChecklistSection: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(item.title)
-                .accessibilityValue(Text(isCompleted ? "Selected" : "Not selected"))
-                .accessibilityAddTraits(isCompleted ? .isSelected : [])
+                // The label already combines the title and detail; the toggle trait
+                // and value tell VoiceOver that activating the row checks it off.
+                .accessibilityAddTraits(.isToggle)
+                .accessibilityValue(Text(isCompleted ? "Checked" : "Not checked"))
                 .accessibilityIdentifier("toolbox-checklist-\(item.id)")
             }
 
@@ -378,6 +511,9 @@ private struct ToolboxChecklistSection: View {
                 }
                 .accessibilityIdentifier("toolbox-reset-checklist")
             }
+        } header: {
+            Text("\(store.completedCount) of \(items.count) done")
+                .monospacedDigit()
         } footer: {
             Text(
                 "Your checklist is a reminder, not a replacement for official instructions."
@@ -406,7 +542,7 @@ private struct ToolboxResourceRow: View {
 
                 Text(resource.authority.label)
                     .font(.caption2.weight(.medium))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 6)
@@ -418,10 +554,13 @@ private struct ToolboxResourceRow: View {
         .padding(.vertical, 3)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Opens the official website")
+        .accessibilityHint("Opens in browser")
     }
 }
 
 #Preview {
-    ComiketToolboxView()
+    // The Toolbox is pushed inside the Profile stack, so it owns no stack itself.
+    NavigationStack {
+        ComiketToolboxView()
+    }
 }
