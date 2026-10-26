@@ -1,0 +1,17 @@
+# Exceptions for scripts/check-xcstrings.sh.
+#
+# Each line is `file:<repo-relative path>` or `key:<exact catalog key>`, with an
+# optional reason after two spaces and `#`. Add an entry only for Japanese text
+# that is data, not interface copy: hall names, space codes, catalog formats,
+# and search keywords that must match Japanese input.
+
+# Japanese hall names and venue words that the map matches against catalog data.
+file:ComiNavi/Features/Map/BigSightCampus.swift  # 東/西/南 hall prefixes from Circle.ms data
+file:ComiNavi/Features/Map/MapScreenModel.swift  # 会場 and 東123 map identifiers from catalog data
+file:ComiNavi/Features/Map/WhereAmI.swift  # Japanese space-code parser and canonical addresses
+file:ComiNavi/Features/SharedPlans/SharedPlanExport.swift  # Export mirrors the Japanese Circle.ms address format
+file:ComiNavi/Features/Toolbox/ComiketToolbox.swift  # Japanese search keywords for official links
+
+# English keys that quote Japanese characters on purpose.
+key:Circle, creator, or space (e.g. 東A01a)  # Space codes are printed in Japanese
+key:Characters in Gojūon order, starting with あ on the left  # Describes the kana picker

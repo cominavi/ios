@@ -264,7 +264,7 @@
 				};
 			};
 			buildConfigurationList = B5E9AEAE2C9333CD00742CE8 /* Build configuration list for PBXProject "ComiNavi" */;
-			developmentRegion = ja;
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
