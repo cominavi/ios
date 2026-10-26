@@ -25,14 +25,17 @@ struct ContentView: View {
     @SceneStorage("ContentView.selectedTab") private var selection: AppTab = .map
     @State private var selectedDay = 1
     @State private var showsCatalogSettings = false
+    private let catalogResetAction: CatalogResetAction?
 
     @MainActor
     init(
         catalogLibrary: CatalogLibrary = AppData.catalogLibrary,
-        sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox
+        sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox,
+        catalogResetAction: CatalogResetAction? = nil
     ) {
         _catalogLibrary = State(initialValue: catalogLibrary)
         _sharedLocationInbox = State(initialValue: sharedLocationInbox)
+        self.catalogResetAction = catalogResetAction
     }
 
     var body: some View {
@@ -159,7 +162,10 @@ struct ContentView: View {
             content(circle)
                 .id(ObjectIdentifier(circle))
         } else {
-            CatalogLibraryLoadingSurface(catalogLibrary: catalogLibrary)
+            CatalogLibraryLoadingSurface(
+                catalogLibrary: catalogLibrary,
+                resetAction: catalogResetAction
+            )
         }
     }
 
@@ -212,8 +218,21 @@ struct ContentView: View {
     }
 }
 
+/// Lets the catalog failure surface offer EntryView's destructive
+/// "Log Out & Reset" recovery without owning the logout flow.
+struct CatalogResetAction {
+    var isInProgress: Bool
+    var issue: String?
+    var request: () -> Void
+}
+
+/// The single loading and failure surface for the catalog tabs. It covers
+/// discovery, download, opening, and failure with one string set and one
+/// symbol, and every state with a known event list lets the user pick
+/// another Comiket.
 private struct CatalogLibraryLoadingSurface: View {
     let catalogLibrary: CatalogLibrary
+    let resetAction: CatalogResetAction?
 
     var body: some View {
         switch catalogLibrary.phase {
@@ -221,60 +240,114 @@ private struct CatalogLibraryLoadingSurface: View {
             CatalogErrorSurface(
                 symbolName: "exclamationmark.triangle.fill",
                 title: String(localized: "Catalog unavailable"),
-                message: message,
+                message: resetAction?.issue ?? message,
                 advice: catalogLibrary.failureRecovery == .redownload
                     ? String(localized: "Start a fresh download. The incomplete copy will be removed, then the new catalog will be verified before it opens.")
                     : String(localized: "Please try again.")
             ) {
                 CatalogRecoveryButton(catalogLibrary: catalogLibrary)
-            }
 
-        case .loading(let event):
-            CatalogStatusSurface(
-                symbolName: "arrow.down.circle.fill",
-                eyebrow: event.shortName,
-                title: String(localized: "Opening catalog…"),
-                subtitle: String(localized: "Preparing catalog…")
-            ) {
-                CatalogActivityIndicator(
-                    accessibilityLabel: String(localized: "Opening catalog…")
-                )
+                if let resetAction {
+                    CatalogResetButton(action: resetAction)
+                }
+
+                CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
             }
 
         case .downloading(let event, let progress):
-            CatalogStatusSurface(
-                symbolName: "arrow.down.circle.fill",
-                eyebrow: event.shortName,
-                title: String(localized: "Downloading catalog…"),
-                subtitle: String(localized: "Downloading the catalog, this may take a while…")
-            ) {
-                DownloadProgressView(progresses: [progress])
+            downloadingSurface(eyebrow: event.shortName, progresses: [progress])
+
+        case .loading(let event):
+            // Circle.ms catalogs download inside the data source after the
+            // library has handed it over, so its progress wins when present.
+            if let progresses = dataSourceDownloadProgresses {
+                downloadingSurface(eyebrow: event.shortName, progresses: progresses)
+            } else {
+                openingSurface(
+                    eyebrow: event.shortName,
+                    title: String(localized: "Opening catalog…")
+                )
             }
 
         case .discovering:
-            CatalogStatusSurface(
-                symbolName: "sparkles",
+            openingSurface(
                 eyebrow: String(localized: "Catalog"),
-                title: String(localized: "Finding available catalogs…"),
-                subtitle: String(localized: "Preparing catalog…")
-            ) {
-                CatalogActivityIndicator(
-                    accessibilityLabel: String(localized: "Finding available catalogs…")
-                )
-            }
+                title: String(localized: "Finding available catalogs…")
+            )
 
         case .idle, .ready:
-            CatalogStatusSurface(
-                symbolName: "circle.dotted",
-                eyebrow: String(localized: "Catalog"),
-                title: String(localized: "Opening catalog…"),
-                subtitle: String(localized: "Preparing catalog…")
-            ) {
-                CatalogActivityIndicator(
-                    accessibilityLabel: String(localized: "Opening catalog…")
+            openingSurface(
+                eyebrow: catalogLibrary.selectedEvent?.shortName
+                    ?? String(localized: "Catalog"),
+                title: String(localized: "Opening catalog…")
+            )
+        }
+    }
+
+    private var dataSourceDownloadProgresses: Readiness.Progresses? {
+        guard case .downloading(let progresses)? = catalogLibrary.dataSource?.readiness,
+              !progresses.isEmpty
+        else { return nil }
+        return progresses
+    }
+
+    private func openingSurface(eyebrow: String, title: String) -> some View {
+        CatalogStatusSurface(
+            symbolName: "map",
+            eyebrow: eyebrow,
+            title: title,
+            subtitle: String(localized: "The map and the circle list open when the catalog is ready.")
+        ) {
+            CatalogActivityIndicator(accessibilityLabel: title)
+
+            CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
+                .padding(.top, 24)
+        }
+    }
+
+    private func downloadingSurface(
+        eyebrow: String,
+        progresses: Readiness.Progresses
+    ) -> some View {
+        CatalogStatusSurface(
+            symbolName: "map",
+            eyebrow: eyebrow,
+            title: String(localized: "Downloading catalog…"),
+            subtitle: String(localized: "This can take a few minutes. You can use Shared Plans and Profile in the meantime.")
+        ) {
+            DownloadProgressView(progresses: progresses)
+
+            CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
+                .padding(.top, 24)
+        }
+    }
+}
+
+private struct CatalogResetButton: View {
+    let action: CatalogResetAction
+
+    var body: some View {
+        FocusedActionButton(
+            role: .destructive,
+            emphasis: .secondary,
+            tint: .red,
+            action: action.request
+        ) {
+            if action.isInProgress {
+                ProgressView()
+                    .accessibilityLabel(Text("Logging out…"))
+            } else {
+                LucideLabel(
+                    "Log Out & Reset",
+                    icon: "person.crop.circle.badge.minus"
                 )
             }
         }
+        .disabled(action.isInProgress)
+        .accessibilityHint(
+            Text("Signs you out and removes downloaded catalogs from this device.")
+        )
+        .accessibilityIdentifier("catalog-log-out-reset")
     }
 }
 
@@ -340,7 +413,7 @@ private struct CatalogLoadingEventPicker: View {
                     }
                 }
             } label: {
-                LucideLabel("Choose another catalog", icon: "arrow.left.arrow.right")
+                LucideLabel("Choose another Comiket", icon: "arrow.left.arrow.right")
             }
             .buttonStyle(.bordered)
             .accessibilityIdentifier("catalog-loading-event-selector")
