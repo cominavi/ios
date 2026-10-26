@@ -3,10 +3,6 @@ import Foundation
 enum ExploreDiscoveryKind: String, Sendable {
     case tag
 
-    var title: LocalizedStringResource {
-        "Tag"
-    }
-
     var systemImage: String {
         "tag.fill"
     }

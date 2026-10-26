@@ -259,7 +259,10 @@ struct ExploreView<EventDayHeader: View>: View {
             || model.selectedTag != nil
             || model.shinagakiFilter != .all
         let showsDiscoveryMatchMenu = model.selectedDiscoveryTermIDs.count > 1
-        return (hasFilterChipRow ? 1 : 0) | (showsDiscoveryMatchMenu ? 2 : 0)
+        let showsDiscoveryCloud = ExploreDiscoveryCloud.hasContent(model)
+        return (hasFilterChipRow ? 1 : 0)
+            | (showsDiscoveryMatchMenu ? 2 : 0)
+            | (showsDiscoveryCloud ? 4 : 0)
     }
 
     private var emptyMessage: String {
@@ -359,70 +362,99 @@ private struct ExploreSearchField: View {
 private struct ExploreDiscoveryCloud: View {
     let model: ExploreModel
     let horizontalPadding: CGFloat
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    /// The demo and App Review catalogs ship without enrichment, so they never
+    /// produce tags. Hide the whole section, header included, instead of
+    /// leaving a titled empty band above the results.
+    static func hasContent(_ model: ExploreModel) -> Bool {
+        model.isDiscoveryLoading || !model.discoveryTerms.isEmpty
+    }
+
+    /// Compact widths get one lane so the cloud does not push the first row
+    /// of circles below the fold; wider layouts keep two staggered lanes.
+    private var laneCount: Int {
+        horizontalSizeClass == .compact ? 1 : 2
+    }
 
     var body: some View {
         @Bindable var model = model
 
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Popular tags")
-                        .font(.headline)
-                    Text("Most-used tags for this day")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+        if Self.hasContent(model) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Popular tags")
+                            .font(.headline)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("Most-used tags for this day")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    if model.selectedDiscoveryTermIDs.count > 1 {
+                        Menu {
+                            Picker("Match tags", selection: $model.discoveryMatchMode) {
+                                ForEach(ExploreDiscoveryMatchMode.allCases) { mode in
+                                    Text(mode.title).tag(mode)
+                                }
+                            }
+                        } label: {
+                            LucideLabel(
+                                resource: model.discoveryMatchMode.shortTitle,
+                                icon: "slider.horizontal.3"
+                            )
+                                .labelStyle(.titleAndIcon)
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .accessibilityLabel("Tag matching")
+                        .accessibilityValue(Text(model.discoveryMatchMode.title))
+                        .accessibilityIdentifier("explore-discovery-match-mode")
+                    }
                 }
+                .padding(.horizontal, horizontalPadding)
 
-                Spacer(minLength: 8)
-
-                if model.selectedDiscoveryTermIDs.count > 1 {
-                    Menu {
-                        Picker("Match tags", selection: $model.discoveryMatchMode) {
-                            ForEach(ExploreDiscoveryMatchMode.allCases) { mode in
-                                Text(mode.title).tag(mode)
+                if model.discoveryTerms.isEmpty {
+                    ExploreDiscoverySkeleton(
+                        laneCount: laneCount,
+                        horizontalPadding: horizontalPadding
+                    )
+                } else {
+                    ScrollView(.horizontal) {
+                        HorizontalStaggeredLayout(laneCount: laneCount, spacing: 8) {
+                            ForEach(model.discoveryTerms) { term in
+                                ExploreDiscoveryTermButton(
+                                    term: term,
+                                    isSelected: model.selectedDiscoveryTermIDs.contains(term.id),
+                                    action: { model.toggleDiscoveryTerm(term.id) }
+                                )
                             }
                         }
-                    } label: {
-                        LucideLabel(
-                            resource: model.discoveryMatchMode.shortTitle,
-                            icon: "slider.horizontal.3"
-                        )
-                            .labelStyle(.titleAndIcon)
-                            .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, horizontalPadding)
                     }
-                    .accessibilityLabel("Tag matching")
-                    .accessibilityValue(Text(model.discoveryMatchMode.title))
-                    .accessibilityIdentifier("explore-discovery-match-mode")
+                    .scrollIndicators(.hidden)
+                    .frame(minHeight: ExploreDiscoveryMetrics.height(laneCount: laneCount))
                 }
             }
-            .padding(.horizontal, horizontalPadding)
-
-            if model.discoveryTerms.isEmpty, model.isDiscoveryLoading {
-                ExploreDiscoverySkeleton(horizontalPadding: horizontalPadding)
-            } else {
-                ScrollView(.horizontal) {
-                    HorizontalStaggeredLayout(spacing: 8) {
-                        ForEach(model.discoveryTerms) { term in
-                            ExploreDiscoveryTermButton(
-                                term: term,
-                                isSelected: model.selectedDiscoveryTermIDs.contains(term.id),
-                                action: { model.toggleDiscoveryTerm(term.id) }
-                            )
-                        }
-                    }
-                    .padding(.horizontal, horizontalPadding)
-                }
-                .scrollIndicators(.hidden)
-                .frame(minHeight: 96)
-            }
+            .padding(.top, 6)
+            .padding(.bottom, 10)
+            .background(Color(uiColor: .systemBackground))
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("explore-discovery-cloud")
         }
-        .padding(.top, 6)
-        .padding(.bottom, 10)
-        .background(Color(uiColor: .systemBackground))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Popular tags")
-        .accessibilityIdentifier("explore-discovery-cloud")
+    }
+}
+
+private enum ExploreDiscoveryMetrics {
+    static let chipHeight: CGFloat = 44
+    static let laneSpacing: CGFloat = 8
+
+    static func height(laneCount: Int) -> CGFloat {
+        let lanes = CGFloat(max(laneCount, 1))
+        return chipHeight * lanes + laneSpacing * (lanes - 1)
     }
 }
 
@@ -445,11 +477,12 @@ private struct ExploreDiscoverySkeleton: View {
         Item(id: 9, width: 122),
     ]
 
+    let laneCount: Int
     let horizontalPadding: CGFloat
 
     var body: some View {
         ScrollView(.horizontal) {
-            HorizontalStaggeredLayout(spacing: 8) {
+            HorizontalStaggeredLayout(laneCount: laneCount, spacing: 8) {
                 ForEach(Self.items) { item in
                     ExploreDiscoverySkeletonChip(width: item.width)
                 }
@@ -458,7 +491,7 @@ private struct ExploreDiscoverySkeleton: View {
         }
         .scrollDisabled(true)
         .scrollIndicators(.hidden)
-        .frame(minHeight: 96)
+        .frame(minHeight: ExploreDiscoveryMetrics.height(laneCount: laneCount))
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Finding popular tags…")
@@ -496,22 +529,23 @@ private struct ExploreDiscoverySkeletonChip: View {
     }
 }
 
-/// Two independent horizontal lanes for intrinsically-sized discovery chips.
+/// Independent horizontal lanes for intrinsically-sized discovery chips.
 /// Unlike `LazyHGrid`, a long label in one lane does not reserve the same
-/// horizontal column width in the other lane.
+/// horizontal column width in the other lanes.
 private struct HorizontalStaggeredLayout: Layout {
     private struct Placement {
-        let row: Int
+        let lane: Int
         let x: CGFloat
         let size: CGSize
     }
 
     private struct Arrangement {
         let placements: [Placement]
-        let firstRowHeight: CGFloat
+        let laneOffsets: [CGFloat]
         let size: CGSize
     }
 
+    let laneCount: Int
     let spacing: CGFloat
 
     func sizeThatFits(
@@ -529,13 +563,12 @@ private struct HorizontalStaggeredLayout: Layout {
         cache: inout ()
     ) {
         let arrangement = arrangement(for: subviews)
-        let secondRowY = bounds.minY + arrangement.firstRowHeight + spacing
 
         for (subview, placement) in zip(subviews, arrangement.placements) {
             subview.place(
                 at: CGPoint(
                     x: bounds.minX + placement.x,
-                    y: placement.row == 0 ? bounds.minY : secondRowY
+                    y: bounds.minY + arrangement.laneOffsets[placement.lane]
                 ),
                 anchor: UnitPoint.topLeading,
                 proposal: ProposedViewSize(
@@ -547,28 +580,34 @@ private struct HorizontalStaggeredLayout: Layout {
     }
 
     private func arrangement(for subviews: Subviews) -> Arrangement {
-        var rowWidths = [CGFloat.zero, .zero]
-        var rowHeights = [CGFloat.zero, .zero]
+        let lanes = max(laneCount, 1)
+        var laneWidths = Array(repeating: CGFloat.zero, count: lanes)
+        var laneHeights = Array(repeating: CGFloat.zero, count: lanes)
         var placements: [Placement] = []
         placements.reserveCapacity(subviews.count)
 
         for subview in subviews {
             let size = subview.sizeThatFits(.unspecified)
-            let row = rowWidths[0] <= rowWidths[1] ? 0 : 1
-            let x = rowWidths[row] == 0 ? 0 : rowWidths[row] + spacing
-            placements.append(Placement(row: row, x: x, size: size))
-            rowWidths[row] = x + size.width
-            rowHeights[row] = max(rowHeights[row], size.height)
+            // Fill the shortest lane so lanes stay balanced in width.
+            let lane = laneWidths.indices.min { laneWidths[$0] < laneWidths[$1] } ?? 0
+            let x = laneWidths[lane] == 0 ? 0 : laneWidths[lane] + spacing
+            placements.append(Placement(lane: lane, x: x, size: size))
+            laneWidths[lane] = x + size.width
+            laneHeights[lane] = max(laneHeights[lane], size.height)
         }
 
-        let hasSecondRow = rowHeights[1] > 0
+        var laneOffsets: [CGFloat] = []
+        var height: CGFloat = 0
+        for laneHeight in laneHeights {
+            laneOffsets.append(height == 0 ? 0 : height + spacing)
+            if laneHeight > 0 {
+                height = (height == 0 ? 0 : height + spacing) + laneHeight
+            }
+        }
         return Arrangement(
             placements: placements,
-            firstRowHeight: rowHeights[0],
-            size: CGSize(
-                width: rowWidths.max() ?? 0,
-                height: rowHeights[0] + (hasSecondRow ? spacing + rowHeights[1] : 0)
-            )
+            laneOffsets: laneOffsets,
+            size: CGSize(width: laneWidths.max() ?? 0, height: height)
         )
     }
 }
@@ -599,7 +638,7 @@ private struct ExploreDiscoveryTermButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(term.title)
-        .accessibilityValue("\(term.kind.title), \(term.count) circles")
+        .accessibilityValue("\(term.count) circles")
         .accessibilityHint(isSelected ? "Double tap to remove this tag" : "Double tap to filter by this tag")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("explore-discovery-term-\(term.id)")
@@ -1391,14 +1430,15 @@ private struct ExploreFilterSheet: View {
                     }
                     .accessibilityIdentifier("explore-genre-picker")
 
-                    Picker("Tag", selection: $model.selectedTag) {
-                        Text("All tags").tag(String?.none)
-                        ForEach(model.tagFacets) { tag in
-                            Text("\(tag.name) (\(tag.count))").tag(String?.some(tag.name))
+                    if !model.tagFacets.isEmpty {
+                        Picker("Tag", selection: $model.selectedTag) {
+                            Text("All tags").tag(String?.none)
+                            ForEach(model.tagFacets) { tag in
+                                Text("\(tag.name) (\(tag.count))").tag(String?.some(tag.name))
+                            }
                         }
+                        .accessibilityIdentifier("explore-tag-picker")
                     }
-                    .disabled(model.tagFacets.isEmpty)
-                    .accessibilityIdentifier("explore-tag-picker")
 
                     ExploreExpandedFilterField(title: "Shinagaki") {
                         ExploreFilterFlowLayout {
@@ -1444,13 +1484,10 @@ private struct ExploreFilterSheet: View {
                 } header: {
                     Text("Catalog")
                 } footer: {
-                    switch model.tagState {
-                    case .idle, .loading:
-                        Text("Loading Circle.ms tags…")
-                    case .unavailable:
+                    // Catalogs without enrichment never produce tags, so a
+                    // loading footer would never resolve. Only explain failures.
+                    if case .unavailable = model.tagState {
                         Text("Some tags are unavailable right now.")
-                    case .ready:
-                        EmptyView()
                     }
                 }
 
@@ -1499,7 +1536,7 @@ private struct ExploreFilterSheet: View {
                 }
             }
         }
-        .presentationDetents([.fraction(0.92), .large])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .accessibilityIdentifier("explore-filter-sheet")
     }
