@@ -177,14 +177,26 @@ struct CatalogStatusSurface<Content: View>: View {
 }
 
 struct CatalogActivityIndicator: View {
-    let accessibilityLabel: String
+    private let accessibilityLabel: Text
+
+    /// Literal labels resolve through the string catalog, so call sites can
+    /// pass an English source string directly.
+    init(accessibilityLabel: LocalizedStringResource) {
+        self.accessibilityLabel = Text(accessibilityLabel)
+    }
+
+    /// Already-localized runtime text, such as a status message.
+    @_disfavoredOverload
+    init(accessibilityLabel: String) {
+        self.accessibilityLabel = Text(verbatim: accessibilityLabel)
+    }
 
     var body: some View {
         ProgressView()
             .controlSize(.large)
             .tint(Color.accentColor)
             .frame(width: 44, height: 44)
-            .accessibilityLabel(Text(accessibilityLabel))
+            .accessibilityLabel(accessibilityLabel)
     }
 }
 

@@ -553,7 +553,7 @@ final class SharedPlanStore {
                         let quarantined = write.quarantined(
                             for: .terminalFailure,
                             code: "invite_capability_missing",
-                            message: "招待リンクをもう一度開いてください。"
+                            message: String(localized: "Open the invitation link again.")
                         )
                         try await persistence.saveQuarantinedRESTWrites(
                             [quarantined],
@@ -752,7 +752,7 @@ final class SharedPlanStore {
         }
         guard let syncRequestAuthorizer else {
             syncStatuses[planID] = .quarantined(.unavailable(
-                String(localized: "共有プランに接続できません。")
+                String(localized: "Cannot connect to the Shared Plan.")
             ))
             return
         }
@@ -2838,7 +2838,7 @@ final class SharedPlanStore {
         )
         else {
             throw SharedPlanError.documentLimit(
-                String(localized: "共同編集が有効になるまで内容は変更できません。")
+                String(localized: "You can edit this plan after collaborative editing turns on.")
             )
         }
         guard let userID = actorUserID() else { throw SharedPlanError.profileRequired }
@@ -2982,7 +2982,7 @@ final class SharedPlanStore {
                 throw SharedPlanError.planCompactionRequired
             } catch {
                 let issue = SharedPlanSyncIssue.unavailable(
-                    String(localized: "共有プランのデータを読み込めません。")
+                    String(localized: "Cannot load the Shared Plan data.")
                 )
                 let quarantined = SharedPlanDocumentSnapshot(
                     planID: snapshot.planID,
@@ -3000,7 +3000,7 @@ final class SharedPlanStore {
             }
             guard document.planID == plan.id, document.comiketNo == plan.comiketNo else {
                 let issue = SharedPlanSyncIssue.unavailable(
-                    String(localized: "保存されたプランを開けません。")
+                    String(localized: "Cannot open the saved plan.")
                 )
                 let quarantined = SharedPlanDocumentSnapshot(
                     planID: snapshot.planID,

@@ -5,6 +5,10 @@ struct SharedPlanInvitationSheet: View {
     let profileStore: CominaviProfileStore
     let invitationInbox: SharedPlanInvitationInbox
     let onDismiss: () -> Void
+    /// Opens ComiNavi sign-in. The caller must keep `invitationInbox.pending`
+    /// so the invitation opens again after sign-in completes. Without it, the
+    /// sheet only closes and the invitation waits for a later sign-in.
+    var onSignIn: (() -> Void)?
 
     @State private var preview: SharedPlanInvitationPreview?
     @State private var isLoading = true
@@ -17,11 +21,11 @@ struct SharedPlanInvitationSheet: View {
     var body: some View {
         NavigationStack {
             invitationContent
-            .navigationTitle("共有プランへの招待")
+            .navigationTitle("Shared Plan Invitation")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") {
+                    Button("Cancel", role: .cancel) {
                         cancelInvitation()
                     }
                     .disabled(isAccepting)
@@ -29,7 +33,7 @@ struct SharedPlanInvitationSheet: View {
             }
         }
         // The only dismiss paths are explicit: Cancel deletes the route
-        // capability, while “Log in and continue” intentionally retains it.
+        // capability, while “Sign in to continue” intentionally retains it.
         .interactiveDismissDisabled()
         .task(id: pending.token) { await loadPreview() }
     }
@@ -41,17 +45,17 @@ struct SharedPlanInvitationSheet: View {
                 symbolName: "person.crop.circle.badge.plus",
                 animatesBackdrop: true
             ) {
-                Text("招待を確認しています…")
+                Text("Checking invitation…")
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                Text("共有プランの名前と参加先アカウントを安全に確認しています。")
+                Text("ComiNavi is securely checking the plan name and the account that will join.")
                     .foregroundStyle(.secondary)
                     .padding(.top, 12)
-                CatalogActivityIndicator(accessibilityLabel: "招待を確認しています…")
+                CatalogActivityIndicator(accessibilityLabel: "Checking invitation…")
                     .padding(.top, 30)
             }
         } else if let preview {
             FocusedActionSurface(symbolName: "person.crop.circle.badge.plus") {
-                Text("C\(preview.comiketNo) · 共有プラン")
+                Text("C\(preview.comiketNo) · Shared Plan")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
                     .accessibilityIdentifier("shared-plan-invitation-comiket")
@@ -68,7 +72,7 @@ struct SharedPlanInvitationSheet: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(profile.displayName)
                                 .font(.headline)
-                            Text("このアカウントで参加します")
+                            Text("You will join with this account")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -83,23 +87,29 @@ struct SharedPlanInvitationSheet: View {
                         if isAccepting {
                             ProgressView()
                         } else {
-                            LucideLabel("このプランに参加", icon: "person.crop.circle.badge.plus")
+                            LucideLabel("Join this plan", icon: "person.crop.circle.badge.plus")
                         }
                     }
                     .disabled(isAccepting)
                     .padding(.top, 28)
                 } else {
-                    Text("参加する本人の名前とプロフィール画像を確認してから追加します。ログインして続けてください。")
+                    Text("The plan shows your name and profile picture to its members. Sign in to continue.")
                         .foregroundStyle(.secondary)
                         .padding(.top, 18)
 
-                    FocusedActionButton(action: onDismiss) {
-                        LucideLabel("ログインして続ける", icon: "person.crop.circle.badge.plus")
+                    FocusedActionButton(action: onSignIn ?? onDismiss) {
+                        LucideLabel("Sign in to continue", icon: "circle-user")
                     }
                     .padding(.top, 28)
+                    .accessibilityIdentifier("shared-plan-invitation-sign-in")
+
+                    Text("Your invitation opens again after you sign in.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 10)
                 }
 
-                Text("参加後はメンバー全員がプランを編集できます。招待リンクは信頼できる相手だけに共有してください。")
+                Text("All members can edit the plan after they join. Share invitation links only with people you trust.")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .padding(.top, 18)
@@ -109,9 +119,9 @@ struct SharedPlanInvitationSheet: View {
                 symbolName: "exclamationmark.triangle.fill",
                 tint: .orange
             ) {
-                Text("招待を確認できません")
+                Text("Cannot open invitation")
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                Text(issue ?? "この招待リンクは利用できません。")
+                Text(issue ?? String(localized: "This invitation link cannot be used."))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 12)
@@ -121,7 +131,7 @@ struct SharedPlanInvitationSheet: View {
                     FocusedActionButton(action: {
                         Task { await loadPreview() }
                     }) {
-                        LucideLabel("もう一度確認", icon: "arrow.clockwise")
+                        LucideLabel("Check again", icon: "arrow.clockwise")
                     }
                     .padding(.top, 28)
                 }
