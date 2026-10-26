@@ -39,6 +39,21 @@ enum SharedPlanInvitationLink {
         }
     }
 
+    /// Finds an invitation link in text that a person pasted, such as a whole
+    /// chat message. A bare token is also accepted, because some messengers
+    /// strip the scheme and host from a long link.
+    static func url(fromPastedText text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isValid(token: trimmed) { return canonicalURL(token: trimmed) }
+        let candidates = [trimmed] + trimmed.split(whereSeparator: \.isWhitespace).map(String.init)
+        for candidate in candidates {
+            if let url = URL(string: candidate), token(from: url) != nil {
+                return url
+            }
+        }
+        return nil
+    }
+
     static func canonicalURL(token: String) -> URL? {
         guard isValid(token: token) else { return nil }
         return URL(string: "https://cominavi.net/join/\(token)")
@@ -85,6 +100,9 @@ final class SharedPlanInvitationInbox {
 
     private(set) var pending: Pending?
     var issue: SharedPlanError?
+    /// Changes each time an in-app surface, rather than `onOpenURL`, asks the
+    /// root view to show the confirmation sheet for `pending`.
+    private(set) var presentationRequestCount = 0
 
     @ObservationIgnored private let storage: any SharedPlanInvitationSecretStoring
 
@@ -122,6 +140,14 @@ final class SharedPlanInvitationInbox {
         pending = request
         issue = nil
         return true
+    }
+
+    /// Asks the root view to present the pending invitation. A pasted link
+    /// that matches the current pending token must still open the sheet, so
+    /// this does not depend on `pending` changing.
+    func requestPresentation() {
+        guard pending != nil else { return }
+        presentationRequestCount += 1
     }
 
     func consume(token: String) {
