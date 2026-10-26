@@ -30,33 +30,35 @@ struct ComiketToolboxView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                if searchText.isEmpty {
-                    C108ToolboxNotice()
-                    ToolboxReminderSection(store: reminderStore)
-                    ToolboxQuickAccess(copiedVenue: $copiedVenue)
-                    if let liveSection {
-                        ToolboxResourceSectionView(section: liveSection)
-                    }
-                    ToolboxChecklistSection(store: checklistStore)
-                    ForEach(nonLiveSections) { section in
-                        ToolboxResourceSectionView(section: section)
-                    }
-                } else {
-                    ForEach(visibleSections) { section in
-                        ToolboxResourceSectionView(section: section)
-                    }
+        List {
+            if searchText.isEmpty {
+                C108ToolboxNotice()
+                ToolboxReminderSection(store: reminderStore)
+                ToolboxQuickAccess(copiedVenue: $copiedVenue)
+                if let liveSection {
+                    ToolboxResourceSectionView(section: liveSection)
+                }
+                ToolboxChecklistSection(store: checklistStore)
+                ForEach(nonLiveSections) { section in
+                    ToolboxResourceSectionView(section: section)
+                }
+            } else {
+                ForEach(visibleSections) { section in
+                    ToolboxResourceSectionView(section: section)
                 }
             }
-            .overlay {
-                if !searchText.isEmpty, visibleSections.isEmpty {
-                    ContentUnavailableView.search(text: searchText)
-                }
-            }
-            .navigationTitle("Toolbox")
-            .searchable(text: $searchText, prompt: "Search official resources")
         }
+        .overlay {
+            if !searchText.isEmpty, visibleSections.isEmpty {
+                ContentUnavailableView.search(text: searchText)
+            }
+        }
+        .navigationTitle("Toolbox")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search official resources"
+        )
         .task {
             await reminderStore.refresh()
         }
@@ -423,5 +425,8 @@ private struct ToolboxResourceRow: View {
 }
 
 #Preview {
-    ComiketToolboxView()
+    // The Toolbox is pushed inside the Profile stack, so it owns no stack itself.
+    NavigationStack {
+        ComiketToolboxView()
+    }
 }
