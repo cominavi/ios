@@ -117,14 +117,11 @@ struct ExploreView<EventDayHeader: View>: View {
                     Button {
                         showsFilters = true
                     } label: {
-                        LucideLabel(
-                            "Filter",
-                            icon: activeFilterCount == 0
-                                ? "line.3.horizontal.decrease"
-                                : "line.3.horizontal.decrease.circle.fill"
-                        )
+                        ExploreFilterButtonLabel(activeFilterCount: activeFilterCount)
                     }
-                    .accessibilityValue(activeFilterCount == 0 ? "No filters" : "\(activeFilterCount) active")
+                    .accessibilityLabel(
+                        ExploreFilterButtonLabel.accessibilityLabel(for: activeFilterCount)
+                    )
                     .accessibilityIdentifier("explore-filter-button")
                     .id(activeFilterCount)
 
@@ -228,15 +225,10 @@ struct ExploreView<EventDayHeader: View>: View {
             ExploreResultsHeader(
                 visibleCount: model.visibleCircles.count,
                 totalCount: model.selectedDayCircleCount,
-                selectedGenre: model.genreFacets.first { $0.id == model.selectedGenreID }?.name,
-                selectedTag: model.selectedTag,
-                selectedShinagakiFilter: model.shinagakiFilter == .all
-                    ? nil
-                    : String(localized: model.shinagakiFilter.title),
+                activeFilters: model.activeFilters,
                 horizontalPadding: horizontalPadding,
-                onClearGenre: { model.selectedGenreID = nil },
-                onClearTag: { model.selectedTag = nil },
-                onClearShinagaki: { model.shinagakiFilter = .all }
+                onRemove: { model.clear($0) },
+                onClearAll: { model.clearFilters() }
             )
 
             ExploreDiscoveryCloud(model: model, horizontalPadding: horizontalPadding)
@@ -244,20 +236,11 @@ struct ExploreView<EventDayHeader: View>: View {
     }
 
     private var activeFilterCount: Int {
-        (model.selectedGenreID == nil ? 0 : 1)
-            + (model.selectedTag == nil ? 0 : 1)
-            + model.selectedDiscoveryTermIDs.count
-            + (model.shinagakiFilter == .all ? 0 : 1)
-            + (model.favoriteFilter == .all ? 0 : 1)
-            + (model.selectedFavoriteColors.isEmpty ? 0 : 1)
-            + (model.attendanceFilter == .all ? 0 : 1)
-            + (model.spaceFilter == .all ? 0 : 1)
+        model.activeFilters.count
     }
 
     private var galleryHeaderLayoutVersion: Int {
-        let hasFilterChipRow = model.selectedGenreID != nil
-            || model.selectedTag != nil
-            || model.shinagakiFilter != .all
+        let hasFilterChipRow = activeFilterCount > 0
         let showsDiscoveryMatchMenu = model.selectedDiscoveryTermIDs.count > 1
         let showsDiscoveryCloud = ExploreDiscoveryCloud.hasContent(model)
         return (hasFilterChipRow ? 1 : 0)
@@ -656,49 +639,46 @@ private struct ExploreDiscoveryTermButton: View {
 private struct ExploreResultsHeader: View {
     let visibleCount: Int
     let totalCount: Int
-    let selectedGenre: String?
-    let selectedTag: String?
-    let selectedShinagakiFilter: String?
+    let activeFilters: [ExploreActiveFilter]
     let horizontalPadding: CGFloat
-    let onClearGenre: () -> Void
-    let onClearTag: () -> Void
-    let onClearShinagaki: () -> Void
+    let onRemove: (ExploreActiveFilterKind) -> Void
+    let onClearAll: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Group {
-                if visibleCount == totalCount {
-                    Text("\(totalCount) circles")
-                } else {
-                    Text("\(visibleCount) of \(totalCount) circles")
-                }
-            }
-            .font(.subheadline.monospacedDigit().weight(.semibold))
-            .foregroundStyle(.secondary)
-
-            if selectedGenre != nil || selectedTag != nil || selectedShinagakiFilter != nil {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        if let selectedGenre {
-                            FilterChip(title: selectedGenre, systemImage: "theatermasks", onRemove: onClearGenre)
-                        }
-                        if let selectedTag {
-                            FilterChip(title: selectedTag, systemImage: "tag", onRemove: onClearTag)
-                        }
-                        if let selectedShinagakiFilter {
-                            FilterChip(
-                                title: selectedShinagakiFilter,
-                                systemImage: "doc.richtext",
-                                onRemove: onClearShinagaki
-                            )
-                        }
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                Group {
+                    if visibleCount == totalCount {
+                        Text("\(totalCount) circles")
+                    } else {
+                        Text("\(visibleCount) of \(totalCount) circles")
                     }
                 }
-                .scrollIndicators(.hidden)
+                .font(.subheadline.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.secondary)
+                .fixedSize()
+                .padding(.trailing, activeFilters.isEmpty ? 0 : 4)
+
+                ForEach(activeFilters) { filter in
+                    FilterChip(
+                        title: filter.title,
+                        systemImage: filter.systemImage,
+                        onRemove: { onRemove(filter.kind) }
+                    )
+                }
+
+                if activeFilters.count > 1 {
+                    Button("Clear all", action: onClearAll)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 44)
+                        .accessibilityIdentifier("explore-clear-all-filters")
+                }
             }
+            .frame(minHeight: 44)
+            .padding(.horizontal, horizontalPadding)
         }
-        .padding(.horizontal, horizontalPadding)
-        .padding(.vertical, 10)
+        .scrollIndicators(.hidden)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .systemBackground))
     }
@@ -711,19 +691,43 @@ private struct FilterChip: View {
 
     var body: some View {
         Button(action: onRemove) {
-            Label {
+            HStack(spacing: 6) {
+                LucideIcon(systemImage)
                 Text(title)
                     .lineLimit(1)
-            } icon: {
-                LucideIcon(systemImage)
+                LucideIcon("xmark", size: 12)
+                    .foregroundStyle(.secondary)
             }
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, 12)
             .frame(minHeight: 44)
             .background(Color.accentColor.opacity(0.12), in: .capsule)
+            .contentShape(.capsule)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Remove \(title) filter")
+    }
+}
+
+/// Filter glyph with a visible count, matching the tag page. The state is part
+/// of the label so VoiceOver reads it even where `accessibilityValue` is dropped.
+struct ExploreFilterButtonLabel: View {
+    let activeFilterCount: Int
+
+    var body: some View {
+        HStack(spacing: 5) {
+            LucideIcon("line.3.horizontal.decrease")
+            if activeFilterCount > 0 {
+                Text(activeFilterCount, format: .number)
+                    .font(.caption.monospacedDigit().weight(.bold))
+            }
+        }
+    }
+
+    static func accessibilityLabel(for activeFilterCount: Int) -> Text {
+        activeFilterCount == 0
+            ? Text("Filter")
+            : Text("Filter, \(activeFilterCount) active")
     }
 }
 
@@ -1518,14 +1522,7 @@ private struct ExploreFilterSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if model.selectedGenreID != nil
-                        || model.selectedTag != nil
-                        || model.shinagakiFilter != .all
-                        || model.favoriteFilter != .all
-                        || !model.selectedFavoriteColors.isEmpty
-                        || model.attendanceFilter != .all
-                        || model.spaceFilter != .all
-                    {
+                    if !model.activeFilters.isEmpty {
                         Button("Clear") {
                             model.clearFilters()
                         }

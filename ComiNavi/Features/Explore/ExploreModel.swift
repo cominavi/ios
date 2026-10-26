@@ -110,6 +110,28 @@ enum ExploreSpaceFilter: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// One filter input that currently narrows Explore results. The toolbar badge,
+/// the removable chips above the results and the filter sheet's Clear button
+/// all derive from the same list, so they cannot disagree about what is active.
+enum ExploreActiveFilterKind: Hashable, Sendable {
+    case genre
+    case tag
+    case discoveryTerm(String)
+    case shinagaki
+    case saved
+    case favoriteColors
+    case attendance
+    case space
+}
+
+struct ExploreActiveFilter: Identifiable, Equatable, Sendable {
+    let kind: ExploreActiveFilterKind
+    let title: String
+    let systemImage: String
+
+    var id: ExploreActiveFilterKind { kind }
+}
+
 struct ExploreArtworkPixelSize: Hashable, Sendable {
     let width: Int
     let height: Int
@@ -623,9 +645,88 @@ final class ExploreModel {
         }
     }
 
+    var activeFilters: [ExploreActiveFilter] {
+        var filters: [ExploreActiveFilter] = []
+        if let selectedGenreID {
+            filters.append(ExploreActiveFilter(
+                kind: .genre,
+                title: genreFacets.first { $0.id == selectedGenreID }?.name
+                    ?? String(localized: "Genre"),
+                systemImage: "theatermasks"
+            ))
+        }
+        // A tag page's own tag is its scope, not a removable filter.
+        if fixedTag == nil, let selectedTag {
+            filters.append(ExploreActiveFilter(
+                kind: .tag,
+                title: selectedTag,
+                systemImage: "tag"
+            ))
+        }
+        for term in discoveryTerms where selectedDiscoveryTermIDs.contains(term.id) {
+            filters.append(ExploreActiveFilter(
+                kind: .discoveryTerm(term.id),
+                title: term.title,
+                systemImage: "tag"
+            ))
+        }
+        if shinagakiFilter != .all {
+            filters.append(ExploreActiveFilter(
+                kind: .shinagaki,
+                title: String(localized: shinagakiFilter.title),
+                systemImage: "doc.richtext"
+            ))
+        }
+        if favoriteFilter != .all {
+            filters.append(ExploreActiveFilter(
+                kind: .saved,
+                title: String(localized: favoriteFilter.title),
+                systemImage: "star"
+            ))
+        }
+        if !selectedFavoriteColors.isEmpty {
+            filters.append(ExploreActiveFilter(
+                kind: .favoriteColors,
+                title: BookmarkColor.selectableColors
+                    .filter { selectedFavoriteColors.contains($0) }
+                    .map { String(localized: $0.displayName) }
+                    .formatted(.list(type: .or)),
+                systemImage: "paintbrush.pointed"
+            ))
+        }
+        if attendanceFilter != .all {
+            filters.append(ExploreActiveFilter(
+                kind: .attendance,
+                title: String(localized: attendanceFilter.title),
+                systemImage: "person.2.crop.square.stack"
+            ))
+        }
+        if spaceFilter != .all {
+            filters.append(ExploreActiveFilter(
+                kind: .space,
+                title: String(localized: spaceFilter.title),
+                systemImage: "square.grid.2x2"
+            ))
+        }
+        return filters
+    }
+
+    func clear(_ filter: ExploreActiveFilterKind) {
+        switch filter {
+        case .genre: selectedGenreID = nil
+        case .tag: selectedTag = fixedTag
+        case .discoveryTerm(let termID): selectedDiscoveryTermIDs.remove(termID)
+        case .shinagaki: shinagakiFilter = .all
+        case .saved: favoriteFilter = .all
+        case .favoriteColors: selectedFavoriteColors = []
+        case .attendance: attendanceFilter = .all
+        case .space: spaceFilter = .all
+        }
+    }
+
     func clearFilters() {
         selectedGenreID = nil
-        selectedTag = nil
+        selectedTag = fixedTag
         selectedDiscoveryTermIDs = []
         shinagakiFilter = .all
         favoriteFilter = .all
