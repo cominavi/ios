@@ -912,7 +912,7 @@ struct SharedPlanListUITestSurface: View {
     private let plans = [
         SharedPlan(
             id: Self.planID,
-            name: "買い物リスト",
+            name: "Shopping list",
             comiketNo: 108,
             ownership: .owned,
             role: .owner,

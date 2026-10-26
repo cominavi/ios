@@ -58,7 +58,7 @@ struct ContentView: View {
 
             Tab(
                 "Explore",
-                image: LucideIcon.assetName(for: "safari"),
+                image: LucideIcon.assetName(for: "binoculars"),
                 value: AppTab.explore
             ) {
                 catalogTab { circle in
@@ -83,7 +83,8 @@ struct ContentView: View {
                 SharedPlansScreen(
                     store: AppData.sharedPlanStore,
                     comiketNo: readyDataSource?.comiket.number,
-                    currentUserID: AppData.profileStore.profile?.id
+                    currentUserID: AppData.profileStore.profile?.id,
+                    onRequestSignIn: { selection = .profile }
                 )
             }
 

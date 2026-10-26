@@ -177,6 +177,11 @@ struct EntryView: View {
                     }
                 }
             }
+            // The Shared Plans join sheet stores a pasted link in the inbox and
+            // asks the root to show the same confirmation as an opened link.
+            .onChange(of: invitationInbox.presentationRequestCount) {
+                showsInvitationConfirmation = invitationInbox.pending != nil
+            }
             .onChange(of: profileStore.requiresReauthentication) { _, required in
                 guard required, AppData.isAccountDeletionPending else { return }
                 accountDeletionPending = true

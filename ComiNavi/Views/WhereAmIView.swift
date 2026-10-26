@@ -9,7 +9,7 @@ private enum ComiketLocationPickerPurpose: Equatable {
 
     var flowTitle: LocalizedStringResource {
         switch self {
-        case .currentLocation: "Where Am I"
+        case .currentLocation: "Where am I?"
         case .destination: "Go to Space"
         }
     }

@@ -4,7 +4,7 @@ import XCTest
 final class LucideIconTests: XCTestCase {
     @MainActor
     func testEveryPrimaryTabIconResolvesToBundledArtwork() {
-        for icon in ["map", "safari", "list-checks", "person.circle"] {
+        for icon in ["map", "binoculars", "list-checks", "person.circle"] {
             XCTAssertNotNil(
                 LucideIcon.uiImage(for: icon),
                 "Primary tab icon '\(icon)' is missing from Assets.xcassets"

@@ -10,7 +10,7 @@ final class ProfilePresentationTests: XCTestCase {
             providerUserID: "42"
         )
 
-        XCTAssertEqual(identity.profileDisplayDetail, "連携済み")
+        XCTAssertEqual(identity.profileDisplayDetail, String(localized: "Linked"))
         XCTAssertFalse(identity.profileDisplayDetail.localizedCaseInsensitiveContains("production"))
     }
 

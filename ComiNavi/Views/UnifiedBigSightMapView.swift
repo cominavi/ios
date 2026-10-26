@@ -873,12 +873,10 @@ final class UnifiedMapHostView: UIView {
                 "Drag to move, pinch to zoom, rotate with two fingers, or tap a venue or table."
         )
         mapView.accessibilityValue = renderer.accessibilitySummary
+        // The proxies only mark the scope for UI automation. They carry no
+        // label, so assistive technology meets one map canvas, not two.
         campusAccessibilityProxy.isHidden = scope != .campus
         venueAccessibilityProxy.isHidden = scope != .venue
-        let activeProxy = scope == .campus ? campusAccessibilityProxy : venueAccessibilityProxy
-        activeProxy.accessibilityLabel = mapView.accessibilityLabel
-        activeProxy.accessibilityHint = mapView.accessibilityHint
-        activeProxy.accessibilityValue = mapView.accessibilityValue
         updateVenueAccessibilityElements(renderer: renderer, scope: scope)
         updateCampusHint(scope: scope)
     }
@@ -959,6 +957,20 @@ final class MapAttributionButton: UIButton {
             dy: min(0, (bounds.height - minimumSide) / 2)
         )
         return target.contains(point)
+    }
+
+    /// Reports the same 44-point target to assistive technology, so the
+    /// VoiceOver cursor and Switch Control match the touch area.
+    override var accessibilityFrame: CGRect {
+        get {
+            let frame = super.accessibilityFrame
+            let minimumSide = MapChromeLayout.controlSize
+            return frame.insetBy(
+                dx: min(0, (frame.width - minimumSide) / 2),
+                dy: min(0, (frame.height - minimumSide) / 2)
+            )
+        }
+        set { super.accessibilityFrame = newValue }
     }
 }
 

@@ -104,7 +104,10 @@ struct ExploreView<EventDayHeader: View>: View {
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                // The tab bar already names Explore, so the event and day take
+                // the title slot. A leading item squeezed the inline title on
+                // iPhone and moved into the unlabeled overflow menu on iPad.
+                ToolbarItem(placement: .principal) {
                     eventDayHeader
                 }
 
@@ -611,9 +614,9 @@ private struct ExploreDiscoveryTermButton: View {
                 .lineLimit(1)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 44)
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .foregroundStyle(isSelected ? Color.onAccentFill : Color.primary)
                 .background(
-                    isSelected ? Color.accentColor : Color(uiColor: .secondarySystemBackground),
+                    isSelected ? Color.accentFill : Color(uiColor: .secondarySystemBackground),
                     in: .capsule
                 )
                 .overlay {
@@ -678,11 +681,13 @@ private struct ExploreResultsHeader: View {
                         .accessibilityIdentifier("explore-clear-all-filters")
                 }
             }
-            .frame(minHeight: 44)
+            // Without chips the row holds only the count, so it needs no
+            // 44-point touch height and gives the space to the results.
+            .frame(minHeight: activeFilters.isEmpty ? 24 : 44)
             .padding(.horizontal, horizontalPadding)
         }
         .scrollIndicators(.hidden)
-        .padding(.vertical, 6)
+        .padding(.vertical, activeFilters.isEmpty ? 2 : 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .systemBackground))
     }
@@ -1377,9 +1382,9 @@ struct ExploreCircleArtwork: View {
             if isShowingShinagaki {
                 LucideIcon("doc.richtext.fill")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.onAccentFill)
                     .frame(width: 24, height: 24)
-                    .background(Color.accentColor, in: .circle)
+                    .background(Color.accentFill, in: .circle)
                     .padding(6)
                     .accessibilityHidden(true)
             }

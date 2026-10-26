@@ -88,7 +88,7 @@ struct FollowingImportView: View {
 
             if let onSignIn {
                 FocusedActionButton(action: onSignIn) {
-                    Text("Sign In")
+                    Text("Sign in")
                 }
                 .padding(.top, 28)
                 .accessibilityIdentifier("following-import-sign-in")

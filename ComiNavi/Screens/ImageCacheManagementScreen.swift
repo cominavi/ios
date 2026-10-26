@@ -155,7 +155,7 @@ struct ImageCacheManagementScreen: View {
                 }
             }
         }
-        .navigationTitle(Text("Image Cache", tableName: "ImageCache"))
+        .navigationTitle(Text("Image cache", tableName: "ImageCache"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -237,7 +237,7 @@ private struct ImageCacheSummarySection: View {
                         ProgressView()
                             .controlSize(.small)
                     }
-                    Text("Clear All Image Caches", tableName: "ImageCache")
+                    Text("Clear all image caches", tableName: "ImageCache")
                 }
             }
             .disabled(isBusy)

@@ -369,7 +369,7 @@ private enum SharedPlanMemberPresentation {
         currentUserID: String?
     ) -> String {
         member.userID == currentUserID
-            ? "\(member.displayName) (自分)"
+            ? String(localized: "\(member.displayName) (You)")
             : member.displayName
     }
 }
@@ -2238,7 +2238,7 @@ private struct SharedPlanNeedEditorRow: View {
                     currentUserID: isCurrentUser ? userID : nil
                 )
             } else if isCurrentUser {
-                name = String(localized: "自分")
+                name = String(localized: "You")
             } else {
                 name = String(localized: "Former member")
             }
@@ -2345,7 +2345,7 @@ private struct SharedPlanCreateNeedSheet: View {
                         "Requester",
                         value: currentUserID == nil
                             ? String(localized: "Verified profile required")
-                            : String(localized: "自分")
+                            : String(localized: "You")
                     )
                 }
             }
@@ -2687,10 +2687,10 @@ struct SharedPlanPurchaseUITestSurface: View {
     @State private var presentedProgress: SharedPlanPurchaseProgressEdit?
 
     private let identity = SharedPlanCircleIdentityPresentation(
-        circleName: "うどん道場",
-        penName: "青井",
+        circleName: "うどん道場", // l10n-allow-cjk: fixture catalog data
+        penName: "青井", // l10n-allow-cjk: fixture catalog data
         day: 1,
-        blockName: "東A",
+        blockName: "東A", // l10n-allow-cjk: fixture catalog data
         spaceNumber: 12,
         spaceNumberSub: 0
     )
@@ -2720,14 +2720,14 @@ struct SharedPlanPurchaseUITestSurface: View {
         SharedPlanPurchaseNeed(
             id: UUID(uuidString: "10000000-0000-4000-8000-000000000001")!,
             requesterUserID: Self.requesterID,
-            itemName: "新刊セット",
+            itemName: "新刊セット", // l10n-allow-cjk: fixture catalog data
             unitPrice: 2_000,
             wantedQuantity: 2
         ),
         SharedPlanPurchaseNeed(
             id: UUID(uuidString: "10000000-0000-4000-8000-000000000002")!,
             requesterUserID: Self.requesterID,
-            itemName: "新刊のみ",
+            itemName: "新刊のみ", // l10n-allow-cjk: fixture catalog data
             unitPrice: 1_000,
             wantedQuantity: 2,
             buyerAllocations: [Self.buyerID: 1]
@@ -2735,14 +2735,14 @@ struct SharedPlanPurchaseUITestSurface: View {
         SharedPlanPurchaseNeed(
             id: UUID(uuidString: "10000000-0000-4000-8000-000000000003")!,
             requesterUserID: Self.requesterID,
-            itemName: "アクキー",
+            itemName: "アクキー", // l10n-allow-cjk: fixture catalog data
             wantedQuantity: 1,
             buyerAllocations: [Self.buyerID: 1]
         ),
         SharedPlanPurchaseNeed(
             id: UUID(uuidString: "10000000-0000-4000-8000-000000000004")!,
             requesterUserID: Self.requesterID,
-            itemName: "アクリルスタンド",
+            itemName: "アクリルスタンド", // l10n-allow-cjk: fixture catalog data
             unitPrice: 1_500,
             wantedQuantity: 2,
             buyerAllocations: [Self.requesterID: 2],
@@ -2751,7 +2751,7 @@ struct SharedPlanPurchaseUITestSurface: View {
         SharedPlanPurchaseNeed(
             id: UUID(uuidString: "10000000-0000-4000-8000-000000000005")!,
             requesterUserID: Self.requesterID,
-            itemName: "会場限定本",
+            itemName: "会場限定本", // l10n-allow-cjk: fixture catalog data
             unitPrice: 1_000,
             wantedQuantity: 1,
             buyerAllocations: [Self.buyerID: 1],

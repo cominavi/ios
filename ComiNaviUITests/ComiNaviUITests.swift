@@ -1066,7 +1066,7 @@ final class ComiNaviUITests: XCTestCase {
 
         app.activate()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
-        XCTAssertTrue(app.buttons["Login via circle.ms"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["sign-in-circlems"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -1080,7 +1080,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.staticTexts["コミナビへようこそ！"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["circle.msでログイン"].exists)
+        XCTAssertTrue(app.buttons["sign-in-circlems"].exists)
         XCTAssertFalse(app.buttons["C104のデモデータを見る"].exists)
     }
 
@@ -1177,7 +1177,7 @@ final class ComiNaviUITests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.buttons["Login via circle.ms"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["sign-in-circlems"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.otherElements["sign-in-circlems-environment"].exists)
 
         let logo = app.descendants(matching: .any)["sign-in-logo"]
@@ -1196,7 +1196,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(
             app.buttons["global-event-day-banner"].waitForExistence(timeout: 120)
         )
-        XCTAssertFalse(app.buttons["Login via circle.ms"].exists)
+        XCTAssertFalse(app.buttons["sign-in-circlems"].exists)
     }
 
     @MainActor
@@ -1784,7 +1784,7 @@ final class ComiNaviUITests: XCTestCase {
         takeScreenshot(named: "Map-Layers-Arrival")
 
         layerButton.tap()
-        app.buttons["Hide Optional Layers"].tap()
+        app.buttons["Hide All Layers"].tap()
         XCTAssertEqual(layerButton.value as? String, "0 of 6 shown")
     }
 

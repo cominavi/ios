@@ -88,9 +88,32 @@ const iconNames = [
   "users",
   "wifi-off",
   "x",
+  // Added with the design-system pass: toolbox checklist, sync, location, and tab icons.
+  "archive",
+  "binoculars",
+  "cloud-upload",
+  "coins",
+  "credit-card",
+  "download",
+  "droplet",
+  "locate",
+  "pill",
+  "pointer",
+  "smartphone",
+  "umbrella",
+  "user-round-search",
 ];
 
-for (const name of iconNames) {
+// Outline icons that also need a solid variant, written as `lucide-<name>-filled`.
+// The variant fills the outline path with the same color as its stroke.
+const filledIconNames = ["star"];
+
+const variants = [
+  ...iconNames.map((name) => ({ name, assetSuffix: "", filled: false })),
+  ...filledIconNames.map((name) => ({ name, assetSuffix: "-filled", filled: true })),
+];
+
+for (const { name, assetSuffix, filled } of variants) {
   const icon = iconSet.icons[name];
   if (!icon) {
     throw new Error(`Lucide icon is missing from Iconify: ${name}`);
@@ -98,14 +121,17 @@ for (const name of iconNames) {
 
   const width = icon.width ?? iconSet.width ?? 24;
   const height = icon.height ?? iconSet.height ?? 24;
-  const body = icon.body.replaceAll("currentColor", "#000000");
+  let body = icon.body.replaceAll("currentColor", "#000000");
+  if (filled) {
+    body = body.replaceAll('fill="none"', 'fill="#000000"');
+  }
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
     body,
     "</svg>",
     "",
   ].join("\n");
-  const assetName = `lucide-${name}`;
+  const assetName = `lucide-${name}${assetSuffix}`;
   const imageset = path.join(outputRoot, `${assetName}.imageset`);
   fs.mkdirSync(imageset, { recursive: true });
   fs.writeFileSync(path.join(imageset, `${assetName}.svg`), svg);
@@ -131,4 +157,4 @@ for (const name of iconNames) {
   );
 }
 
-console.log(`Generated ${iconNames.length} Lucide assets from Iconify.`);
+console.log(`Generated ${variants.length} Lucide assets from Iconify.`);

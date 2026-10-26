@@ -178,7 +178,7 @@ struct ProfileScreen: View {
 
             Section("Tools") {
                 NavigationLink {
-                    ComiketToolboxView()
+                    ComiketToolboxView(event: catalogLibrary.selectedEvent)
                 } label: {
                     LucideLabel("Toolbox", icon: "square.grid.2x2")
                 }
@@ -211,7 +211,7 @@ struct ProfileScreen: View {
                     ImageCacheManagementScreen()
                 } label: {
                     Label {
-                        Text("Image Cache", tableName: "ImageCache")
+                        Text("Image cache", tableName: "ImageCache")
                     } icon: {
                         LucideIcon("images")
                     }
@@ -553,7 +553,7 @@ struct ProfileScreen: View {
             .accessibilityElement(children: .combine)
 
             FocusedActionButton(action: presentSignIn) {
-                Text("Sign In")
+                Text("Sign in")
             }
             .accessibilityIdentifier("profile-sign-in")
         }
@@ -1030,7 +1030,6 @@ private struct AccountDeletionConfirmationView: View {
 
             VStack(spacing: 12) {
                 FocusedActionButton(
-                    tint: .accentColor,
                     action: continueToConsequences
                 ) {
                     Label("Next", systemImage: "arrow.right")

@@ -755,16 +755,25 @@ private struct MapControlPanel: View {
         if horizontalSizeClass == .regular {
             stackedSelectors
         } else {
+            // The day capsule drops its status capsules, one at a time,
+            // before the chrome falls back to two rows.
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .center, spacing: 8) {
-                    if let eventDaySelector {
-                        eventDaySelector
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
-                    MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
-                }
+                singleRowSelectors(statusLimit: 2)
+                singleRowSelectors(statusLimit: 1)
+                singleRowSelectors(statusLimit: 0)
                 stackedSelectors
             }
+        }
+    }
+
+    private func singleRowSelectors(statusLimit: Int) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            if let eventDaySelector {
+                eventDaySelector
+                    .style(.inline(statusLimit: statusLimit))
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
         }
     }
 
@@ -1187,18 +1196,29 @@ private struct MapLayerMenu: View {
 
             Section("Layers") {
                 ForEach(BigSightMapLayer.allCases) { layer in
-                    let hasData = availableLayers.contains(layer)
-                    Toggle(isOn: binding(for: layer)) {
-                        Label {
-                            Text(verbatim: layer.title)
-                            if !hasData {
-                                Text("No data for C\(eventNumber)")
+                    if availableLayers.contains(layer) {
+                        Toggle(isOn: binding(for: layer)) {
+                            Label {
+                                Text(verbatim: layer.title)
+                            } icon: {
+                                LucideIcon(layer.systemImage)
                             }
-                        } icon: {
-                            LucideIcon(layer.systemImage)
                         }
+                    } else {
+                        // A disabled button, not a toggle: a layer with no
+                        // data must never show a checkmark, and a menu button
+                        // shows its second text as a caption.
+                        Button {} label: {
+                            Label {
+                                Text(verbatim: layer.title)
+                                Text("No data for C\(eventNumber)")
+                            } icon: {
+                                LucideIcon(layer.systemImage)
+                            }
+                        }
+                        .disabled(true)
+                        .accessibilityValue(Text("No data for C\(eventNumber)"))
                     }
-                    .disabled(!hasData)
                 }
             }
 

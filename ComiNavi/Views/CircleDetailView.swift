@@ -865,68 +865,88 @@ private struct CircleDetailHeader: View {
     /// The day, canonical venue text and optional map affordance. The venue
     /// stays in `.primary`; the accent is reserved for the pin and the
     /// "Show on map" affordance so the text keeps full contrast.
+    /// Puts "Show on map" beside the address when the day line fits on one
+    /// line, and under it otherwise, so the date never wraps in a narrow
+    /// column.
     @ViewBuilder
     private func locationSummary(
         spaceLabel: String,
         showsMapAffordance: Bool
     ) -> some View {
-        let layout = dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
-            : AnyLayout(HStackLayout(alignment: .center, spacing: 10))
-
-        layout {
-            HStack(alignment: .top, spacing: 10) {
-                LucideIcon("mappin.and.ellipse", size: 20)
-                    .foregroundStyle(Color.accentColor)
-                    .padding(.top, 2)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    if let day = address?.day ?? circle.day {
-                        Group {
-                            if let dayDateText {
-                                Text("Day \(day) · \(dayDateText)")
-                            } else {
-                                Text("Day \(day)")
-                            }
-                        }
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("circle-location-day")
+        Group {
+            if dynamicTypeSize.isAccessibilitySize || !showsMapAffordance {
+                VStack(alignment: .leading, spacing: 8) {
+                    locationText(spaceLabel: spaceLabel)
+                    if showsMapAffordance { mapAffordance }
+                }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .center, spacing: 10) {
+                        locationText(spaceLabel: spaceLabel)
+                            .fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 0)
+                        mapAffordance
                     }
-
-                    Text(verbatim: address?.venueLocationText ?? spaceLabel)
-                        .font(.headline.monospaced().weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("circle-location-venue")
-
-                    if let hallGloss {
-                        Text(verbatim: hallGloss)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 4) {
+                        locationText(spaceLabel: spaceLabel)
+                        mapAffordance
                     }
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if showsMapAffordance {
-                Group {
-                    if isOpeningMap {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        HStack(spacing: 4) {
-                            Text("Show on map")
-                            LucideIcon("chevron.forward", size: 14)
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                    }
-                }
-                .frame(minHeight: 44)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+    }
+
+    private func locationText(spaceLabel: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            LucideIcon("mappin.and.ellipse", size: 20)
+                .foregroundStyle(Color.accentColor)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                if let day = address?.day ?? circle.day {
+                    Group {
+                        if let dayDateText {
+                            Text("Day \(day) · \(dayDateText)")
+                        } else {
+                            Text("Day \(day)")
+                        }
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("circle-location-day")
+                }
+
+                Text(verbatim: address?.venueLocationText ?? spaceLabel)
+                    .font(.headline.monospaced().weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("circle-location-venue")
+
+                if let hallGloss {
+                    Text(verbatim: hallGloss)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var mapAffordance: some View {
+        Group {
+            if isOpeningMap {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                HStack(spacing: 4) {
+                    Text("Show on map")
+                    LucideIcon("chevron.forward", size: 14)
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+            }
+        }
+        .frame(minHeight: 44)
     }
 
     private func copy(_ address: ComiketSpaceAddress) {
@@ -1077,42 +1097,41 @@ private struct CircleDetailExternalLinksRow: View {
     let links: [CircleExternalLink]
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(links) { link in
-                    Link(destination: link.url) {
-                        HStack(spacing: 6) {
-                            CircleExternalLinkIcon(kind: link.kind)
-                            Text(link.title)
-                                .font(.subheadline.weight(.semibold))
-                                .lineLimit(1)
-                        }
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 14)
-                        .frame(minHeight: 44)
-                        .background(
-                            Color(uiColor: .secondarySystemGroupedBackground),
-                            in: .capsule
-                        )
-                        .overlay {
-                            Capsule()
-                                .stroke(
-                                    Color(uiColor: .separator).opacity(0.24),
-                                    lineWidth: 0.5
-                                )
-                        }
-                        .contentShape(.capsule)
+        // Chips wrap instead of scrolling sideways: a horizontal scroller in
+        // the narrow identity column clipped the last chip at the edge.
+        CircleTagFlowLayout(spacing: 8) {
+            ForEach(links) { link in
+                Link(destination: link.url) {
+                    HStack(spacing: 6) {
+                        CircleExternalLinkIcon(kind: link.kind)
+                        Text(link.title)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text(link.title))
-                    .accessibilityValue(Text(verbatim: link.preview))
-                    .accessibilityHint("Opens in your browser")
-                    .accessibilityIdentifier(link.accessibilityIdentifier)
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 44)
+                    .background(
+                        Color(uiColor: .secondarySystemGroupedBackground),
+                        in: .capsule
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                Color(uiColor: .separator).opacity(0.24),
+                                lineWidth: 0.5
+                            )
+                    }
+                    .contentShape(.capsule)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(link.title))
+                .accessibilityValue(Text(verbatim: link.preview))
+                .accessibilityHint("Opens in your browser")
+                .accessibilityIdentifier(link.accessibilityIdentifier)
             }
-            .padding(.vertical, 2)
         }
-        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .padding(.vertical, 2)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("circle-external-links")
     }

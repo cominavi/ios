@@ -542,7 +542,7 @@ final class SharedPlanEditorModel {
                 ?? (draft.replicaID != replicaID
                     || readOnlyReason != nil
                     || circleContent(for: draft.circle) == nil
-                    ? String(localized: "未保存のメモを保管しています。")
+                    ? String(localized: "Your unsaved note is kept on this device.")
                     : nil)
             guard let reason,
                   let exportText = Self.memoDraftExport(
@@ -702,7 +702,7 @@ final class SharedPlanEditorModel {
         now: Date = Date()
     ) {
         guard canEdit, let replicaID else {
-            issueMessage = String(localized: "このプランは現在読み取り専用です。")
+            issueMessage = String(localized: "This plan is read-only right now.")
             return
         }
         nextMemoGeneration &+= 1
@@ -1120,7 +1120,7 @@ final class SharedPlanEditorModel {
               let state = draft.state,
               draft.isComplete
         else {
-            issueMessage = String(localized: "すべての競合に対する選択が必要です。")
+            issueMessage = String(localized: "Choose an option for every conflict.")
             return
         }
         do {
@@ -1221,13 +1221,13 @@ final class SharedPlanEditorModel {
         operation: () async throws -> Bool
     ) async {
         guard canEdit else {
-            issueMessage = String(localized: "このプランは現在読み取り専用です。")
+            issueMessage = String(localized: "This plan is read-only right now.")
             return
         }
         await acquireMutationOperation()
         defer { releaseMutationOperation() }
         guard canEdit else {
-            issueMessage = String(localized: "このプランは現在読み取り専用です。")
+            issueMessage = String(localized: "This plan is read-only right now.")
             return
         }
         AppTrack.userIntent(
@@ -1348,7 +1348,7 @@ final class SharedPlanEditorModel {
             await preserveMemoDraftForRecovery(
                 draft,
                 reason: draft.replicaID == replicaID ? .circleUnavailable : .authorityLost,
-                message: String(localized: "編集権限が変わったため、メモを保管しています。"),
+                message: String(localized: "Your editing access changed, so your note is kept on this device."),
                 using: service
             )
             return
@@ -1357,7 +1357,7 @@ final class SharedPlanEditorModel {
             await preserveMemoDraftForRecovery(
                 draft,
                 reason: .authorityLost,
-                message: String(localized: "編集権限がないため、メモを保管しています。"),
+                message: String(localized: "You can't edit this plan, so your note is kept on this device."),
                 using: service
             )
             return

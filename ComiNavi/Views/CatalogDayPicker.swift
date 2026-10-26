@@ -185,11 +185,15 @@ private struct CatalogEventStatusBadge: View {
 }
 
 struct CatalogEventDayBanner: View {
-    enum Style {
+    enum Style: Equatable {
         /// A two-line card with the date, for wide layouts.
         case card
         /// A one-line capsule that matches the Explore toolbar control.
         case compact
+        /// A tighter capsule with no chevron that shares one row with the
+        /// map selectors. It shows at most `statusLimit` status capsules;
+        /// the full statuses stay in the accessibility label.
+        case inline(statusLimit: Int)
     }
 
     let event: CatalogEvent?
@@ -203,7 +207,7 @@ struct CatalogEventDayBanner: View {
     @ScaledMetric(relativeTo: .body) private var minimumHeight = 54.0
 
     private var adaptiveMinimumHeight: CGFloat {
-        verticalSizeClass == .compact || style == .compact ? 44 : minimumHeight
+        verticalSizeClass == .compact || style != .card ? 44 : minimumHeight
     }
 
     private var summary: CatalogEventDaySummary {
@@ -220,6 +224,7 @@ struct CatalogEventDayBanner: View {
             switch style {
             case .card: cardLabel
             case .compact: compactLabel
+            case .inline(let statusLimit): inlineLabel(statusLimit: statusLimit)
             }
         }
         .buttonStyle(.plain)
@@ -283,6 +288,42 @@ struct CatalogEventDayBanner: View {
         }
         .padding(.horizontal, 14)
         .frame(minHeight: adaptiveMinimumHeight)
+        .contentShape(.capsule)
+        .background(.regularMaterial, in: .capsule)
+        .overlay {
+            Capsule()
+                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
+        }
+    }
+}
+
+extension CatalogEventDayBanner {
+    /// The same banner in another style, for layouts that pick a style
+    /// after the caller built the banner.
+    func style(_ style: Style) -> CatalogEventDayBanner {
+        var copy = self
+        copy.style = style
+        return copy
+    }
+
+    fileprivate func inlineLabel(statusLimit: Int) -> some View {
+        HStack(spacing: 6) {
+            LucideIcon("calendar.badge.clock")
+                .foregroundStyle(Color.accentColor)
+
+            HStack(spacing: 6) {
+                Text(summary.title)
+                    .lineLimit(1)
+
+                ForEach(summary.statuses.suffix(statusLimit)) { status in
+                    CatalogEventStatusBadge(status: status)
+                }
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 44)
         .contentShape(.capsule)
         .background(.regularMaterial, in: .capsule)
         .overlay {

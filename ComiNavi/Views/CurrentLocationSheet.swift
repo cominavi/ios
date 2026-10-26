@@ -70,7 +70,7 @@ struct CurrentLocationSheet: View {
     private var sourcePresentation: (title: LocalizedStringResource, icon: String) {
         switch location.source {
         case .guidedLocator:
-            ("Positioned with Where Am I", "location.viewfinder")
+            ("Positioned with Where am I?", "location.viewfinder")
         case .mapLongPress:
             ("Positioned from your map press", "hand.tap.fill")
         case .gps:

@@ -280,7 +280,7 @@ actor SharedPlanAutomergeDocument {
     ) throws {
         guard data.count <= Self.maximumSavedDocumentBytes else {
             throw SharedPlanError.documentLimit(
-                String(localized: "プランのデータが大きすぎます。")
+                String(localized: "The plan data is too large.")
             )
         }
         let document = try Document(data)
@@ -817,7 +817,7 @@ actor SharedPlanAutomergeDocument {
             guard state == .active else { return false }
             guard document.keys(obj: circlesObject).count < Self.maximumCircles else {
                 throw SharedPlanError.documentLimit(
-                    String(localized: "1つのプランに追加できるサークルは2,000件までです。")
+                    String(localized: "A plan can have up to 2,000 circles.")
                 )
             }
         } else if let existing,
@@ -922,7 +922,7 @@ actor SharedPlanAutomergeDocument {
         let upper = prospective.unicodeScalars.index(lower, offsetBy: deleteCount)
         prospective.replaceSubrange(lower..<upper, with: text)
         guard prospective.utf8.count <= Self.maximumMemoUTF8Bytes else {
-            throw SharedPlanError.documentLimit(String(localized: "メモは64 KiB以内にしてください。"))
+            throw SharedPlanError.documentLimit(String(localized: "Keep the note under 64 KiB."))
         }
 
         try performDomainChange(operationID: operationID, timestamp: authoredAt) {
@@ -2721,7 +2721,7 @@ actor SharedPlanAutomergeDocument {
 
         guard conflicts.count <= 2_000 else {
             throw SharedPlanError.documentLimit(
-                String(localized: "プラン内の競合が上限を超えています。")
+                String(localized: "This plan has too many conflicts.")
             )
         }
         return conflicts.values.sorted { $0.conflictID < $1.conflictID }
@@ -2861,7 +2861,7 @@ actor SharedPlanAutomergeDocument {
             conflicts[conflict.id] = conflict
             guard conflicts.count <= 2_000 else {
                 throw SharedPlanError.documentLimit(
-                    String(localized: "プラン内の競合が上限を超えています。")
+                    String(localized: "This plan has too many conflicts.")
                 )
             }
         }
@@ -3414,7 +3414,7 @@ actor SharedPlanAutomergeDocument {
               quantities.allSatisfy({ (0...Self.maximumQuantity).contains($0) })
         else {
             throw SharedPlanError.documentLimit(
-                String(localized: "数量は0から999の範囲で入力してください。")
+                String(localized: "Enter a quantity from 0 to 999.")
             )
         }
     }
@@ -3430,7 +3430,7 @@ actor SharedPlanAutomergeDocument {
     private func validateQuantity(_ quantity: Int) throws {
         guard (0...Self.maximumQuantity).contains(quantity) else {
             throw SharedPlanError.documentLimit(
-                String(localized: "数量は0から999の範囲で入力してください。")
+                String(localized: "Enter a quantity from 0 to 999.")
             )
         }
     }
@@ -3799,7 +3799,7 @@ actor SharedPlanAutomergeDocument {
               document.save().count <= Self.maximumSavedDocumentBytes
         else {
             throw SharedPlanError.documentLimit(
-                String(localized: "プランのデータが大きすぎます。")
+                String(localized: "The plan data is too large.")
             )
         }
     }
@@ -3826,7 +3826,7 @@ actor SharedPlanAutomergeDocument {
               document.save().count <= maximumSavedDocumentBytes
         else {
             throw SharedPlanError.documentLimit(
-                String(localized: "プランのデータが大きすぎます。")
+                String(localized: "The plan data is too large.")
             )
         }
         return retainedPayloadBytes

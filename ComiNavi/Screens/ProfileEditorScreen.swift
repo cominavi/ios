@@ -34,9 +34,9 @@ struct ProfileEditorScreen: View {
                             .overlay(alignment: .bottomTrailing) {
                                 Image(systemName: "camera.fill")
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.onAccentFill)
                                     .padding(7)
-                                    .background(Color.accentColor, in: .circle)
+                                    .background(Color.accentFill, in: .circle)
                             }
 
                         Text("Change Picture")

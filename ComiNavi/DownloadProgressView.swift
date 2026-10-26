@@ -74,14 +74,17 @@ struct FocusedActionButton<Label: View>: View {
 
     let role: ButtonRole?
     let emphasis: Emphasis
-    let tint: Color
+    /// A custom tint, such as red for a destructive action. Without one, a
+    /// primary button uses the lime accent fill behind dark text and a
+    /// secondary button uses the accent color.
+    let tint: Color?
     let action: () -> Void
     @ViewBuilder private let label: () -> Label
 
     init(
         role: ButtonRole? = nil,
         emphasis: Emphasis = .primary,
-        tint: Color = .accentColor,
+        tint: Color? = nil,
         action: @escaping () -> Void,
         @ViewBuilder label: @escaping () -> Label
     ) {
@@ -112,14 +115,30 @@ struct FocusedActionButton<Label: View>: View {
         }
         .buttonBorderShape(.capsule)
         .controlSize(.large)
-        .tint(tint)
+        .tint(resolvedTint)
+    }
+
+    private var usesAccentFill: Bool {
+        tint == nil && emphasis == .primary
+    }
+
+    private var resolvedTint: Color {
+        if let tint { return tint }
+        return usesAccentFill ? .accentFill : .accentColor
     }
 
     private var button: some View {
         Button(role: role, action: action) {
-            label()
-                .font(.headline)
-                .frame(maxWidth: .infinity)
+            if usesAccentFill {
+                label()
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(Color.onAccentFill)
+            } else {
+                label()
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
         }
     }
 }

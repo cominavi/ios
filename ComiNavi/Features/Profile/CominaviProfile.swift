@@ -165,9 +165,9 @@ final class CominaviProfileStore {
 
     var pendingMutationDescription: String? {
         switch pendingMutation?.kind {
-        case .displayName: String(localized: "表示名の変更を送信待ちです。")
-        case .avatarUpload: String(localized: "アバターの変更を送信待ちです。")
-        case .avatarDelete: String(localized: "アバターの削除を送信待ちです。")
+        case .displayName: String(localized: "Your display name change is waiting to be sent.")
+        case .avatarUpload: String(localized: "Your profile picture change is waiting to be sent.")
+        case .avatarDelete: String(localized: "Your profile picture removal is waiting to be sent.")
         case nil: nil
         }
     }
