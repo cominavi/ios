@@ -497,22 +497,36 @@ private struct CircleXProfile {
 private struct CircleXProfileRow: View {
     let profile: CircleXProfile
     var avatarSize: CGFloat = 40
+    /// Leads with the handle when the display name only repeats a name that
+    /// is already visible, such as the pen name in the header.
+    var prefersHandle = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             CircleXProfileAvatar(url: profile.avatarURL, size: avatarSize)
 
             VStack(alignment: .leading, spacing: 1) {
-                DimmedCircleDisplayName(displayName: profile.displayName)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                if prefersHandle {
+                    Text(verbatim: "@\(profile.handle)")
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
 
-                Text(verbatim: "@\(profile.handle)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    Text(verbatim: "X")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    DimmedCircleDisplayName(displayName: profile.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+
+                    Text(verbatim: "@\(profile.handle)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .layoutPriority(1)
@@ -522,8 +536,9 @@ private struct CircleXProfileRow: View {
                 .accessibilityHidden(true)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text(verbatim: profile.displayName))
-        .accessibilityValue(Text(verbatim: "@\(profile.handle)"))
+        .accessibilityLabel(
+            Text("X profile, \(profile.displayName), @\(profile.handle)")
+        )
     }
 }
 
@@ -739,7 +754,10 @@ private struct CircleDetailHeader: View {
 
             if let xProfile {
                 Link(destination: xProfile.url) {
-                    CircleXProfileRow(profile: xProfile)
+                    CircleXProfileRow(
+                        profile: xProfile,
+                        prefersHandle: xProfile.displayName == circle.penName.nonBlank
+                    )
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
                         .background(
