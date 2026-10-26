@@ -156,7 +156,7 @@ struct MapView: View {
                     showsDestinationPicker = true
                 }
             )
-            .padding(.horizontal, 14)
+            .padding(.horizontal, MapChromeLayout.edgeInset)
             .safeAreaPadding(.top, 8)
 
             VStack(alignment: .trailing, spacing: 8) {
@@ -723,12 +723,17 @@ struct MapView: View {
 }
 
 private struct MapControlPanel: View {
+    /// Width of the leading control column on iPad and other regular-width
+    /// layouts; the map stays visible beside it instead of under a full-width
+    /// bar.
+    private static let regularColumnWidth: CGFloat = 380
+
     let model: MapScreenModel
     let eventDaySelector: CatalogEventDayBanner?
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
     let onGoToSpace: () -> Void
 
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -737,19 +742,34 @@ private struct MapControlPanel: View {
                 MapSearchField(model: model, onGoToSpace: onGoToSpace)
             }
         }
-        .frame(maxWidth: 760, alignment: .leading)
+        .frame(
+            maxWidth: horizontalSizeClass == .regular ? Self.regularColumnWidth : .infinity,
+            alignment: .leading
+        )
     }
 
+    /// One row when the day selector and the map tools fit side by side,
+    /// which keeps more of the map visible; two rows otherwise.
     @ViewBuilder
     private var selectors: some View {
-        if verticalSizeClass == .compact {
-            HStack(alignment: .center, spacing: 8) {
-                if let eventDaySelector {
-                    eventDaySelector
-                }
-                MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
-            }
+        if horizontalSizeClass == .regular {
+            stackedSelectors
         } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 8) {
+                    if let eventDaySelector {
+                        eventDaySelector
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
+                }
+                stackedSelectors
+            }
+        }
+    }
+
+    private var stackedSelectors: some View {
+        VStack(alignment: .leading, spacing: 8) {
             if let eventDaySelector {
                 eventDaySelector
             }
@@ -1041,7 +1061,6 @@ private struct MapLocationControlIcon: View {
 private struct MapSelectorBar: View {
     let model: MapScreenModel
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         HStack(spacing: 8) {
@@ -1072,9 +1091,7 @@ private struct MapSelectorBar: View {
             }
             .accessibilityIdentifier("map-venue-selector")
 
-            if verticalSizeClass != .compact {
-                Spacer(minLength: 0)
-            }
+            Spacer(minLength: 0)
 
             MapLayerMenu(
                 eventNumber: model.eventNumber,
