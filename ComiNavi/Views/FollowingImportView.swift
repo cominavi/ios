@@ -4,16 +4,65 @@ import UIKit
 
 struct FollowingImportView: View {
     let dataSource: CirclemsDataSource
+    /// The X import runs on the ComiNavi service, so a signed-out person sees
+    /// a sign-in prompt instead of a form that fails only after submit.
+    let isSignedIn: Bool
+    let onSignIn: (() -> Void)?
     @State private var model: FollowingImportModel
     @State private var isShowingImportForm = false
     @Environment(\.appHapticFeedback) private var hapticFeedback
 
-    init(dataSource: CirclemsDataSource) {
+    init(
+        dataSource: CirclemsDataSource,
+        isSignedIn: Bool = true,
+        onSignIn: (() -> Void)? = nil
+    ) {
         self.dataSource = dataSource
+        self.isSignedIn = isSignedIn
+        self.onSignIn = onSignIn
         _model = State(initialValue: FollowingImportModel(dataSource: dataSource))
     }
 
     var body: some View {
+        Group {
+            if !isSignedIn {
+                signInRequiredSurface
+            } else {
+                activityContent
+            }
+        }
+        .navigationTitle("X followed circles")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { importToolbar }
+        .task(id: isSignedIn) {
+            guard isSignedIn else { return }
+            await model.load()
+        }
+        .onChange(of: model.importState?.importedAt) { oldValue, newValue in
+            guard oldValue != newValue, newValue != nil else { return }
+            isShowingImportForm = false
+            hapticFeedback?.play(.completion)
+        }
+        .onChange(of: model.lastBulkFavorite) { _, undo in
+            guard let undo else { return }
+            hapticFeedback?.play(.completion)
+            AppToast.showSuccess(
+                String(localized: "Favorited \(undo.circleCount) circles"),
+                subtitle: nil
+            )
+        }
+        .onChange(of: model.errorMessage) { _, message in
+            guard let message else { return }
+            AppToast.showError(
+                String(localized: "Could not update followed circles"),
+                subtitle: message
+            )
+            model.dismissError()
+        }
+    }
+
+    @ViewBuilder
+    private var activityContent: some View {
         Group {
             switch model.activity {
             case .loading:
@@ -24,23 +73,28 @@ struct FollowingImportView: View {
                 readyContent
             }
         }
-        .navigationTitle("X followed circles")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { importToolbar }
-        .task { await model.load() }
-        .onChange(of: model.importState?.importedAt) { oldValue, newValue in
-            guard oldValue != newValue, newValue != nil else { return }
-            isShowingImportForm = false
-            hapticFeedback?.play(.completion)
+    }
+
+    private var signInRequiredSurface: some View {
+        FocusedActionSurface(symbolName: "person.2.crop.square.stack") {
+            Text("Sign in required")
+                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Sign in to ComiNavi to find the circles that an X account follows in this catalog.")
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+
+            if let onSignIn {
+                FocusedActionButton(action: onSignIn) {
+                    Text("Sign In")
+                }
+                .padding(.top, 28)
+                .accessibilityIdentifier("following-import-sign-in")
+            }
         }
-        .onChange(of: model.errorMessage) { _, message in
-            guard let message else { return }
-            AppToast.showError(
-                String(localized: "Could not update followed circles"),
-                subtitle: message
-            )
-            model.dismissError()
-        }
+        .accessibilityIdentifier("following-import-sign-in-required")
     }
 
     @ViewBuilder
@@ -63,11 +117,11 @@ struct FollowingImportView: View {
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Preparing catalog…")
+            Text("Loading imported circles…")
                 .foregroundStyle(.secondary)
                 .padding(.top, 12)
 
-            CatalogActivityIndicator(accessibilityLabel: "Preparing catalog…")
+            CatalogActivityIndicator(accessibilityLabel: "Loading imported circles…")
                 .padding(.top, 30)
         }
         .accessibilityIdentifier("following-import-loading")
@@ -254,6 +308,25 @@ struct FollowingImportView: View {
                         )
                     )
                     .accessibilityIdentifier("following-import-favorite-all")
+
+                    if let undo = model.lastBulkFavorite {
+                        HStack(spacing: 12) {
+                            Label {
+                                Text("Favorited \(undo.circleCount) circles")
+                            } icon: {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                            .font(.subheadline)
+
+                            Spacer(minLength: 8)
+
+                            Button("Undo", action: model.undoFavoriteAll)
+                                .buttonStyle(.borderless)
+                                .disabled(model.activity != .idle)
+                                .accessibilityIdentifier("following-import-undo-favorite-all")
+                        }
+                    }
                 }
             }
 
@@ -323,7 +396,7 @@ struct FollowingImportView: View {
 
     @ToolbarContentBuilder
     private var importToolbar: some ToolbarContent {
-        if model.activity == .idle, model.importState != nil {
+        if isSignedIn, model.activity == .idle, model.importState != nil {
             if isShowingImportForm {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { isShowingImportForm = false }

@@ -25,7 +25,7 @@ struct ProfileEditorScreen: View {
 
     var body: some View {
         Form {
-            Section("プロフィール画像") {
+            Section("Profile picture") {
                 Button {
                     isShowingAvatarPicker = true
                 } label: {
@@ -39,7 +39,7 @@ struct ProfileEditorScreen: View {
                                     .background(Color.accentColor, in: .circle)
                             }
 
-                        Text("アバターを変更")
+                        Text("Change Picture")
                             .font(.subheadline)
                     }
                     .frame(maxWidth: .infinity)
@@ -47,19 +47,19 @@ struct ProfileEditorScreen: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isSavingChanges || profileStore.isSaving)
-                .accessibilityLabel("アバターを変更")
-                .accessibilityHint("写真を選択して正方形に切り抜きます")
+                .accessibilityLabel("Change Picture")
+                .accessibilityHint("Choose a photo and crop it to a square")
                 .accessibilityIdentifier("profile-change-avatar")
 
                 if canRemoveAvatar {
-                    Button("アバターを削除", role: .destructive, action: stageAvatarRemoval)
+                    Button("Remove Picture", role: .destructive, action: stageAvatarRemoval)
                         .disabled(isSavingChanges)
                         .accessibilityIdentifier("profile-remove-avatar")
                 }
             }
 
-            Section("プロフィール") {
-                TextField("表示名", text: $displayName)
+            Section("Profile") {
+                TextField("Display name", text: $displayName)
                     .textContentType(.name)
                     .submitLabel(.done)
                     .onSubmit {
@@ -73,20 +73,20 @@ struct ProfileEditorScreen: View {
             if let issueMessage {
                 Section {
                     Text(issueMessage)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
                 }
             }
         }
-        .navigationTitle("プロフィールを編集")
+        .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("キャンセル", action: dismiss.callAsFunction)
+                Button("Cancel", action: dismiss.callAsFunction)
                     .disabled(isSavingChanges)
             }
 
             ToolbarItem(placement: .confirmationAction) {
-                Button("保存", action: saveChanges)
+                Button("Save", action: saveChanges)
                     .disabled(!canSaveChanges)
                     .accessibilityIdentifier("profile-save")
             }
@@ -115,13 +115,13 @@ struct ProfileEditorScreen: View {
                 .scaledToFill()
                 .frame(width: 104, height: 104)
                 .clipShape(.circle)
-                .accessibilityLabel("プロフィール画像")
+                .accessibilityLabel("Profile picture")
         case .removed:
             Image(systemName: "person.crop.circle.fill")
                 .resizable()
                 .foregroundStyle(.secondary)
                 .frame(width: 104, height: 104)
-                .accessibilityLabel("プロフィール画像なし")
+                .accessibilityLabel("No profile picture")
         }
     }
 

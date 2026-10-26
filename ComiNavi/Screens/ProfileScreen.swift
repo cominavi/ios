@@ -29,11 +29,13 @@ struct ProfileScreen: View {
     private enum PresentedSheet: Identifiable {
         case profileEditor(userID: String)
         case issueReport
+        case signIn
 
         var id: String {
             switch self {
             case .profileEditor(let userID): "profile-editor-\(userID)"
             case .issueReport: "issue-report"
+            case .signIn: "sign-in"
             }
         }
     }
@@ -45,6 +47,7 @@ struct ProfileScreen: View {
         case failed(message: String)
     }
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage(SharedLocationClipboardImporter.enabledDefaultsKey)
     private var automaticallyReadsSharedLocations = false
     @State private var isShowingLogoutConfirmation = false
@@ -61,6 +64,7 @@ struct ProfileScreen: View {
     @State private var favoriteRecoveryIssue: String?
     @State private var favoriteRecoveryPendingDiscard: QuarantinedCanonicalFavoriteMutation?
     @State private var favoriteSyncState = FavoriteSyncState.idle
+    @State private var containerWidth: CGFloat = 0
     let favoriteColorLabelStore: FavoriteColorLabelStore
     @StateObject private var circlemsLinkViewModel = SignInViewModel()
     let catalogLibrary: CatalogLibrary
@@ -79,83 +83,10 @@ struct ProfileScreen: View {
 
     var body: some View {
         Form {
-            Section {
-                HStack {
-                    AuthenticatedProfileAvatar(
-                        url: profileStore.profile?.avatarURL,
-                        size: 88,
-                        revision: profileStore.profile?.revision
-                    )
-                    .accessibilityIdentifier("profile-avatar")
-                    .padding(.trailing, 8)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(isLoggedIn ? "ComiNaviアカウント" : "ログインしていません")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Text(
-                            profileStore.profile?.displayName
-                                ?? userState.user?.nickname
-                                ?? String(localized: "Not logged in")
-                        )
-                            .font(.title3)
-
-                        if let profile = profileStore.profile {
-                            HStack(spacing: 12) {
-                                if let identity = profile.identities.first(where: {
-                                    $0.provider == "circlems"
-                                }) {
-                                    Label {
-                                        Text("Circle.ms · \(identity.profileDisplayDetail)")
-                                            .lineLimit(1)
-                                    } icon: {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(.green)
-                                    }
-                                    .foregroundStyle(.secondary)
-                                    .accessibilityIdentifier("profile-circlems-status")
-                                } else {
-                                    Button {
-                                        linkCirclemsIdentity(profile.id)
-                                    } label: {
-                                        if circlemsLinkViewModel.state == .authenticating {
-                                            HStack(spacing: 5) {
-                                                ProgressView()
-                                                Text("Circle.msを連携中…")
-                                            }
-                                        } else {
-                                            Label("Circle.msを連携", systemImage: "link")
-                                        }
-                                    }
-                                    .disabled(
-                                        !profileStore.isIdentityVerified
-                                            || circlemsLinkViewModel.state == .authenticating
-                                    )
-                                    .accessibilityIdentifier("profile-link-circlems")
-                                }
-
-                                Spacer(minLength: 0)
-
-                                Button {
-                                    presentedSheet = .profileEditor(userID: profile.id)
-                                } label: {
-                                    Label("編集", systemImage: "pencil")
-                                }
-                                .disabled(!profileStore.isIdentityVerified)
-                                .accessibilityIdentifier("profile-edit")
-                            }
-                            .font(.caption)
-                            .buttonStyle(.borderless)
-                            .padding(.top, 5)
-                        }
-                    }
-                }
-                .padding(.vertical, 8)
-            }
+            accountHeaderSection
 
             if !nonCirclemsIdentities.isEmpty {
-                Section("プロフィール") {
+                Section("Linked accounts") {
                     ForEach(nonCirclemsIdentities, id: \.stableID) { identity in
                         LabeledContent(
                             providerDisplayName(identity.provider),
@@ -168,30 +99,32 @@ struct ProfileScreen: View {
             if let profileIssue {
                 Section {
                     Text(profileIssue)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
                 }
             }
 
-            if let issue = profileStore.issueMessage, issue != profileIssue {
+            // The sign-in card already asks a signed-out person to sign in, so a
+            // stored session issue is only shown for an account that exists.
+            if isLoggedIn, let issue = profileStore.issueMessage, issue != profileIssue {
                 Section {
                     Text(issue)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
                 }
             }
 
             if profileStore.hasPendingMutation {
-                Section("送信待ちのプロフィール変更") {
+                Section("Unsent profile changes") {
                     if let description = profileStore.pendingMutationDescription {
                         Text(description)
                             .foregroundStyle(.secondary)
                     }
 
-                    Button("再送する") {
+                    Button("Send Again") {
                         retryPendingProfileMutation()
                     }
                     .disabled(profileStore.isSaving || !profileStore.isIdentityVerified)
 
-                    Button("この変更を破棄", role: .destructive) {
+                    Button("Discard This Change", role: .destructive) {
                         isShowingPendingMutationDiscardConfirmation = true
                     }
                     .disabled(profileStore.isSaving)
@@ -199,10 +132,10 @@ struct ProfileScreen: View {
             }
 
             if !favoriteRecoveries.isEmpty {
-                Section("お気に入り変更の確認") {
+                Section("Review favorite changes") {
                     ForEach(favoriteRecoveries) { recovery in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("送信できなかったお気に入り変更")
+                            Text("Favorite change not sent")
                                 .font(.subheadline.weight(.semibold))
                             Text(recovery.message)
                                 .font(.caption)
@@ -217,12 +150,12 @@ struct ProfileScreen: View {
 
                             HStack {
                                 ShareLink(item: favoriteRecoveryExport(recovery)) {
-                                    Label("書き出す", systemImage: "square.and.arrow.up")
+                                    Label("Export", systemImage: "square.and.arrow.up")
                                 }
 
                                 Spacer()
 
-                                Button("破棄", role: .destructive) {
+                                Button("Discard", role: .destructive) {
                                     favoriteRecoveryPendingDiscard = recovery
                                 }
                             }
@@ -235,94 +168,24 @@ struct ProfileScreen: View {
             if let favoriteRecoveryIssue {
                 Section {
                     Text(favoriteRecoveryIssue)
-                        .foregroundStyle(.orange)
-                }
-            }
-
-            if hasLinkedCirclemsIdentity, let dataSource = catalogLibrary.dataSource {
-                Section {
-                    Button {
-                        syncFavoritesToCirclems(dataSource)
-                    } label: {
-                        HStack {
-                            if favoriteSyncState == .syncing {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                            }
-                            Text("Sync ComiNavi favorites to Circle.ms")
-                        }
-                    }
-                    .disabled(
-                        favoriteSyncState == .syncing
-                            || !profileStore.isIdentityVerified
-                    )
-                    .accessibilityIdentifier("profile-sync-circlems-favorites")
-
-                    switch favoriteSyncState {
-                    case .idle, .syncing:
-                        EmptyView()
-                    case .succeeded:
-                        Label {
-                            Text("ComiNavi favorites were synced to Circle.ms.")
-                        } icon: {
-                            Image(systemName: "checkmark.circle.fill")
-                        }
-                        .font(.footnote)
-                        .foregroundStyle(.green)
-                        .accessibilityIdentifier("profile-sync-circlems-favorites-success")
-                    case .failed(let message):
-                        Text(message)
-                            .font(.footnote)
-                            .foregroundStyle(.orange)
-                            .accessibilityIdentifier("profile-sync-circlems-favorites-error")
-                    }
-                } header: {
-                    Text("Circle.ms")
-                } footer: {
-                    Text(
-                        "Adds or updates your ComiNavi favorites in Circle.ms. Existing Circle.ms memos and unrelated favorites are kept."
-                    )
+                        .foregroundStyle(.red)
                 }
             }
 
             if let dataSource = catalogLibrary.dataSource {
-                Section("Favorites") {
-                    NavigationLink {
-                        FavoriteMapPDFScreen(
-                            dataSource: dataSource,
-                            colorLabelStore: favoriteColorLabelStore
-                        )
-                    } label: {
-                        Label("Printable favorite map", systemImage: "map")
-                    }
-                    .accessibilityIdentifier("profile-favorite-map")
-
-                    NavigationLink {
-                        FavoriteColorLabelsScreen(store: favoriteColorLabelStore)
-                    } label: {
-                        Label("Color labels", systemImage: "tag")
-                    }
-                    .accessibilityIdentifier("profile-favorite-color-labels")
-                }
-
-                Section("X followed circles") {
-                    NavigationLink {
-                        FollowingImportView(dataSource: dataSource)
-                    } label: {
-                        HStack(spacing: 12) {
-                            LucideIcon("users", size: 24)
-                                .foregroundStyle(Color.accentColor)
-                            Text("Find followed circles")
-                            Spacer()
-                            Text("Import")
-                        }
-                    }
-                    .accessibilityIdentifier("profile-following-import")
-                }
+                favoritesSection(dataSource)
             }
 
-            Section("Shared locations") {
+            Section("Tools") {
+                NavigationLink {
+                    ComiketToolboxView()
+                } label: {
+                    LucideLabel("Toolbox", icon: "square.grid.2x2")
+                }
+                .accessibilityIdentifier("profile-toolbox")
+            }
+
+            Section {
                 Toggle(
                     "Detect locations from clipboard",
                     isOn: $automaticallyReadsSharedLocations
@@ -335,14 +198,12 @@ struct ProfileScreen: View {
                 }
                 .buttonBorderShape(.roundedRectangle)
                 .accessibilityIdentifier("profile-paste-shared-location")
-            }
-
-            Section("ツール") {
-                NavigationLink {
-                    ComiketToolboxView()
-                } label: {
-                    Label("コミケツールボックス", systemImage: "square.grid.2x2")
-                }
+            } header: {
+                Text("Settings")
+            } footer: {
+                Text(
+                    "Friends can send you a ComiNavi location link. When this setting is on, ComiNavi checks the clipboard for a new link each time you return to the app. To open a link that you copied, tap Paste."
+                )
             }
 
             Section {
@@ -352,12 +213,10 @@ struct ProfileScreen: View {
                     Label {
                         Text("Image Cache", tableName: "ImageCache")
                     } icon: {
-                        Image(systemName: "photo.stack")
+                        LucideIcon("images")
                     }
                 }
                 .accessibilityIdentifier("profile-image-cache")
-            } header: {
-                Text("Storage", tableName: "ImageCache")
             }
 
             Section("Support") {
@@ -369,36 +228,34 @@ struct ProfileScreen: View {
                 .accessibilityIdentifier("profile-report-issue")
             }
 
-            Section("Account") {
-                Button {
-                    if !isLoggedIn {
-                        returnToAuthentication()
-                    } else {
+            if isLoggedIn {
+                Section("Account") {
+                    Button(role: .destructive) {
                         isShowingLogoutConfirmation = true
+                    } label: {
+                        LucideLabel("Sign Out", icon: "person.crop.circle.badge.minus")
                     }
-                } label: {
-                    HStack {
-                        LucideIcon(isLoggedIn ? "person.crop.circle.badge.minus" : "person.crop.circle.badge.plus")
-                            .frame(width: 24, height: 24)
+                    .accessibilityIdentifier("profile-account-action")
+                    .disabled(isLoggingOut || isDeletingAccount)
 
-                        Text(isLoggedIn ? "ログアウト" : "ログイン")
+                    if profileStore.profile != nil {
+                        Button("Delete ComiNavi account", role: .destructive) {
+                            isShowingAccountDeletionConfirmation = true
+                        }
+                        .disabled(
+                            isLoggingOut || isDeletingAccount
+                                || !profileStore.isIdentityVerified
+                        )
+                        .accessibilityIdentifier("profile-delete-account")
                     }
-                    .foregroundStyle(isLoggedIn ? Color.red : Color.primary)
-                }
-                .accessibilityIdentifier("profile-account-action")
-                .disabled(isLoggingOut || isDeletingAccount)
-
-                if profileStore.profile != nil {
-                    Button("Delete ComiNavi account", role: .destructive) {
-                        isShowingAccountDeletionConfirmation = true
-                    }
-                    .disabled(
-                        isLoggingOut || isDeletingAccount
-                            || !profileStore.isIdentityVerified
-                    )
-                    .accessibilityIdentifier("profile-delete-account")
                 }
             }
+        }
+        .contentMargins(.horizontal, readableHorizontalMargin, for: .scrollContent)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            containerWidth = width
         }
         .navigationTitle("Profile")
         .sheet(item: $presentedSheet) { sheet in
@@ -409,7 +266,21 @@ struct ProfileScreen: View {
                 }
             case .issueReport:
                 IssueReportScreen()
+            case .signIn:
+                NavigationStack {
+                    SignInView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Cancel") { presentedSheet = nil }
+                                    .accessibilityIdentifier("profile-cancel-sign-in")
+                            }
+                        }
+                }
             }
+        }
+        .onChange(of: verifiedProfileID) { _, newValue in
+            guard newValue != nil, case .signIn? = presentedSheet else { return }
+            finishSignIn()
         }
         .fullScreenCover(isPresented: $isShowingAccountDeletionConfirmation) {
             AccountDeletionConfirmationView {
@@ -430,25 +301,25 @@ struct ProfileScreen: View {
             await loadFavoriteRecoveries()
         }
         .confirmationDialog(
-            "ComiNaviからログアウトしますか？",
+            "Sign out of ComiNavi?",
             isPresented: $isShowingLogoutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("ログアウト", role: .destructive) {
-                returnToAuthentication()
+            Button("Sign Out", role: .destructive) {
+                signOut()
             }
             .accessibilityIdentifier("profile-confirm-log-out")
 
-            Button("キャンセル", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログを削除します。")
+            Text("This removes this account's Shared Plans, unsent changes, and downloaded catalogs from this device.")
         }
         .confirmationDialog(
-            "送信待ちのプロフィール変更を破棄しますか？",
+            "Discard the unsent profile change?",
             isPresented: $isShowingPendingMutationDiscardConfirmation,
             titleVisibility: .visible
         ) {
-            Button("変更を破棄", role: .destructive) {
+            Button("Discard Change", role: .destructive) {
                 do {
                     try profileStore.discardPendingMutation()
                     profileIssue = nil
@@ -456,27 +327,237 @@ struct ProfileScreen: View {
                     profileIssue = error.localizedDescription
                 }
             }
-            Button("キャンセル", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("未送信の変更は復元できません。")
+            Text("You cannot restore an unsent change.")
         }
         .confirmationDialog(
-            "このお気に入り変更を破棄しますか？",
+            "Discard this favorite change?",
             isPresented: Binding(
                 get: { favoriteRecoveryPendingDiscard != nil },
                 set: { if !$0 { favoriteRecoveryPendingDiscard = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button("変更を破棄", role: .destructive) {
+            Button("Discard Change", role: .destructive) {
                 discardFavoriteRecovery()
             }
-            Button("キャンセル", role: .cancel) {
+            Button("Cancel", role: .cancel) {
                 favoriteRecoveryPendingDiscard = nil
             }
         } message: {
-            Text("書き出していない変更内容は復元できません。")
+            Text("You cannot restore a change that you did not export.")
         }
+    }
+
+    /// Everything that acts on the person's favorites sits in one place, so
+    /// the printable map, color labels, and X import are easy to find.
+    private func favoritesSection(_ dataSource: CirclemsDataSource) -> some View {
+        Section {
+            NavigationLink {
+                FavoriteMapPDFScreen(
+                    dataSource: dataSource,
+                    colorLabelStore: favoriteColorLabelStore
+                )
+            } label: {
+                LucideLabel("Printable favorite map", icon: "map")
+            }
+            .accessibilityIdentifier("profile-favorite-map")
+
+            NavigationLink {
+                FavoriteColorLabelsScreen(store: favoriteColorLabelStore)
+            } label: {
+                LucideLabel("Color labels", icon: "tag")
+            }
+            .accessibilityIdentifier("profile-favorite-color-labels")
+
+            NavigationLink {
+                FollowingImportView(
+                    dataSource: dataSource,
+                    isSignedIn: isLoggedIn,
+                    onSignIn: presentSignIn
+                )
+            } label: {
+                LucideLabel("Import from X", icon: "users")
+            }
+            .accessibilityIdentifier("profile-following-import")
+
+            if hasLinkedCirclemsIdentity {
+                circlemsFavoriteSyncRows(dataSource)
+            }
+        } header: {
+            Text("Your favorites")
+        }
+    }
+
+    @ViewBuilder
+    private func circlemsFavoriteSyncRows(_ dataSource: CirclemsDataSource) -> some View {
+        Button {
+            syncFavoritesToCirclems(dataSource)
+        } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Sync favorites to Circle.ms")
+                    Text(
+                        "Adds or updates your ComiNavi favorites in Circle.ms. Existing Circle.ms memos and unrelated favorites are kept."
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            } icon: {
+                if favoriteSyncState == .syncing {
+                    ProgressView()
+                } else {
+                    LucideIcon("arrow.triangle.2.circlepath")
+                }
+            }
+        }
+        .disabled(
+            favoriteSyncState == .syncing
+                || !profileStore.isIdentityVerified
+        )
+        .accessibilityIdentifier("profile-sync-circlems-favorites")
+
+        switch favoriteSyncState {
+        case .idle, .syncing:
+            EmptyView()
+        case .succeeded:
+            Label {
+                Text("ComiNavi favorites were synced to Circle.ms.")
+            } icon: {
+                Image(systemName: "checkmark.circle.fill")
+            }
+            .font(.footnote)
+            .foregroundStyle(.green)
+            .accessibilityIdentifier("profile-sync-circlems-favorites-success")
+        case .failed(let message):
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .accessibilityIdentifier("profile-sync-circlems-favorites-error")
+        }
+    }
+
+    /// On iPad and other regular-width containers the form keeps a readable
+    /// column of about 700 pt instead of stretching rows to the full width.
+    private var readableHorizontalMargin: CGFloat? {
+        guard horizontalSizeClass == .regular, containerWidth > 0 else { return nil }
+        return max(16, (containerWidth - 700) / 2)
+    }
+
+    /// A person who never signed in (the demo catalog and App Review path)
+    /// sees one value sentence and one Sign In action instead of an empty
+    /// account header.
+    @ViewBuilder
+    private var accountHeaderSection: some View {
+        Section {
+            if isLoggedIn {
+                signedInHeader
+            } else {
+                signedOutHeader
+            }
+        }
+    }
+
+    private var signedInHeader: some View {
+        HStack {
+            AuthenticatedProfileAvatar(
+                url: profileStore.profile?.avatarURL,
+                size: 88,
+                revision: profileStore.profile?.revision
+            )
+            .accessibilityIdentifier("profile-avatar")
+            .padding(.trailing, 8)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ComiNavi account")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(
+                    profileStore.profile?.displayName
+                        ?? userState.user?.nickname
+                        ?? String(localized: "Signed in")
+                )
+                    .font(.title3)
+
+                if let profile = profileStore.profile {
+                    HStack(spacing: 12) {
+                        if let identity = profile.identities.first(where: {
+                            $0.provider == "circlems"
+                        }) {
+                            Label {
+                                Text("Circle.ms · \(identity.profileDisplayDetail)")
+                                    .lineLimit(1)
+                            } icon: {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("profile-circlems-status")
+                        } else {
+                            Button {
+                                linkCirclemsIdentity(profile.id)
+                            } label: {
+                                if circlemsLinkViewModel.state == .authenticating {
+                                    HStack(spacing: 5) {
+                                        ProgressView()
+                                        Text("Linking Circle.ms…")
+                                    }
+                                } else {
+                                    Label("Link Circle.ms", systemImage: "link")
+                                }
+                            }
+                            .disabled(
+                                !profileStore.isIdentityVerified
+                                    || circlemsLinkViewModel.state == .authenticating
+                            )
+                            .accessibilityIdentifier("profile-link-circlems")
+                        }
+
+                        Spacer(minLength: 0)
+
+                        Button {
+                            presentedSheet = .profileEditor(userID: profile.id)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        .disabled(!profileStore.isIdentityVerified)
+                        .accessibilityIdentifier("profile-edit")
+                    }
+                    .font(.caption)
+                    .buttonStyle(.borderless)
+                    .padding(.top, 5)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var signedOutHeader: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
+                AuthenticatedProfileAvatar(url: nil, size: 56)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Not signed in")
+                        .font(.headline)
+                    Text("Sign in to sync plans and favorites")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
+
+            FocusedActionButton(action: presentSignIn) {
+                Text("Sign In")
+            }
+            .accessibilityIdentifier("profile-sign-in")
+        }
+        .padding(.vertical, 8)
     }
 
     private var isLoggedIn: Bool {
@@ -491,15 +572,33 @@ struct ProfileScreen: View {
         profileStore.profile?.identities.contains { $0.provider == "circlems" } == true
     }
 
-    private func returnToAuthentication() {
-        let dataSource = AppData.circlems
-        guard isLoggedIn else {
+    private var verifiedProfileID: String? {
+        guard profileStore.isIdentityVerified else { return nil }
+        return profileStore.profile?.id
+    }
+
+    private func presentSignIn() {
+        presentedSheet = .signIn
+    }
+
+    /// Sign-in from Profile keeps the current catalog open until the account
+    /// is verified. Cancelling the sheet therefore leaves the demo catalog and
+    /// the person's place in it untouched.
+    private func finishSignIn() {
+        presentedSheet = nil
+        if catalogLibrary.mode == .demo {
+            // A signed-in account reads the ComiNavi catalog, not the bundled
+            // demo data. The app shell loads the new catalog once it is idle.
             withAnimation {
-                catalogLibrary.reset()
+                catalogLibrary.selectMode(.cominavi)
             }
-            return
         }
-        guard !isLoggingOut else { return }
+        Task { await profileStore.load() }
+    }
+
+    private func signOut() {
+        let dataSource = AppData.circlems
+        guard isLoggedIn, !isLoggingOut else { return }
         AppTrack.userIntent(.signOutStarted)
         isLoggingOut = true
         Task {
@@ -658,9 +757,9 @@ struct ProfileScreen: View {
 extension CominaviProfileIdentity {
     var profileDisplayDetail: String {
         if provider == "circlems" {
-            return email ?? String(localized: "連携済み")
+            return email ?? String(localized: "Linked")
         }
-        return email ?? environment ?? String(localized: "連携済み")
+        return email ?? environment ?? String(localized: "Linked")
     }
 }
 
@@ -689,7 +788,7 @@ struct AuthenticatedProfileAvatar: View {
         }
         .frame(width: size, height: size)
         .clipShape(.circle)
-        .accessibilityLabel("プロフィール画像")
+        .accessibilityLabel("Profile picture")
         .task(id: loadID) {
             image = nil
             guard let url else { return }
