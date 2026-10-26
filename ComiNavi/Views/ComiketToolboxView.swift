@@ -224,47 +224,57 @@ private struct ToolboxReminderSection: View {
             .padding(.vertical, 3)
             .accessibilityElement(children: .combine)
 
-            ForEach(ComiketReminderKind.allCases) { kind in
-                Toggle(
-                    isOn: Binding(
-                        get: { store.isEnabled(kind) },
-                        set: { enabled in
-                            store.setEnabledOptimistically(enabled, for: kind)
-                        }
-                    )
-                ) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(verbatim: kind.timeLabel)
-                            .font(.body.monospacedDigit().weight(.semibold))
-                            .frame(width: 50, alignment: .leading)
+            if store.isSchedulable {
+                ForEach(ComiketReminderKind.allCases) { kind in
+                    Toggle(
+                        isOn: Binding(
+                            get: { store.isEnabled(kind) },
+                            set: { enabled in
+                                store.setEnabledOptimistically(enabled, for: kind)
+                            }
+                        )
+                    ) {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            Text(verbatim: kind.timeLabel)
+                                .font(.body.monospacedDigit().weight(.semibold))
+                                .frame(width: 50, alignment: .leading)
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(kind.title)
-                                .font(.body)
-                            Text("Both days · 15 min before")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(kind.title)
+                                    .font(.body)
+                                Text("Both days · 15 min before")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    // A milestone whose fire dates have all passed cannot schedule anything.
+                    .disabled(!store.hasFutureFireDate(for: kind))
+                    .accessibilityIdentifier("toolbox-reminder-\(kind.rawValue)")
                 }
-                .accessibilityIdentifier("toolbox-reminder-\(kind.rawValue)")
-            }
 
-            reminderStatus
+                reminderStatus
 
-            if needsSettingsButton {
-                Button("Open notification settings") {
-                    guard let url = URL(string: UIApplication.openNotificationSettingsURLString)
-                    else { return }
-                    UIApplication.shared.open(url)
+                if needsSettingsButton {
+                    Button("Open notification settings") {
+                        guard let url = URL(string: UIApplication.openNotificationSettingsURLString)
+                        else { return }
+                        UIApplication.shared.open(url)
+                    }
+                    .accessibilityIdentifier("toolbox-reminder-open-settings")
                 }
-                .accessibilityIdentifier("toolbox-reminder-open-settings")
+            } else {
+                Text("Reminders for \(edition.shortName) have ended.")
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("toolbox-reminders-ended")
             }
         } footer: {
             VStack(alignment: .leading, spacing: 5) {
-                Text(
-                    "Your choices are saved. Delivery still follows your iOS notification settings."
-                )
+                if store.isSchedulable {
+                    Text(
+                        "Your choices are saved. Delivery still follows your iOS notification settings."
+                    )
+                }
                 Link(
                     "Official \(edition.shortName) admission schedule",
                     destination: edition.reminderScheduleURL

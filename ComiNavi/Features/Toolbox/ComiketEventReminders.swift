@@ -126,6 +126,17 @@ enum ComiketEventReminderCatalog {
         .sorted { $0.fireDate < $1.fireDate }
     }
 
+    /// Whether `kind` still has at least one reminder left to fire on any event day.
+    static func hasFutureFireDate(for kind: ComiketReminderKind, now: Date = Date()) -> Bool {
+        !requests(for: [kind], now: now).isEmpty
+    }
+
+    /// Whether any reminder can still be scheduled. After the last milestone the
+    /// toggles would save a choice that never fires, so the UI retires them.
+    static func isSchedulable(now: Date = Date()) -> Bool {
+        ComiketReminderKind.allCases.contains { hasFutureFireDate(for: $0, now: now) }
+    }
+
     static func requestIdentifier(day: Int, kind: ComiketReminderKind) -> String {
         "\(SystemComiketNotificationScheduler.requestPrefix).c108.day\(day).\(kind.rawValue)"
     }
@@ -254,6 +265,14 @@ final class ComiketReminderStore {
         enabledKinds.contains(kind)
     }
 
+    var isSchedulable: Bool {
+        ComiketEventReminderCatalog.isSchedulable(now: now())
+    }
+
+    func hasFutureFireDate(for kind: ComiketReminderKind) -> Bool {
+        ComiketEventReminderCatalog.hasFutureFireDate(for: kind, now: now())
+    }
+
     func refresh() async {
         state = state(for: await scheduler.authorization())
         guard case .authorized = state else { return }
@@ -304,7 +323,10 @@ final class ComiketReminderStore {
     private func finishSelection(_ mutation: ReminderSelectionMutation) async {
         do {
             var authorization = await scheduler.authorization()
-            if mutation.enabled, authorization == .notDetermined {
+            // Never ask for notification permission for a milestone that already passed.
+            if mutation.enabled, authorization == .notDetermined,
+                hasFutureFireDate(for: mutation.kind)
+            {
                 _ = try await scheduler.requestAuthorization()
                 authorization = await scheduler.authorization()
             }
