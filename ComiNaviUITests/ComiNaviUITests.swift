@@ -663,6 +663,19 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["共有プラン"].waitForExistence(timeout: 5))
     }
 
+    /// Profile does not depend on the selected day, and on iPad a banner
+    /// above its navigation stack sat under the tab bar and caught its taps.
+    @MainActor
+    func testProfileHasNoEventDayBanner() {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        XCTAssertTrue(app.buttons["global-event-day-banner"].waitForExistence(timeout: 30))
+        app.buttons["Profile"].firstMatch.tap()
+        XCTAssertFalse(app.buttons["global-event-day-banner"].waitForExistence(timeout: 2))
+    }
+
     @MainActor
     func testProfileOpensCategorizedImageCacheManagement() {
         let app = XCUIApplication()
