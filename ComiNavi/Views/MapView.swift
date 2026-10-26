@@ -53,7 +53,10 @@ struct MapView: View {
     @State private var gpsSession: GPSLocationSession?
     @State private var locationBeforeManualPicker: LocatedMapUser?
     @State private var isMapLegendExpanded = true
-    @State private var visibleMapLayers = BigSightMapLayer.defaultVisible
+    /// Layer choices persist across launches; an empty value means every
+    /// layer is hidden, so the default applies only before the first choice.
+    @AppStorage("map.visibleLayers") private var storedVisibleMapLayers =
+        BigSightMapLayer.storageValue(for: BigSightMapLayer.defaultVisible)
     @State private var circleSheetDetent: PresentationDetent = .fraction(0.62)
     @Binding private var selectedDay: Int
     private let dataSource: CirclemsDataSource?
@@ -61,6 +64,17 @@ struct MapView: View {
     private let sharedLocationInbox: SharedLocationInbox?
     private let sharedPlanStore: SharedPlanStore?
     private let onboardingStore: FeatureOnboardingStore
+
+    private var visibleMapLayers: Set<BigSightMapLayer> {
+        BigSightMapLayer.layers(fromStorageValue: storedVisibleMapLayers)
+    }
+
+    private var visibleMapLayersBinding: Binding<Set<BigSightMapLayer>> {
+        Binding(
+            get: { BigSightMapLayer.layers(fromStorageValue: storedVisibleMapLayers) },
+            set: { storedVisibleMapLayers = BigSightMapLayer.storageValue(for: $0) }
+        )
+    }
 
     private var currentLocationMapBottomInset: CGFloat {
         showsCurrentLocation ? Self.currentLocationSheetHeight : 0
@@ -133,7 +147,7 @@ struct MapView: View {
             MapControlPanel(
                 model: model,
                 eventDaySelector: eventDaySelector,
-                visibleMapLayers: $visibleMapLayers,
+                visibleMapLayers: visibleMapLayersBinding,
                 onFindCircle: {
                     showsCircleSearch = true
                 }
@@ -1077,73 +1091,11 @@ private struct MapSelectorBar: View {
                 Spacer(minLength: 0)
             }
 
-            Menu {
-                Section("Quick Views") {
-                    Button {
-                        visibleMapLayers = [.essentials, .assistance, .cosplay]
-                    } label: {
-                        LucideLabel("Before arrival", icon: "map.fill")
-                    }
-                    Button {
-                        visibleMapLayers = [.gates, .essentials, .assistance]
-                    } label: {
-                        LucideLabel("Arrival", icon: "figure.walk.arrival")
-                    }
-                    Button {
-                        visibleMapLayers = [.essentials, .assistance, .verticalAccess, .cosplay]
-                    } label: {
-                        LucideLabel("On-site", icon: "building.2.fill")
-                    }
-                }
-
-                Section("Layers") {
-                    ForEach(BigSightMapLayer.allCases) { layer in
-                        Toggle(
-                            isOn: Binding(
-                                get: { visibleMapLayers.contains(layer) },
-                                set: { isVisible in
-                                    if isVisible {
-                                        visibleMapLayers.insert(layer)
-                                    } else {
-                                        visibleMapLayers.remove(layer)
-                                    }
-                                }
-                            )
-                        ) {
-                            LucideLabel(verbatim: layer.title, icon: layer.systemImage)
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button {
-                    visibleMapLayers = BigSightMapLayer.defaultVisible
-                } label: {
-                    LucideLabel("Show All", icon: "eye")
-                }
-                Button {
-                    visibleMapLayers.removeAll()
-                } label: {
-                    LucideLabel("Hide Optional Layers", icon: "eye.slash")
-                }
-            } label: {
-                LucideIcon("line.3.horizontal.decrease.circle")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(
-                        visibleMapLayers == BigSightMapLayer.defaultVisible
-                            ? Color.primary
-                            : Color.accentColor
-                    )
-                    .frame(width: 44, height: 44)
-                    .background(.thinMaterial, in: .circle)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Map layers")
-            .accessibilityValue(
-                "\(visibleMapLayers.count) of \(BigSightMapLayer.allCases.count) shown"
+            MapLayerMenu(
+                eventNumber: model.eventNumber,
+                availableLayers: model.availableMapLayers,
+                visibleMapLayers: $visibleMapLayers
             )
-            .accessibilityIdentifier("map-layer-button")
 
             Button {
                 model.setSearchPresented(!model.isSearchPresented)
@@ -1197,6 +1149,120 @@ private struct MapSelectorBar: View {
         )
     }
 
+}
+
+private struct MapLayerMenu: View {
+    let eventNumber: Int
+    let availableLayers: Set<BigSightMapLayer>
+    @Binding var visibleMapLayers: Set<BigSightMapLayer>
+
+    private var shownLayers: Set<BigSightMapLayer> {
+        visibleMapLayers.intersection(availableLayers)
+    }
+
+    private var activeQuickView: MapQuickView? {
+        MapQuickView.matching(visibleMapLayers, available: availableLayers)
+    }
+
+    private var showsEveryLayer: Bool {
+        shownLayers == availableLayers
+    }
+
+    var body: some View {
+        Menu {
+            // A picker gives the active preset a system checkmark. A custom
+            // layer mix selects no preset.
+            Picker("Quick Views", selection: quickViewSelection) {
+                ForEach(availableQuickViews) { quickView in
+                    VStack(alignment: .leading) {
+                        Text(verbatim: quickView.title)
+                        Text(verbatim: quickView.subtitle)
+                    }
+                    .tag(MapQuickView?.some(quickView))
+                }
+            }
+            .pickerStyle(.inline)
+
+            Section("Layers") {
+                ForEach(BigSightMapLayer.allCases) { layer in
+                    let hasData = availableLayers.contains(layer)
+                    Toggle(isOn: binding(for: layer)) {
+                        Label {
+                            Text(verbatim: layer.title)
+                            if !hasData {
+                                Text("No data for C\(eventNumber)")
+                            }
+                        } icon: {
+                            LucideIcon(layer.systemImage)
+                        }
+                    }
+                    .disabled(!hasData)
+                }
+            }
+
+            Section {
+                if showsEveryLayer {
+                    Button {
+                        visibleMapLayers = []
+                    } label: {
+                        LucideLabel("Hide All Layers", icon: "eye.slash")
+                    }
+                } else {
+                    Button {
+                        visibleMapLayers = BigSightMapLayer.defaultVisible
+                    } label: {
+                        LucideLabel("Show All Layers", icon: "eye")
+                    }
+                }
+            }
+        } label: {
+            LucideIcon("line.3.horizontal.decrease.circle")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(showsEveryLayer ? Color.primary : Color.accentColor)
+                .frame(width: 44, height: 44)
+                .background(.thinMaterial, in: .circle)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Map layers")
+        .accessibilityValue(accessibilityValue)
+        .accessibilityIdentifier("map-layer-button")
+    }
+
+    private var availableQuickViews: [MapQuickView] {
+        MapQuickView.allCases.filter { quickView in
+            quickView.requiredLayer.map(availableLayers.contains) ?? true
+        }
+    }
+
+    private var accessibilityValue: String {
+        if let activeQuickView {
+            return activeQuickView.title
+        }
+        return String(localized: "\(shownLayers.count) of \(availableLayers.count) shown")
+    }
+
+    private var quickViewSelection: Binding<MapQuickView?> {
+        Binding(
+            get: { activeQuickView },
+            set: { quickView in
+                guard let quickView else { return }
+                visibleMapLayers = quickView.layers
+            }
+        )
+    }
+
+    private func binding(for layer: BigSightMapLayer) -> Binding<Bool> {
+        Binding(
+            get: { visibleMapLayers.contains(layer) },
+            set: { isVisible in
+                if isVisible {
+                    visibleMapLayers.insert(layer)
+                } else {
+                    visibleMapLayers.remove(layer)
+                }
+            }
+        )
+    }
 }
 
 private struct MapSearchField: View {

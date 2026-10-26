@@ -146,6 +146,13 @@ final class MapScreenModel {
         days.first(where: { $0.dayIndex == selectedDay })?.halls ?? []
     }
 
+    /// Map layers that have facilities for this event and day. Before the
+    /// campus loads every layer is assumed to be available.
+    var availableMapLayers: Set<BigSightMapLayer> {
+        guard let campusScene else { return BigSightMapLayer.defaultVisible }
+        return BigSightMapLayer.available(in: campusScene.facilities)
+    }
+
     var favoriteBookmarks: [Int: MapBookmark] {
         bookmarks.filter { $0.value.isFavorite }
     }
