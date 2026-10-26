@@ -33,12 +33,27 @@ enum ExploreGalleryZoomGeometry {
             return width >= 900 ? 2 : 1
         }
         if width >= 1_100 {
-            return 4
+            return 5
         }
         if width >= 700 {
-            return 3
+            return 4
         }
         return 2
+    }
+
+    /// Cards at least this wide show the pen name, circle name and space.
+    static let fullCardDetailMinimumWidth: CGFloat = 150
+    /// Cards at least this wide keep the circle name and space code.
+    static let titleCardDetailMinimumWidth: CGFloat = 76
+
+    static func cardDetail(forItemWidth width: CGFloat) -> ExploreGalleryCardDetail {
+        if width >= fullCardDetailMinimumWidth {
+            return .full
+        }
+        if width >= titleCardDetailMinimumWidth {
+            return .title
+        }
+        return .artworkOnly
     }
 
     static func availableWidth(_ width: CGFloat, adjustedInsets: UIEdgeInsets) -> CGFloat {
