@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct BigSightVenueBadge: View {
+    private static let minimumSideForEnglish: CGFloat = 32
+
     let icon: BigSightMapIcon
 
     var body: some View {
@@ -24,10 +26,15 @@ struct BigSightVenueBadge: View {
                         Text(badge.japanese)
                             .font(.system(size: side * 0.43, weight: .heavy, design: .rounded))
 
-                        Text(badge.english)
-                            .font(.system(size: side * 0.14, weight: .black, design: .rounded))
-                            .tracking(side * 0.006)
-                            .minimumScaleFactor(0.8)
+                        // Below 32 pt the English line renders under 4.5 pt
+                        // and cannot be read, so small badges show only the
+                        // kanji.
+                        if side >= Self.minimumSideForEnglish {
+                            Text(badge.english)
+                                .font(.system(size: side * 0.14, weight: .black, design: .rounded))
+                                .tracking(side * 0.006)
+                                .minimumScaleFactor(0.8)
+                        }
                     }
                     .foregroundStyle(.white)
                     .lineLimit(1)
