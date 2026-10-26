@@ -16,6 +16,22 @@ enum DemoState {
     case authenticating
 }
 
+/// The part of a sign-in attempt that is running, shown under the button so a
+/// slow attempt is not a silent spinner.
+enum SignInStep: Equatable {
+    case openingBrowser
+    case verifying
+    case loadingProfile
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .openingBrowser: "Opening Circle.ms…"
+        case .verifying: "Verifying your account…"
+        case .loadingProfile: "Loading your profile…"
+        }
+    }
+}
+
 struct ConventionFloorBlockCoordinate: Hashable {
     let column: Int
     let row: Int
@@ -67,7 +83,7 @@ private enum SignInError: LocalizedError {
         switch self {
         case .environmentChanged:
             String(
-                localized: "The login response could not be verified. Please try again."
+                localized: "The sign-in response couldn't be verified. Please try again."
             )
         }
     }
@@ -78,8 +94,13 @@ final class SignInViewModel: NSObject, ObservableObject,
     ASWebAuthenticationPresentationContextProviding
 {
     @Published var state: DemoState = .anonymous
+    @Published var step: SignInStep?
     @Published var authenticationError: String?
     private var authenticationSession: ASWebAuthenticationSession?
+    private var authenticationTask: Task<Void, Never>?
+    /// Identifies the running attempt so a cancelled attempt that finishes late
+    /// cannot reset the state of a newer one.
+    private var authenticationAttemptID: UUID?
     private let appleProvider = AppleSignInAuthorizationProvider()
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
@@ -96,22 +117,59 @@ final class SignInViewModel: NSObject, ObservableObject,
             .authenticationStarted,
             data: ["provider": "circlems"]
         )
+        startAuthentication(isCancellation: isCancellation) {
+            _ = try await self.perform(
+                purpose: .authenticate,
+                expectedPublicUserID: nil
+            )
+        }
+    }
+
+    /// Stops the running sign-in attempt and returns to the signed-out state.
+    /// A durable authorization flow stays stored, so the next attempt resumes
+    /// it instead of starting a second provider sign-in.
+    func cancelAuthentication() {
+        guard state == .authenticating else { return }
+        authenticationAttemptID = nil
+        authenticationTask?.cancel()
+        authenticationTask = nil
+        authenticationSession?.cancel()
+        authenticationSession = nil
+        state = .anonymous
+        step = nil
+    }
+
+    private func startAuthentication(
+        isCancellation: @escaping @MainActor (Error) -> Bool,
+        operation: @escaping @MainActor () async throws -> Void
+    ) {
+        let attemptID = UUID()
+        authenticationAttemptID = attemptID
         state = .authenticating
+        step = .openingBrowser
         authenticationError = nil
-        Task {
+        authenticationTask = Task {
             do {
-                _ = try await perform(
-                    purpose: .authenticate,
-                    expectedPublicUserID: nil
-                )
+                try await operation()
+                guard authenticationAttemptID == attemptID else { return }
+                step = .loadingProfile
                 await AppData.profileStore.load()
-                state = .anonymous
+                finishAuthentication(attemptID)
             } catch {
-                state = .anonymous
-                if isCancellation(error) { return }
+                guard authenticationAttemptID == attemptID else { return }
+                finishAuthentication(attemptID)
+                if isCancellation(error) || error is CancellationError { return }
                 authenticationError = error.localizedDescription
             }
         }
+    }
+
+    private func finishAuthentication(_ attemptID: UUID) {
+        guard authenticationAttemptID == attemptID else { return }
+        authenticationAttemptID = nil
+        authenticationTask = nil
+        state = .anonymous
+        step = nil
     }
 
     func resumePendingSignInIfNeeded() {
@@ -140,21 +198,11 @@ final class SignInViewModel: NSObject, ObservableObject,
                 "entry_context": entryContext.rawValue,
             ]
         )
-        state = .authenticating
-        authenticationError = nil
-        Task {
-            do {
-                try await performGoogleAuthentication(
-                    entryContext: entryContext,
-                    invitationToken: invitationToken
-                )
-                await AppData.profileStore.load()
-                state = .anonymous
-            } catch {
-                state = .anonymous
-                if isGoogleCancellation(error) { return }
-                authenticationError = error.localizedDescription
-            }
+        startAuthentication(isCancellation: isGoogleCancellation) {
+            try await self.performGoogleAuthentication(
+                entryContext: entryContext,
+                invitationToken: invitationToken
+            )
         }
     }
 
@@ -192,21 +240,11 @@ final class SignInViewModel: NSObject, ObservableObject,
                 "entry_context": entryContext.rawValue,
             ]
         )
-        state = .authenticating
-        authenticationError = nil
-        Task {
-            do {
-                try await performAppleAuthentication(
-                    entryContext: entryContext,
-                    invitationToken: invitationToken
-                )
-                await AppData.profileStore.load()
-                state = .anonymous
-            } catch {
-                state = .anonymous
-                if isAppleCancellation(error) { return }
-                authenticationError = error.localizedDescription
-            }
+        startAuthentication(isCancellation: isAppleCancellation) {
+            try await self.performAppleAuthentication(
+                entryContext: entryContext,
+                invitationToken: invitationToken
+            )
         }
     }
 
@@ -236,7 +274,10 @@ final class SignInViewModel: NSObject, ObservableObject,
             data: ["provider": "circlems"]
         )
         state = .authenticating
-        defer { state = .anonymous }
+        defer {
+            state = .anonymous
+            step = nil
+        }
         return try await perform(purpose: .link, expectedPublicUserID: publicUserID)
     }
 
@@ -280,6 +321,7 @@ final class SignInViewModel: NSObject, ObservableObject,
                 guard environment.storageNamespace == AppEnvironment.current.storageNamespace else {
                     throw SignInError.environmentChanged
                 }
+                step = .verifying
                 publication = try await CominaviServiceClient.shared
                     .recordCirclemsAuthorizationCallback(
                         callback,
@@ -289,6 +331,7 @@ final class SignInViewModel: NSObject, ObservableObject,
                 flow = publication.flow
             }
 
+            step = .verifying
             publication = try await CominaviServiceClient.shared
                 .recordCirclemsAuthorizationSubmission(for: publication)
             flow = publication.flow
