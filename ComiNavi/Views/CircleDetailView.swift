@@ -17,6 +17,8 @@ struct CircleDetailView: View {
     @State private var planModel: CircleUserPlanModel
     @State private var isShowingSharedPlanRequest = false
     @State private var isShowingSignIn = false
+    @State private var headerHeight: CGFloat = 0
+    @State private var isHeaderScrolledAway = false
 
     init(
         circle: CirclemsDataSchema.ComiketCircleWC,
@@ -73,6 +75,11 @@ struct CircleDetailView: View {
                     externalLinks: externalLinks,
                     xProfile: xProfile
                 )
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    headerHeight = height
+                }
 
                 CircleDetailActionRow(
                     isFavorite: planModel.isFavorite,
@@ -171,11 +178,20 @@ struct CircleDetailView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 20)
         }
+        // The header already shows the name and address, so the bar repeats
+        // them only once the header has scrolled out of view.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            headerHeight > 0
+                && geometry.contentOffset.y + geometry.contentInsets.top > headerHeight
+        } action: { _, isScrolledAway in
+            isHeaderScrolledAway = isScrolledAway
+        }
         .background(Color(uiColor: .systemGroupedBackground))
         .modifier(
             CircleDetailNavigationTitle(
                 title: circle.circleName.nonBlank ?? String(localized: "Circle"),
-                subtitle: navigationSubtitle
+                subtitle: navigationSubtitle,
+                isVisible: isHeaderScrolledAway
             )
         )
         .navigationBarTitleDisplayMode(.inline)
@@ -1242,33 +1258,32 @@ private struct CirclePlanColorButton: View {
 private struct CircleDetailNavigationTitle: ViewModifier {
     let title: String
     let subtitle: String?
+    let isVisible: Bool
 
-    @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *), let subtitle {
-            content
-                .navigationTitle(title)
-                .navigationSubtitle(subtitle)
-        } else if let subtitle {
-            content
-                .navigationTitle(String())
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        CircleDetailPrincipalTitle(
-                            title: title,
-                            subtitle: subtitle
-                        )
-                    }
+        // `navigationTitle` keeps the back menu and the VoiceOver screen
+        // title; the principal item controls what the bar shows. Using the
+        // principal item on every OS also avoids the extra subtitle row that
+        // `navigationSubtitle` adds on iPad.
+        content
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    CircleDetailPrincipalTitle(
+                        title: title,
+                        subtitle: subtitle
+                    )
+                    .opacity(isVisible ? 1 : 0)
+                    .accessibilityHidden(!isVisible)
+                    .animation(.easeOut(duration: 0.15), value: isVisible)
                 }
-        } else {
-            content.navigationTitle(title)
-        }
+            }
     }
 }
 
 private struct CircleDetailPrincipalTitle: View {
     let title: String
-    let subtitle: String
+    let subtitle: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1276,10 +1291,12 @@ private struct CircleDetailPrincipalTitle: View {
                 .font(.headline)
                 .lineLimit(1)
 
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
         .accessibilityElement(children: .combine)
     }
