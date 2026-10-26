@@ -208,13 +208,6 @@ private struct ToolboxReminderSection: View {
                         .foregroundStyle(.orange)
                     Text("\(edition.shortName) event reminders")
                         .font(.headline)
-                    Spacer()
-                    Text("Local only")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(.secondary.opacity(0.1), in: .capsule)
                 }
 
                 Text("Get a Time Sensitive alert 15 minutes before selected milestones.")
@@ -272,7 +265,7 @@ private struct ToolboxReminderSection: View {
             VStack(alignment: .leading, spacing: 5) {
                 if store.isSchedulable {
                     Text(
-                        "Your choices are saved. Delivery still follows your iOS notification settings."
+                        "Reminders are set on this device only. Delivery follows your iOS notification settings."
                     )
                 }
                 Link(
@@ -541,7 +534,7 @@ private struct ToolboxResourceRow: View {
 
                 Text(resource.authority.label)
                     .font(.caption2.weight(.medium))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 6)
