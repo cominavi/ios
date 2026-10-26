@@ -117,7 +117,7 @@ final class SignInViewModel: NSObject, ObservableObject,
             .authenticationStarted,
             data: ["provider": "circlems"]
         )
-        startAuthentication(isCancellation: isCancellation) {
+        startAuthentication(initialStep: .openingBrowser, isCancellation: isCancellation) {
             _ = try await self.perform(
                 purpose: .authenticate,
                 expectedPublicUserID: nil
@@ -140,13 +140,14 @@ final class SignInViewModel: NSObject, ObservableObject,
     }
 
     private func startAuthentication(
+        initialStep: SignInStep,
         isCancellation: @escaping @MainActor (Error) -> Bool,
         operation: @escaping @MainActor () async throws -> Void
     ) {
         let attemptID = UUID()
         authenticationAttemptID = attemptID
         state = .authenticating
-        step = .openingBrowser
+        step = initialStep
         authenticationError = nil
         authenticationTask = Task {
             do {
@@ -198,7 +199,7 @@ final class SignInViewModel: NSObject, ObservableObject,
                 "entry_context": entryContext.rawValue,
             ]
         )
-        startAuthentication(isCancellation: isGoogleCancellation) {
+        startAuthentication(initialStep: .verifying, isCancellation: isGoogleCancellation) {
             try await self.performGoogleAuthentication(
                 entryContext: entryContext,
                 invitationToken: invitationToken
@@ -240,7 +241,7 @@ final class SignInViewModel: NSObject, ObservableObject,
                 "entry_context": entryContext.rawValue,
             ]
         )
-        startAuthentication(isCancellation: isAppleCancellation) {
+        startAuthentication(initialStep: .verifying, isCancellation: isAppleCancellation) {
             try await self.performAppleAuthentication(
                 entryContext: entryContext,
                 invitationToken: invitationToken
