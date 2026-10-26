@@ -2,7 +2,7 @@ import Combine
 import SwiftUI
 import UIKit
 
-private enum MapLocationMode: Equatable {
+private enum MapLocationMode: Hashable {
     case manual
     case gps
 
@@ -39,6 +39,7 @@ struct MapView: View {
     private static let currentLocationSheetHeight: CGFloat = 430
 
     @Environment(\.openURL) private var openURL
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: MapScreenModel
     @State private var showsWhereAmI = false
     @State private var showsDestinationPicker = false
@@ -75,8 +76,12 @@ struct MapView: View {
         )
     }
 
+    /// On iPhone the location sheet covers the bottom of the map, so the
+    /// map keeps the user above it. On iPad the sheet is a centered form
+    /// sheet; a token 1 pt inset still asks the canvas to refocus.
     private var currentLocationMapBottomInset: CGFloat {
-        showsCurrentLocation ? Self.currentLocationSheetHeight : 0
+        guard showsCurrentLocation else { return 0 }
+        return horizontalSizeClass == .regular ? 1 : Self.currentLocationSheetHeight
     }
 
     @MainActor
@@ -168,6 +173,8 @@ struct MapView: View {
                     eventNumber: model.eventNumber,
                     mode: locationMode,
                     isManualCompassEnabled: isManualCompassEnabled,
+                    onLocate: locateOrRecenter,
+                    onSetLocation: presentManualLocationPicker,
                     onSelectManualMode: selectManualLocationMode,
                     onSelectGPSMode: requestGPSLocationMode,
                     onToggleManualCompass: {
@@ -184,6 +191,9 @@ struct MapView: View {
             .padding(.trailing, MapChromeLayout.edgeInset)
             .safeAreaPadding(.bottom, MapChromeLayout.edgeInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            // The UIKit compass beside these controls ignores the keyboard,
+            // so the column must too or the row splits apart while typing.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
 
             if requiresLocationPermissionRecovery {
                 LocationPermissionRecoveryOverlay(
@@ -525,7 +535,20 @@ struct MapView: View {
     }
 
     private func selectManualLocationMode() {
-        presentManualLocationPicker()
+        locationMode = .manual
+    }
+
+    /// The location button's tap: show the user's position when there is
+    /// one, otherwise start the way the current mode finds it.
+    private func locateOrRecenter() {
+        if model.locatedUser != nil {
+            // Presenting the location sheet focuses the map on the user.
+            showsCurrentLocation = true
+        } else if locationMode == .gps {
+            updateGPSLocation()
+        } else {
+            presentManualLocationPicker()
+        }
     }
 
     private func presentManualLocationPicker() {
@@ -741,6 +764,8 @@ private struct MapLocationControls: View {
     let eventNumber: Int
     let mode: MapLocationMode
     let isManualCompassEnabled: Bool
+    let onLocate: () -> Void
+    let onSetLocation: () -> Void
     let onSelectManualMode: () -> Void
     let onSelectGPSMode: () -> Void
     let onToggleManualCompass: () -> Void
@@ -748,41 +773,59 @@ private struct MapLocationControls: View {
     let onClearDestination: () -> Void
 
     @State private var copiedDestination = false
-    @State private var showsLocationModes = false
     @State private var showsDestinationActions = false
     @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            if showsLocationModes {
-                locationModeMenu
-            }
-
-            HStack(spacing: MapChromeLayout.controlSpacing) {
-                Button {
-                    showsLocationModes.toggle()
-                } label: {
-                    MapLocationControlIcon(
-                        icon: showsLocationModes ? "xmark" : "location.viewfinder",
-                        isActive: location != nil || mode == .gps
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    showsLocationModes ? "Close location modes" : whereAmILabel
-                )
-                .accessibilityValue(Text(mode.title))
-                .accessibilityHint("Choose how ComiNavi determines your location")
-                .accessibilityIdentifier(
-                    location == nil ? "where-am-i-button" : "current-location-button"
-                )
-
-                Button {
-                    if destination == nil {
-                        onFindTable()
-                    } else {
-                        showsDestinationActions = true
+        HStack(spacing: MapChromeLayout.controlSpacing) {
+            // A tap shows or finds the user's position; touch and hold opens
+            // the location options.
+            Menu {
+                Picker("Location Mode", selection: modeSelection) {
+                    ForEach([MapLocationMode.manual, .gps], id: \.self) { option in
+                        LucideLabel(resource: option.title, icon: option.icon)
+                            .tag(option)
+                            .accessibilityIdentifier(
+                                option == .manual ? "location-mode-manual" : "location-mode-gps"
+                            )
                     }
+                }
+                .pickerStyle(.inline)
+
+                if mode == .manual {
+                    Toggle(isOn: compassSelection) {
+                        LucideLabel("Show Compass Overlay", icon: "safari")
+                    }
+                    .accessibilityIdentifier("manual-compass-overlay-toggle")
+                }
+
+                Button {
+                    onSetLocation()
+                } label: {
+                    LucideLabel("Set My Location…", icon: "location.viewfinder")
+                }
+                .accessibilityIdentifier("location-set-manually")
+            } label: {
+                MapLocationControlIcon(
+                    icon: "location.viewfinder",
+                    isActive: location != nil || mode == .gps
+                )
+            } primaryAction: {
+                onLocate()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(whereAmILabel)
+            .accessibilityValue(Text(mode.title))
+            .accessibilityHint("Shows your location. Touch and hold for location options.")
+            .accessibilityIdentifier(
+                location == nil ? "where-am-i-button" : "current-location-button"
+            )
+
+            // The pin only appears once a space is pinned; search and the
+            // Go to Space flow are the ways to pin one.
+            if let destination {
+                Button {
+                    showsDestinationActions = true
                 } label: {
                     destinationIcon
                 }
@@ -795,29 +838,27 @@ private struct MapLocationControls: View {
                     isPresented: $showsDestinationActions,
                     titleVisibility: .visible
                 ) {
-                    if let destination {
-                        Button {
-                            onFindTable()
-                        } label: {
-                            LucideLabel("Go to Another Space", icon: "mappin.and.ellipse")
-                        }
-
-                        Divider()
-
-                        Button {
-                            copy(destination)
-                        } label: {
-                            LucideLabel("Copy circle location", icon: "doc.on.doc")
-                        }
-                        .accessibilityIdentifier("copy-destination-button")
-
-                        Button(role: .destructive) {
-                            onClearDestination()
-                        } label: {
-                            LucideLabel("Clear destination", icon: "xmark")
-                        }
-                        .accessibilityIdentifier("clear-destination-button")
+                    Button {
+                        onFindTable()
+                    } label: {
+                        LucideLabel("Go to Another Space", icon: "mappin.and.ellipse")
                     }
+
+                    Divider()
+
+                    Button {
+                        copy(destination)
+                    } label: {
+                        LucideLabel("Copy circle location", icon: "doc.on.doc")
+                    }
+                    .accessibilityIdentifier("copy-destination-button")
+
+                    Button(role: .destructive) {
+                        onClearDestination()
+                    } label: {
+                        LucideLabel("Clear destination", icon: "xmark")
+                    }
+                    .accessibilityIdentifier("clear-destination-button")
                 }
             }
         }
@@ -826,63 +867,27 @@ private struct MapLocationControls: View {
         }
     }
 
-    private var locationModeMenu: some View {
-        VStack(spacing: 8) {
-            MapLocationModeOptionButton(
-                mode: .manual,
-                isSelected: mode == .manual,
-                accessibilityIdentifier: "location-mode-manual"
-            ) {
-                showsLocationModes = false
-                onSelectManualMode()
-            }
-
-            MapLocationModeOptionButton(
-                mode: .gps,
-                isSelected: mode == .gps,
-                accessibilityIdentifier: "location-mode-gps"
-            ) {
-                showsLocationModes = false
-                onSelectGPSMode()
-            }
-
-            if mode == .manual {
-                Button {
-                    showsLocationModes = false
-                    onToggleManualCompass()
-                } label: {
-                    HStack(spacing: 10) {
-                        LucideLabel(
-                            resource:
-                                isManualCompassEnabled
-                                ? LocalizedStringResource("Hide Compass Overlay")
-                                : LocalizedStringResource("Show Compass Overlay"),
-                            icon: "safari"
-                        )
-                        Spacer(minLength: 12)
-                        if isManualCompassEnabled {
-                            LucideIcon("checkmark")
-                        }
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+    private var modeSelection: Binding<MapLocationMode> {
+        Binding(
+            get: { mode },
+            set: { newMode in
+                switch newMode {
+                case .manual: onSelectManualMode()
+                case .gps: onSelectGPSMode()
                 }
-                .buttonStyle(.bordered)
-                .tint(isManualCompassEnabled ? .accentColor : .primary)
-                .accessibilityAddTraits(isManualCompassEnabled ? .isSelected : [])
-                .accessibilityIdentifier("manual-compass-overlay-toggle")
             }
-        }
-        .padding(8)
-        .frame(width: 264)
-        .background(.regularMaterial, in: .rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(.white.opacity(0.55), lineWidth: 0.5)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Location Mode")
-        .accessibilityIdentifier("location-mode-menu")
+        )
+    }
+
+    private var compassSelection: Binding<Bool> {
+        Binding(
+            get: { isManualCompassEnabled },
+            set: { isEnabled in
+                if isEnabled != isManualCompassEnabled {
+                    onToggleManualCompass()
+                }
+            }
+        )
     }
 
     private var whereAmILabel: String {
@@ -919,31 +924,6 @@ private struct MapLocationControls: View {
             ) ?? destination.canonicalLocationText
         copiedDestination = true
         hapticFeedback?.play(.copyConfirmation)
-    }
-}
-
-private struct MapLocationModeOptionButton: View {
-    let mode: MapLocationMode
-    let isSelected: Bool
-    let accessibilityIdentifier: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                LucideLabel(resource: mode.title, icon: mode.icon)
-                Spacer(minLength: 12)
-                if isSelected {
-                    LucideIcon("checkmark")
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        }
-        .buttonStyle(.bordered)
-        .tint(isSelected ? .accentColor : .primary)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 
