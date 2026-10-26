@@ -457,6 +457,10 @@ final class UnifiedMapHostView: UIView {
         basemapView.attributionButton.isHidden = true
         basemapView.compassView.isHidden = true
         basemapView.delegate = self
+        // MapLibre exposes its own zoom slider, compass, and attribution
+        // elements even when they are visually hidden. The SpriteKit canvas
+        // already describes the map, so the basemap stays silent.
+        basemapView.accessibilityElementsHidden = true
         addSubview(basemapView)
 
         mapView.translatesAutoresizingMaskIntoConstraints = false
@@ -479,9 +483,11 @@ final class UnifiedMapHostView: UIView {
                 proxy.bottomAnchor.constraint(equalTo: bottomAnchor),
             ])
         }
-        campusAccessibilityProxy.isAccessibilityElement = true
+        // The proxies keep their scope-specific identifiers for automation,
+        // but VoiceOver reads only `mapView` so the canvas is announced once.
+        campusAccessibilityProxy.isAccessibilityElement = false
         campusAccessibilityProxy.accessibilityIdentifier = "campus-map-canvas"
-        venueAccessibilityProxy.isAccessibilityElement = true
+        venueAccessibilityProxy.isAccessibilityElement = false
         venueAccessibilityProxy.accessibilityIdentifier = "interactive-map-canvas"
 
         var configuration = UIButton.Configuration.filled()
@@ -1268,8 +1274,6 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     var accessibilitySummary: String {
-        let bearing = Double(normalizedRotation(mapCamera.zRotation) * 180 / .pi)
-            .formatted(.number.precision(.fractionLength(1)))
         let zoom = Double(zoomFactor).formatted(.number.precision(.fractionLength(1)))
         var summary: String
         if scope == .campus {
@@ -1290,17 +1294,20 @@ final class UnifiedBigSightScene: SKScene {
             summary = String(localized: "\(summary), destination \(destinationSummary)")
         }
         #if DEBUG
-            var debugSummary = String(
-                localized:
+            // Raw camera numbers mean nothing to a VoiceOver user. UI tests
+            // opt in to them explicitly to observe camera changes.
+            if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-map-diagnostics") {
+                let bearing = Double(normalizedRotation(mapCamera.zRotation) * 180 / .pi)
+                    .formatted(.number.precision(.fractionLength(1)))
+                var debugSummary =
                     "\(summary), camera offset \(mapCamera.position.x) \(mapCamera.position.y), bearing \(bearing) degrees"
-            )
-            if let locatedUserHeading {
-                debugSummary += ", user heading \(Int(locatedUserHeading.rounded())) degrees"
+                if let locatedUserHeading {
+                    debugSummary += ", user heading \(Int(locatedUserHeading.rounded())) degrees"
+                }
+                return debugSummary
             }
-            return debugSummary
-        #else
-            return summary
         #endif
+        return summary
     }
 
     init(campus: BigSightCampusScene, appearance: UnifiedMapAppearance = .light) {
