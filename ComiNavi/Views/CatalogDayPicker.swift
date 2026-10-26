@@ -336,7 +336,6 @@ struct CatalogEventDaySheet: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 22) {
-                    sheetSummary
                     daySection
                     eventNavigationSection
                 }
@@ -345,7 +344,7 @@ struct CatalogEventDaySheet: View {
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Day & Comiket")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
@@ -366,33 +365,6 @@ struct CatalogEventDaySheet: View {
         }
     }
 
-    private var sheetSummary: some View {
-        HStack(spacing: 14) {
-            LucideIcon("calendar.badge.clock")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 46, height: 46)
-                .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 12))
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Day \(selectedDay)")
-                    .font(.headline)
-                Text(activeEvent?.displayName ?? String(localized: "Comiket"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(uiColor: .separator).opacity(0.25), lineWidth: 0.5)
-        }
-    }
-
     private var eventNavigationSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Comiket")
@@ -402,17 +374,18 @@ struct CatalogEventDaySheet: View {
                 CatalogEventSelectionView(catalogLibrary: catalogLibrary)
             } label: {
                 HStack(spacing: 14) {
-                    LucideIcon("externaldrive")
+                    LucideIcon("calendar.badge.clock")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(Color.accentColor)
                         .frame(width: 30)
-                        .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(activeEvent?.shortName ?? String(localized: "Comiket"))
+                        // The open catalog, not the one that is loading: the
+                        // days above still belong to it until the switch ends.
+                        Text(catalogLibrary.selectedEvent?.shortName ?? String(localized: "Comiket"))
                             .font(.headline)
                             .foregroundStyle(.primary)
-                        Text("Choose another catalog")
+                        Text("Choose another Comiket")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -422,7 +395,6 @@ struct CatalogEventDaySheet: View {
                     LucideIcon("chevron.forward")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
                 }
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, minHeight: eventRowHeight)
@@ -437,8 +409,10 @@ struct CatalogEventDaySheet: View {
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(Color(uiColor: .separator).opacity(0.25), lineWidth: 0.5)
             }
-            .accessibilityHint("Choose another catalog")
+            .accessibilityHint("Choose another Comiket")
             .accessibilityIdentifier("catalog-event-selection-link")
+
+            CatalogSwitchProgress(catalogLibrary: catalogLibrary)
         }
     }
 
@@ -467,22 +441,15 @@ struct CatalogEventDaySheet: View {
                         isSelected: day.dayIndex == selectedDay,
                         minimumHeight: dayRowHeight
                     ) {
+                        // A day is a single choice, so picking one is the
+                        // whole task: close the sheet instead of asking for Done.
                         selectedDay = day.dayIndex
+                        dismiss()
                     }
                     .accessibilityIdentifier("global-day-\(day.dayIndex)")
                 }
             }
         }
-    }
-
-    private var activeEvent: CatalogEvent? {
-        if case .loading(let event) = catalogLibrary.phase {
-            return event
-        }
-        if case .downloading(let event, _) = catalogLibrary.phase {
-            return event
-        }
-        return catalogLibrary.selectedEvent
     }
 
     private var availableDays: [UFDSchema.Day] {
@@ -498,8 +465,8 @@ struct CatalogEventDaySheet: View {
     }
 
     private var openingLabel: String {
-        if let activeEvent {
-            return String(localized: "Opening \(activeEvent.shortName)…")
+        if let event = catalogLibrary.switchTarget ?? catalogLibrary.selectedEvent {
+            return String(localized: "Opening \(event.shortName)…")
         }
         return String(localized: "Opening catalog…")
     }
@@ -507,6 +474,67 @@ struct CatalogEventDaySheet: View {
     private func formattedDate(_ day: UFDSchema.Day) -> String? {
         guard let date = Calendar.current.date(from: day.date) else { return nil }
         return date.formatted(CatalogDateFormatting.full(for: date))
+    }
+}
+
+/// Progress for a switch to another Comiket, with a way to keep the open
+/// one. A full catalog download can be hundreds of megabytes.
+private struct CatalogSwitchProgress: View {
+    let catalogLibrary: CatalogLibrary
+
+    var body: some View {
+        if let event = catalogLibrary.switchTarget {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) {
+                    if fractionCompleted == nil {
+                        ProgressView()
+                    }
+
+                    Text(statusText(for: event))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+
+                    Spacer(minLength: 8)
+
+                    Button("Cancel", role: .cancel) {
+                        catalogLibrary.cancelPendingLoad()
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityHint(
+                        Text("Stops the switch and keeps \(catalogLibrary.selectedEvent?.shortName ?? "") open.")
+                    )
+                    .accessibilityIdentifier("catalog-switch-cancel")
+                }
+
+                if let fractionCompleted {
+                    ProgressView(value: fractionCompleted)
+                        .tint(Color.accentColor)
+                        .accessibilityHidden(true)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Color(uiColor: .secondarySystemGroupedBackground),
+                in: .rect(cornerRadius: 14)
+            )
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("catalog-switch-progress")
+        }
+    }
+
+    private var fractionCompleted: Double? {
+        guard case .downloading(_, let progress) = catalogLibrary.phase else { return nil }
+        return progress.fractionCompleted
+    }
+
+    private func statusText(for event: CatalogEvent) -> String {
+        guard let fractionCompleted else {
+            return String(localized: "Switching to \(event.shortName)…")
+        }
+        let percent = fractionCompleted.formatted(.percent.precision(.fractionLength(0)))
+        return String(localized: "Switching to \(event.shortName)… \(percent)")
     }
 }
 
@@ -520,16 +548,25 @@ private struct CatalogEventSelectionView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 8) {
+                CatalogSwitchProgress(catalogLibrary: catalogLibrary)
+
                 ForEach(catalogLibrary.events) { event in
                     let dateDescription = dateDescription(for: event)
                     CatalogSettingRow(
                         title: event.shortName,
                         detail: dateDescription ?? event.displayName,
-                        systemImage: "externaldrive",
-                        isSelected: event == activeEvent,
+                        systemImage: "calendar.badge.clock",
+                        isSelected: event == catalogLibrary.selectedEvent,
+                        isLoading: event == catalogLibrary.switchTarget,
                         minimumHeight: rowHeight
                     ) {
-                        catalogLibrary.select(event)
+                        // Picking the open Comiket again during a switch
+                        // means "stay here".
+                        if event == catalogLibrary.selectedEvent {
+                            catalogLibrary.cancelPendingLoad()
+                        } else {
+                            catalogLibrary.select(event)
+                        }
                     }
                     .accessibilityLabel(
                         [event.displayName, dateDescription]
@@ -544,18 +581,8 @@ private struct CatalogEventSelectionView: View {
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Comiket")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("catalog-event-selection-page")
-    }
-
-    private var activeEvent: CatalogEvent? {
-        if case .loading(let event) = catalogLibrary.phase {
-            return event
-        }
-        if case .downloading(let event, _) = catalogLibrary.phase {
-            return event
-        }
-        return catalogLibrary.selectedEvent
     }
 
     private func dateDescription(for event: CatalogEvent) -> String? {
@@ -574,6 +601,7 @@ private struct CatalogSettingRow: View {
     let detail: String?
     let systemImage: String
     let isSelected: Bool
+    var isLoading = false
     let minimumHeight: CGFloat
     let action: () -> Void
 
@@ -584,7 +612,6 @@ private struct CatalogSettingRow: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                     .frame(width: 30)
-                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
@@ -599,11 +626,12 @@ private struct CatalogSettingRow: View {
 
                 Spacer(minLength: 8)
 
-                if isSelected {
+                if isLoading {
+                    ProgressView()
+                } else if isSelected {
                     LucideIcon("checkmark.circle.fill")
                         .font(.title3)
                         .foregroundStyle(Color.accentColor)
-                        .accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, 16)
@@ -622,7 +650,7 @@ private struct CatalogSettingRow: View {
                     lineWidth: isSelected ? 1 : 0.5
                 )
         }
-        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        // The trait alone announces "Selected"; a value would repeat it.
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

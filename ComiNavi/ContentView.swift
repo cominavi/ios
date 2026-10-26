@@ -135,7 +135,7 @@ struct ContentView: View {
                 catalogLibrary: catalogLibrary,
                 selectedDay: $selectedDay
             )
-            .presentationDetents([.large])
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationContentInteraction(.scrolls)
         }

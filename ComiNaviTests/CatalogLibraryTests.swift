@@ -539,6 +539,42 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertEqual(library.dataSource?.readiness, .ready)
         XCTAssertFalse(library.dataSource === originalDataSource)
     }
+
+    func testCancellingCatalogSwitchKeepsOpenCatalog() async throws {
+        let baseConfiguration = try await bundledDemoCatalogSource().configuration(
+            for: DemoCatalogSource.c104
+        )
+        let firstEvent = DemoCatalogSource.c104
+        let secondEvent = CatalogEvent(id: 191, number: 105)
+        let source = MultiEventDemoCatalogSource(
+            events: [firstEvent, secondEvent],
+            baseConfiguration: baseConfiguration,
+            stalledEvent: secondEvent
+        )
+        let (defaults, suiteName) = isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let library = CatalogLibrary(
+            sources: [.demo: source],
+            defaults: defaults,
+            initialMode: .demo
+        )
+
+        library.start()
+        try await waitForReady(in: library)
+        let originalDataSource = try XCTUnwrap(library.dataSource)
+
+        library.select(secondEvent)
+        XCTAssertEqual(library.switchTarget, secondEvent)
+        XCTAssertEqual(library.selectedEvent, firstEvent)
+
+        library.cancelPendingLoad()
+
+        XCTAssertEqual(library.phase, .ready)
+        XCTAssertNil(library.switchTarget)
+        XCTAssertEqual(library.selectedEvent, firstEvent)
+        XCTAssertTrue(library.dataSource === originalDataSource)
+    }
+
     private func isolatedDefaults() -> (defaults: UserDefaults, suiteName: String) {
         let suiteName = "net.cominavi.tests.catalog-library.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -597,6 +633,8 @@ private struct MultiEventDemoCatalogSource: CatalogSource {
     let mode = CatalogDataMode.demo
     let events: [CatalogEvent]
     let baseConfiguration: CatalogDataSourceConfiguration
+    /// An event whose configuration never arrives until the load is cancelled.
+    var stalledEvent: CatalogEvent?
 
     func availableEvents() async throws -> [CatalogEvent] {
         events
@@ -606,7 +644,10 @@ private struct MultiEventDemoCatalogSource: CatalogSource {
         for event: CatalogEvent,
         progress: (@MainActor @Sendable (Readiness.Progress) -> Void)?
     ) async throws -> CatalogDataSourceConfiguration {
-        CatalogDataSourceConfiguration(
+        if event == stalledEvent {
+            try await Task.sleep(for: .seconds(600))
+        }
+        return CatalogDataSourceConfiguration(
             eventID: event.id,
             eventNumber: event.number,
             main: baseConfiguration.main,

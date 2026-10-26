@@ -634,8 +634,10 @@ final class ComiNaviUITests: XCTestCase {
         let secondDay = app.buttons["global-day-2"]
         XCTAssertTrue(secondDay.exists)
         secondDay.tap()
-        XCTAssertEqual(secondDay.value as? String, "Selected")
-        app.buttons["catalog-settings-done"].tap()
+        // Picking a day closes the sheet.
+        XCTAssertTrue(
+            app.otherElements["catalog-event-day-sheet"].waitForNonExistence(timeout: 5)
+        )
 
         mapTab.tap()
         XCTAssertTrue(eventDayBanner.waitForExistence(timeout: 5))
@@ -1223,10 +1225,11 @@ final class ComiNaviUITests: XCTestCase {
             dayButton.tap()
 
             XCTAssertTrue(map.exists, "The map surface disappeared while switching to day \(day)")
-            XCTAssertEqual(dayButton.value as? String, "Selected")
             takeScreenshot(named: "C104-Day-\(day)-Map-Transition")
 
-            app.buttons["catalog-settings-done"].tap()
+            // Picking a day closes the sheet.
+            XCTAssertTrue(dayButton.waitForNonExistence(timeout: 5))
+            XCTAssertTrue(eventDayBanner.label.contains("Day \(day)"))
             takeScreenshot(named: "C104-Day-\(day)-Map-Visible")
             XCTAssertTrue(map.waitForExistence(timeout: 10))
             XCTAssertFalse(app.staticTexts["Map unavailable"].exists)
@@ -2253,7 +2256,7 @@ final class ComiNaviUITests: XCTestCase {
         alternateEvent.tap()
 
         expectation(
-            for: NSPredicate(format: "value == %@", "Selected"),
+            for: NSPredicate(format: "selected == true"),
             evaluatedWith: alternateEvent
         )
         waitForExpectations(timeout: 30)
@@ -2273,7 +2276,7 @@ final class ComiNaviUITests: XCTestCase {
             XCTAssertTrue(event108.waitForExistence(timeout: 3))
             event108.tap()
             expectation(
-                for: NSPredicate(format: "value == %@", "Selected"),
+                for: NSPredicate(format: "selected == true"),
                 evaluatedWith: event108
             )
             waitForExpectations(timeout: 30)

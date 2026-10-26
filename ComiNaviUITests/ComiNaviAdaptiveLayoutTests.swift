@@ -52,7 +52,7 @@ final class ComiNaviAdaptiveLayoutTests: XCTestCase {
         let dayTwo = app.buttons["global-day-2"]
         XCTAssertTrue(dayTwo.waitForExistence(timeout: 5))
         dayTwo.tap()
-        app.buttons["catalog-settings-done"].tap()
+        XCTAssertTrue(dayTwo.waitForNonExistence(timeout: 5))
         XCTAssertTrue(day.label.contains("Day 2"))
 
         tab("Explore", in: app).tap()
