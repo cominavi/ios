@@ -1116,6 +1116,17 @@ final class UnifiedBigSightScene: SKScene {
         let minimumZoom: CGFloat
         let labelMinimumZoom: CGFloat
         let maximumZoom: CGFloat
+        /// Side of the square or round backing, in screen points.
+        let badgeSize: CGFloat
+        let venueID: Int?
+    }
+
+    /// The on-screen footprint of a hall badge and its title, in the SKView's
+    /// coordinate space.
+    struct VenueBadgeTarget: Equatable {
+        let venueID: Int
+        let title: String
+        let frame: CGRect
     }
 
     private static let darkArtworkShader = SKShader(
@@ -1861,8 +1872,16 @@ final class UnifiedBigSightScene: SKScene {
                 layer: nil,
                 minimumZoom: 0,
                 labelMinimumZoom: 0,
-                maximumZoom: 12
+                maximumZoom: 12,
+                badgeSize: UnifiedMapMarkerMetrics.backingSize(
+                    for: venue.kind.icon,
+                    iconSize: UnifiedMapMarkerMetrics.venueIconSize
+                ),
+                venueID: venue.id
             ))
+        // Hall titles must stay readable where a neighboring badge overlaps
+        // them, so they draw above every marker backing.
+        venueMarker.label.zPosition = 30
         markerRoot.addChild(venueMarker.node)
 
         if venue.scene.artwork == nil {
@@ -1904,7 +1923,12 @@ final class UnifiedBigSightScene: SKScene {
                 layer: facility.layer,
                 minimumZoom: facility.minimumZoom,
                 labelMinimumZoom: presentation.labelMinimumZoom,
-                maximumZoom: isInsideVenue ? facility.maximumZoom : .infinity
+                maximumZoom: isInsideVenue ? facility.maximumZoom : .infinity,
+                badgeSize: UnifiedMapMarkerMetrics.backingSize(
+                    for: facility.kind.icon,
+                    iconSize: UnifiedMapMarkerMetrics.facilityIconSize(for: facility.kind)
+                ),
+                venueID: nil
             ))
         markerRoot.addChild(marker.node)
     }
@@ -2166,6 +2190,100 @@ final class UnifiedBigSightScene: SKScene {
         }
         for child in userRoot.children {
             child.setScale(mapCamera.xScale)
+        }
+        layoutVenueMarkerLabels()
+    }
+
+    /// Places each hall title on the first side of its badge that does not
+    /// overlap another hall badge or an already placed title, and hides the
+    /// title when no side is clear. East 1–3 and East 4–6 sit close enough
+    /// at overview zoom that the default below-badge title otherwise falls
+    /// under the neighboring badge.
+    private func layoutVenueMarkerLabels() {
+        guard view != nil else { return }
+        let visibleMarkers = venueMarkers.filter { !$0.node.isHidden }
+        let badgeRects = visibleMarkers.map(badgeViewRect)
+        var placedLabelRects: [CGRect] = []
+        for (index, marker) in visibleMarkers.enumerated() {
+            guard marker.label.alpha > 0 else { continue }
+            let center = markerViewCenter(marker)
+            let labelSize = marker.label.frame.size
+            let clearance = marker.badgeSize / 2 + 3
+            // Screen-space offsets, y down: below, above, trailing, leading.
+            let candidates = [
+                CGPoint(x: 0, y: clearance + labelSize.height / 2),
+                CGPoint(x: 0, y: -(clearance + labelSize.height / 2)),
+                CGPoint(x: clearance + labelSize.width / 2, y: 0),
+                CGPoint(x: -(clearance + labelSize.width / 2), y: 0),
+            ]
+            var placement: (offset: CGPoint, rect: CGRect)?
+            for offset in candidates {
+                let rect = CGRect(
+                    x: center.x + offset.x - labelSize.width / 2,
+                    y: center.y + offset.y - labelSize.height / 2,
+                    width: labelSize.width,
+                    height: labelSize.height
+                )
+                let hitsBadge = badgeRects.indices.contains { otherIndex in
+                    otherIndex != index && badgeRects[otherIndex].intersects(rect)
+                }
+                if !hitsBadge, !placedLabelRects.contains(where: { $0.intersects(rect) }) {
+                    placement = (offset, rect)
+                    break
+                }
+            }
+            guard let placement else {
+                marker.label.isHidden = true
+                continue
+            }
+            // The marker is scaled and rotated to stay screen-upright, so one
+            // local unit is one screen point with the y axis pointing up.
+            marker.label.position = CGPoint(x: placement.offset.x, y: -placement.offset.y)
+            marker.label.isHidden = false
+            placedLabelRects.append(placement.rect)
+        }
+    }
+
+    private func markerViewCenter(_ marker: ScreenSpaceMarker) -> CGPoint {
+        convertPoint(toView: marker.node.convert(.zero, to: self))
+    }
+
+    private func badgeViewRect(_ marker: ScreenSpaceMarker) -> CGRect {
+        let center = markerViewCenter(marker)
+        return CGRect(
+            x: center.x - marker.badgeSize / 2,
+            y: center.y - marker.badgeSize / 2,
+            width: marker.badgeSize,
+            height: marker.badgeSize
+        )
+    }
+
+    /// Hall badges that are currently drawn, with frames that cover the badge
+    /// and its visible title. The host exposes each one as a VoiceOver button.
+    func venueBadgeTargets() -> [VenueBadgeTarget] {
+        guard view != nil else { return [] }
+        return venueMarkers.compactMap { marker in
+            guard let venueID = marker.venueID,
+                !marker.node.isHidden,
+                marker.node.alpha > 0.05
+            else { return nil }
+            var frame = badgeViewRect(marker)
+            if !marker.label.isHidden {
+                let center = markerViewCenter(marker)
+                let size = marker.label.frame.size
+                frame = frame.union(
+                    CGRect(
+                        x: center.x + marker.label.position.x - size.width / 2,
+                        y: center.y - marker.label.position.y - size.height / 2,
+                        width: size.width,
+                        height: size.height
+                    ))
+            }
+            return VenueBadgeTarget(
+                venueID: venueID,
+                title: marker.label.text ?? "",
+                frame: frame
+            )
         }
     }
 
