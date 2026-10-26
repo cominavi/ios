@@ -2,30 +2,65 @@ import SwiftUI
 import UIKit
 
 /// App-wide Lucide icons bundled from Iconify's `@iconify-json/lucide` data.
+///
+/// Icons are decorative by default: the text next to them already names the
+/// action, so VoiceOver must not read the asset name. Pass `accessibilityLabel`
+/// only when the icon is the sole content of a control.
 struct LucideIcon: View {
     private let legacyName: String
     private let requestedSize: Double?
-    @ScaledMetric(relativeTo: .body) private var size = 17.0
+    private let accessibilityLabel: Text?
+    /// Dynamic Type multiplier applied to every icon, including fixed `size:` call sites.
+    @ScaledMetric(relativeTo: .body) private var scale = 1.0
 
-    init(_ legacyName: String, size: Double? = nil) {
+    init(_ legacyName: String, size: Double? = nil, accessibilityLabel: Text? = nil) {
         self.legacyName = legacyName
         requestedSize = size
+        self.accessibilityLabel = accessibilityLabel
+        Self.assertAssetExists(Self.assetName(for: legacyName))
     }
 
     var body: some View {
-        Image(Self.assetName(for: legacyName))
+        let dimension = Self.scaledDimension(requestedSize ?? Self.defaultSize, scale: scale)
+        icon
             .resizable()
             .renderingMode(.template)
             .scaledToFit()
-            .frame(
-                width: requestedSize ?? size,
-                height: requestedSize ?? size
-            )
-            .accessibilityHidden(true)
+            .frame(width: dimension, height: dimension)
+    }
+
+    private var icon: Image {
+        if let accessibilityLabel {
+            Image(Self.assetName(for: legacyName), label: accessibilityLabel)
+        } else {
+            Image(decorative: Self.assetName(for: legacyName))
+        }
+    }
+
+    static let defaultSize = 17.0
+
+    /// Scales a design size with Dynamic Type. Large hero glyphs grow less than
+    /// inline icons so that they do not push the text they illustrate off screen.
+    static func scaledDimension(_ size: Double, scale: Double) -> Double {
+        let maximumScale = size >= 28 ? 1.4 : 2.0
+        return size * min(max(scale, 0.8), maximumScale)
+    }
+
+    static func assertAssetExists(_ assetName: String) {
+        #if DEBUG
+            if UIImage(named: assetName) == nil {
+                assertionFailure("Missing icon asset \(assetName). Add a mapping or an imageset.")
+            }
+        #endif
     }
 
     static func uiImage(for legacyName: String) -> UIImage? {
         UIImage(named: assetName(for: legacyName))?.withRenderingMode(.alwaysTemplate)
+    }
+
+    /// Every SF Symbol-style name with an explicit mapping, for asset coverage tests.
+    static var mappedLegacyNames: [String] {
+        Array(lucideNameByLegacyName.keys)
     }
 
     static func assetName(for legacyName: String) -> String {
@@ -74,16 +109,19 @@ struct LucideIcon: View {
         "figure.walk.arrival": "footprints",
         "gearshape.2.fill": "settings",
         "globe": "globe",
-        "hand.tap.fill": "mouse-pointer-click",
+        // Manual positioning: the user points at the map.
+        "hand.tap.fill": "pointer",
         "info.circle": "info",
+        "info.circle.fill": "info",
         "line.3.horizontal.decrease": "list-filter",
         "line.3.horizontal.decrease.circle": "list-filter",
         "line.3.horizontal.decrease.circle.fill": "list-filter",
         "list.bullet": "list",
-        "location": "map-pin",
-        "location.fill": "map-pin",
+        // GPS and "where am I" use crosshairs. `map-pin` is only for destinations.
+        "location": "locate",
+        "location.fill": "locate",
         "location.north.fill": "navigation",
-        "location.north.line.fill": "navigation",
+        "location.north.line.fill": "compass",
         "location.slash": "map-pin-off",
         "location.viewfinder": "locate-fixed",
         "magnifyingglass": "search",
@@ -92,6 +130,8 @@ struct LucideIcon: View {
         "mappin.and.ellipse": "map-pin",
         "minus": "minus",
         "person.circle": "circle-user",
+        "person.circle.fill": "circle-user",
+        "person.crop.circle.badge.questionmark": "user-round-search",
         "person.2.crop.square.stack": "users",
         "person.crop.circle.badge.minus": "user-round-minus",
         "person.crop.circle.badge.plus": "user-round-plus",
@@ -102,6 +142,8 @@ struct LucideIcon: View {
         "paintbrush.pointed": "paintbrush",
         "plus": "plus",
         "ruler": "ruler",
+        // The Explore tab uses binoculars so the compass overlay keeps `compass`.
+        "binoculars": "binoculars",
         "safari": "compass",
         "slider.horizontal.3": "sliders-horizontal",
         "sparkle.magnifyingglass": "scan-search",
@@ -111,7 +153,7 @@ struct LucideIcon: View {
         "square.3.layers.3d.top.filled": "layers-3",
         "square.and.arrow.up": "share",
         "star": "star",
-        "star.fill": "star",
+        "star.fill": "star-filled",
         "tag": "tag",
         "tag.fill": "tag",
         "tag.slash": "tag-x",
@@ -133,11 +175,14 @@ struct LucideIcon: View {
 struct IconifyBrandIcon: View {
     private let name: String
     private let requestedSize: Double?
-    @ScaledMetric(relativeTo: .body) private var size = 19.0
+    private let accessibilityLabel: Text?
+    @ScaledMetric(relativeTo: .body) private var scale = 1.0
 
-    init(_ name: String, size: Double? = nil) {
+    init(_ name: String, size: Double? = nil, accessibilityLabel: Text? = nil) {
         self.name = name
         requestedSize = size
+        self.accessibilityLabel = accessibilityLabel
+        LucideIcon.assertAssetExists("simple-icons-\(name)")
     }
 
     static func uiImage(for name: String) -> UIImage? {
@@ -145,15 +190,20 @@ struct IconifyBrandIcon: View {
     }
 
     var body: some View {
-        Image("simple-icons-\(name)")
+        let dimension = LucideIcon.scaledDimension(requestedSize ?? 19, scale: scale)
+        icon
             .resizable()
             .renderingMode(.template)
             .scaledToFit()
-            .frame(
-                width: requestedSize ?? size,
-                height: requestedSize ?? size
-            )
-            .accessibilityHidden(true)
+            .frame(width: dimension, height: dimension)
+    }
+
+    private var icon: Image {
+        if let accessibilityLabel {
+            Image("simple-icons-\(name)", label: accessibilityLabel)
+        } else {
+            Image(decorative: "simple-icons-\(name)")
+        }
     }
 }
 
@@ -182,6 +232,10 @@ struct LucideLabel: View {
         } icon: {
             LucideIcon(icon)
         }
+        // One element whose label is the title. A Section header then reads its
+        // title with the heading trait instead of an icon asset name.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
     }
 }
 
