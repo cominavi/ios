@@ -120,6 +120,133 @@ struct ComiketSpaceAddress: Equatable, Sendable {
     }
 }
 
+/// A space code typed into map search, such as "東A01a", "1日目 西あ12",
+/// "Day 2 East ア-34b", or a bare "シ01".
+///
+/// Attendees usually know a circle by its space code, so search resolves the
+/// code directly instead of sending them through the block-and-number flow.
+struct ComiketSpaceCodeQuery: Equatable, Sendable {
+    let day: Int?
+    let direction: BigSightVenue.Direction?
+    /// The block character with full-width Latin letters folded to ASCII.
+    let blockName: String
+    let spaceNumber: Int
+    /// 0 for the a side, 1 for the b side, `nil` for the whole table.
+    let subspace: Int?
+
+    static func parse(_ query: String) -> Self? {
+        var rest = Substring(normalized(query))
+        guard !rest.isEmpty else { return nil }
+
+        let day = consumeDay(from: &rest)
+        var afterDirection = rest
+        if let direction = consumeDirection(from: &afterDirection),
+            let code = parseSpace(afterDirection, day: day, direction: direction)
+        {
+            return code
+        }
+        return parseSpace(rest, day: day, direction: nil)
+    }
+
+    private static func parseSpace(
+        _ value: Substring,
+        day: Int?,
+        direction: BigSightVenue.Direction?
+    ) -> Self? {
+        var rest = value
+        guard let block = rest.first, block.isLetter else { return nil }
+        rest.removeFirst()
+
+        let digits = rest.prefix(while: { $0.isASCII && $0.isNumber })
+        guard (1...2).contains(digits.count), let spaceNumber = Int(digits), spaceNumber > 0
+        else {
+            return nil
+        }
+        rest.removeFirst(digits.count)
+
+        let subspace: Int?
+        switch rest.lowercased() {
+        case "": subspace = nil
+        case "a": subspace = 0
+        case "b": subspace = 1
+        case "ab", "a+b": subspace = nil
+        default: return nil
+        }
+
+        return Self(
+            day: day,
+            direction: direction,
+            blockName: String(block),
+            spaceNumber: spaceNumber,
+            subspace: subspace
+        )
+    }
+
+    /// Whether a catalog block name is the block this query names. Block
+    /// letters are case-sensitive at Comiket, so `ignoringCase` is only a
+    /// fallback when no exact block exists.
+    func matches(blockName candidate: String, ignoringCase: Bool = false) -> Bool {
+        let folded = Self.foldingFullWidthASCII(candidate)
+        return ignoringCase
+            ? folded.lowercased() == blockName.lowercased()
+            : folded == blockName
+    }
+
+    private static func consumeDay(from rest: inout Substring) -> Int? {
+        if let digit = rest.first, digit.isASCII, let day = digit.wholeNumberValue,
+            rest.dropFirst().hasPrefix("日目")
+        {
+            rest.removeFirst(1 + "日目".count)
+            return day
+        }
+        if rest.lowercased().hasPrefix("day"),
+            let digit = rest.dropFirst(3).first,
+            digit.isASCII,
+            let day = digit.wholeNumberValue
+        {
+            rest.removeFirst(4)
+            return day
+        }
+        return nil
+    }
+
+    private static func consumeDirection(from rest: inout Substring) -> BigSightVenue.Direction? {
+        let prefixes: [(String, BigSightVenue.Direction)] = [
+            ("東", .east), ("西", .west), ("南", .south),
+            ("east", .east), ("west", .west), ("south", .south),
+        ]
+        let lowered = rest.lowercased()
+        for (prefix, direction) in prefixes where lowered.hasPrefix(prefix) {
+            // Only whole English words count, so the block letter in a code
+            // such as "E12" or "S03a" is never read as a direction.
+            rest.removeFirst(prefix.count)
+            return direction
+        }
+        return nil
+    }
+
+    private static func normalized(_ query: String) -> String {
+        foldingFullWidthASCII(query).filter { character in
+            !character.isWhitespace && !"-‐–・·_".contains(character)
+        }
+    }
+
+    private static func foldingFullWidthASCII(_ value: String) -> String {
+        String(
+            String.UnicodeScalarView(
+                value.unicodeScalars.map { scalar in
+                    if (0xFF01...0xFF5E).contains(scalar.value),
+                        let ascii = UnicodeScalar(scalar.value - 0xFEE0)
+                    {
+                        return ascii
+                    }
+                    return scalar
+                }
+            )
+        )
+    }
+}
+
 struct LocatedMapUser: Identifiable, Equatable, Sendable {
     enum Source: Hashable, Sendable {
         case guidedLocator

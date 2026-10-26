@@ -420,8 +420,8 @@ struct MapView: View {
                     selectedTableID: model.selection?.table.id,
                     circlePlacements: model.visibleCirclePlacements,
                     circleArtwork: model.visibleCircleArtwork,
-                    searchMatches: model.searchMatches,
-                    searchActive: !model.searchQuery.isEmpty,
+                    searchMatches: isSearchHighlightActive ? model.searchMatches : [],
+                    searchActive: isSearchHighlightActive,
                     genrePlacements: model.genrePlacements,
                     bookmarks: Array(model.favoriteBookmarks.values),
                     primarySharedPlanCircles: model.primarySharedPlanCircles,
@@ -458,8 +458,10 @@ struct MapView: View {
                     selectedTableID: model.selection?.table.id,
                     circlePlacements: model.visibleCirclePlacements,
                     circleArtwork: model.visibleCircleArtwork,
-                    searchMatches: model.searchMatches.filter { $0.mapID == scene.id.mapID },
-                    searchActive: !model.searchQuery.isEmpty,
+                    searchMatches: isSearchHighlightActive
+                        ? model.searchMatches.filter { $0.mapID == scene.id.mapID }
+                        : [],
+                    searchActive: isSearchHighlightActive,
                     genrePlacements: model.genrePlacements,
                     bookmarks: Array(model.favoriteBookmarks.values),
                     primarySharedPlanCircles: model.primarySharedPlanCircles,
@@ -506,6 +508,12 @@ struct MapView: View {
             }
 
         }
+    }
+
+    /// The query survives closing search, but matches only highlight the
+    /// map while search is open.
+    private var isSearchHighlightActive: Bool {
+        model.isSearchPresented && !model.searchQuery.isEmpty
     }
 
     private var sharedPlanCircleSignature: String {
@@ -1269,7 +1277,9 @@ private struct MapSearchField: View {
     let model: MapScreenModel
     let onFindByLocation: () -> Void
     @State private var text = ""
+    @State private var showsResults = true
     @FocusState private var isFocused: Bool
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         VStack(spacing: 8) {
@@ -1278,33 +1288,61 @@ private struct MapSearchField: View {
                     .foregroundStyle(.secondary)
 
                 TextField(
-                    "Circle, creator, or description",
+                    "Circle, creator, or space (e.g. 東A01a)",
                     text: $text
                 )
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .focused($isFocused)
                 .submitLabel(.search)
-                .accessibilityHint("Search circle names, creators, or descriptions")
+                .accessibilityLabel("Search circles")
+                .accessibilityHint("Search circle names, creators, or space codes on every day")
                 .accessibilityIdentifier("map-search-field")
 
                 if model.isSearching {
                     ProgressView()
                         .controlSize(.small)
-                } else if !model.searchQuery.isEmpty {
-                    Text("\(model.searchMatches.count)")
+                } else if hasQuery {
+                    Text("^[\(model.searchResultCount) circle](inflect: true)")
                         .font(.caption.monospacedDigit().weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .accessibilityLabel("\(model.searchMatches.count) matching circles")
+                        .lineLimit(1)
+                        .fixedSize()
+                        .accessibilityLabel("\(model.searchResultCount) matching circles")
                         .accessibilityIdentifier("map-search-summary")
+                }
+
+                if !text.isEmpty {
+                    Button {
+                        text = ""
+                        isFocused = true
+                    } label: {
+                        LucideIcon("xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 28, minHeight: 44)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
+                    .accessibilityIdentifier("map-search-clear")
                 }
             }
             .padding(.horizontal, 13)
-            .frame(height: 44)
+            .frame(minHeight: 44)
             .background(.regularMaterial, in: .rect(cornerRadius: 14))
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(.white.opacity(0.55), lineWidth: 0.5)
+            }
+
+            if showsResults, hasQuery, !model.isSearching || model.searchResultCount > 0 {
+                MapSearchResultsList(model: model) { result in
+                    isFocused = false
+                    showsResults = false
+                    model.select(result)
+                }
+                .frame(maxHeight: horizontalSizeClass == .regular ? 480 : 280)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             Button {
@@ -1325,8 +1363,142 @@ private struct MapSearchField: View {
             isFocused = true
         }
         .onChange(of: text) { _, value in
+            showsResults = true
             model.updateSearchQuery(value)
         }
+        .onChange(of: isFocused) { _, focused in
+            if focused {
+                showsResults = true
+            }
+        }
+    }
+
+    private var hasQuery: Bool {
+        !model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+/// Search results for every event day, current day first. A tap opens the
+/// circle on the map, switching day and hall when needed.
+private struct MapSearchResultsList: View {
+    let model: MapScreenModel
+    let onSelect: (MapScreenModel.SearchResult) -> Void
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                if let emptyMessage {
+                    Text(emptyMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("map-search-empty")
+                }
+
+                ForEach(model.searchResultGroups) { group in
+                    Section {
+                        ForEach(group.results) { result in
+                            MapSearchResultRow(result: result) {
+                                onSelect(result)
+                            }
+                            if result.id != group.results.last?.id {
+                                Divider()
+                                    .padding(.leading, 14)
+                            }
+                        }
+                    } header: {
+                        Text("Day \(group.day)")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.regularMaterial)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                }
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.immediately)
+        .background(.regularMaterial, in: .rect(cornerRadius: 14))
+        .clipShape(.rect(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(.white.opacity(0.55), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Search results")
+        .accessibilityIdentifier("map-search-results")
+    }
+
+    /// Explains a day without matches. When other days have matches, it
+    /// names the next one so the attendee knows where the circles are.
+    private var emptyMessage: String? {
+        let currentDay = model.selectedDay
+        guard model.searchResultGroups.first?.day != currentDay else { return nil }
+        guard let otherDay = model.searchResultGroups.first else {
+            return String(localized: "No circles match this search")
+        }
+        return String(
+            localized:
+                "No circles on Day \(currentDay) · \(otherDay.results.count) on Day \(otherDay.day)"
+        )
+    }
+}
+
+private struct MapSearchResultRow: View {
+    let result: MapScreenModel.SearchResult
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: displayName)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if !result.penName.isEmpty {
+                        Text(verbatim: result.penName)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                Text(verbatim: result.address.formatted(.short))
+                    .font(.subheadline.monospaced().weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Shows this circle on the map")
+        .accessibilityIdentifier("map-search-result-\(result.id)")
+    }
+
+    private var displayName: String {
+        result.circleName.isEmpty ? String(localized: "No circle assigned") : result.circleName
+    }
+
+    private var accessibilityLabel: String {
+        [displayName, result.penName, result.address.formatted(.full)]
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
     }
 }
 
