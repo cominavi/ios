@@ -455,7 +455,9 @@ final class UnifiedMapHostView: UIView {
     var onActivateVenue: ((Int) -> Void)?
     private static let campusHintSeenKey = "map.campusHallHint.seen"
     /// Cached because accessibility refreshes on every camera frame.
-    private var hasSeenCampusHint = UserDefaults.standard.bool(forKey: campusHintSeenKey)
+    private var hasSeenCampusHint = UserDefaults.standard.bool(
+        forKey: UnifiedMapHostView.campusHintSeenKey
+    )
     private(set) var basemapState = UnifiedBasemapState.loading
 
     private enum CompassState: Equatable {
