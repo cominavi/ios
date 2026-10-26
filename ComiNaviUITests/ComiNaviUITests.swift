@@ -571,7 +571,7 @@ final class ComiNaviUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        let catalogTab = app.buttons["Catalog"]
+        let catalogTab = app.buttons["Map"].firstMatch
         XCTAssertTrue(catalogTab.waitForExistence(timeout: 10))
         catalogTab.tap()
 
@@ -628,14 +628,16 @@ final class ComiNaviUITests: XCTestCase {
         takeScreenshot(named: "Explore-Filters-Expanded")
         app.buttons["Done"].tap()
 
-        eventDayBanner.tap()
+        app.buttons["global-event-day-toolbar-button"].tap()
         XCTAssertTrue(app.otherElements["catalog-event-day-sheet"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["global-day-1"].exists)
         let secondDay = app.buttons["global-day-2"]
         XCTAssertTrue(secondDay.exists)
         secondDay.tap()
-        XCTAssertEqual(secondDay.value as? String, "Selected")
-        app.buttons["catalog-settings-done"].tap()
+        // Picking a day closes the sheet.
+        XCTAssertTrue(
+            app.otherElements["catalog-event-day-sheet"].waitForNonExistence(timeout: 5)
+        )
 
         mapTab.tap()
         XCTAssertTrue(eventDayBanner.waitForExistence(timeout: 5))
@@ -648,17 +650,30 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-ui-testing-no-catalog-shell")
         app.launch()
 
-        let shell = app.otherElements["catalog-independent-shell"]
+        let shell = app.otherElements["app-shell"]
         XCTAssertTrue(shell.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Map"].firstMatch.exists)
         XCTAssertTrue(app.buttons["共有プラン"].exists)
         XCTAssertTrue(app.buttons["Profile"].exists)
-        XCTAssertTrue(app.navigationBars["共有プラン"].exists)
 
-        app.buttons["Catalog"].tap()
+        app.buttons["Map"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Try Again"].waitForExistence(timeout: 5))
 
         app.buttons["共有プラン"].tap()
         XCTAssertTrue(app.navigationBars["共有プラン"].waitForExistence(timeout: 5))
+    }
+
+    /// Profile does not depend on the selected day, and on iPad a banner
+    /// above its navigation stack sat under the tab bar and caught its taps.
+    @MainActor
+    func testProfileHasNoEventDayBanner() {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        XCTAssertTrue(app.buttons["global-event-day-banner"].waitForExistence(timeout: 30))
+        app.buttons["Profile"].firstMatch.tap()
+        XCTAssertFalse(app.buttons["global-event-day-banner"].waitForExistence(timeout: 2))
     }
 
     @MainActor
@@ -668,7 +683,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.otherElements["catalog-independent-shell"].waitForExistence(timeout: 5)
+            app.otherElements["app-shell"].waitForExistence(timeout: 5)
         )
         app.buttons["Profile"].tap()
         let imageCacheLink = app.buttons["profile-image-cache"]
@@ -810,11 +825,12 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-demo-data")
         app.launch()
 
-        let eventDaySelector = app.buttons["global-event-day-banner"]
-        XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["global-event-day-banner"].waitForExistence(timeout: 20))
 
         app.buttons["Explore"].firstMatch.tap()
         XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 5))
+        let eventDaySelector = app.buttons["global-event-day-toolbar-button"]
+        XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 5))
 
         let filterButton = app.buttons["explore-filter-button"]
         XCTAssertTrue(filterButton.exists)
@@ -1222,10 +1238,11 @@ final class ComiNaviUITests: XCTestCase {
             dayButton.tap()
 
             XCTAssertTrue(map.exists, "The map surface disappeared while switching to day \(day)")
-            XCTAssertEqual(dayButton.value as? String, "Selected")
             takeScreenshot(named: "C104-Day-\(day)-Map-Transition")
 
-            app.buttons["catalog-settings-done"].tap()
+            // Picking a day closes the sheet.
+            XCTAssertTrue(dayButton.waitForNonExistence(timeout: 5))
+            XCTAssertTrue(eventDayBanner.label.contains("Day \(day)"))
             takeScreenshot(named: "C104-Day-\(day)-Map-Visible")
             XCTAssertTrue(map.waitForExistence(timeout: 10))
             XCTAssertFalse(app.staticTexts["Map unavailable"].exists)
@@ -1501,7 +1518,7 @@ final class ComiNaviUITests: XCTestCase {
 
         let cloud = app.otherElements["explore-discovery-cloud"]
         XCTAssertTrue(cloud.waitForExistence(timeout: 20))
-        let eventDayBanner = app.buttons["global-event-day-banner"]
+        let eventDayBanner = app.buttons["global-event-day-toolbar-button"]
         let searchField = app.textFields["explore-search-field"]
         XCTAssertTrue(eventDayBanner.exists)
         XCTAssertTrue(searchField.exists)
@@ -1596,7 +1613,7 @@ final class ComiNaviUITests: XCTestCase {
         )
         waitForExpectations(timeout: 8)
 
-        XCTAssertTrue(app.buttons["global-event-day-banner"].isHittable)
+        XCTAssertTrue(app.buttons["global-event-day-toolbar-button"].isHittable)
         XCTAssertTrue(app.buttons["explore-filter-button"].isHittable)
         takeScreenshot(named: "Explore-iPad-Landscape-Adaptive")
     }
@@ -2252,7 +2269,7 @@ final class ComiNaviUITests: XCTestCase {
         alternateEvent.tap()
 
         expectation(
-            for: NSPredicate(format: "value == %@", "Selected"),
+            for: NSPredicate(format: "selected == true"),
             evaluatedWith: alternateEvent
         )
         waitForExpectations(timeout: 30)
@@ -2272,7 +2289,7 @@ final class ComiNaviUITests: XCTestCase {
             XCTAssertTrue(event108.waitForExistence(timeout: 3))
             event108.tap()
             expectation(
-                for: NSPredicate(format: "value == %@", "Selected"),
+                for: NSPredicate(format: "selected == true"),
                 evaluatedWith: event108
             )
             waitForExpectations(timeout: 30)

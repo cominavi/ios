@@ -12,23 +12,17 @@ import UserNotifications
 enum EntryContentRoute: Equatable {
     case accountDeletion
     case signIn
-    case catalogLoading
-    case catalog
-    case catalogIndependent
+    case app
 
     static func resolve(
         accountDeletionPending: Bool,
-        shouldShowSignIn: Bool,
-        catalogIsPreparing _: Bool,
-        hasCatalog: Bool
+        shouldShowSignIn: Bool
     ) -> Self {
         if accountDeletionPending { return .accountDeletion }
         if shouldShowSignIn { return .signIn }
-        if hasCatalog { return .catalog }
-        // CatalogIndependentContentView keeps plans and profile usable while
-        // the catalog tab discovers or revalidates its last installed data.
-        // An authenticated launch must never be held behind network work.
-        return .catalogIndependent
+        // ContentView owns every catalog state, so an authenticated launch
+        // enters the app at once and is never held behind network work.
+        return .app
     }
 }
 
@@ -330,21 +324,21 @@ struct EntryView: View {
                 CatalogStatusSurface(
                     symbolName: "map",
                     eyebrow: "C108",
-                    title: String(localized: "Preparing catalog…"),
-                    subtitle: String(localized: "Opening catalog…")
+                    title: String(localized: "Opening catalog…"),
+                    subtitle: String(localized: "The map and the circle list open when the catalog is ready.")
                 ) {
                     CatalogActivityIndicator(
-                        accessibilityLabel: String(localized: "Preparing catalog…")
+                        accessibilityLabel: String(localized: "Opening catalog…")
                     )
                 }
             } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-catalog-download"
             ) {
                 CatalogStatusSurface(
-                    symbolName: "arrow.down.circle.fill",
+                    symbolName: "map",
                     eyebrow: "C108",
-                    title: String(localized: "Downloading\ncatalog"),
-                    subtitle: String(localized: "Downloading the catalog, this may take a while…")
+                    title: String(localized: "Downloading catalog…"),
+                    subtitle: String(localized: "This can take a few minutes. You can use Shared Plans and Profile in the meantime.")
                 ) {
                     DownloadProgressView(progresses: [
                         .init(
@@ -429,7 +423,7 @@ struct EntryView: View {
             } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-no-catalog-shell"
             ) {
-                CatalogIndependentContentView(
+                ContentView(
                     catalogLibrary: catalogLibrary,
                     sharedLocationInbox: sharedLocationInbox
                 )
@@ -457,9 +451,7 @@ struct EntryView: View {
     private var regularAppContent: some View {
         switch EntryContentRoute.resolve(
             accountDeletionPending: accountDeletionPending,
-            shouldShowSignIn: shouldShowSignIn,
-            catalogIsPreparing: catalogIsPreparing,
-            hasCatalog: catalogIsReady
+            shouldShowSignIn: shouldShowSignIn
         ) {
         case .accountDeletion:
             AccountDeletionPendingView(
@@ -479,35 +471,24 @@ struct EntryView: View {
                     : nil,
                 googleSpecialEntry: googleSpecialEntryActive
             )
-        case .catalogLoading:
-            catalogLoadingView
-        case .catalog:
+        case .app:
             ContentView(
                 catalogLibrary: catalogLibrary,
-                sharedLocationInbox: sharedLocationInbox
-            )
-        case .catalogIndependent:
-            CatalogIndependentContentView(
-                catalogLibrary: catalogLibrary,
-                sharedLocationInbox: sharedLocationInbox
+                sharedLocationInbox: sharedLocationInbox,
+                catalogResetAction: catalogResetAction
             )
         }
     }
 
-    private var catalogIsReady: Bool {
-        catalogLibrary.dataSource?.readiness == .ready
-    }
-
-    private var catalogIsPreparing: Bool {
-        guard !catalogIsReady else { return false }
-        return switch catalogLibrary.phase {
-        case .idle, .discovering, .loading, .downloading:
-            true
-        case .ready:
-            true
-        case .failed:
-            false
-        }
+    /// A broken catalog install must always have a way out. Demo data has
+    /// no account to log out of, so it only offers the retry.
+    private var catalogResetAction: CatalogResetAction? {
+        guard catalogLibrary.mode != .demo else { return nil }
+        return CatalogResetAction(
+            isInProgress: isResettingAfterCatalogError,
+            issue: catalogResetIssue,
+            request: { showsCatalogResetConfirmation = true }
+        )
     }
 
     #if DEBUG
@@ -764,73 +745,6 @@ struct EntryView: View {
             String(localized: "This location could not be found in the official catalog.")
         case nil:
             ""
-        }
-    }
-
-    @ViewBuilder
-    private var catalogLoadingView: some View {
-        switch catalogLibrary.phase {
-        case .failed(let message):
-            CatalogErrorSurface(
-                symbolName: "exclamationmark.triangle.fill",
-                title: String(localized: "Catalog unavailable"),
-                message: catalogResetIssue ?? message,
-                advice: String(localized: "Please try again.")
-            ) {
-                FocusedActionButton {
-                    catalogLibrary.retry()
-                } label: {
-                    LucideLabel("Try Again", icon: "arrow.clockwise")
-                }
-
-                FocusedActionButton(
-                    role: .destructive,
-                    emphasis: .secondary,
-                    tint: .red,
-                    action: { showsCatalogResetConfirmation = true }
-                ) {
-                    if isResettingAfterCatalogError {
-                        ProgressView()
-                    } else {
-                        LucideLabel(
-                            "Log Out & Reset",
-                            icon: "person.crop.circle.badge.minus"
-                        )
-                    }
-                }
-                .disabled(isResettingAfterCatalogError)
-            }
-        case .loading(let event):
-            CatalogStatusSurface(
-                symbolName: "arrow.down.circle.fill",
-                eyebrow: event.shortName,
-                title: String(localized: "Opening catalog…"),
-                subtitle: String(localized: "Preparing catalog…")
-            ) {
-                CatalogActivityIndicator(
-                    accessibilityLabel: String(localized: "Opening catalog…")
-                )
-            }
-        case .downloading(let event, let progress):
-            CatalogStatusSurface(
-                symbolName: "arrow.down.circle.fill",
-                eyebrow: event.shortName,
-                title: String(localized: "Downloading catalog…"),
-                subtitle: String(localized: "Downloading the catalog, this may take a while…")
-            ) {
-                DownloadProgressView(progresses: [progress])
-            }
-        case .idle, .discovering, .ready:
-            CatalogStatusSurface(
-                symbolName: "sparkles",
-                eyebrow: String(localized: "Catalog"),
-                title: String(localized: "Finding available catalogs…"),
-                subtitle: String(localized: "Preparing catalog…")
-            ) {
-                CatalogActivityIndicator(
-                    accessibilityLabel: String(localized: "Finding available catalogs…")
-                )
-            }
         }
     }
 

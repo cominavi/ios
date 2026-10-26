@@ -376,6 +376,17 @@ final class CatalogLibrary {
         return false
     }
 
+    /// The Comiket that is loading while the current catalog stays open.
+    var switchTarget: CatalogEvent? {
+        guard isSwitching else { return nil }
+        switch phase {
+        case .loading(let event), .downloading(let event, _):
+            return event
+        default:
+            return nil
+        }
+    }
+
     func start() {
         guard phase == .idle || dataSource == nil,
               let source = sources[mode]
@@ -475,6 +486,23 @@ final class CatalogLibrary {
             phase = .idle
             start()
         }
+    }
+
+    /// Abandons a switch to another Comiket and keeps the open catalog. A
+    /// first load has nothing to fall back to, so the loading surface owns
+    /// its recovery instead.
+    func cancelPendingLoad() {
+        guard isSwitching, let selectedEvent else { return }
+
+        operationTask?.cancel()
+        operationTask = nil
+        pendingDataSource?.cancelPreparation()
+        pendingDataSource = nil
+        // A late progress callback checks for `.ready` and stays quiet.
+        phase = .ready
+        errorMessage = nil
+        failureRecovery = .retry
+        recoveryEvent = selectedEvent
     }
 
     func dismissError() {
