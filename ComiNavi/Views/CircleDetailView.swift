@@ -11,6 +11,7 @@ struct CircleDetailView: View {
     @State private var details: CatalogCircleDetails?
     @State private var extensionsByCircleID: [Int: CirclemsDataSchema.ComiketCircleExtend] = [:]
     @State private var circleAddress: ComiketSpaceAddress?
+    @State private var circleHallMapName: String?
     @State private var isShowingDataSources = false
     @State private var isOpeningMap = false
     @State private var planModel: CircleUserPlanModel
@@ -63,6 +64,9 @@ struct CircleDetailView: View {
                     spaceLabel: spaceLabel,
                     favoriteColor: planModel.selectedColor,
                     address: circleAddress,
+                    dayDateText: dayDateText,
+                    hallGloss: hallGloss,
+                    canOpenMap: circle.updateId != nil,
                     isOpeningMap: isOpeningMap,
                     onOpenMap: openOnMap,
                     externalLinks: externalLinks,
@@ -209,6 +213,7 @@ struct CircleDetailView: View {
         }
         .task(id: circle.id) {
             circleAddress = nil
+            circleHallMapName = nil
             await loadCircleAddress()
         }
         .task(id: circle.id) {
@@ -290,6 +295,35 @@ struct CircleDetailView: View {
         return "\(block.name)\(String(format: "%02d", spaceNumber))\(side)"
     }
 
+    /// The calendar date of the circle's day, such as "Sun, Aug 11", shown
+    /// next to "Day 1" so attendees do not have to map day numbers to dates.
+    private var dayDateText: String? {
+        guard let dayIndex = circleAddress?.day ?? circle.day,
+              let components = dataSource.comiket.days
+                  .first(where: { $0.dayIndex == dayIndex })?.date
+        else { return nil }
+
+        var calendar = Calendar(identifier: .gregorian)
+        if let timeZone = components.timeZone {
+            calendar.timeZone = timeZone
+        }
+        guard let date = calendar.date(from: components) else { return nil }
+
+        var style = CatalogDateFormatting.abbreviated(for: date, calendar: calendar)
+        style.timeZone = calendar.timeZone
+        return date.formatted(style)
+    }
+
+    /// An English gloss such as "West Halls 1–2" under the canonical Japanese
+    /// hall text. Japanese readers already read the canonical text, so the
+    /// gloss is omitted for them.
+    private var hallGloss: String? {
+        guard let circleHallMapName,
+              Bundle.main.preferredLocalizations.first?.hasPrefix("ja") != true
+        else { return nil }
+        return CircleHallGloss.text(forMapName: circleHallMapName)
+    }
+
     private var navigationSubtitle: String? {
         if let circleAddress {
             return circleAddress.navigationSubtitle
@@ -362,7 +396,13 @@ struct CircleDetailView: View {
                     tableID: location.tableID,
                     subspace: location.subspace
                 )
-            else { return }
+            else {
+                AppToast.showError(
+                    String(localized: "Couldn't find this booth on the map"),
+                    subtitle: nil
+                )
+                return
+            }
 
             AppData.sharedLocationInbox.receive(url: sharedLocation.url)
         }
@@ -375,15 +415,17 @@ struct CircleDetailView: View {
         ),
             let location = locations.first(where: { $0.catalogCircleID == circle.id }),
             let blockID = circle.blockId,
-            let block = dataSource.comiket.blocks.first(where: { $0.externalBlockId == blockID })
+            let block = dataSource.comiket.blocks.first(where: { $0.externalBlockId == blockID }),
+            // Without a hall the canonical address would be incomplete, so
+            // the card keeps showing the plain space label instead.
+            let hall = dataSource.comiket.days
+                .first(where: { $0.dayIndex == location.day })?
+                .halls.first(where: { $0.externalMapId == location.mapID })
         else { return }
-        let hallName = dataSource.comiket.days
-            .first(where: { $0.dayIndex == location.day })?
-            .halls.first(where: { $0.externalMapId == location.mapID })?
-            .name ?? "会場"
+        circleHallMapName = hall.mapName
         circleAddress = ComiketSpaceAddress(
             day: location.day,
-            hallName: hallName,
+            hallName: hall.name,
             blockName: block.name,
             spaceNumber: location.tableID.spaceNumber,
             subspace: isCombinedAB ? nil : location.subspace,
@@ -536,6 +578,9 @@ private struct CircleDetailHeader: View {
     let spaceLabel: String?
     let favoriteColor: BookmarkColor?
     let address: ComiketSpaceAddress?
+    let dayDateText: String?
+    let hallGloss: String?
+    let canOpenMap: Bool
     let isOpeningMap: Bool
     let onOpenMap: () -> Void
     let externalLinks: [CircleExternalLink]
@@ -678,41 +723,20 @@ private struct CircleDetailHeader: View {
     }
 
     private func locationRow(spaceLabel: String) -> some View {
-        HStack(spacing: 8) {
-            Button(action: onOpenMap) {
-                HStack(alignment: .top, spacing: 10) {
-                    LucideIcon("mappin.and.ellipse", size: 20)
-                        .foregroundStyle(Color.accentColor)
-                        .padding(.top, 2)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        if let day = address?.day ?? circle.day {
-                            Text("Day \(day)")
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.secondary)
-                                .accessibilityIdentifier("circle-location-day")
-                        }
-
-                        Text(verbatim: address?.venueLocationText ?? spaceLabel)
-                            .font(.headline.monospaced().weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("circle-location-venue")
-                    }
-
-                    if isOpeningMap {
-                        ProgressView()
-                            .controlSize(.small)
-                            .padding(.top, 12)
-                    }
+        HStack(spacing: 4) {
+            if canOpenMap {
+                Button(action: onOpenMap) {
+                    locationSummary(spaceLabel: spaceLabel, showsMapAffordance: true)
+                        .contentShape(.rect)
                 }
-                .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                .contentShape(.rect)
+                .buttonStyle(.plain)
+                .disabled(isOpeningMap)
+                .accessibilityHint("Shows this circle on the map")
+                .accessibilityIdentifier("circle-location-map-button")
+            } else {
+                locationSummary(spaceLabel: spaceLabel, showsMapAffordance: false)
+                    .accessibilityElement(children: .combine)
             }
-            .buttonStyle(.plain)
-            .disabled(isOpeningMap)
-            .accessibilityHint("Shows this circle on the map")
-            .accessibilityIdentifier("circle-location-map-button")
 
             if let address {
                 Button {
@@ -735,9 +759,83 @@ private struct CircleDetailHeader: View {
         }
         .padding(.leading, 12)
         .padding(.trailing, 4)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.accentColor.opacity(0.08), in: .rect(cornerRadius: 12))
+        .background(
+            Color(uiColor: .secondarySystemGroupedBackground),
+            in: .rect(cornerRadius: 12)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(uiColor: .separator).opacity(0.24), lineWidth: 0.5)
+        }
+    }
+
+    /// The day, canonical venue text and optional map affordance. The venue
+    /// stays in `.primary`; the accent is reserved for the pin and the
+    /// "Show on map" affordance so the text keeps full contrast.
+    @ViewBuilder
+    private func locationSummary(
+        spaceLabel: String,
+        showsMapAffordance: Bool
+    ) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: 10))
+
+        layout {
+            HStack(alignment: .top, spacing: 10) {
+                LucideIcon("mappin.and.ellipse", size: 20)
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.top, 2)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if let day = address?.day ?? circle.day {
+                        Group {
+                            if let dayDateText {
+                                Text("Day \(day) · \(dayDateText)")
+                            } else {
+                                Text("Day \(day)")
+                            }
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("circle-location-day")
+                    }
+
+                    Text(verbatim: address?.venueLocationText ?? spaceLabel)
+                        .font(.headline.monospaced().weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("circle-location-venue")
+
+                    if let hallGloss {
+                        Text(verbatim: hallGloss)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if showsMapAffordance {
+                Group {
+                    if isOpeningMap {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        HStack(spacing: 4) {
+                            Text("Show on map")
+                            LucideIcon("chevron.forward", size: 14)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                    }
+                }
+                .frame(minHeight: 44)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
     }
 
     private func copy(_ address: ComiketSpaceAddress) {
@@ -1891,6 +1989,28 @@ private struct ShinagakiMediaGallery: View {
         }
     }
 #endif
+
+/// Builds an English gloss for a Big Sight hall from its catalog map name,
+/// for example "W12" becomes "West Halls 1–2" and "E7" becomes "East Hall 7".
+private enum CircleHallGloss {
+    static func text(forMapName mapName: String) -> String? {
+        guard let direction = mapName.uppercased().first else { return nil }
+        let numbers = mapName.dropFirst().compactMap(\.wholeNumberValue)
+        guard let first = numbers.first, let last = numbers.last else { return nil }
+
+        let isSingleHall = first == last
+        let range = isSingleHall ? "\(first)" : "\(first)–\(last)"
+        switch (direction, isSingleHall) {
+        case ("E", true): return String(localized: "East Hall \(range)")
+        case ("E", false): return String(localized: "East Halls \(range)")
+        case ("W", true): return String(localized: "West Hall \(range)")
+        case ("W", false): return String(localized: "West Halls \(range)")
+        case ("S", true): return String(localized: "South Hall \(range)")
+        case ("S", false): return String(localized: "South Halls \(range)")
+        default: return nil
+        }
+    }
+}
 
 private extension Optional where Wrapped == String {
     var nonBlank: String? {
