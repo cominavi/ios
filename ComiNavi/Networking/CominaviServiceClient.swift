@@ -27,9 +27,11 @@ enum CominaviServiceError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .notLoggedIn:
-            String(localized: "ComiNaviにもう一度ログインしてください。")
+            String(localized: "Please sign in to ComiNavi again.")
         case .authenticationStorageUnavailable:
-            String(localized: "ログイン情報を安全に保存できませんでした。もう一度ログインしてください。")
+            String(
+                localized: "ComiNavi couldn't save your sign-in securely. Please sign in again."
+            )
         case .logoutPending:
             String(localized: "Sign out is still being completed. Please try again shortly.")
         case .accountDeletionPending:
