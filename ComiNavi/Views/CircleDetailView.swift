@@ -166,8 +166,20 @@ struct CircleDetailView: View {
                 .accessibilityValue(planModel.isFavorite ? "In favorites" : "Not in favorites")
                 .accessibilityHint("Adds or removes this circle from your favorites")
                 .accessibilityAddTraits(planModel.isFavorite ? .isSelected : [])
+                .disabled(isFavoriteUnavailable)
                 .accessibilityIdentifier("circle-favorite-button")
             }
+        }
+        // Observed here rather than in the favorite settings section, which
+        // only exists after a favorite succeeds, so a failed first toggle
+        // still reports why the star reverted.
+        .onChange(of: planModel.saveState) { _, state in
+            guard case .failed(let message) = state else { return }
+            AppToast.showError(
+                String(localized: "Could not save circle"),
+                subtitle: message
+            )
+            planModel.dismissSaveError()
         }
         .sheet(isPresented: $isShowingDataSources) {
             CircleDetailDataSourcesSheet(
@@ -233,6 +245,12 @@ struct CircleDetailView: View {
             })
         }
         .accessibilityIdentifier("circle-detail-screen")
+    }
+
+    /// Disables favorite controls only once details have loaded, so the
+    /// star stays usable while the public circle ID is still resolving.
+    private var isFavoriteUnavailable: Bool {
+        details != nil && planModel.isFavoriteUnavailable && !planModel.isFavorite
     }
 
     private var hasAboutInformation: Bool {
@@ -900,14 +918,6 @@ private struct CircleUserPlanSection: View {
             }
         }
         .accessibilityIdentifier("circle-user-plan-section")
-        .onChange(of: model.saveState) { _, state in
-            guard case .failed(let message) = state else { return }
-            AppToast.showError(
-                String(localized: "Could not save circle"),
-                subtitle: message
-            )
-            model.dismissSaveError()
-        }
         .onDisappear {
             model.flushMemo()
         }
