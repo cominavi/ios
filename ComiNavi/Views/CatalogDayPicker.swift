@@ -74,118 +74,253 @@ enum CatalogDateFormatting {
     }
 }
 
-struct CatalogEventDayBanner: View {
+/// A short status shown beside the event name, so nobody mistakes an old or
+/// demo catalog for the upcoming Comiket.
+enum CatalogEventStatus: Hashable, Identifiable {
+    case past
+    case demo
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .past: String(localized: "Past event")
+        case .demo: String(localized: "Demo")
+        }
+    }
+}
+
+/// What every day control says about the active catalog: which Comiket and
+/// day are open, the date, and whether the data is past or demo data.
+struct CatalogEventDaySummary {
     let event: CatalogEvent?
     let days: [UFDSchema.Day]
     let selectedDay: Int
+    let isDemo: Bool
+    var referenceDate: Date = .now
+    var calendar: Calendar = .current
+
+    /// "C104 · Day 1", or "Day 1" before the event is known.
+    var title: String {
+        guard let event else { return String(localized: "Day \(selectedDay)") }
+        return String(localized: "\(event.shortName) · Day \(selectedDay)")
+    }
+
+    var selectedDate: Date? {
+        guard let day = days.first(where: { $0.dayIndex == selectedDay }) else { return nil }
+        return calendar.date(from: day.date)
+    }
+
+    /// Past comes before Demo, so the compact fallback (the last status)
+    /// keeps the demo warning, which also implies old data.
+    var statuses: [CatalogEventStatus] {
+        var statuses: [CatalogEventStatus] = []
+        if isPastEvent { statuses.append(.past) }
+        if isDemo { statuses.append(.demo) }
+        return statuses
+    }
+
+    var accessibilityLabel: String {
+        var parts = [
+            event?.displayName ?? String(localized: "Comiket"),
+            String(localized: "Day \(selectedDay)"),
+        ]
+        if let selectedDate {
+            parts.append(
+                selectedDate.formatted(
+                    CatalogDateFormatting.full(for: selectedDate, relativeTo: referenceDate)
+                )
+            )
+        }
+        parts += statuses.map(\.title)
+        return parts.joined(separator: ", ")
+    }
+
+    private var isPastEvent: Bool {
+        guard let lastDate = days.compactMap({ calendar.date(from: $0.date) }).max() else {
+            return false
+        }
+        return lastDate < calendar.startOfDay(for: referenceDate)
+    }
+}
+
+/// The event and day title with its status capsules. Narrow containers drop
+/// the capsules before they truncate the title.
+private struct CatalogEventDayTitle: View {
+    let summary: CatalogEventDaySummary
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            row(summary.statuses)
+            row(Array(summary.statuses.suffix(1)))
+            row([])
+        }
+    }
+
+    private func row(_ statuses: [CatalogEventStatus]) -> some View {
+        HStack(spacing: 6) {
+            Text(summary.title)
+                .lineLimit(1)
+
+            ForEach(statuses) { status in
+                CatalogEventStatusBadge(status: status)
+            }
+        }
+    }
+}
+
+private struct CatalogEventStatusBadge: View {
+    let status: CatalogEventStatus
+
+    var body: some View {
+        Text(status.title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color(uiColor: .tertiarySystemFill), in: .capsule)
+    }
+}
+
+struct CatalogEventDayBanner: View {
+    enum Style {
+        /// A two-line card with the date, for wide layouts.
+        case card
+        /// A one-line capsule that matches the Explore toolbar control.
+        case compact
+    }
+
+    let event: CatalogEvent?
+    let days: [UFDSchema.Day]
+    let selectedDay: Int
+    let isDemo: Bool
+    var style: Style = .card
     let action: () -> Void
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ScaledMetric(relativeTo: .body) private var minimumHeight = 54.0
 
     private var adaptiveMinimumHeight: CGFloat {
-        verticalSizeClass == .compact ? 44 : minimumHeight
+        verticalSizeClass == .compact || style == .compact ? 44 : minimumHeight
     }
 
-    private var selectedDate: Date? {
-        guard let day = days.first(where: { $0.dayIndex == selectedDay }) else { return nil }
-        return Calendar.current.date(from: day.date)
+    private var summary: CatalogEventDaySummary {
+        CatalogEventDaySummary(
+            event: event,
+            days: days,
+            selectedDay: selectedDay,
+            isDemo: isDemo
+        )
     }
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 11) {
-                LucideIcon("calendar.badge.clock")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 30, height: 30)
-                    .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 9))
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(primaryLabel)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    if let selectedDate {
-                        Text(
-                            selectedDate,
-                            format: CatalogDateFormatting.abbreviated(for: selectedDate)
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    }
-                }
-
-                Spacer(minLength: 8)
-
-                LucideIcon("chevron.up.chevron.down")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
+            switch style {
+            case .card: cardLabel
+            case .compact: compactLabel
             }
-            .padding(.horizontal, 13)
-            .frame(maxWidth: .infinity, minHeight: adaptiveMinimumHeight)
-            .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: horizontalSizeClass == .regular ? 280 : .infinity, alignment: .leading)
+        .accessibilityLabel(summary.accessibilityLabel)
+        .accessibilityHint("Change event day or Comiket")
+        .accessibilityIdentifier("global-event-day-banner")
+    }
+
+    private var cardLabel: some View {
+        HStack(spacing: 11) {
+            LucideIcon("calendar.badge.clock")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 30, height: 30)
+                .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 9))
+
+            VStack(alignment: .leading, spacing: 1) {
+                CatalogEventDayTitle(summary: summary)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                if let selectedDate = summary.selectedDate {
+                    Text(
+                        selectedDate,
+                        format: CatalogDateFormatting.abbreviated(for: selectedDate)
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            LucideIcon("chevron.down")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 13)
+        .frame(maxWidth: 340, minHeight: adaptiveMinimumHeight, alignment: .leading)
+        .contentShape(.rect)
         .background(.regularMaterial, in: .rect(cornerRadius: 14))
         .overlay {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
         }
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("Change event day or Comiket")
-        .accessibilityIdentifier("global-event-day-banner")
     }
 
-    private var primaryLabel: String {
-        String(localized: "Day \(selectedDay)")
-    }
+    private var compactLabel: some View {
+        HStack(spacing: 8) {
+            LucideIcon("calendar.badge.clock")
+                .foregroundStyle(Color.accentColor)
 
-    private var accessibilityLabel: String {
-        let eventName = event?.displayName ?? String(localized: "Comiket")
-        guard let selectedDate else {
-            return "\(eventName), \(String(localized: "Day \(selectedDay)"))"
+            CatalogEventDayTitle(summary: summary)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+
+            LucideIcon("chevron.down")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.tertiary)
         }
-        let date = selectedDate.formatted(CatalogDateFormatting.full(for: selectedDate))
-        return "\(eventName), \(String(localized: "Day \(selectedDay)")), \(date)"
+        .padding(.horizontal, 14)
+        .frame(minHeight: adaptiveMinimumHeight)
+        .contentShape(.capsule)
+        .background(.regularMaterial, in: .capsule)
+        .overlay {
+            Capsule()
+                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
+        }
     }
 }
 
 struct CatalogEventDayToolbarButton: View {
     let event: CatalogEvent?
+    let days: [UFDSchema.Day]
     let selectedDay: Int
+    let isDemo: Bool
     let action: () -> Void
+
+    private var summary: CatalogEventDaySummary {
+        CatalogEventDaySummary(
+            event: event,
+            days: days,
+            selectedDay: selectedDay,
+            isDemo: isDemo
+        )
+    }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
                 LucideIcon("calendar.badge.clock")
-                    .accessibilityHidden(true)
 
-                Text(label)
-                    .lineLimit(1)
+                CatalogEventDayTitle(summary: summary)
                     .minimumScaleFactor(0.85)
             }
             .font(.subheadline.weight(.semibold))
         }
-        .accessibilityLabel(accessibilityLabel)
+        .accessibilityLabel(summary.accessibilityLabel)
         .accessibilityHint("Change event day or Comiket")
-        .accessibilityIdentifier("global-event-day-banner")
-    }
-
-    private var label: String {
-        String(localized: "Day \(selectedDay)")
-    }
-
-    private var accessibilityLabel: String {
-        let eventName = event?.displayName ?? String(localized: "Comiket")
-        return "\(eventName), \(String(localized: "Day \(selectedDay)"))"
+        .accessibilityIdentifier("global-event-day-toolbar-button")
     }
 }
 

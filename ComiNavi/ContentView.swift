@@ -25,6 +25,7 @@ struct ContentView: View {
     @SceneStorage("ContentView.selectedTab") private var selection: AppTab = .map
     @State private var selectedDay = 1
     @State private var showsCatalogSettings = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     private let catalogResetAction: CatalogResetAction?
 
     @MainActor
@@ -64,7 +65,9 @@ struct ContentView: View {
                     ExploreView(dataSource: circle, selectedDay: $selectedDay) {
                         CatalogEventDayToolbarButton(
                             event: catalogLibrary.selectedEvent,
-                            selectedDay: selectedDay
+                            days: circle.comiket.days,
+                            selectedDay: selectedDay,
+                            isDemo: catalogLibrary.mode == .demo
                         ) {
                             showsCatalogSettings = true
                         }
@@ -207,11 +210,15 @@ struct ContentView: View {
         selection = .map
     }
 
+    /// iPhone uses the same one-line capsule as the Explore toolbar; wide
+    /// layouts have room for the card with the date.
     private func eventDayBanner(for circle: CirclemsDataSource) -> CatalogEventDayBanner {
         CatalogEventDayBanner(
             event: catalogLibrary.selectedEvent,
             days: circle.comiket.days,
-            selectedDay: selectedDay
+            selectedDay: selectedDay,
+            isDemo: catalogLibrary.mode == .demo,
+            style: horizontalSizeClass == .regular ? .card : .compact
         ) {
             showsCatalogSettings = true
         }

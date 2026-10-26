@@ -628,7 +628,7 @@ final class ComiNaviUITests: XCTestCase {
         takeScreenshot(named: "Explore-Filters-Expanded")
         app.buttons["Done"].tap()
 
-        eventDayBanner.tap()
+        app.buttons["global-event-day-toolbar-button"].tap()
         XCTAssertTrue(app.otherElements["catalog-event-day-sheet"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["global-day-1"].exists)
         let secondDay = app.buttons["global-day-2"]
@@ -810,11 +810,12 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-demo-data")
         app.launch()
 
-        let eventDaySelector = app.buttons["global-event-day-banner"]
-        XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["global-event-day-banner"].waitForExistence(timeout: 20))
 
         app.buttons["Explore"].firstMatch.tap()
         XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 5))
+        let eventDaySelector = app.buttons["global-event-day-toolbar-button"]
+        XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 5))
 
         let filterButton = app.buttons["explore-filter-button"]
         XCTAssertTrue(filterButton.exists)
@@ -1501,7 +1502,7 @@ final class ComiNaviUITests: XCTestCase {
 
         let cloud = app.otherElements["explore-discovery-cloud"]
         XCTAssertTrue(cloud.waitForExistence(timeout: 20))
-        let eventDayBanner = app.buttons["global-event-day-banner"]
+        let eventDayBanner = app.buttons["global-event-day-toolbar-button"]
         let searchField = app.textFields["explore-search-field"]
         XCTAssertTrue(eventDayBanner.exists)
         XCTAssertTrue(searchField.exists)
@@ -1596,7 +1597,7 @@ final class ComiNaviUITests: XCTestCase {
         )
         waitForExpectations(timeout: 8)
 
-        XCTAssertTrue(app.buttons["global-event-day-banner"].isHittable)
+        XCTAssertTrue(app.buttons["global-event-day-toolbar-button"].isHittable)
         XCTAssertTrue(app.buttons["explore-filter-button"].isHittable)
         takeScreenshot(named: "Explore-iPad-Landscape-Adaptive")
     }
