@@ -16,6 +16,7 @@ struct CircleDetailView: View {
     @State private var isOpeningMap = false
     @State private var planModel: CircleUserPlanModel
     @State private var isShowingSharedPlanRequest = false
+    @State private var isShowingSignIn = false
 
     init(
         circle: CirclemsDataSchema.ComiketCircleWC,
@@ -71,6 +72,15 @@ struct CircleDetailView: View {
                     onOpenMap: openOnMap,
                     externalLinks: externalLinks,
                     xProfile: xProfile
+                )
+
+                CircleDetailActionRow(
+                    isFavorite: planModel.isFavorite,
+                    isFavoriteUnavailable: isFavoriteUnavailable,
+                    sharedPlanAvailability: sharedPlanAvailability,
+                    onToggleFavorite: { planModel.toggleFavorite() },
+                    onAddToSharedPlan: { isShowingSharedPlanRequest = true },
+                    onSignIn: { isShowingSignIn = true }
                 )
 
                 if AppData.profileStore.isIdentityVerified,
@@ -129,6 +139,19 @@ struct CircleDetailView: View {
                             }
                         }
                     }
+                }
+
+                if isMissingCommunityDetails {
+                    LucideLabel("No item list or tags for this circle yet.", icon: "info.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(
+                            Color(uiColor: .secondarySystemGroupedBackground),
+                            in: .rect(cornerRadius: 16)
+                        )
+                        .accessibilityIdentifier("circle-detail-empty-state")
                 }
 
                 Button {
@@ -193,6 +216,14 @@ struct CircleDetailView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $isShowingSignIn) {
+            SignInView()
+        }
+        .onChange(of: AppData.profileStore.isIdentityVerified) { _, isVerified in
+            if isVerified {
+                isShowingSignIn = false
+            }
+        }
         .sheet(isPresented: $isShowingSharedPlanRequest) {
             if let key = sharedPlanCircleKey,
                let currentUserID = AppData.profileStore.profile?.id
@@ -256,6 +287,22 @@ struct CircleDetailView: View {
     /// star stays usable while the public circle ID is still resolving.
     private var isFavoriteUnavailable: Bool {
         details != nil && planModel.isFavoriteUnavailable && !planModel.isFavorite
+    }
+
+    private var sharedPlanAvailability: CircleDetailActionRow.SharedPlanAvailability {
+        guard AppData.profileStore.isIdentityVerified,
+              AppData.profileStore.profile?.id != nil
+        else { return .signedOut }
+        return sharedPlanCircleKey == nil ? .unavailable : .available
+    }
+
+    /// True once details have loaded and the circle has no tags, item list
+    /// or About text, so the page explains the gap instead of ending blank.
+    private var isMissingCommunityDetails: Bool {
+        details != nil
+            && combinedTags.isEmpty
+            && shinagakiPosts.isEmpty
+            && !hasAboutInformation
     }
 
     private var hasAboutInformation: Bool {
@@ -853,6 +900,132 @@ private struct CircleDetailHeader: View {
 
     private var displayName: String {
         circle.circleName.nonBlank ?? String(localized: "Unnamed circle")
+    }
+}
+
+/// The persistent primary actions under the header. "Show on map" is the
+/// location card above, so this row holds the favorite and shared plan
+/// actions and stays visible even when the circle has no enrichment.
+private struct CircleDetailActionRow: View {
+    enum SharedPlanAvailability {
+        case available
+        case unavailable
+        case signedOut
+    }
+
+    let isFavorite: Bool
+    let isFavoriteUnavailable: Bool
+    let sharedPlanAvailability: SharedPlanAvailability
+    let onToggleFavorite: () -> Void
+    let onAddToSharedPlan: () -> Void
+    let onSignIn: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 10) {
+                    favoriteButton
+                    sharedPlanButton
+                }
+
+                VStack(spacing: 10) {
+                    favoriteButton
+                    sharedPlanButton
+                }
+            }
+
+            if let caption {
+                Text(caption)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("circle-detail-actions")
+    }
+
+    private var favoriteButton: some View {
+        Button(action: onToggleFavorite) {
+            LucideLabel(
+                isFavorite ? "Favorited" : "Favorite",
+                icon: isFavorite ? "star.fill" : "star"
+            )
+        }
+        .buttonStyle(CircleDetailActionButtonStyle(isProminent: isFavorite))
+        .disabled(isFavoriteUnavailable)
+        .accessibilityHint("Adds or removes this circle from your favorites")
+        .accessibilityAddTraits(isFavorite ? .isSelected : [])
+        .accessibilityIdentifier("circle-favorite-action")
+    }
+
+    private var sharedPlanButton: some View {
+        Button {
+            switch sharedPlanAvailability {
+            case .available:
+                onAddToSharedPlan()
+            case .signedOut:
+                onSignIn()
+            case .unavailable:
+                break
+            }
+        } label: {
+            LucideLabel("Add to shared plan", icon: "cart.fill")
+        }
+        .buttonStyle(CircleDetailActionButtonStyle(isProminent: false))
+        .disabled(sharedPlanAvailability == .unavailable)
+        .accessibilityHint(Text(sharedPlanHint))
+        .accessibilityIdentifier("circle-shared-plan-action")
+    }
+
+    private var sharedPlanHint: LocalizedStringKey {
+        sharedPlanAvailability == .signedOut
+            ? "Opens sign-in"
+            : "Adds a purchase request for this circle to a shared plan"
+    }
+
+    private var caption: LocalizedStringKey? {
+        if sharedPlanAvailability == .signedOut {
+            return "Sign in to add requests"
+        }
+        if isFavoriteUnavailable {
+            return "Favorites aren't available for this circle."
+        }
+        return nil
+    }
+}
+
+/// A labeled action button. The prominent variant uses the lime fill behind
+/// dark text; the plain variant matches the grouped cards on the page.
+private struct CircleDetailActionButtonStyle: ButtonStyle {
+    let isProminent: Bool
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(isProminent ? Color.onAccentFill : Color.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(
+                isProminent
+                    ? Color.accentFill
+                    : Color(uiColor: .secondarySystemGroupedBackground),
+                in: .rect(cornerRadius: 12)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        Color(uiColor: .separator).opacity(isProminent ? 0 : 0.24),
+                        lineWidth: 0.5
+                    )
+            }
+            .contentShape(.rect(cornerRadius: 12))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.45)
     }
 }
 
