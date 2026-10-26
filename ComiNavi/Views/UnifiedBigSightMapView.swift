@@ -427,7 +427,7 @@ final class UnifiedMapHostView: UIView {
     let basemapView: MLNMapView
     let mapView = SKView(frame: .zero)
     let compassButton = MapCompassButton(type: .system)
-    private let dataAttributionButton = UIButton(type: .system)
+    private let dataAttributionButton = MapAttributionButton(type: .system)
     private let campusAccessibilityProxy = UIView(frame: .zero)
     private let venueAccessibilityProxy = UIView(frame: .zero)
     private var requestedBasemapCamera: UnifiedBasemapCamera?
@@ -529,19 +529,25 @@ final class UnifiedMapHostView: UIView {
             UIConfigurationTextAttributesTransformer {
                 incoming in
                 var outgoing = incoming
-                outgoing.font = .systemFont(ofSize: 8, weight: .regular)
+                // Caption 2 follows Dynamic Type; the cap keeps the credit on
+                // one line beside the bottom controls at accessibility sizes.
+                outgoing.font = UIFontMetrics(forTextStyle: .caption2).scaledFont(
+                    for: .systemFont(ofSize: 11, weight: .regular),
+                    maximumPointSize: 17
+                )
                 return outgoing
             }
         attributionConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 1,
-            leading: 3,
-            bottom: 1,
-            trailing: 3
+            top: 3,
+            leading: 6,
+            bottom: 3,
+            trailing: 6
         )
         dataAttributionButton.configuration = attributionConfiguration
         dataAttributionButton.contentHorizontalAlignment = .trailing
         dataAttributionButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.72)
-        dataAttributionButton.layer.cornerRadius = 4
+        dataAttributionButton.layer.cornerRadius = 6
+        dataAttributionButton.layer.cornerCurve = .continuous
         dataAttributionButton.accessibilityLabel = String(localized: "Map data attribution")
         dataAttributionButton.accessibilityValue =
             "OpenStreetMap, OpenStreetMap US, OpenMapTiles, and MapLibre"
@@ -929,6 +935,19 @@ final class UnifiedMapHostView: UIView {
             guard let url = URL(string: url) else { return }
             UIApplication.shared.open(url)
         }
+    }
+}
+
+/// The map data credit stays visually compact, but accepts touches across a
+/// full 44-point target around its label.
+final class MapAttributionButton: UIButton {
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        let minimumSide = MapChromeLayout.controlSize
+        let target = bounds.insetBy(
+            dx: min(0, (bounds.width - minimumSide) / 2),
+            dy: min(0, (bounds.height - minimumSide) / 2)
+        )
+        return target.contains(point)
     }
 }
 
