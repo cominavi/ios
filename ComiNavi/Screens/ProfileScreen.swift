@@ -372,7 +372,11 @@ struct ProfileScreen: View {
             .accessibilityIdentifier("profile-favorite-color-labels")
 
             NavigationLink {
-                FollowingImportView(dataSource: dataSource)
+                FollowingImportView(
+                    dataSource: dataSource,
+                    isSignedIn: isLoggedIn,
+                    onSignIn: presentSignIn
+                )
             } label: {
                 LucideLabel("Import from X", icon: "users")
             }
