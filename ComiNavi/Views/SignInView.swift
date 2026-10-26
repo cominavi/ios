@@ -16,6 +16,22 @@ enum DemoState {
     case authenticating
 }
 
+/// The part of a sign-in attempt that is running, shown under the button so a
+/// slow attempt is not a silent spinner.
+enum SignInStep: Equatable {
+    case openingBrowser
+    case verifying
+    case loadingProfile
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .openingBrowser: "Opening Circle.ms…"
+        case .verifying: "Verifying your account…"
+        case .loadingProfile: "Loading your profile…"
+        }
+    }
+}
+
 struct ConventionFloorBlockCoordinate: Hashable {
     let column: Int
     let row: Int
@@ -67,7 +83,7 @@ private enum SignInError: LocalizedError {
         switch self {
         case .environmentChanged:
             String(
-                localized: "The login response could not be verified. Please try again."
+                localized: "The sign-in response couldn't be verified. Please try again."
             )
         }
     }
@@ -78,8 +94,13 @@ final class SignInViewModel: NSObject, ObservableObject,
     ASWebAuthenticationPresentationContextProviding
 {
     @Published var state: DemoState = .anonymous
+    @Published var step: SignInStep?
     @Published var authenticationError: String?
     private var authenticationSession: ASWebAuthenticationSession?
+    private var authenticationTask: Task<Void, Never>?
+    /// Identifies the running attempt so a cancelled attempt that finishes late
+    /// cannot reset the state of a newer one.
+    private var authenticationAttemptID: UUID?
     private let appleProvider = AppleSignInAuthorizationProvider()
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
@@ -96,22 +117,60 @@ final class SignInViewModel: NSObject, ObservableObject,
             .authenticationStarted,
             data: ["provider": "circlems"]
         )
+        startAuthentication(initialStep: .openingBrowser, isCancellation: isCancellation) {
+            _ = try await self.perform(
+                purpose: .authenticate,
+                expectedPublicUserID: nil
+            )
+        }
+    }
+
+    /// Stops the running sign-in attempt and returns to the signed-out state.
+    /// A durable authorization flow stays stored, so the next attempt resumes
+    /// it instead of starting a second provider sign-in.
+    func cancelAuthentication() {
+        guard state == .authenticating else { return }
+        authenticationAttemptID = nil
+        authenticationTask?.cancel()
+        authenticationTask = nil
+        authenticationSession?.cancel()
+        authenticationSession = nil
+        state = .anonymous
+        step = nil
+    }
+
+    private func startAuthentication(
+        initialStep: SignInStep,
+        isCancellation: @escaping @MainActor (Error) -> Bool,
+        operation: @escaping @MainActor () async throws -> Void
+    ) {
+        let attemptID = UUID()
+        authenticationAttemptID = attemptID
         state = .authenticating
+        step = initialStep
         authenticationError = nil
-        Task {
+        authenticationTask = Task {
             do {
-                _ = try await perform(
-                    purpose: .authenticate,
-                    expectedPublicUserID: nil
-                )
+                try await operation()
+                guard authenticationAttemptID == attemptID else { return }
+                step = .loadingProfile
                 await AppData.profileStore.load()
-                state = .anonymous
+                finishAuthentication(attemptID)
             } catch {
-                state = .anonymous
-                if isCancellation(error) { return }
+                guard authenticationAttemptID == attemptID else { return }
+                finishAuthentication(attemptID)
+                if isCancellation(error) || error is CancellationError { return }
                 authenticationError = error.localizedDescription
             }
         }
+    }
+
+    private func finishAuthentication(_ attemptID: UUID) {
+        guard authenticationAttemptID == attemptID else { return }
+        authenticationAttemptID = nil
+        authenticationTask = nil
+        state = .anonymous
+        step = nil
     }
 
     func resumePendingSignInIfNeeded() {
@@ -140,21 +199,11 @@ final class SignInViewModel: NSObject, ObservableObject,
                 "entry_context": entryContext.rawValue,
             ]
         )
-        state = .authenticating
-        authenticationError = nil
-        Task {
-            do {
-                try await performGoogleAuthentication(
-                    entryContext: entryContext,
-                    invitationToken: invitationToken
-                )
-                await AppData.profileStore.load()
-                state = .anonymous
-            } catch {
-                state = .anonymous
-                if isGoogleCancellation(error) { return }
-                authenticationError = error.localizedDescription
-            }
+        startAuthentication(initialStep: .verifying, isCancellation: isGoogleCancellation) {
+            try await self.performGoogleAuthentication(
+                entryContext: entryContext,
+                invitationToken: invitationToken
+            )
         }
     }
 
@@ -192,21 +241,11 @@ final class SignInViewModel: NSObject, ObservableObject,
                 "entry_context": entryContext.rawValue,
             ]
         )
-        state = .authenticating
-        authenticationError = nil
-        Task {
-            do {
-                try await performAppleAuthentication(
-                    entryContext: entryContext,
-                    invitationToken: invitationToken
-                )
-                await AppData.profileStore.load()
-                state = .anonymous
-            } catch {
-                state = .anonymous
-                if isAppleCancellation(error) { return }
-                authenticationError = error.localizedDescription
-            }
+        startAuthentication(initialStep: .verifying, isCancellation: isAppleCancellation) {
+            try await self.performAppleAuthentication(
+                entryContext: entryContext,
+                invitationToken: invitationToken
+            )
         }
     }
 
@@ -236,7 +275,10 @@ final class SignInViewModel: NSObject, ObservableObject,
             data: ["provider": "circlems"]
         )
         state = .authenticating
-        defer { state = .anonymous }
+        defer {
+            state = .anonymous
+            step = nil
+        }
         return try await perform(purpose: .link, expectedPublicUserID: publicUserID)
     }
 
@@ -280,6 +322,7 @@ final class SignInViewModel: NSObject, ObservableObject,
                 guard environment.storageNamespace == AppEnvironment.current.storageNamespace else {
                     throw SignInError.environmentChanged
                 }
+                step = .verifying
                 publication = try await CominaviServiceClient.shared
                     .recordCirclemsAuthorizationCallback(
                         callback,
@@ -289,6 +332,7 @@ final class SignInViewModel: NSObject, ObservableObject,
                 flow = publication.flow
             }
 
+            step = .verifying
             publication = try await CominaviServiceClient.shared
                 .recordCirclemsAuthorizationSubmission(for: publication)
             flow = publication.flow
@@ -560,89 +604,76 @@ final class SignInViewModel: NSObject, ObservableObject,
     }
 }
 
+/// Why the sign-in screen is showing. A person whose session expired sees a
+/// short notice and their previous name instead of the first-launch welcome.
+enum SignInReason: Equatable {
+    case firstLaunch
+    case sessionExpired(message: String?, displayName: String?)
+}
+
 struct SignInView: View {
     private static let demoUnlockTapCount = 10
+    /// A sign-in attempt that runs longer than this offers a Cancel button.
+    private static let cancelDelay: Duration = .seconds(15)
+    private static let circlemsPortalURL = URL(string: "https://portal.circle.ms/")!
 
-    @ScaledMetric(relativeTo: .title) private var logoSize = 60.0
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @ScaledMetric(relativeTo: .title) private var logoTileSize = 80.0
     @StateObject private var vm = SignInViewModel()
     @State private var logoTapCount = 0
     @State private var isDemoDataUnlocked = false
+    @State private var canCancelAuthentication = false
+    private let reason: SignInReason?
     private let onUseDemoData: (() -> Void)?
     private let googleInvitation: SharedPlanInvitationInbox.Pending?
     private let googleSpecialEntry: Bool
 
+    /// - Parameter reason: Pass a value to override the reason that the shared
+    ///   profile store reports, for example in previews.
     init(
+        reason: SignInReason? = nil,
         onUseDemoData: (() -> Void)? = nil,
         googleInvitation: SharedPlanInvitationInbox.Pending? = nil,
         googleSpecialEntry: Bool = false
     ) {
+        self.reason = reason
         self.onUseDemoData = onUseDemoData
         self.googleInvitation = googleInvitation
         self.googleSpecialEntry = googleSpecialEntry
     }
 
+    private var resolvedReason: SignInReason {
+        if let reason { return reason }
+        let profileStore = AppData.profileStore
+        guard profileStore.requiresReauthentication else { return .firstLaunch }
+        return .sessionExpired(
+            message: profileStore.issueMessage,
+            displayName: profileStore.profile?.displayName
+        )
+    }
+
+    private var isRegularWidth: Bool {
+        horizontalSizeClass == .regular
+    }
+
     var body: some View {
+        let reason = resolvedReason
         GeometryReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    brandMark
+                VStack(spacing: 0) {
+                    // iPhone keeps the actions in thumb reach at the bottom.
+                    // iPad centers one readable column instead of stretching it.
+                    Spacer(minLength: isRegularWidth ? 24 : 40)
 
-                    Spacer(minLength: 80)
+                    content(reason: reason)
+                        .frame(maxWidth: isRegularWidth ? 520 : 620, alignment: .leading)
+                        .background { contentScrim }
 
-                    hero
-
-                    loginButton
-                        .padding(.top, loginButtonTopPadding)
-
-                    if isDemoDataUnlocked, let onUseDemoData {
-                        Button(action: onUseDemoData) {
-                            LucideLabel("Continue with demo data", icon: "externaldrive")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity, minHeight: 52)
-                        }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.roundedRectangle(radius: 16))
-                        .disabled(vm.state == .authenticating)
-                        .padding(.top, 12)
-                        .accessibilityIdentifier("sign-in-demo-data")
+                    if isRegularWidth {
+                        Spacer(minLength: 24)
                     }
-
-                    if let googleInvitation {
-                        if GoogleSignInConfiguration.load() != nil {
-                            googleLoginButton(invitation: googleInvitation)
-                                .padding(.top, 12)
-                        }
-                    } else if googleSpecialEntry {
-                        if GoogleSignInConfiguration.load() != nil {
-                            googleLoginButton(invitation: nil)
-                                .padding(.top, 12)
-                        }
-                    }
-
-                    if let authenticationError = vm.authenticationError {
-                        HStack(alignment: .top, spacing: 10) {
-                            LucideIcon("exclamationmark.circle.fill", size: 20)
-                                .foregroundStyle(.red)
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Authentication failed")
-                                    .font(.subheadline.weight(.semibold))
-                                Text(authenticationError)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        .padding(.top, 12)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier("sign-in-authentication-error")
-                    }
-
                 }
-                .frame(
-                    maxWidth: 620, minHeight: max(0, proxy.size.height - 48), alignment: .topLeading
-                )
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, minHeight: max(0, proxy.size.height - 48))
                 .padding(.horizontal, 24)
                 .padding(.vertical, 24)
             }
@@ -671,12 +702,113 @@ struct SignInView: View {
                 vm.resumePendingGoogleAuthenticationIfNeeded(entryContext: .special)
             }
         }
+        .task(id: vm.state) {
+            canCancelAuthentication = false
+            guard vm.state == .authenticating else { return }
+            try? await Task.sleep(for: Self.cancelDelay)
+            guard !Task.isCancelled, vm.state == .authenticating else { return }
+            canCancelAuthentication = true
+        }
+    }
+
+    private func content(reason: SignInReason) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            brandMark
+
+            hero(reason: reason)
+                .padding(.top, 20)
+
+            switch reason {
+            case .firstLaunch:
+                valueRows
+                    .padding(.top, 24)
+            case .sessionExpired(let message, _):
+                sessionExpiredNotice(
+                    message: message
+                        ?? CominaviServiceError.notLoggedIn.localizedDescription
+                )
+                .padding(.top, 20)
+            }
+
+            loginButton
+                .padding(.top, 28)
+
+            authenticationProgress
+
+            if isDemoDataUnlocked, let onUseDemoData {
+                Button(action: onUseDemoData) {
+                    LucideLabel("Continue with demo data", icon: "externaldrive")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .disabled(vm.state == .authenticating)
+                .padding(.top, 12)
+                .accessibilityIdentifier("sign-in-demo-data")
+            }
+
+            if let googleInvitation {
+                if GoogleSignInConfiguration.load() != nil {
+                    googleLoginButton(invitation: googleInvitation)
+                        .padding(.top, 12)
+                }
+            } else if googleSpecialEntry {
+                if GoogleSignInConfiguration.load() != nil {
+                    googleLoginButton(invitation: nil)
+                        .padding(.top, 12)
+                }
+            }
+
+            if let authenticationError = vm.authenticationError {
+                HStack(alignment: .top, spacing: 10) {
+                    LucideIcon("exclamationmark.circle.fill", size: 20)
+                        .foregroundStyle(.red)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Couldn't sign in")
+                            .font(.subheadline.weight(.semibold))
+                        Text(authenticationError)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.top, 12)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("sign-in-authentication-error")
+            }
+
+            circlemsExplanation
+                .padding(.top, 20)
+
+            Text("ComiNavi is an unofficial app. It is not affiliated with Comic Market or Circle.ms.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 16)
+        }
+    }
+
+    /// A soft background fill behind the text, so the moving booth highlights
+    /// of the backdrop never cross the headline or the explanation.
+    private var contentScrim: some View {
+        RoundedRectangle(cornerRadius: 32, style: .continuous)
+            .fill(Color(uiColor: .systemBackground).opacity(0.9))
+            .padding(-20)
+            .blur(radius: 16)
+            .accessibilityHidden(true)
     }
 
     private var brandMark: some View {
         LogoShape()
-            .foregroundStyle(.primary)
-            .frame(width: logoSize, height: logoSize)
+            .foregroundStyle(Color.onAccentFill)
+            .padding(logoTileSize * 0.2)
+            .frame(width: logoTileSize, height: logoTileSize)
+            .background(
+                Color.accentFill,
+                in: RoundedRectangle(cornerRadius: logoTileSize * 0.24, style: .continuous)
+            )
             .contentShape(.rect)
             .onTapGesture(perform: recordLogoTap)
             .accessibilityLabel("ComiNavi")
@@ -691,26 +823,116 @@ struct SignInView: View {
         }
     }
 
-    private var hero: some View {
+    private func hero(reason: SignInReason) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Welcome to ComiNavi!")
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .foregroundStyle(Color.accentColor)
+            switch reason {
+            case .firstLaunch:
+                Text("Welcome to ComiNavi!")
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .accessibilityAddTraits(.isHeader)
 
-            Text("Find circles. Know where they are.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+                Text("Find circles. Know where they are.")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            case .sessionExpired(_, let displayName):
+                Text("Sign in again")
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .foregroundStyle(.primary)
+                    .accessibilityAddTraits(.isHeader)
+
+                if let displayName, !displayName.isEmpty {
+                    Text("You were signed in as \(displayName).")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var valueRows: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            valueRow("Find any space on the venue map", icon: "map")
+            valueRow("Search the circle catalog", icon: "search")
+            valueRow("Share purchase plans with friends", icon: "users")
+        }
+    }
+
+    private func valueRow(_ title: LocalizedStringKey, icon: String) -> some View {
+        HStack(spacing: 12) {
+            LucideIcon(icon, size: 20)
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 28)
+
+            Text(title)
+                .font(.body)
+                .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
     }
 
-    private var loginButtonTopPadding: CGFloat {
-        #if DEBUG
-            32
-        #else
-            48
-        #endif
+    private func sessionExpiredNotice(message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            LucideIcon("info.circle", size: 20)
+                .foregroundStyle(.secondary)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Color(uiColor: .secondarySystemBackground),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("sign-in-session-expired")
+    }
+
+    private var circlemsExplanation: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(
+                "Sign in with your Circle.ms account. Circle.ms runs the official Comic Market Web Catalog. It opens in a secure browser sheet, and ComiNavi never sees your password."
+            )
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Link(destination: Self.circlemsPortalURL) {
+                Text("Don't have a Circle.ms account?")
+                    .font(.footnote.weight(.semibold))
+            }
+            .accessibilityHint("Opens Circle.ms in Safari.")
+        }
+    }
+
+    /// The running step of a sign-in attempt, and a Cancel button once the
+    /// attempt has run for a while.
+    @ViewBuilder
+    private var authenticationProgress: some View {
+        if vm.state == .authenticating {
+            HStack(spacing: 12) {
+                if let step = vm.step {
+                    Text(step.title)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("sign-in-step")
+                }
+
+                Spacer(minLength: 0)
+
+                if canCancelAuthentication {
+                    Button("Cancel", action: vm.cancelAuthentication)
+                        .font(.footnote.weight(.semibold))
+                        .accessibilityIdentifier("sign-in-cancel")
+                }
+            }
+            .padding(.top, 10)
+        }
     }
 
     @ViewBuilder
@@ -719,12 +941,12 @@ struct SignInView: View {
             loginButtonContent
                 .buttonStyle(.glassProminent)
                 .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(.accentColor)
+                .tint(Color.accentFill)
         } else {
             loginButtonContent
                 .buttonStyle(.borderedProminent)
                 .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(.accentColor)
+                .tint(Color.accentFill)
         }
     }
 
@@ -734,26 +956,26 @@ struct SignInView: View {
                 if vm.state == .authenticating {
                     ProgressView()
                         .controlSize(.small)
-                        .tint(.black.opacity(0.82))
+                        .tint(Color.onAccentFill)
 
-                    Text("Authenticating...")
+                    Text("Signing in…")
                 } else {
-                    Text("Login via circle.ms")
+                    Text("Sign in with Circle.ms")
 
                     Spacer(minLength: 12)
 
                     LucideIcon("arrow.up.right")
-                        .accessibilityHidden(true)
                 }
             }
             .font(.headline)
-            .foregroundStyle(.black.opacity(0.82))
+            .foregroundStyle(Color.onAccentFill)
             .frame(maxWidth: .infinity, minHeight: 56)
             .padding(.horizontal, 8)
             .contentTransition(.opacity)
         }
         .disabled(vm.state == .authenticating)
-        .accessibilityHint("Tap to log in")
+        .accessibilityHint("Opens Circle.ms in a secure browser sheet.")
+        .accessibilityIdentifier("sign-in-circlems")
         .animation(.easeInOut(duration: 0.2), value: vm.state == .authenticating)
     }
 
@@ -794,31 +1016,77 @@ struct SignInView: View {
 }
 
 private struct ConventionFloorBackdrop: View {
+    /// The live crowd simulation stops after this long so an unattended sign-in
+    /// screen does not keep the GPU busy.
+    private static let idleTimeout: Duration = .seconds(20)
+
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var accessibilityVoiceOverEnabled
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @State private var scene = ConventionFloorScene()
+    @State private var isIdle = false
+
+    /// UI tests read the accessibility tree and capture screenshots, so they
+    /// always receive the deterministic static floor.
+    private static let isUITesting = ProcessInfo.processInfo.arguments.contains {
+        $0.hasPrefix("-cominavi-ui-testing")
+    }
+
+    private var usesStaticFloor: Bool {
+        accessibilityReduceMotion || accessibilityVoiceOverEnabled || Self.isUITesting
+    }
 
     private var isSimulationPaused: Bool {
-        accessibilityReduceMotion || scenePhase != .active
+        isIdle || scenePhase != .active
     }
 
     var body: some View {
-        SpriteView(
-            scene: scene,
-            preferredFramesPerSecond: 30,
-            options: [
-                .allowsTransparency,
-                .ignoresSiblingOrder,
-                .shouldCullNonVisibleNodes,
-            ],
-            shouldRender: { _ in
-                UIApplication.shared.applicationState == .active
+        Group {
+            if usesStaticFloor {
+                StaticConventionFloor()
+            } else {
+                liveFloor
             }
-        )
+        }
         .allowsHitTesting(false)
+        // SpriteKit publishes every node to the accessibility tree. Collapse the
+        // backdrop into one ignored element before hiding it.
+        .accessibilityElement(children: .ignore)
         .accessibilityHidden(true)
         .ignoresSafeArea()
+    }
+
+    private var liveFloor: some View {
+        GeometryReader { proxy in
+            SpriteView(
+                scene: scene,
+                preferredFramesPerSecond: 20,
+                options: [
+                    .allowsTransparency,
+                    .ignoresSiblingOrder,
+                    .shouldCullNonVisibleNodes,
+                ],
+                shouldRender: { _ in
+                    !isIdle && UIApplication.shared.applicationState == .active
+                }
+            )
+            .task(
+                id: IdleTimerKey(
+                    isActive: scenePhase == .active,
+                    colorScheme: colorScheme,
+                    width: proxy.size.width,
+                    height: proxy.size.height
+                )
+            ) {
+                // Any change that needs a fresh frame restarts the idle timer.
+                isIdle = false
+                guard scenePhase == .active else { return }
+                try? await Task.sleep(for: Self.idleTimeout)
+                guard !Task.isCancelled else { return }
+                isIdle = true
+            }
+        }
         .onAppear {
             scene.setSimulationPaused(isSimulationPaused)
         }
@@ -830,6 +1098,79 @@ private struct ConventionFloorBackdrop: View {
         }
         .onChange(of: colorScheme, initial: true) { _, newColorScheme in
             scene.setVeilColor(for: newColorScheme)
+        }
+    }
+
+    private struct IdleTimerKey: Hashable {
+        let isActive: Bool
+        let colorScheme: ColorScheme
+        let width: CGFloat
+        let height: CGFloat
+    }
+}
+
+/// A still drawing of the booth grid for VoiceOver, Reduce Motion and UI tests.
+/// It uses the same proportions as `ConventionFloorScene` without SpriteKit.
+private struct StaticConventionFloor: View {
+    var body: some View {
+        Canvas { context, size in
+            let tableShortSide = min(max(size.width / 72, 4.6), 6.4)
+            let tableLongSide = tableShortSide * 2.65
+            let tableSpacing = tableShortSide * 0.32
+            let tablesPerBank = 10
+            let blockWidth = tableLongSide * 2 + tableShortSide * 2
+            let bankLength =
+                CGFloat(tablesPerBank) * tableLongSide
+                + CGFloat(tablesPerBank - 1) * tableSpacing
+            let blockHeight = bankLength + tableShortSide * 2
+            let horizontalStride = blockWidth + tableLongSide * 1.2
+            let verticalStride = blockHeight + tableLongSide * 3.25
+
+            let diagonal = (size.width * size.width + size.height * size.height).squareRoot()
+            var path = Path()
+            var blockY = -diagonal / 2 - verticalStride
+            while blockY < diagonal / 2 + verticalStride {
+                var blockX = -diagonal / 2 - horizontalStride
+                while blockX < diagonal / 2 + horizontalStride {
+                    let rightBankX = blockX + blockWidth - tableShortSide
+                    for table in 0..<tablesPerBank {
+                        let tableY =
+                            blockY + tableShortSide
+                            + CGFloat(table) * (tableLongSide + tableSpacing)
+                        for x in [blockX, rightBankX] {
+                            path.addRect(
+                                CGRect(
+                                    x: x,
+                                    y: tableY,
+                                    width: tableShortSide,
+                                    height: tableLongSide
+                                )
+                            )
+                        }
+                    }
+                    let endCapX = blockX + tableShortSide
+                    for endY in [blockY, blockY + blockHeight - tableShortSide] {
+                        path.addRect(
+                            CGRect(
+                                x: endCapX,
+                                y: endY,
+                                width: tableLongSide * 2,
+                                height: tableShortSide
+                            )
+                        )
+                    }
+                    blockX += horizontalStride
+                }
+                blockY += verticalStride
+            }
+
+            context.translateBy(x: size.width / 2, y: size.height / 2)
+            context.rotate(by: .radians(.pi / 12))
+            context.stroke(
+                path,
+                with: .color(Color(uiColor: .secondaryLabel).opacity(0.22)),
+                lineWidth: 1.45
+            )
         }
     }
 }
@@ -1052,6 +1393,9 @@ private final class ConventionFloorScene: SKScene {
 
     override func didMove(to view: SKView) {
         view.isOpaque = false
+        view.isAccessibilityElement = false
+        view.accessibilityElementsHidden = true
+        view.accessibilityElements = []
         rebuildFloor()
     }
 
@@ -1077,6 +1421,10 @@ private final class ConventionFloorScene: SKScene {
     }
 
     private func configureScene() {
+        // The backdrop is decorative. Keep the scene and its thousands of
+        // nodes out of the accessibility tree.
+        isAccessibilityElement = false
+        accessibilityElements = []
         backgroundColor = .clear
         scaleMode = .resizeFill
         anchorPoint = .zero
@@ -2627,7 +2975,16 @@ private final class ConventionFloorScene: SKScene {
     }
 }
 
-#Preview {
-    SignInView()
+#Preview("First launch") {
+    SignInView(reason: .firstLaunch)
         .environment(\.locale, .init(identifier: "ja"))
+}
+
+#Preview("Session expired") {
+    SignInView(
+        reason: .sessionExpired(
+            message: "Please sign in to ComiNavi again.",
+            displayName: "Comike Fan"
+        )
+    )
 }
