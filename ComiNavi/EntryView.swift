@@ -12,23 +12,17 @@ import UserNotifications
 enum EntryContentRoute: Equatable {
     case accountDeletion
     case signIn
-    case catalogLoading
-    case catalog
-    case catalogIndependent
+    case app
 
     static func resolve(
         accountDeletionPending: Bool,
-        shouldShowSignIn: Bool,
-        catalogIsPreparing _: Bool,
-        hasCatalog: Bool
+        shouldShowSignIn: Bool
     ) -> Self {
         if accountDeletionPending { return .accountDeletion }
         if shouldShowSignIn { return .signIn }
-        if hasCatalog { return .catalog }
-        // CatalogIndependentContentView keeps plans and profile usable while
-        // the catalog tab discovers or revalidates its last installed data.
-        // An authenticated launch must never be held behind network work.
-        return .catalogIndependent
+        // ContentView owns every catalog state, so an authenticated launch
+        // enters the app at once and is never held behind network work.
+        return .app
     }
 }
 
@@ -429,7 +423,7 @@ struct EntryView: View {
             } else if ProcessInfo.processInfo.arguments.contains(
                 "-cominavi-ui-testing-no-catalog-shell"
             ) {
-                CatalogIndependentContentView(
+                ContentView(
                     catalogLibrary: catalogLibrary,
                     sharedLocationInbox: sharedLocationInbox
                 )
@@ -457,9 +451,7 @@ struct EntryView: View {
     private var regularAppContent: some View {
         switch EntryContentRoute.resolve(
             accountDeletionPending: accountDeletionPending,
-            shouldShowSignIn: shouldShowSignIn,
-            catalogIsPreparing: catalogIsPreparing,
-            hasCatalog: catalogIsReady
+            shouldShowSignIn: shouldShowSignIn
         ) {
         case .accountDeletion:
             AccountDeletionPendingView(
@@ -479,34 +471,11 @@ struct EntryView: View {
                     : nil,
                 googleSpecialEntry: googleSpecialEntryActive
             )
-        case .catalogLoading:
-            catalogLoadingView
-        case .catalog:
+        case .app:
             ContentView(
                 catalogLibrary: catalogLibrary,
                 sharedLocationInbox: sharedLocationInbox
             )
-        case .catalogIndependent:
-            CatalogIndependentContentView(
-                catalogLibrary: catalogLibrary,
-                sharedLocationInbox: sharedLocationInbox
-            )
-        }
-    }
-
-    private var catalogIsReady: Bool {
-        catalogLibrary.dataSource?.readiness == .ready
-    }
-
-    private var catalogIsPreparing: Bool {
-        guard !catalogIsReady else { return false }
-        return switch catalogLibrary.phase {
-        case .idle, .discovering, .loading, .downloading:
-            true
-        case .ready:
-            true
-        case .failed:
-            false
         }
     }
 

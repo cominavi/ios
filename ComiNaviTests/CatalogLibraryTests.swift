@@ -65,48 +65,27 @@ final class CatalogLibraryTests: XCTestCase {
         XCTAssertEqual(cominaviConfigurationEventIDs, [230])
     }
 
-    func testAuthenticatedUserWithoutCatalogKeepsIndependentAppDestinationsAvailable() {
+    func testAuthenticatedUserEntersTheAppShellInEveryCatalogState() {
         XCTAssertEqual(
             EntryContentRoute.resolve(
                 accountDeletionPending: false,
-                shouldShowSignIn: false,
-                catalogIsPreparing: false,
-                hasCatalog: false
+                shouldShowSignIn: false
             ),
-            .catalogIndependent
+            .app
         )
         XCTAssertEqual(
             EntryContentRoute.resolve(
                 accountDeletionPending: false,
-                shouldShowSignIn: false,
-                catalogIsPreparing: false,
-                hasCatalog: true
+                shouldShowSignIn: true
             ),
-            .catalog
+            .signIn
         )
-    }
-
-    func testAuthenticatedUserEntersAppWhileCatalogPrepares() {
         XCTAssertEqual(
             EntryContentRoute.resolve(
-                accountDeletionPending: false,
-                shouldShowSignIn: false,
-                catalogIsPreparing: true,
-                hasCatalog: false
+                accountDeletionPending: true,
+                shouldShowSignIn: true
             ),
-            .catalogIndependent
-        )
-    }
-
-    func testCatalogReplacementKeepsReadyAppShellVisible() {
-        XCTAssertEqual(
-            EntryContentRoute.resolve(
-                accountDeletionPending: false,
-                shouldShowSignIn: false,
-                catalogIsPreparing: true,
-                hasCatalog: true
-            ),
-            .catalog
+            .accountDeletion
         )
     }
 

@@ -571,7 +571,7 @@ final class ComiNaviUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        let catalogTab = app.buttons["Catalog"]
+        let catalogTab = app.buttons["Map"].firstMatch
         XCTAssertTrue(catalogTab.waitForExistence(timeout: 10))
         catalogTab.tap()
 
@@ -648,13 +648,13 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-ui-testing-no-catalog-shell")
         app.launch()
 
-        let shell = app.otherElements["catalog-independent-shell"]
+        let shell = app.otherElements["app-shell"]
         XCTAssertTrue(shell.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Map"].firstMatch.exists)
         XCTAssertTrue(app.buttons["共有プラン"].exists)
         XCTAssertTrue(app.buttons["Profile"].exists)
-        XCTAssertTrue(app.navigationBars["共有プラン"].exists)
 
-        app.buttons["Catalog"].tap()
+        app.buttons["Map"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Try Again"].waitForExistence(timeout: 5))
 
         app.buttons["共有プラン"].tap()
@@ -668,7 +668,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.otherElements["catalog-independent-shell"].waitForExistence(timeout: 5)
+            app.otherElements["app-shell"].waitForExistence(timeout: 5)
         )
         app.buttons["Profile"].tap()
         let imageCacheLink = app.buttons["profile-image-cache"]
