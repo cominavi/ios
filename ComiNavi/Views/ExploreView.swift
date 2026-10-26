@@ -285,22 +285,57 @@ struct ExploreView<EventDayHeader: View>: View {
     }
 }
 
+/// Static placeholder cards in the same grid shape as the gallery, so the
+/// first load reads as "circles are on the way" instead of a separate screen.
 private struct ExploreLoadingScreen: View {
-    var body: some View {
-        VStack(spacing: 18) {
-            ProgressView()
-                .controlSize(.large)
-                .tint(Color.accentColor)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-            Text("Organizing circles…")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.primary)
+    private var columns: [GridItem] {
+        Array(
+            repeating: GridItem(.flexible(), spacing: 12, alignment: .top),
+            count: horizontalSizeClass == .compact ? 2 : 4
+        )
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
+                ForEach(0..<12, id: \.self) { _ in
+                    ExploreSkeletonCard()
+                }
+            }
+            .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
+            .padding(.top, 12)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .scrollDisabled(true)
+        .allowsHitTesting(false)
         .background(Color(uiColor: .systemBackground))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Organizing circles…")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading circles…")
         .accessibilityIdentifier("explore-loading-screen")
+    }
+}
+
+private struct ExploreSkeletonCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(uiColor: .secondarySystemFill))
+                .aspectRatio(
+                    ExploreLayoutMetrics.circleArtworkAspectRatio,
+                    contentMode: .fit
+                )
+
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(uiColor: .quaternaryLabel))
+                    .frame(height: 10)
+                    .padding(.trailing, 24)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(uiColor: .quaternaryLabel))
+                    .frame(width: 48, height: 10)
+            }
+        }
     }
 }
 
@@ -1306,12 +1341,12 @@ struct ExploreCircleArtwork: View {
                 Rectangle()
                     .fill(Color(uiColor: .secondarySystemFill))
                     .overlay {
+                        // The plain fill is the loading state; only a failed
+                        // load gets a glyph.
                         if didFinishLoading {
                             LucideIcon("photo.badge.exclamationmark")
                                 .font(.title2)
                                 .foregroundStyle(.tertiary)
-                        } else {
-                            ProgressView()
                         }
                     }
             }
