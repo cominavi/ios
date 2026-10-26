@@ -74,16 +74,13 @@ struct ComiketReminderRequest: Equatable, Sendable {
 }
 
 enum ComiketEventReminderCatalog {
-    static let eventNumber = 108
+    /// The edition whose admission schedule the reminders follow.
+    static let edition = ComiketToolboxEdition.c108
+    static let eventNumber = edition.eventNumber
     static let leadTime: TimeInterval = 15 * 60
-    static let officialScheduleURL = URL(
-        string: "https://www.comiket.co.jp/info-a/TAFO/C108TAFO/ticket.html"
-    )!
+    static let officialScheduleURL = edition.reminderScheduleURL
 
-    private static let eventDays = [
-        (day: 1, year: 2026, month: 8, date: 15),
-        (day: 2, year: 2026, month: 8, date: 16),
-    ]
+    private static var eventDays: [ComiketToolboxEventDay] { edition.days }
 
     static var tokyoCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)

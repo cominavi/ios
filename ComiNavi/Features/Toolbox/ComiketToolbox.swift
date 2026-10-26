@@ -61,6 +61,8 @@ struct ComiketToolboxResource: Identifiable, Sendable {
     let icon: String
     let url: URL
     let searchTerms: String
+    /// The Comiket this link is specific to, or `nil` for links that apply to every event.
+    let eventNumber: Int?
 
     func matches(_ query: String) -> Bool {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -119,6 +121,80 @@ enum C108ToolboxNoticeCatalog {
     ]
 }
 
+struct ComiketToolboxEventDay: Sendable {
+    let day: Int
+    let year: Int
+    let month: Int
+    let date: Int
+}
+
+/// The event-specific part of the Toolbox for one Comiket.
+///
+/// Notices, reminders, and edition links are only true for one event and only
+/// until it ends, so the Toolbox hides them unless the selected event matches
+/// an edition that is still valid. Everything else in the catalog is evergreen.
+struct ComiketToolboxEdition: Identifiable, Sendable {
+    let eventNumber: Int
+    let days: [ComiketToolboxEventDay]
+    let notices: [ComiketToolboxNotice]
+    let reminderScheduleURL: URL
+    /// When the notices were last checked against official posts.
+    let verifiedAt: Date
+    /// After this instant the edition's notices, reminders, and links no longer apply.
+    let validUntil: Date
+
+    var id: Int { eventNumber }
+    var shortName: String { "C\(eventNumber)" }
+
+    func applies(at now: Date) -> Bool {
+        now < validUntil
+    }
+
+    static let c108 = ComiketToolboxEdition(
+        eventNumber: 108,
+        days: [
+            ComiketToolboxEventDay(day: 1, year: 2026, month: 8, date: 15),
+            ComiketToolboxEventDay(day: 2, year: 2026, month: 8, date: 16),
+        ],
+        notices: C108ToolboxNoticeCatalog.notices,
+        reminderScheduleURL: URL(
+            string: "https://www.comiket.co.jp/info-a/TAFO/C108TAFO/ticket.html"
+        )!,
+        verifiedAt: tokyoDate(year: 2026, month: 8, day: 13, hour: 12),
+        // The day after the last event day, so the content stays up through closing.
+        validUntil: tokyoDate(year: 2026, month: 8, day: 17, hour: 0)
+    )
+
+    static let all: [ComiketToolboxEdition] = [.c108]
+
+    /// The edition for the selected event, if it is still valid at `now`.
+    ///
+    /// Without a selected event, the newest edition that is still valid is used.
+    static func current(
+        forEventNumber eventNumber: Int?,
+        now: Date = Date()
+    ) -> ComiketToolboxEdition? {
+        all.first { edition in
+            (eventNumber == nil || edition.eventNumber == eventNumber) && edition.applies(at: now)
+        }
+    }
+
+    private static func tokyoDate(year: Int, month: Int, day: Int, hour: Int) -> Date {
+        let calendar = ComiketEventReminderCatalog.tokyoCalendar
+        let components = DateComponents(
+            timeZone: calendar.timeZone,
+            year: year,
+            month: month,
+            day: day,
+            hour: hour
+        )
+        guard let date = calendar.date(from: components) else {
+            preconditionFailure("Invalid Toolbox edition date")
+        }
+        return date
+    }
+}
+
 enum ComiketToolboxCatalog {
     static let venueMapsURL = makeURL(
         "https://maps.apple.com/?daddr=Tokyo+Big+Sight,+3-11-1+Ariake,+Koto+City,+Tokyo&dirflg=r"
@@ -143,7 +219,8 @@ enum ComiketToolboxCatalog {
             .comiket,
             "list-checks",
             "https://posfie.com/@comiketofficial/p/KaBB6nx",
-            "直前 まとめ latest guidance beginner international Dr.P"
+            "直前 まとめ latest guidance beginner international Dr.P",
+            eventNumber: 108
         ),
         resource(
             "international-x",
@@ -193,7 +270,8 @@ enum ComiketToolboxCatalog {
             .comiket,
             "calendar-days",
             "https://www.comiket.co.jp/info-a/C108/C108Info.html",
-            "開催概要 時間 ホール 日程 交通"
+            "開催概要 時間 ホール 日程 交通",
+            eventNumber: 108
         ),
         resource(
             "c108-entry",
@@ -203,7 +281,8 @@ enum ComiketToolboxCatalog {
             .comiket,
             "door-open",
             "https://www.comiket.co.jp/info-a/C108/C108EntryTicket2.html",
-            "ticket チケット リストバンド 入場 午前 午後 アーリー"
+            "ticket チケット リストバンド 入場 午前 午後 アーリー",
+            eventNumber: 108
         ),
         resource(
             "c108-notes",
@@ -213,7 +292,8 @@ enum ComiketToolboxCatalog {
             .comiket,
             "file-text",
             "https://www.comiket.co.jp/info-a/C108/C108CtlgNotes.pdf",
-            "catalog notes rules 諸注意 カタログ ルール 禁止事項 pdf"
+            "catalog notes rules 諸注意 カタログ ルール 禁止事項 pdf",
+            eventNumber: 108
         ),
         resource(
             "beginner-guide",
@@ -243,7 +323,8 @@ enum ComiketToolboxCatalog {
             .comiket,
             "map",
             "https://www.comiket.co.jp/info-a/C108/C108CtlgMap.html",
-            "地図 map offline pdf サークルスペース ホール"
+            "地図 map offline pdf サークルスペース ホール",
+            eventNumber: 108
         ),
         resource(
             "c108-food",
@@ -253,7 +334,8 @@ enum ComiketToolboxCatalog {
             .comiket,
             "shopping-cart",
             "https://www.comiket.co.jp/info-a/C108/C108Food.html",
-            "food drink restaurant convenience store フード 飲食 コンビニ 水分"
+            "food drink restaurant convenience store フード 飲食 コンビニ 水分",
+            eventNumber: 108
         ),
         resource(
             "big-sight-floor-maps",
@@ -353,7 +435,8 @@ enum ComiketToolboxCatalog {
             .transitOperator,
             "calendar-clock",
             "https://www.yurikamome.co.jp/company/news/bbee2796dd59429f6aa22fb274f5ace8_1.pdf",
-            "yurikamome 東京ビッグサイト駅 ゆりかもめ 時刻表 臨時ダイヤ pdf 混雑 入場規制 13時 18時"
+            "yurikamome 東京ビッグサイト駅 ゆりかもめ 時刻表 臨時ダイヤ pdf 混雑 入場規制 13時 18時",
+            eventNumber: 108
         ),
         resource(
             "haneda-airport-limousine-c108",
@@ -363,7 +446,8 @@ enum ComiketToolboxCatalog {
             .bigSight,
             "navigation",
             "https://x.com/comiketofficial/status/2087798510016208907",
-            "haneda airport limousine bus 羽田空港 リムジンバス 臨時便"
+            "haneda airport limousine bus 羽田空港 リムジンバス 臨時便",
+            eventNumber: 108
         ),
         resource(
             "tokyo-brt-c108",
@@ -373,7 +457,8 @@ enum ComiketToolboxCatalog {
             .transitOperator,
             "calendar-clock",
             "https://tokyo-brt.co.jp/caution/547",
-            "brt 新橋 国際展示場 臨時便 バス"
+            "brt 新橋 国際展示場 臨時便 バス",
+            eventNumber: 108
         ),
         resource(
             "toei-bus",
@@ -433,7 +518,8 @@ enum ComiketToolboxCatalog {
             .comiket,
             "globe",
             "https://www.comiket.co.jp/info-a/TAFO/C108TAFO/index.html",
-            "english overseas foreign international 英語 海外 参加"
+            "english overseas foreign international 英語 海外 参加",
+            eventNumber: 108
         ),
         resource(
             "beginner-guide-zh-hans",
@@ -465,6 +551,22 @@ enum ComiketToolboxCatalog {
         }
     }
 
+    /// Sections that apply to `edition`. Edition-specific links are left out when
+    /// they belong to another event or when no edition is valid.
+    static func sections(
+        for edition: ComiketToolboxEdition?,
+        matching query: String = ""
+    ) -> [ComiketToolboxSection] {
+        sections(matching: query).compactMap { section in
+            let applicable = section.resources.filter { resource in
+                resource.eventNumber == nil || resource.eventNumber == edition?.eventNumber
+            }
+            return applicable.isEmpty
+                ? nil
+                : ComiketToolboxSection(category: section.category, resources: applicable)
+        }
+    }
+
     private static func resource(
         _ id: String,
         _ category: ComiketToolboxResource.Category,
@@ -473,7 +575,8 @@ enum ComiketToolboxCatalog {
         _ authority: ComiketToolboxResource.Authority,
         _ icon: String,
         _ url: String,
-        _ searchTerms: String
+        _ searchTerms: String,
+        eventNumber: Int? = nil
     ) -> ComiketToolboxResource {
         ComiketToolboxResource(
             id: id,
@@ -483,7 +586,8 @@ enum ComiketToolboxCatalog {
             authority: authority,
             icon: icon,
             url: makeURL(url),
-            searchTerms: searchTerms
+            searchTerms: searchTerms,
+            eventNumber: eventNumber
         )
     }
 
