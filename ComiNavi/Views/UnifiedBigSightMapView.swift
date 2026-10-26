@@ -128,6 +128,11 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     let onSelectTable: (CatalogMapTable, Int) -> Void
     let onSelectLocatedUser: () -> Void
     let onLocate: (Int, CGPoint, CatalogMapTable, Int) -> Void
+    /// Measured map chrome, so camera fits frame content in the uncovered
+    /// area. When `nil`, the renderer estimates the chrome from the safe area.
+    var overviewChromeInsets: MapViewportInsets? = nil
+    /// Frames a campus target once per request `id`.
+    var cameraFitRequest: MapCameraFitRequest? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
@@ -191,7 +196,9 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             locatedUser: locatedUser,
             destination: destination,
             visibleMapLayers: visibleMapLayers,
-            locationFocusBottomInset: locationFocusBottomInset
+            locationFocusBottomInset: locationFocusBottomInset,
+            overviewInsets: overviewChromeInsets,
+            cameraFitRequest: cameraFitRequest
         )
         host.updateBasemap(camera: renderer.basemapCamera)
         host.updateAccessibility(renderer: renderer, scope: scope)
@@ -1293,6 +1300,15 @@ final class UnifiedBigSightScene: SKScene {
     private var minimumCameraScale: CGFloat = 1
     private var maximumCameraScale: CGFloat = 0.01
     private var hasFittedInitialCamera = false
+    /// True while the camera still shows the fitted campus overview. A size
+    /// change then fits the overview again; after any pan, zoom, rotation,
+    /// or focus, the user's camera stays where it is.
+    private var isShowingOverviewFit = false
+    private var overviewInsets: MapViewportInsets?
+    private var lastCameraFitRequestID: UUID?
+    /// The overview never opens closer than this, so it stays clear of the
+    /// 2.4x threshold at which the campus drills into a hall.
+    private static let maximumOverviewZoomFactor: CGFloat = 2
     private var lastCameraPosition = CGPoint(x: CGFloat.infinity, y: CGFloat.infinity)
     private var lastCameraScale: CGFloat = .infinity
     private var lastCameraRotation: CGFloat = .infinity
@@ -1519,8 +1535,16 @@ final class UnifiedBigSightScene: SKScene {
         locatedUser: LocatedMapUser?,
         destination: MapDestination? = nil,
         visibleMapLayers: Set<BigSightMapLayer> = BigSightMapLayer.defaultVisible,
-        locationFocusBottomInset: CGFloat = 0
+        locationFocusBottomInset: CGFloat = 0,
+        overviewInsets: MapViewportInsets? = nil,
+        cameraFitRequest: MapCameraFitRequest? = nil
     ) {
+        if overviewInsets != self.overviewInsets {
+            self.overviewInsets = overviewInsets
+            if hasFittedInitialCamera, isShowingOverviewFit, self.scope == .campus {
+                focusCampus(animated: false)
+            }
+        }
         if self.campus.id != campus.id {
             self.campus = campus
             lastDynamicFingerprint = nil
@@ -1601,9 +1625,14 @@ final class UnifiedBigSightScene: SKScene {
         } else if shouldFocusLocatedUser, let locatedUser {
             focus(on: locatedUser, animated: true)
         }
+        if let cameraFitRequest, cameraFitRequest.id != lastCameraFitRequestID {
+            lastCameraFitRequestID = cameraFitRequest.id
+            fitCamera(to: cameraFitRequest.target, searchMatches: searchMatches)
+        }
     }
 
     func beginGesture() {
+        isShowingOverviewFit = false
         mapCamera.removeAllActions()
     }
 
@@ -1683,6 +1712,7 @@ final class UnifiedBigSightScene: SKScene {
             gridAlignedRotation: gridAlignedCameraRotation
         )
         mapCamera.removeAction(forKey: "compass-rotation")
+        isShowingOverviewFit = false
 
         if reduceMotion {
             mapCamera.zRotation = targetRotation
@@ -2098,14 +2128,24 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func fitCameraIfNeeded(force: Bool) {
-        guard size.width > 1, size.height > 1, force || !hasFittedInitialCamera else { return }
+        guard size.width > 1, size.height > 1 else { return }
         let bounds = UnifiedMapProjection.sceneBounds(fromCampus: campus.bounds)
+        // The zoom-out limit always follows the current viewport, even when
+        // the user's camera is kept.
         minimumCameraScale = max(
             bounds.width / (size.width * 0.86), bounds.height / (size.height * 0.76))
         maximumCameraScale = max(minimumCameraScale / 180, 0.006)
-        mapCamera.position = CGPoint(x: bounds.midX, y: bounds.midY)
-        mapCamera.setScale(minimumCameraScale)
+        let refitsOverview = isShowingOverviewFit && scope == .campus
+        guard force || !hasFittedInitialCamera || refitsOverview else {
+            clampCamera()
+            applyLevelOfDetail()
+            return
+        }
+        let fit = campusOverviewFit()
+        mapCamera.position = fit.position
+        mapCamera.setScale(fit.scale)
         mapCamera.zRotation = 0
+        isShowingOverviewFit = true
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-rotated-camera") {
                 mapCamera.zRotation = .pi / 4
@@ -2116,12 +2156,112 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func focusCampus(animated: Bool) {
-        let bounds = UnifiedMapProjection.sceneBounds(fromCampus: campus.bounds)
+        let fit = campusOverviewFit()
         animateCamera(
-            position: CGPoint(x: bounds.midX, y: bounds.midY),
-            scale: minimumCameraScale,
+            position: fit.position,
+            scale: fit.scale,
             rotation: 0,
             animated: animated
+        )
+        isShowingOverviewFit = true
+    }
+
+    /// Chrome that covers the map edges. MapView can report measured insets;
+    /// until it does, estimate the event banner and hall selector at the top
+    /// and the control row at the bottom.
+    private var effectiveOverviewInsets: MapViewportInsets {
+        if let overviewInsets { return overviewInsets }
+        let safeArea = view?.safeAreaInsets ?? .zero
+        return MapViewportInsets(
+            top: safeArea.top + 96,
+            left: safeArea.left + MapChromeLayout.edgeInset,
+            bottom: safeArea.bottom + MapChromeLayout.edgeInset + MapChromeLayout.controlSize
+                + MapChromeLayout.controlSpacing,
+            right: safeArea.right + MapChromeLayout.edgeInset
+        )
+    }
+
+    /// The halls and the stations attendees walk from, in scene coordinates.
+    /// `campus.bounds` also holds every facility and footway, which leaves
+    /// the halls small on a large screen such as iPad.
+    private var campusOverviewSceneRect: CGRect {
+        var rect = campus.venues.reduce(CGRect.null) { $0.union($1.bounds) }
+        for facility in campus.facilities where facility.kind == .train {
+            rect = rect.union(CGRect(origin: facility.center, size: CGSize(width: 1, height: 1)))
+        }
+        return UnifiedMapProjection.sceneBounds(fromCampus: rect.isNull ? campus.bounds : rect)
+    }
+
+    private func campusOverviewFit() -> MapCameraFit {
+        let rect = campusOverviewSceneRect
+        let closestScale = minimumCameraScale / Self.maximumOverviewZoomFactor
+        return MapCameraMath.spriteKitCameraFit(
+            sceneRect: rect,
+            viewportSize: size,
+            insets: effectiveOverviewInsets,
+            padding: MapCameraMath.locationMarkerViewportPadding,
+            scaleRange: min(closestScale, minimumCameraScale)...minimumCameraScale
+        )
+            ?? MapCameraFit(
+                position: CGPoint(x: rect.midX, y: rect.midY),
+                scale: minimumCameraScale
+            )
+    }
+
+    private func fitCamera(
+        to target: MapCameraFitRequest.Target,
+        searchMatches: [CatalogMapSearchMatch]
+    ) {
+        switch target {
+        case .campusOverview:
+            focusCampus(animated: true)
+        case .layer(let layer):
+            let rect = campus.facilities
+                .filter { $0.layer == layer }
+                .reduce(CGRect.null) {
+                    $0.union(CGRect(origin: $1.center, size: CGSize(width: 1, height: 1)))
+                }
+            fitCamera(toCampusRect: rect, rotation: mapCamera.zRotation)
+        case .searchMatches:
+            let venuesByMapID = Dictionary(uniqueKeysWithValues: campus.venues.map { ($0.id, $0) })
+            var rect = CGRect.null
+            var matchedVenues: [Int: BigSightVenuePlacement] = [:]
+            for match in searchMatches {
+                guard let venue = venuesByMapID[match.mapID],
+                    let table = venue.scene.tableByID[match.tableID]
+                else { continue }
+                let local = subspaceRect(table: table, subspace: match.subspace, scene: venue.scene)
+                rect = rect.union(local.applying(venue.transform))
+                matchedVenues[venue.id] = venue
+            }
+            // Matches in one hall read best in that hall's own orientation.
+            let rotation =
+                matchedVenues.count == 1
+                ? -(matchedVenues.values.first?.rotation ?? 0)
+                : mapCamera.zRotation
+            fitCamera(toCampusRect: rect, rotation: rotation)
+        }
+    }
+
+    private func fitCamera(toCampusRect rect: CGRect, rotation: CGFloat) {
+        guard !rect.isNull else { return }
+        let closestScale = max(maximumCameraScale, minimumCameraScale / 45)
+        guard
+            let fit = MapCameraMath.spriteKitCameraFit(
+                sceneRect: UnifiedMapProjection.sceneBounds(fromCampus: rect),
+                viewportSize: size,
+                insets: effectiveOverviewInsets,
+                padding: MapCameraMath.locationMarkerViewportPadding,
+                cameraRotation: rotation,
+                scaleRange: min(closestScale, minimumCameraScale)...minimumCameraScale
+            )
+        else { return }
+        animateCamera(
+            position: fit.position,
+            scale: fit.scale,
+            rotation: rotation,
+            animated: true,
+            updatesSemanticScope: true
         )
     }
 
@@ -2208,15 +2348,21 @@ final class UnifiedBigSightScene: SKScene {
         )
     }
 
-    private func animateCamera(position: CGPoint, scale: CGFloat, rotation: CGFloat, animated: Bool)
-    {
+    private func animateCamera(
+        position: CGPoint,
+        scale: CGFloat,
+        rotation: CGFloat,
+        animated: Bool,
+        updatesSemanticScope: Bool = false
+    ) {
         mapCamera.removeAllActions()
+        isShowingOverviewFit = false
         let duration = animated && !reduceMotion ? 0.42 : 0
         guard duration > 0 else {
             mapCamera.position = position
             mapCamera.setScale(scale)
             mapCamera.zRotation = rotation
-            endGesture(updateSemanticScope: false)
+            endGesture(updateSemanticScope: updatesSemanticScope)
             return
         }
         let group = SKAction.group([
@@ -2226,7 +2372,7 @@ final class UnifiedBigSightScene: SKScene {
         ])
         group.timingMode = .easeInEaseOut
         mapCamera.run(group) { [weak self] in
-            self?.endGesture(updateSemanticScope: false)
+            self?.endGesture(updateSemanticScope: updatesSemanticScope)
         }
     }
 
