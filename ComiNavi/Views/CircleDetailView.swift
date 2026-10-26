@@ -218,6 +218,7 @@ struct CircleDetailView: View {
         }
         .sheet(isPresented: $isShowingSignIn) {
             SignInView()
+                .presentationDragIndicator(.visible)
         }
         .onChange(of: AppData.profileStore.isIdentityVerified) { _, isVerified in
             if isVerified {
@@ -1037,20 +1038,27 @@ private struct CircleDetailExternalLinksRow: View {
             HStack(spacing: 10) {
                 ForEach(links) { link in
                     Link(destination: link.url) {
-                        CircleExternalLinkIcon(kind: link.kind)
-                            .frame(width: 44, height: 44)
-                            .background(
-                                Color(uiColor: .secondarySystemGroupedBackground),
-                                in: Circle()
-                            )
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        Color(uiColor: .separator).opacity(0.24),
-                                        lineWidth: 0.5
-                                    )
-                            }
-                            .contentShape(Circle())
+                        HStack(spacing: 6) {
+                            CircleExternalLinkIcon(kind: link.kind)
+                            Text(link.title)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .background(
+                            Color(uiColor: .secondarySystemGroupedBackground),
+                            in: .capsule
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(
+                                    Color(uiColor: .separator).opacity(0.24),
+                                    lineWidth: 0.5
+                                )
+                        }
+                        .contentShape(.capsule)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(Text(link.title))
@@ -1073,13 +1081,14 @@ private struct CircleDetailExternalLinksRow: View {
             Group {
                 switch kind {
                 case .xProfile:
-                    IconifyBrandIcon("x", size: 19)
+                    IconifyBrandIcon("x", size: 15)
                 case .pixiv:
-                    IconifyBrandIcon("pixiv", size: 21)
+                    IconifyBrandIcon("pixiv", size: 17)
                 case .website:
-                    LucideIcon("globe", size: 20)
+                    LucideIcon("globe", size: 16)
                 case .circlems:
-                    LucideIcon("person.2.crop.square.stack", size: 20)
+                    // A catalog record, not a group of people.
+                    LucideIcon("doc.richtext", size: 16)
                 }
             }
             .foregroundStyle(.primary)
