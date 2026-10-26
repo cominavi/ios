@@ -47,6 +47,7 @@ struct ProfileScreen: View {
         case failed(message: String)
     }
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage(SharedLocationClipboardImporter.enabledDefaultsKey)
     private var automaticallyReadsSharedLocations = false
     @State private var isShowingLogoutConfirmation = false
@@ -63,6 +64,7 @@ struct ProfileScreen: View {
     @State private var favoriteRecoveryIssue: String?
     @State private var favoriteRecoveryPendingDiscard: QuarantinedCanonicalFavoriteMutation?
     @State private var favoriteSyncState = FavoriteSyncState.idle
+    @State private var containerWidth: CGFloat = 0
     let favoriteColorLabelStore: FavoriteColorLabelStore
     @StateObject private var circlemsLinkViewModel = SignInViewModel()
     let catalogLibrary: CatalogLibrary
@@ -170,90 +172,20 @@ struct ProfileScreen: View {
                 }
             }
 
-            if hasLinkedCirclemsIdentity, let dataSource = catalogLibrary.dataSource {
-                Section {
-                    Button {
-                        syncFavoritesToCirclems(dataSource)
-                    } label: {
-                        HStack {
-                            if favoriteSyncState == .syncing {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                            }
-                            Text("Sync ComiNavi favorites to Circle.ms")
-                        }
-                    }
-                    .disabled(
-                        favoriteSyncState == .syncing
-                            || !profileStore.isIdentityVerified
-                    )
-                    .accessibilityIdentifier("profile-sync-circlems-favorites")
-
-                    switch favoriteSyncState {
-                    case .idle, .syncing:
-                        EmptyView()
-                    case .succeeded:
-                        Label {
-                            Text("ComiNavi favorites were synced to Circle.ms.")
-                        } icon: {
-                            Image(systemName: "checkmark.circle.fill")
-                        }
-                        .font(.footnote)
-                        .foregroundStyle(.green)
-                        .accessibilityIdentifier("profile-sync-circlems-favorites-success")
-                    case .failed(let message):
-                        Text(message)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                            .accessibilityIdentifier("profile-sync-circlems-favorites-error")
-                    }
-                } header: {
-                    Text("Circle.ms")
-                } footer: {
-                    Text(
-                        "Adds or updates your ComiNavi favorites in Circle.ms. Existing Circle.ms memos and unrelated favorites are kept."
-                    )
-                }
-            }
-
             if let dataSource = catalogLibrary.dataSource {
-                Section("Favorites") {
-                    NavigationLink {
-                        FavoriteMapPDFScreen(
-                            dataSource: dataSource,
-                            colorLabelStore: favoriteColorLabelStore
-                        )
-                    } label: {
-                        Label("Printable favorite map", systemImage: "map")
-                    }
-                    .accessibilityIdentifier("profile-favorite-map")
-
-                    NavigationLink {
-                        FavoriteColorLabelsScreen(store: favoriteColorLabelStore)
-                    } label: {
-                        Label("Color labels", systemImage: "tag")
-                    }
-                    .accessibilityIdentifier("profile-favorite-color-labels")
-                }
-
-                Section("X followed circles") {
-                    NavigationLink {
-                        FollowingImportView(dataSource: dataSource)
-                    } label: {
-                        HStack(spacing: 12) {
-                            LucideIcon("users", size: 24)
-                                .foregroundStyle(Color.accentColor)
-                            Text("Find followed circles")
-                            Spacer()
-                            Text("Import")
-                        }
-                    }
-                    .accessibilityIdentifier("profile-following-import")
-                }
+                favoritesSection(dataSource)
             }
 
-            Section("Shared locations") {
+            Section("Tools") {
+                NavigationLink {
+                    ComiketToolboxView()
+                } label: {
+                    LucideLabel("Toolbox", icon: "square.grid.2x2")
+                }
+                .accessibilityIdentifier("profile-toolbox")
+            }
+
+            Section {
                 Toggle(
                     "Detect locations from clipboard",
                     isOn: $automaticallyReadsSharedLocations
@@ -266,15 +198,12 @@ struct ProfileScreen: View {
                 }
                 .buttonBorderShape(.roundedRectangle)
                 .accessibilityIdentifier("profile-paste-shared-location")
-            }
-
-            Section("Tools") {
-                NavigationLink {
-                    ComiketToolboxView()
-                } label: {
-                    Label("Toolbox", systemImage: "square.grid.2x2")
-                }
-                .accessibilityIdentifier("profile-toolbox")
+            } header: {
+                Text("Settings")
+            } footer: {
+                Text(
+                    "Friends can send you a ComiNavi location link. When this setting is on, ComiNavi checks the clipboard for a new link each time you return to the app. To open a link that you copied, tap Paste."
+                )
             }
 
             Section {
@@ -284,12 +213,10 @@ struct ProfileScreen: View {
                     Label {
                         Text("Image Cache", tableName: "ImageCache")
                     } icon: {
-                        Image(systemName: "photo.stack")
+                        LucideIcon("images")
                     }
                 }
                 .accessibilityIdentifier("profile-image-cache")
-            } header: {
-                Text("Storage", tableName: "ImageCache")
             }
 
             Section("Support") {
@@ -301,36 +228,34 @@ struct ProfileScreen: View {
                 .accessibilityIdentifier("profile-report-issue")
             }
 
-            Section("Account") {
-                Button {
-                    if !isLoggedIn {
-                        presentSignIn()
-                    } else {
+            if isLoggedIn {
+                Section("Account") {
+                    Button(role: .destructive) {
                         isShowingLogoutConfirmation = true
+                    } label: {
+                        LucideLabel("Sign Out", icon: "person.crop.circle.badge.minus")
                     }
-                } label: {
-                    HStack {
-                        LucideIcon(isLoggedIn ? "person.crop.circle.badge.minus" : "person.crop.circle.badge.plus")
-                            .frame(width: 24, height: 24)
+                    .accessibilityIdentifier("profile-account-action")
+                    .disabled(isLoggingOut || isDeletingAccount)
 
-                        Text(isLoggedIn ? "Sign Out" : "Sign In")
+                    if profileStore.profile != nil {
+                        Button("Delete ComiNavi account", role: .destructive) {
+                            isShowingAccountDeletionConfirmation = true
+                        }
+                        .disabled(
+                            isLoggingOut || isDeletingAccount
+                                || !profileStore.isIdentityVerified
+                        )
+                        .accessibilityIdentifier("profile-delete-account")
                     }
-                    .foregroundStyle(isLoggedIn ? Color.red : Color.primary)
-                }
-                .accessibilityIdentifier("profile-account-action")
-                .disabled(isLoggingOut || isDeletingAccount)
-
-                if profileStore.profile != nil {
-                    Button("Delete ComiNavi account", role: .destructive) {
-                        isShowingAccountDeletionConfirmation = true
-                    }
-                    .disabled(
-                        isLoggingOut || isDeletingAccount
-                            || !profileStore.isIdentityVerified
-                    )
-                    .accessibilityIdentifier("profile-delete-account")
                 }
             }
+        }
+        .contentMargins(.horizontal, readableHorizontalMargin, for: .scrollContent)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            containerWidth = width
         }
         .navigationTitle("Profile")
         .sheet(item: $presentedSheet) { sheet in
@@ -423,6 +348,98 @@ struct ProfileScreen: View {
         } message: {
             Text("You cannot restore a change that you did not export.")
         }
+    }
+
+    /// Everything that acts on the person's favorites sits in one place, so
+    /// the printable map, color labels, and X import are easy to find.
+    private func favoritesSection(_ dataSource: CirclemsDataSource) -> some View {
+        Section {
+            NavigationLink {
+                FavoriteMapPDFScreen(
+                    dataSource: dataSource,
+                    colorLabelStore: favoriteColorLabelStore
+                )
+            } label: {
+                LucideLabel("Printable favorite map", icon: "map")
+            }
+            .accessibilityIdentifier("profile-favorite-map")
+
+            NavigationLink {
+                FavoriteColorLabelsScreen(store: favoriteColorLabelStore)
+            } label: {
+                LucideLabel("Color labels", icon: "tag")
+            }
+            .accessibilityIdentifier("profile-favorite-color-labels")
+
+            NavigationLink {
+                FollowingImportView(dataSource: dataSource)
+            } label: {
+                LucideLabel("Import from X", icon: "users")
+            }
+            .accessibilityIdentifier("profile-following-import")
+
+            if hasLinkedCirclemsIdentity {
+                circlemsFavoriteSyncRows(dataSource)
+            }
+        } header: {
+            Text("Your favorites")
+        }
+    }
+
+    @ViewBuilder
+    private func circlemsFavoriteSyncRows(_ dataSource: CirclemsDataSource) -> some View {
+        Button {
+            syncFavoritesToCirclems(dataSource)
+        } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Sync favorites to Circle.ms")
+                    Text(
+                        "Adds or updates your ComiNavi favorites in Circle.ms. Existing Circle.ms memos and unrelated favorites are kept."
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            } icon: {
+                if favoriteSyncState == .syncing {
+                    ProgressView()
+                } else {
+                    LucideIcon("arrow.triangle.2.circlepath")
+                }
+            }
+        }
+        .disabled(
+            favoriteSyncState == .syncing
+                || !profileStore.isIdentityVerified
+        )
+        .accessibilityIdentifier("profile-sync-circlems-favorites")
+
+        switch favoriteSyncState {
+        case .idle, .syncing:
+            EmptyView()
+        case .succeeded:
+            Label {
+                Text("ComiNavi favorites were synced to Circle.ms.")
+            } icon: {
+                Image(systemName: "checkmark.circle.fill")
+            }
+            .font(.footnote)
+            .foregroundStyle(.green)
+            .accessibilityIdentifier("profile-sync-circlems-favorites-success")
+        case .failed(let message):
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .accessibilityIdentifier("profile-sync-circlems-favorites-error")
+        }
+    }
+
+    /// On iPad and other regular-width containers the form keeps a readable
+    /// column of about 700 pt instead of stretching rows to the full width.
+    private var readableHorizontalMargin: CGFloat? {
+        guard horizontalSizeClass == .regular, containerWidth > 0 else { return nil }
+        return max(16, (containerWidth - 700) / 2)
     }
 
     /// A person who never signed in (the demo catalog and App Review path)
