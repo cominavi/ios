@@ -465,32 +465,8 @@ private struct ToolboxChecklistSection: View {
         ComiketChecklistCatalog.items
     }
 
-    private var progress: Double {
-        guard !items.isEmpty else { return 0 }
-        return Double(store.completedCount) / Double(items.count)
-    }
-
     var body: some View {
         Section {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack {
-                    Text("Day-of checklist")
-                        .font(.headline)
-                    Spacer()
-                    Text(verbatim: "\(store.completedCount)/\(items.count)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-
-                ProgressView(value: progress)
-                    .tint(progress == 1 ? .green : Color.accentColor)
-                    .accessibilityLabel("Checklist progress")
-                    .accessibilityValue(
-                        Text(verbatim: "\(store.completedCount)/\(items.count)")
-                    )
-            }
-            .padding(.vertical, 3)
-
             ForEach(items) { item in
                 let isCompleted = store.isCompleted(item)
                 Button {
@@ -521,9 +497,10 @@ private struct ToolboxChecklistSection: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(item.title)
-                .accessibilityValue(Text(isCompleted ? "Selected" : "Not selected"))
-                .accessibilityAddTraits(isCompleted ? .isSelected : [])
+                // The label already combines the title and detail; the toggle trait
+                // and value tell VoiceOver that activating the row checks it off.
+                .accessibilityAddTraits(.isToggle)
+                .accessibilityValue(Text(isCompleted ? "Checked" : "Not checked"))
                 .accessibilityIdentifier("toolbox-checklist-\(item.id)")
             }
 
@@ -533,6 +510,9 @@ private struct ToolboxChecklistSection: View {
                 }
                 .accessibilityIdentifier("toolbox-reset-checklist")
             }
+        } header: {
+            Text("\(store.completedCount) of \(items.count) done")
+                .monospacedDigit()
         } footer: {
             Text(
                 "Your checklist is a reminder, not a replacement for official instructions."

@@ -486,7 +486,7 @@ enum ComiketToolboxCatalog {
             "Tokyo weather forecast",
             "The Japan Meteorological Agency's current forecast for the Tokyo area.",
             .publicAgency,
-            "sparkles",
+            "umbrella",
             "https://www.data.jma.go.jp/multi/yoho/yoho_detail.html?code=130010&lang=jp",
             "jma weather rain temperature 気象庁 天気 雨 気温"
         ),
@@ -616,22 +616,22 @@ enum ComiketChecklistCatalog {
             "Bring the original ID required by your ticket or purchases.", "circle-user"),
         item(
             "phone-power", "Phone and power bank",
-            "Charge both before leaving and save key information offline.", "radio-tower"),
+            "Charge both before leaving and save key information offline.", "smartphone"),
         item(
             "water-salt", "Water and electrolytes",
-            "Carry enough to drink for the whole day.", "briefcase-medical"),
+            "Carry enough to drink for the whole day.", "droplet"),
         item(
             "heat", "Heat protection", "Pack a hat, sunscreen, cooling items, and a towel.",
             "triangle-alert"),
         item(
             "medicine", "Regular medicine", "The venue first-aid rooms do not provide medicine.",
-            "briefcase-medical"),
+            "pill"),
         item(
             "transit", "Charged transit IC card", "Top it up before reaching the crowded stations.",
-            "navigation"),
+            "credit-card"),
         item(
             "cash", "Small cash and coins", "Exact payment keeps circle transactions quick.",
-            "circle"),
+            "coins"),
         item(
             "offline-plan", "Offline circle list and maps",
             "Save your priorities in case mobile service is congested.", "map"),
@@ -640,7 +640,7 @@ enum ComiketChecklistCatalog {
             "shopping-cart"),
         item(
             "weather", "Weather and rain gear", "Check the forecast again before departure.",
-            "sparkles"),
+            "umbrella"),
     ]
 
     private static func item(
