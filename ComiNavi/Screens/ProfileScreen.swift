@@ -90,14 +90,14 @@ struct ProfileScreen: View {
                     .padding(.trailing, 8)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(isLoggedIn ? "ComiNaviアカウント" : "ログインしていません")
+                        Text(isLoggedIn ? "ComiNavi account" : "Not signed in")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
                         Text(
                             profileStore.profile?.displayName
                                 ?? userState.user?.nickname
-                                ?? String(localized: "Not logged in")
+                                ?? String(localized: "Not signed in")
                         )
                             .font(.title3)
 
@@ -122,10 +122,10 @@ struct ProfileScreen: View {
                                         if circlemsLinkViewModel.state == .authenticating {
                                             HStack(spacing: 5) {
                                                 ProgressView()
-                                                Text("Circle.msを連携中…")
+                                                Text("Linking Circle.ms…")
                                             }
                                         } else {
-                                            Label("Circle.msを連携", systemImage: "link")
+                                            Label("Link Circle.ms", systemImage: "link")
                                         }
                                     }
                                     .disabled(
@@ -140,7 +140,7 @@ struct ProfileScreen: View {
                                 Button {
                                     presentedSheet = .profileEditor(userID: profile.id)
                                 } label: {
-                                    Label("編集", systemImage: "pencil")
+                                    Label("Edit", systemImage: "pencil")
                                 }
                                 .disabled(!profileStore.isIdentityVerified)
                                 .accessibilityIdentifier("profile-edit")
@@ -155,7 +155,7 @@ struct ProfileScreen: View {
             }
 
             if !nonCirclemsIdentities.isEmpty {
-                Section("プロフィール") {
+                Section("Linked accounts") {
                     ForEach(nonCirclemsIdentities, id: \.stableID) { identity in
                         LabeledContent(
                             providerDisplayName(identity.provider),
@@ -180,18 +180,18 @@ struct ProfileScreen: View {
             }
 
             if profileStore.hasPendingMutation {
-                Section("送信待ちのプロフィール変更") {
+                Section("Unsent profile changes") {
                     if let description = profileStore.pendingMutationDescription {
                         Text(description)
                             .foregroundStyle(.secondary)
                     }
 
-                    Button("再送する") {
+                    Button("Send Again") {
                         retryPendingProfileMutation()
                     }
                     .disabled(profileStore.isSaving || !profileStore.isIdentityVerified)
 
-                    Button("この変更を破棄", role: .destructive) {
+                    Button("Discard This Change", role: .destructive) {
                         isShowingPendingMutationDiscardConfirmation = true
                     }
                     .disabled(profileStore.isSaving)
@@ -199,10 +199,10 @@ struct ProfileScreen: View {
             }
 
             if !favoriteRecoveries.isEmpty {
-                Section("お気に入り変更の確認") {
+                Section("Review favorite changes") {
                     ForEach(favoriteRecoveries) { recovery in
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("送信できなかったお気に入り変更")
+                            Text("Favorite change not sent")
                                 .font(.subheadline.weight(.semibold))
                             Text(recovery.message)
                                 .font(.caption)
@@ -217,12 +217,12 @@ struct ProfileScreen: View {
 
                             HStack {
                                 ShareLink(item: favoriteRecoveryExport(recovery)) {
-                                    Label("書き出す", systemImage: "square.and.arrow.up")
+                                    Label("Export", systemImage: "square.and.arrow.up")
                                 }
 
                                 Spacer()
 
-                                Button("破棄", role: .destructive) {
+                                Button("Discard", role: .destructive) {
                                     favoriteRecoveryPendingDiscard = recovery
                                 }
                             }
@@ -337,12 +337,13 @@ struct ProfileScreen: View {
                 .accessibilityIdentifier("profile-paste-shared-location")
             }
 
-            Section("ツール") {
+            Section("Tools") {
                 NavigationLink {
                     ComiketToolboxView()
                 } label: {
-                    Label("コミケツールボックス", systemImage: "square.grid.2x2")
+                    Label("Toolbox", systemImage: "square.grid.2x2")
                 }
+                .accessibilityIdentifier("profile-toolbox")
             }
 
             Section {
@@ -381,7 +382,7 @@ struct ProfileScreen: View {
                         LucideIcon(isLoggedIn ? "person.crop.circle.badge.minus" : "person.crop.circle.badge.plus")
                             .frame(width: 24, height: 24)
 
-                        Text(isLoggedIn ? "ログアウト" : "ログイン")
+                        Text(isLoggedIn ? "Sign Out" : "Sign In")
                     }
                     .foregroundStyle(isLoggedIn ? Color.red : Color.primary)
                 }
@@ -430,25 +431,25 @@ struct ProfileScreen: View {
             await loadFavoriteRecoveries()
         }
         .confirmationDialog(
-            "ComiNaviからログアウトしますか？",
+            "Sign out of ComiNavi?",
             isPresented: $isShowingLogoutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("ログアウト", role: .destructive) {
+            Button("Sign Out", role: .destructive) {
                 returnToAuthentication()
             }
             .accessibilityIdentifier("profile-confirm-log-out")
 
-            Button("キャンセル", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("このアカウントの共有プラン、未送信の変更、ダウンロード済みカタログを削除します。")
+            Text("This removes this account's Shared Plans, unsent changes, and downloaded catalogs from this device.")
         }
         .confirmationDialog(
-            "送信待ちのプロフィール変更を破棄しますか？",
+            "Discard the unsent profile change?",
             isPresented: $isShowingPendingMutationDiscardConfirmation,
             titleVisibility: .visible
         ) {
-            Button("変更を破棄", role: .destructive) {
+            Button("Discard Change", role: .destructive) {
                 do {
                     try profileStore.discardPendingMutation()
                     profileIssue = nil
@@ -456,26 +457,26 @@ struct ProfileScreen: View {
                     profileIssue = error.localizedDescription
                 }
             }
-            Button("キャンセル", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("未送信の変更は復元できません。")
+            Text("You cannot restore an unsent change.")
         }
         .confirmationDialog(
-            "このお気に入り変更を破棄しますか？",
+            "Discard this favorite change?",
             isPresented: Binding(
                 get: { favoriteRecoveryPendingDiscard != nil },
                 set: { if !$0 { favoriteRecoveryPendingDiscard = nil } }
             ),
             titleVisibility: .visible
         ) {
-            Button("変更を破棄", role: .destructive) {
+            Button("Discard Change", role: .destructive) {
                 discardFavoriteRecovery()
             }
-            Button("キャンセル", role: .cancel) {
+            Button("Cancel", role: .cancel) {
                 favoriteRecoveryPendingDiscard = nil
             }
         } message: {
-            Text("書き出していない変更内容は復元できません。")
+            Text("You cannot restore a change that you did not export.")
         }
     }
 
@@ -658,9 +659,9 @@ struct ProfileScreen: View {
 extension CominaviProfileIdentity {
     var profileDisplayDetail: String {
         if provider == "circlems" {
-            return email ?? String(localized: "連携済み")
+            return email ?? String(localized: "Linked")
         }
-        return email ?? environment ?? String(localized: "連携済み")
+        return email ?? environment ?? String(localized: "Linked")
     }
 }
 
@@ -689,7 +690,7 @@ struct AuthenticatedProfileAvatar: View {
         }
         .frame(width: size, height: size)
         .clipShape(.circle)
-        .accessibilityLabel("プロフィール画像")
+        .accessibilityLabel("Profile picture")
         .task(id: loadID) {
             image = nil
             guard let url else { return }
