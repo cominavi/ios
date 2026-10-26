@@ -133,6 +133,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                     guard let self, let collectionView else { return }
                     self.measuredHeaderSize = nil
                     self.applyAdaptiveColumnCountIfNeeded(in: collectionView)
+                    self.updateCardDetailIfNeeded(in: collectionView)
                     self.refreshVisibleArtworkIfNeeded(in: collectionView)
                     collectionView.collectionViewLayout.invalidateLayout()
                     collectionView.reconfigureItems(at: collectionView.indexPathsForVisibleItems)
@@ -253,14 +254,15 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             if renderedCardDetail == .artworkOnly {
                 return CGSize(width: width, height: artworkHeight)
             }
-            let penNameHeight = UIFont.preferredFont(
-                forTextStyle: .caption2, compatibleWith: collectionView.traitCollection
-            ).lineHeight
+            let penNameHeight = renderedCardDetail == .full
+                ? UIFont.preferredFont(
+                    forTextStyle: .caption2, compatibleWith: collectionView.traitCollection
+                ).lineHeight + 2
+                : 0
             let titleHeight = UIFont.preferredFont(
                 forTextStyle: .subheadline, compatibleWith: collectionView.traitCollection
             ).lineHeight
-            let hasLocation = renderedCardDetail == .full
-                && circleIndex(for: indexPath) != nil
+            let hasLocation = circleIndex(for: indexPath) != nil
             let locationHeight = hasLocation
                 ? 2 + max(
                     UIFont.preferredFont(
@@ -274,21 +276,47 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                 : 0
             return CGSize(
                 width: width,
-                height: artworkHeight + 8 + penNameHeight + 2 + titleHeight + locationHeight
+                height: artworkHeight + 8 + penNameHeight + titleHeight + locationHeight
             )
         }
 
         private func itemWidth(in collectionView: UICollectionView) -> CGFloat {
+            itemWidth(forColumns: columnCount, in: collectionView)
+        }
+
+        private func itemWidth(
+            forColumns columns: CGFloat,
+            in collectionView: UICollectionView
+        ) -> CGFloat {
             let flowLayout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout
             let spacing = flowLayout?.minimumInteritemSpacing ?? 12
             let sectionInset = flowLayout?.sectionInset ?? .zero
             let horizontalInsets = sectionInset.left + sectionInset.right
             let availableWidth = max(contentWidth(in: collectionView) - horizontalInsets, 1)
-            let totalSpacing = spacing * max(columnCount - 1, 0)
+            let totalSpacing = spacing * max(columns - 1, 0)
             return max(
-                floor((availableWidth - totalSpacing) / columnCount * 100) / 100 - 0.01,
+                floor((availableWidth - totalSpacing) / columns * 100) / 100 - 0.01,
                 1
             )
+        }
+
+        private func cardDetail(
+            forColumns columns: CGFloat,
+            in collectionView: UICollectionView
+        ) -> ExploreGalleryCardDetail {
+            ExploreGalleryZoomGeometry.cardDetail(
+                forItemWidth: itemWidth(forColumns: columns, in: collectionView)
+            )
+        }
+
+        /// Card detail follows the rendered card width, not the column count,
+        /// so a wide iPad column keeps the space code that a 3-column iPhone
+        /// grid has to drop. Re-evaluate it whenever the container resizes.
+        private func updateCardDetailIfNeeded(in collectionView: UICollectionView) {
+            let detail = cardDetail(forColumns: columnCount, in: collectionView)
+            guard detail != renderedCardDetail else { return }
+            renderedCardDetail = detail
+            collectionView.collectionViewLayout.invalidateLayout()
         }
 
         private func contentWidth(in collectionView: UICollectionView) -> CGFloat {
@@ -479,7 +507,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             preserving anchor: PinchAnchor
         ) {
             guard let collectionView else { return }
-            let targetDetail = Self.cardDetail(for: columns)
+            let targetDetail = cardDetail(forColumns: columns, in: collectionView)
             let detailChanged = renderedCardDetail != targetDetail
             let targetPlaceholderCount = placeholderCount(
                 aligning: anchor.circleIndex,
@@ -638,16 +666,6 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             )
         }
 
-        private static func cardDetail(for columns: CGFloat) -> ExploreGalleryCardDetail {
-            if columns >= 5 {
-                return .artworkOnly
-            }
-            if columns >= 2.5 {
-                return .title
-            }
-            return .full
-        }
-
         private func applyAdaptiveColumnCountIfNeeded(
             in collectionView: UICollectionView
         ) {
@@ -660,7 +678,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             guard preferredColumns != columnCount else { return }
 
             columnCount = preferredColumns
-            renderedCardDetail = Self.cardDetail(for: preferredColumns)
+            renderedCardDetail = cardDetail(forColumns: preferredColumns, in: collectionView)
             leadingPlaceholderCount = 0
             measuredHeaderSize = nil
             visibleArtworkPixelSize = nil

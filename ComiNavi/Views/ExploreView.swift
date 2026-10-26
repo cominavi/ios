@@ -1079,11 +1079,15 @@ struct ExploreGalleryCard: View {
 
             if detail != .artworkOnly {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(circle.penName ?? " ")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1, reservesSpace: true)
-                        .opacity(circle.penName == nil ? 0 : 1)
+                    // Narrow cards drop the pen name first; the space code is
+                    // what an attendee needs to walk to the circle.
+                    if detail == .full {
+                        Text(circle.penName ?? " ")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1, reservesSpace: true)
+                            .opacity(circle.penName == nil ? 0 : 1)
+                    }
 
                     Text(circle.displayName)
                         .font(.subheadline.weight(.semibold))
@@ -1091,20 +1095,18 @@ struct ExploreGalleryCard: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
 
-                    if detail == .full {
-                        HStack(spacing: 6) {
-                            Text(circle.spaceLabel)
-                                .font(.caption.monospaced().weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                                .layoutPriority(1)
+                    HStack(spacing: 6) {
+                        Text(circle.spaceLabel)
+                            .font(.caption.monospaced().weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .layoutPriority(1)
 
-                            Spacer(minLength: 0)
+                        Spacer(minLength: 0)
 
-                            favoriteLabel
-                        }
-                        .frame(minHeight: FavoriteColorLabelMetrics.baseHeight)
+                        favoriteLabel
                     }
+                    .frame(minHeight: FavoriteColorLabelMetrics.baseHeight)
                 }
             }
         }
