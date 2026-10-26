@@ -219,13 +219,17 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                 width: itemWidth,
                 displayScale: collectionView.traitCollection.displayScale
             )
+            let onSelect = parent.onSelect
+            let onLongPress = parent.onLongPress
             cell.contentConfiguration = UIHostingConfiguration {
                 ExploreGalleryCard(
                     circle: circle,
                     model: parent.model,
                     favoriteColorLabels: parent.favoriteColorLabels,
                     artworkPixelSize: artworkPixelSize,
-                    detail: renderedCardDetail
+                    detail: renderedCardDetail,
+                    onOpen: { onSelect(circle.id) },
+                    onViewArtwork: { onLongPress(circle.id) }
                 )
             }
             .margins(.all, 0)

@@ -1072,6 +1072,10 @@ struct ExploreGalleryCard: View {
     let favoriteColorLabels: [BookmarkColor: String]
     let artworkPixelSize: ExploreArtworkPixelSize
     var detail: ExploreGalleryCardDetail = .full
+    /// VoiceOver paths for the cell's tap and long-press gestures, which live
+    /// on the hosting collection view and are invisible to assistive tech.
+    var onOpen: (() -> Void)?
+    var onViewArtwork: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1117,6 +1121,16 @@ struct ExploreGalleryCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens circle details")
+        .accessibilityAction {
+            onOpen?()
+        }
+        .accessibilityActions {
+            if let onViewArtwork {
+                Button("View artwork", action: onViewArtwork)
+            }
+        }
     }
 
     private var accessibilityLabel: String {
