@@ -3,14 +3,14 @@ import UIKit
 
 private enum ComiketLocationPickerPurpose: Equatable {
     case currentLocation
+    /// "Go to space": the attendee knows a space code and wants the circle
+    /// there. The flow ends on the circle sheet, which can pin the space.
     case destination
-    case circleSearch
 
     var flowTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "Where Am I"
-        case .destination: "Find a Circle"
-        case .circleSearch: "Find a Circle"
+        case .destination: "Go to Space"
         }
     }
 
@@ -18,7 +18,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "Where are you?"
         case .destination: "Which venue is the circle in?"
-        case .circleSearch: "Which venue is the circle in?"
         }
     }
 
@@ -28,8 +27,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
             "Choose your venue manually."
         case .destination:
             "Choose the venue containing the circle you want to visit."
-        case .circleSearch:
-            "Choose the venue containing the circle you want to find."
         }
     }
 
@@ -37,7 +34,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "Which letter do you see?"
         case .destination: "Which block letter is the circle in?"
-        case .circleSearch: "Which block letter is the circle in?"
         }
     }
 
@@ -47,8 +43,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
             "Look for the large block letter nearest to you, then tap the same character below."
         case .destination:
             "Choose the block letter from the circle's Comiket address."
-        case .circleSearch:
-            "Choose the block letter from the circle's Comiket address."
         }
     }
 
@@ -56,7 +50,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "What number do you see?"
         case .destination: "What space number is the circle in?"
-        case .circleSearch: "What space number is the circle in?"
         }
     }
 
@@ -66,16 +59,13 @@ private enum ComiketLocationPickerPurpose: Equatable {
             "Enter the one- or two-digit space number printed beside the block letter."
         case .destination:
             "Enter the one- or two-digit space number from the circle's Comiket address."
-        case .circleSearch:
-            "Enter the one- or two-digit space number from the circle's Comiket address."
         }
     }
 
     var actionTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "Locate me"
-        case .destination: "Show on map"
-        case .circleSearch: "Show circle"
+        case .destination: "Show circle"
         }
     }
 
@@ -83,7 +73,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "location.viewfinder"
         case .destination: "mappin.and.ellipse"
-        case .circleSearch: "magnifyingglass"
         }
     }
 
@@ -91,7 +80,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "where-am-i"
         case .destination: "find-table"
-        case .circleSearch: "find-circle"
         }
     }
 
@@ -99,29 +87,19 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "where-am-i-locate"
         case .destination: "find-table-show"
-        case .circleSearch: "find-circle-show"
         }
     }
 
-    var includesDayStep: Bool {
-        self == .circleSearch
+    /// Only the destination flow lets the attendee pick a day. The choice
+    /// stays local until the flow completes.
+    var includesDayChoice: Bool {
+        self == .destination
     }
 
-    var venueStep: Int {
-        includesDayStep ? 2 : 1
-    }
-
-    var characterStep: Int {
-        includesDayStep ? 3 : 2
-    }
-
-    var numberStep: Int {
-        includesDayStep ? 4 : 3
-    }
-
-    var stepCount: Int {
-        includesDayStep ? 4 : 3
-    }
+    var venueStep: Int { 1 }
+    var characterStep: Int { 2 }
+    var numberStep: Int { 3 }
+    var stepCount: Int { 3 }
 }
 
 struct WhereAmIView: View {
@@ -135,26 +113,16 @@ struct WhereAmIView: View {
     }
 }
 
+/// The "Go to space" flow: day, hall, block, and number lead to the circle
+/// sheet for that space.
 struct DestinationPickerView: View {
     let mapModel: MapScreenModel
 
     var body: some View {
         ComiketLocationPickerView(
             mapModel: mapModel,
-            purpose: .destination
-        )
-    }
-}
-
-struct CircleSearchPickerView: View {
-    let mapModel: MapScreenModel
-    let days: [UFDSchema.Day]
-
-    var body: some View {
-        ComiketLocationPickerView(
-            mapModel: mapModel,
-            purpose: .circleSearch,
-            days: days
+            purpose: .destination,
+            days: mapModel.days
         )
     }
 }
@@ -171,7 +139,7 @@ private struct ComiketLocationPickerView: View {
     let purpose: ComiketLocationPickerPurpose
     let days: [UFDSchema.Day]
     @State private var path: [Step] = []
-    @State private var selectedSearchDay: Int?
+    @State private var selectedDay: Int
     @State private var venues: [WhereAmIVenueOption] = []
     @State private var selectedVenue: WhereAmIVenueOption?
     @State private var selectedCharacter: String?
@@ -189,28 +157,20 @@ private struct ComiketLocationPickerView: View {
         self.mapModel = mapModel
         self.purpose = purpose
         self.days = days
+        _selectedDay = State(initialValue: mapModel.selectedDay)
     }
 
     var body: some View {
         NavigationStack(path: $path) {
-            Group {
-                if purpose.includesDayStep, selectedSearchDay == nil {
-                    DaySelectionScreen(
-                        days: days,
-                        selectedDay: mapModel.selectedDay,
-                        accessibilityPrefix: purpose.accessibilityPrefix,
-                        onSelect: selectSearchDay
-                    )
-                } else {
-                    VenueSelectionScreen(
-                        venues: venues,
-                        purpose: purpose,
-                        isLoading: isLoadingVenues,
-                        errorMessage: venueError,
-                        onSelect: selectVenue
-                    )
-                }
-            }
+            VenueSelectionScreen(
+                venues: venues,
+                purpose: purpose,
+                days: purpose.includesDayChoice ? days : [],
+                selectedDay: $selectedDay,
+                isLoading: isLoadingVenues,
+                errorMessage: venueError,
+                onSelect: selectVenue
+            )
             .navigationDestination(for: Step.self) { step in
                 switch step {
                 case .character:
@@ -249,28 +209,17 @@ private struct ComiketLocationPickerView: View {
         .tint(.accentColor)
         .sensoryFeedback(.selection, trigger: selectionFeedback)
         .sensoryFeedback(.success, trigger: completionFeedback)
-        .task {
-            if !purpose.includesDayStep {
-                await loadVenues()
-            }
-        }
-        .accessibilityIdentifier("\(purpose.accessibilityPrefix)-flow")
-    }
-
-    private func selectSearchDay(_ day: UFDSchema.Day) {
-        selectedSearchDay = day.dayIndex
-        mapModel.select(day: day.dayIndex)
-        path.removeAll()
-        Task {
+        .task(id: selectedDay) {
             await loadVenues()
         }
+        .accessibilityIdentifier("\(purpose.accessibilityPrefix)-flow")
     }
 
     private func loadVenues() async {
         isLoadingVenues = true
         venueError = nil
         do {
-            venues = try await mapModel.whereAmIVenues()
+            venues = try await mapModel.whereAmIVenues(day: selectedDay)
         } catch is CancellationError {
             return
         } catch {
@@ -318,115 +267,25 @@ private struct ComiketLocationPickerView: View {
             )
             mapModel.locateUser(user)
         case .destination:
-            mapModel.show(
-                WhereAmIResolver.destination(
-                    at: table,
-                    in: selectedVenue
-                ))
-        case .circleSearch:
+            // The app-wide day changes only now, when the attendee confirms.
             mapModel.setSearchPresented(false)
-            mapModel.select(table: table, preferredSubspace: 0)
+            mapModel.open(
+                table: table,
+                mapID: selectedVenue.id,
+                day: selectedDay,
+                preferredSubspace: 0
+            )
         }
         completionFeedback += 1
         dismiss()
     }
 }
 
-private struct DaySelectionScreen: View {
-    let days: [UFDSchema.Day]
-    let selectedDay: Int
-    let accessibilityPrefix: String
-    let onSelect: (UFDSchema.Day) -> Void
-
-    private var orderedDays: [UFDSchema.Day] {
-        days.sorted { $0.dayIndex < $1.dayIndex }
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                WhereAmIHeader(
-                    step: 1,
-                    totalSteps: 4,
-                    title: "Which day is the circle in?",
-                    message: "Choose the event day printed on the circle's Comiket address."
-                )
-
-                VStack(spacing: 12) {
-                    ForEach(orderedDays) { day in
-                        Button {
-                            onSelect(day)
-                        } label: {
-                            HStack(spacing: 14) {
-                                LucideIcon("calendar")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundStyle(
-                                        day.dayIndex == selectedDay
-                                            ? Color.accentColor
-                                            : Color.secondary
-                                    )
-                                    .frame(width: 30)
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Day \(day.dayIndex)")
-                                        .font(.title3.weight(.bold))
-                                        .foregroundStyle(.primary)
-
-                                    if let date = Calendar.current.date(from: day.date) {
-                                        Text(
-                                            date,
-                                            format: CatalogDateFormatting.full(for: date)
-                                        )
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                    }
-                                }
-
-                                Spacer(minLength: 8)
-
-                                LucideIcon("chevron.forward")
-                                    .font(.headline.weight(.semibold))
-                                    .foregroundStyle(.tertiary)
-                                    .accessibilityHidden(true)
-                            }
-                            .padding(.horizontal, 18)
-                            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-                            .background(Color(uiColor: .secondarySystemBackground))
-                            .clipShape(.rect(cornerRadius: 14))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(
-                                        day.dayIndex == selectedDay
-                                            ? Color.accentColor.opacity(0.6)
-                                            : Color(uiColor: .separator).opacity(0.38),
-                                        lineWidth: day.dayIndex == selectedDay ? 1.5 : 0.5
-                                    )
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Day \(day.dayIndex)")
-                        .accessibilityHint("Choose this event day")
-                        .accessibilityIdentifier(
-                            "\(accessibilityPrefix)-day-\(day.dayIndex)"
-                        )
-                    }
-                }
-            }
-            .frame(maxWidth: 720)
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 36)
-            .frame(maxWidth: .infinity)
-        }
-        .background(Color(uiColor: .systemBackground))
-        .navigationTitle("Find a Circle")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 private struct VenueSelectionScreen: View {
     let venues: [WhereAmIVenueOption]
     let purpose: ComiketLocationPickerPurpose
+    let days: [UFDSchema.Day]
+    @Binding var selectedDay: Int
     let isLoading: Bool
     let errorMessage: String?
     let onSelect: (WhereAmIVenueOption) -> Void
@@ -440,6 +299,20 @@ private struct VenueSelectionScreen: View {
                     title: purpose.venueTitle,
                     message: purpose.venueMessage
                 )
+
+                if days.count > 1 {
+                    dayPicker
+                }
+
+                if purpose == .currentLocation {
+                    LucideLabel(
+                        "Tip: Touch and hold the map to set your position.",
+                        icon: "hand.tap.fill"
+                    )
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("where-am-i-long-press-tip")
+                }
 
                 if isLoading {
                     ProgressView("Loading venue maps…")
@@ -464,6 +337,17 @@ private struct VenueSelectionScreen: View {
         .background(Color(uiColor: .systemBackground))
         .navigationTitle(purpose.flowTitle)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var dayPicker: some View {
+        Picker("Day", selection: $selectedDay) {
+            ForEach(days.sorted { $0.dayIndex < $1.dayIndex }) { day in
+                Text("Day \(day.dayIndex)")
+                    .tag(day.dayIndex)
+            }
+        }
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("\(purpose.accessibilityPrefix)-day-picker")
     }
 
     private var venueButtons: some View {
@@ -886,8 +770,6 @@ private struct NumberSelectionScreen: View {
         case .currentLocation:
             "Place your position on the venue map"
         case .destination:
-            "Pin this circle on the map; use current signs and staff directions"
-        case .circleSearch:
             "Open the circle details for this circle"
         }
     }

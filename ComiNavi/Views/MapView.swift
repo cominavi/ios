@@ -2,7 +2,7 @@ import Combine
 import SwiftUI
 import UIKit
 
-private enum MapLocationMode: Equatable {
+private enum MapLocationMode: Hashable {
     case manual
     case gps
 
@@ -39,10 +39,10 @@ struct MapView: View {
     private static let currentLocationSheetHeight: CGFloat = 430
 
     @Environment(\.openURL) private var openURL
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var model: MapScreenModel
     @State private var showsWhereAmI = false
     @State private var showsDestinationPicker = false
-    @State private var showsCircleSearch = false
     @State private var showsCurrentLocation = false
     @State private var opensWhereAmIAfterSheet = false
     @State private var locationMode: MapLocationMode = .manual
@@ -53,7 +53,10 @@ struct MapView: View {
     @State private var gpsSession: GPSLocationSession?
     @State private var locationBeforeManualPicker: LocatedMapUser?
     @State private var isMapLegendExpanded = true
-    @State private var visibleMapLayers = BigSightMapLayer.defaultVisible
+    /// Layer choices persist across launches; an empty value means every
+    /// layer is hidden, so the default applies only before the first choice.
+    @AppStorage("map.visibleLayers") private var storedVisibleMapLayers =
+        BigSightMapLayer.storageValue(for: BigSightMapLayer.defaultVisible)
     @State private var circleSheetDetent: PresentationDetent = .fraction(0.62)
     @Binding private var selectedDay: Int
     private let dataSource: CirclemsDataSource?
@@ -62,8 +65,23 @@ struct MapView: View {
     private let sharedPlanStore: SharedPlanStore?
     private let onboardingStore: FeatureOnboardingStore
 
+    private var visibleMapLayers: Set<BigSightMapLayer> {
+        BigSightMapLayer.layers(fromStorageValue: storedVisibleMapLayers)
+    }
+
+    private var visibleMapLayersBinding: Binding<Set<BigSightMapLayer>> {
+        Binding(
+            get: { BigSightMapLayer.layers(fromStorageValue: storedVisibleMapLayers) },
+            set: { storedVisibleMapLayers = BigSightMapLayer.storageValue(for: $0) }
+        )
+    }
+
+    /// On iPhone the location sheet covers the bottom of the map, so the
+    /// map keeps the user above it. On iPad the sheet is a centered form
+    /// sheet; a token 1 pt inset still asks the canvas to refocus.
     private var currentLocationMapBottomInset: CGFloat {
-        showsCurrentLocation ? Self.currentLocationSheetHeight : 0
+        guard showsCurrentLocation else { return 0 }
+        return horizontalSizeClass == .regular ? 1 : Self.currentLocationSheetHeight
     }
 
     @MainActor
@@ -133,12 +151,12 @@ struct MapView: View {
             MapControlPanel(
                 model: model,
                 eventDaySelector: eventDaySelector,
-                visibleMapLayers: $visibleMapLayers,
-                onFindCircle: {
-                    showsCircleSearch = true
+                visibleMapLayers: visibleMapLayersBinding,
+                onGoToSpace: {
+                    showsDestinationPicker = true
                 }
             )
-            .padding(.horizontal, 14)
+            .padding(.horizontal, MapChromeLayout.edgeInset)
             .safeAreaPadding(.top, 8)
 
             VStack(alignment: .trailing, spacing: 8) {
@@ -155,6 +173,8 @@ struct MapView: View {
                     eventNumber: model.eventNumber,
                     mode: locationMode,
                     isManualCompassEnabled: isManualCompassEnabled,
+                    onLocate: locateOrRecenter,
+                    onSetLocation: presentManualLocationPicker,
                     onSelectManualMode: selectManualLocationMode,
                     onSelectGPSMode: requestGPSLocationMode,
                     onToggleManualCompass: {
@@ -171,6 +191,9 @@ struct MapView: View {
             .padding(.trailing, MapChromeLayout.edgeInset)
             .safeAreaPadding(.bottom, MapChromeLayout.edgeInset)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            // The UIKit compass beside these controls ignores the keyboard,
+            // so the column must too or the row splits apart while typing.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
 
             if requiresLocationPermissionRecovery {
                 LocationPermissionRecoveryOverlay(
@@ -281,6 +304,9 @@ struct MapView: View {
                 dataSource: dataSource,
                 eventNumber: model.eventNumber,
                 mapID: model.selectedMapID,
+                onPinDestination: {
+                    model.pinSelectionAsDestination()
+                },
                 onOpenDetail: { circle, shouldExpandSheet in
                     model.select(circle: circle)
                     if shouldExpandSheet {
@@ -336,11 +362,6 @@ struct MapView: View {
         }
         .sheet(isPresented: $showsDestinationPicker) {
             DestinationPickerView(mapModel: model)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showsCircleSearch) {
-            CircleSearchPickerView(mapModel: model, days: model.days)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -406,8 +427,8 @@ struct MapView: View {
                     selectedTableID: model.selection?.table.id,
                     circlePlacements: model.visibleCirclePlacements,
                     circleArtwork: model.visibleCircleArtwork,
-                    searchMatches: model.searchMatches,
-                    searchActive: !model.searchQuery.isEmpty,
+                    searchMatches: isSearchHighlightActive ? model.searchMatches : [],
+                    searchActive: isSearchHighlightActive,
                     genrePlacements: model.genrePlacements,
                     bookmarks: Array(model.favoriteBookmarks.values),
                     primarySharedPlanCircles: model.primarySharedPlanCircles,
@@ -444,8 +465,10 @@ struct MapView: View {
                     selectedTableID: model.selection?.table.id,
                     circlePlacements: model.visibleCirclePlacements,
                     circleArtwork: model.visibleCircleArtwork,
-                    searchMatches: model.searchMatches.filter { $0.mapID == scene.id.mapID },
-                    searchActive: !model.searchQuery.isEmpty,
+                    searchMatches: isSearchHighlightActive
+                        ? model.searchMatches.filter { $0.mapID == scene.id.mapID }
+                        : [],
+                    searchActive: isSearchHighlightActive,
                     genrePlacements: model.genrePlacements,
                     bookmarks: Array(model.favoriteBookmarks.values),
                     primarySharedPlanCircles: model.primarySharedPlanCircles,
@@ -494,6 +517,12 @@ struct MapView: View {
         }
     }
 
+    /// The query survives closing search, but matches only highlight the
+    /// map while search is open.
+    private var isSearchHighlightActive: Bool {
+        model.isSearchPresented && !model.searchQuery.isEmpty
+    }
+
     private var sharedPlanCircleSignature: String {
         guard let sharedPlanStore else { return "" }
         return sharedPlanStore.plans.lazy.filter {
@@ -506,7 +535,20 @@ struct MapView: View {
     }
 
     private func selectManualLocationMode() {
-        presentManualLocationPicker()
+        locationMode = .manual
+    }
+
+    /// The location button's tap: show the user's position when there is
+    /// one, otherwise start the way the current mode finds it.
+    private func locateOrRecenter() {
+        if model.locatedUser != nil {
+            // Presenting the location sheet focuses the map on the user.
+            showsCurrentLocation = true
+        } else if locationMode == .gps {
+            updateGPSLocation()
+        } else {
+            presentManualLocationPicker()
+        }
     }
 
     private func presentManualLocationPicker() {
@@ -681,33 +723,53 @@ struct MapView: View {
 }
 
 private struct MapControlPanel: View {
+    /// Width of the leading control column on iPad and other regular-width
+    /// layouts; the map stays visible beside it instead of under a full-width
+    /// bar.
+    private static let regularColumnWidth: CGFloat = 380
+
     let model: MapScreenModel
     let eventDaySelector: CatalogEventDayBanner?
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
-    let onFindCircle: () -> Void
+    let onGoToSpace: () -> Void
 
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             selectors
             if model.isSearchPresented {
-                MapSearchField(model: model, onFindByLocation: onFindCircle)
+                MapSearchField(model: model, onGoToSpace: onGoToSpace)
             }
         }
-        .frame(maxWidth: 760, alignment: .leading)
+        .frame(
+            maxWidth: horizontalSizeClass == .regular ? Self.regularColumnWidth : .infinity,
+            alignment: .leading
+        )
     }
 
+    /// One row when the day selector and the map tools fit side by side,
+    /// which keeps more of the map visible; two rows otherwise.
     @ViewBuilder
     private var selectors: some View {
-        if verticalSizeClass == .compact {
-            HStack(alignment: .center, spacing: 8) {
-                if let eventDaySelector {
-                    eventDaySelector
-                }
-                MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
-            }
+        if horizontalSizeClass == .regular {
+            stackedSelectors
         } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 8) {
+                    if let eventDaySelector {
+                        eventDaySelector
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
+                }
+                stackedSelectors
+            }
+        }
+    }
+
+    private var stackedSelectors: some View {
+        VStack(alignment: .leading, spacing: 8) {
             if let eventDaySelector {
                 eventDaySelector
             }
@@ -722,6 +784,8 @@ private struct MapLocationControls: View {
     let eventNumber: Int
     let mode: MapLocationMode
     let isManualCompassEnabled: Bool
+    let onLocate: () -> Void
+    let onSetLocation: () -> Void
     let onSelectManualMode: () -> Void
     let onSelectGPSMode: () -> Void
     let onToggleManualCompass: () -> Void
@@ -729,41 +793,59 @@ private struct MapLocationControls: View {
     let onClearDestination: () -> Void
 
     @State private var copiedDestination = false
-    @State private var showsLocationModes = false
     @State private var showsDestinationActions = false
     @Environment(\.appHapticFeedback) private var hapticFeedback
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            if showsLocationModes {
-                locationModeMenu
-            }
-
-            HStack(spacing: MapChromeLayout.controlSpacing) {
-                Button {
-                    showsLocationModes.toggle()
-                } label: {
-                    MapLocationControlIcon(
-                        icon: showsLocationModes ? "xmark" : "location.viewfinder",
-                        isActive: location != nil || mode == .gps
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    showsLocationModes ? "Close location modes" : whereAmILabel
-                )
-                .accessibilityValue(Text(mode.title))
-                .accessibilityHint("Choose how ComiNavi determines your location")
-                .accessibilityIdentifier(
-                    location == nil ? "where-am-i-button" : "current-location-button"
-                )
-
-                Button {
-                    if destination == nil {
-                        onFindTable()
-                    } else {
-                        showsDestinationActions = true
+        HStack(spacing: MapChromeLayout.controlSpacing) {
+            // A tap shows or finds the user's position; touch and hold opens
+            // the location options.
+            Menu {
+                Picker("Location Mode", selection: modeSelection) {
+                    ForEach([MapLocationMode.manual, .gps], id: \.self) { option in
+                        LucideLabel(resource: option.title, icon: option.icon)
+                            .tag(option)
+                            .accessibilityIdentifier(
+                                option == .manual ? "location-mode-manual" : "location-mode-gps"
+                            )
                     }
+                }
+                .pickerStyle(.inline)
+
+                if mode == .manual {
+                    Toggle(isOn: compassSelection) {
+                        LucideLabel("Show Compass Overlay", icon: "safari")
+                    }
+                    .accessibilityIdentifier("manual-compass-overlay-toggle")
+                }
+
+                Button {
+                    onSetLocation()
+                } label: {
+                    LucideLabel("Set My Location…", icon: "location.viewfinder")
+                }
+                .accessibilityIdentifier("location-set-manually")
+            } label: {
+                MapLocationControlIcon(
+                    icon: "location.viewfinder",
+                    isActive: location != nil || mode == .gps
+                )
+            } primaryAction: {
+                onLocate()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(whereAmILabel)
+            .accessibilityValue(Text(mode.title))
+            .accessibilityHint("Shows your location. Touch and hold for location options.")
+            .accessibilityIdentifier(
+                location == nil ? "where-am-i-button" : "current-location-button"
+            )
+
+            // The pin only appears once a space is pinned; search and the
+            // Go to Space flow are the ways to pin one.
+            if let destination {
+                Button {
+                    showsDestinationActions = true
                 } label: {
                     destinationIcon
                 }
@@ -776,29 +858,27 @@ private struct MapLocationControls: View {
                     isPresented: $showsDestinationActions,
                     titleVisibility: .visible
                 ) {
-                    if let destination {
-                        Button {
-                            onFindTable()
-                        } label: {
-                            LucideLabel("Find a Circle", icon: "mappin.and.ellipse")
-                        }
-
-                        Divider()
-
-                        Button {
-                            copy(destination)
-                        } label: {
-                            LucideLabel("Copy circle location", icon: "doc.on.doc")
-                        }
-                        .accessibilityIdentifier("copy-destination-button")
-
-                        Button(role: .destructive) {
-                            onClearDestination()
-                        } label: {
-                            LucideLabel("Clear destination", icon: "xmark")
-                        }
-                        .accessibilityIdentifier("clear-destination-button")
+                    Button {
+                        onFindTable()
+                    } label: {
+                        LucideLabel("Go to Another Space", icon: "mappin.and.ellipse")
                     }
+
+                    Divider()
+
+                    Button {
+                        copy(destination)
+                    } label: {
+                        LucideLabel("Copy circle location", icon: "doc.on.doc")
+                    }
+                    .accessibilityIdentifier("copy-destination-button")
+
+                    Button(role: .destructive) {
+                        onClearDestination()
+                    } label: {
+                        LucideLabel("Clear destination", icon: "xmark")
+                    }
+                    .accessibilityIdentifier("clear-destination-button")
                 }
             }
         }
@@ -807,63 +887,27 @@ private struct MapLocationControls: View {
         }
     }
 
-    private var locationModeMenu: some View {
-        VStack(spacing: 8) {
-            MapLocationModeOptionButton(
-                mode: .manual,
-                isSelected: mode == .manual,
-                accessibilityIdentifier: "location-mode-manual"
-            ) {
-                showsLocationModes = false
-                onSelectManualMode()
-            }
-
-            MapLocationModeOptionButton(
-                mode: .gps,
-                isSelected: mode == .gps,
-                accessibilityIdentifier: "location-mode-gps"
-            ) {
-                showsLocationModes = false
-                onSelectGPSMode()
-            }
-
-            if mode == .manual {
-                Button {
-                    showsLocationModes = false
-                    onToggleManualCompass()
-                } label: {
-                    HStack(spacing: 10) {
-                        LucideLabel(
-                            resource:
-                                isManualCompassEnabled
-                                ? LocalizedStringResource("Hide Compass Overlay")
-                                : LocalizedStringResource("Show Compass Overlay"),
-                            icon: "safari"
-                        )
-                        Spacer(minLength: 12)
-                        if isManualCompassEnabled {
-                            LucideIcon("checkmark")
-                        }
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+    private var modeSelection: Binding<MapLocationMode> {
+        Binding(
+            get: { mode },
+            set: { newMode in
+                switch newMode {
+                case .manual: onSelectManualMode()
+                case .gps: onSelectGPSMode()
                 }
-                .buttonStyle(.bordered)
-                .tint(isManualCompassEnabled ? .accentColor : .primary)
-                .accessibilityAddTraits(isManualCompassEnabled ? .isSelected : [])
-                .accessibilityIdentifier("manual-compass-overlay-toggle")
             }
-        }
-        .padding(8)
-        .frame(width: 264)
-        .background(.regularMaterial, in: .rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(.white.opacity(0.55), lineWidth: 0.5)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Location Mode")
-        .accessibilityIdentifier("location-mode-menu")
+        )
+    }
+
+    private var compassSelection: Binding<Bool> {
+        Binding(
+            get: { isManualCompassEnabled },
+            set: { isEnabled in
+                if isEnabled != isManualCompassEnabled {
+                    onToggleManualCompass()
+                }
+            }
+        )
     }
 
     private var whereAmILabel: String {
@@ -872,8 +916,8 @@ private struct MapLocationControls: View {
     }
 
     private var destinationLabel: String {
-        destination.map { String(localized: "Table \($0.spaceCode)") }
-            ?? String(localized: "Find a Circle")
+        destination.map { String(localized: "Destination \($0.address.formatted(.short))") }
+            ?? String(localized: "Go to Space")
     }
 
     private var destinationIcon: some View {
@@ -884,7 +928,7 @@ private struct MapLocationControls: View {
     }
 
     private var destinationHint: String {
-        String(localized: "Choose a circle and pin it on the map")
+        String(localized: "Shows actions for the pinned space")
     }
 
     private func copy(_ destination: MapDestination) {
@@ -900,31 +944,6 @@ private struct MapLocationControls: View {
             ) ?? destination.canonicalLocationText
         copiedDestination = true
         hapticFeedback?.play(.copyConfirmation)
-    }
-}
-
-private struct MapLocationModeOptionButton: View {
-    let mode: MapLocationMode
-    let isSelected: Bool
-    let accessibilityIdentifier: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                LucideLabel(resource: mode.title, icon: mode.icon)
-                Spacer(minLength: 12)
-                if isSelected {
-                    LucideIcon("checkmark")
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        }
-        .buttonStyle(.bordered)
-        .tint(isSelected ? .accentColor : .primary)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier(accessibilityIdentifier)
     }
 }
 
@@ -1042,34 +1061,28 @@ private struct MapLocationControlIcon: View {
 private struct MapSelectorBar: View {
     let model: MapScreenModel
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         HStack(spacing: 8) {
             Menu {
-                Button {
-                    model.showCampus()
-                } label: {
-                    if model.scope == .campus {
-                        LucideLabel("Campus", icon: "checkmark")
-                    } else {
-                        Text("Campus")
-                    }
-                }
+                // An inline picker lets the system draw and align the
+                // checkmark for Campus and every hall.
+                Picker("Area", selection: venueSelection) {
+                    Text("Campus")
+                        .tag(Int?.none)
 
-                Divider()
-
-                ForEach(model.halls, id: \.id) { hall in
-                    Button {
-                        model.select(mapID: hall.externalMapId)
-                    } label: {
-                        if model.scope == .venue, hall.externalMapId == model.selectedMapID {
-                            LucideLabel(verbatim: hall.name, icon: "checkmark")
-                        } else {
-                            Text(hall.name)
+                    ForEach(model.halls, id: \.id) { hall in
+                        // The catalog code stays as secondary text so it can
+                        // be matched against printed catalogs and signs.
+                        VStack(alignment: .leading) {
+                            Text(verbatim: BigSightVenue.localizedHallName(for: hall))
+                            Text(verbatim: hall.name)
                         }
+                        .tag(Int?.some(hall.externalMapId))
+                        .accessibilityLabel(Text(verbatim: BigSightVenue.localizedHallName(for: hall)))
                     }
                 }
+                .pickerStyle(.inline)
             } label: {
                 SelectorLabel(
                     title: selectedHallName,
@@ -1078,77 +1091,13 @@ private struct MapSelectorBar: View {
             }
             .accessibilityIdentifier("map-venue-selector")
 
-            if verticalSizeClass != .compact {
-                Spacer(minLength: 0)
-            }
+            Spacer(minLength: 0)
 
-            Menu {
-                Section("Quick Views") {
-                    Button {
-                        visibleMapLayers = [.essentials, .assistance, .cosplay]
-                    } label: {
-                        LucideLabel("Before arrival", icon: "map.fill")
-                    }
-                    Button {
-                        visibleMapLayers = [.gates, .essentials, .assistance]
-                    } label: {
-                        LucideLabel("Arrival", icon: "figure.walk.arrival")
-                    }
-                    Button {
-                        visibleMapLayers = [.essentials, .assistance, .verticalAccess, .cosplay]
-                    } label: {
-                        LucideLabel("On-site", icon: "building.2.fill")
-                    }
-                }
-
-                Section("Layers") {
-                    ForEach(BigSightMapLayer.allCases) { layer in
-                        Toggle(
-                            isOn: Binding(
-                                get: { visibleMapLayers.contains(layer) },
-                                set: { isVisible in
-                                    if isVisible {
-                                        visibleMapLayers.insert(layer)
-                                    } else {
-                                        visibleMapLayers.remove(layer)
-                                    }
-                                }
-                            )
-                        ) {
-                            LucideLabel(verbatim: layer.title, icon: layer.systemImage)
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button {
-                    visibleMapLayers = BigSightMapLayer.defaultVisible
-                } label: {
-                    LucideLabel("Show All", icon: "eye")
-                }
-                Button {
-                    visibleMapLayers.removeAll()
-                } label: {
-                    LucideLabel("Hide Optional Layers", icon: "eye.slash")
-                }
-            } label: {
-                LucideIcon("line.3.horizontal.decrease.circle")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(
-                        visibleMapLayers == BigSightMapLayer.defaultVisible
-                            ? Color.primary
-                            : Color.accentColor
-                    )
-                    .frame(width: 44, height: 44)
-                    .background(.thinMaterial, in: .circle)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Map layers")
-            .accessibilityValue(
-                "\(visibleMapLayers.count) of \(BigSightMapLayer.allCases.count) shown"
+            MapLayerMenu(
+                eventNumber: model.eventNumber,
+                availableLayers: model.availableMapLayers,
+                visibleMapLayers: $visibleMapLayers
             )
-            .accessibilityIdentifier("map-layer-button")
 
             Button {
                 model.setSearchPresented(!model.isSearchPresented)
@@ -1183,17 +1132,148 @@ private struct MapSelectorBar: View {
 
     private var selectedHallName: String {
         guard model.scope == .venue else { return String(localized: "Campus") }
-        return model.halls.first(where: { $0.externalMapId == model.selectedMapID })?.name
+        return model.halls.first(where: { $0.externalMapId == model.selectedMapID })
+            .map(BigSightVenue.localizedHallName(for:))
             ?? String(localized: "Venue")
+    }
+
+    /// `nil` represents the campus overview; a map ID selects that hall.
+    private var venueSelection: Binding<Int?> {
+        Binding(
+            get: { model.scope == .venue ? model.selectedMapID : nil },
+            set: { mapID in
+                if let mapID {
+                    model.select(mapID: mapID)
+                } else {
+                    model.showCampus()
+                }
+            }
+        )
     }
 
 }
 
+private struct MapLayerMenu: View {
+    let eventNumber: Int
+    let availableLayers: Set<BigSightMapLayer>
+    @Binding var visibleMapLayers: Set<BigSightMapLayer>
+
+    private var shownLayers: Set<BigSightMapLayer> {
+        visibleMapLayers.intersection(availableLayers)
+    }
+
+    private var activeQuickView: MapQuickView? {
+        MapQuickView.matching(visibleMapLayers, available: availableLayers)
+    }
+
+    private var showsEveryLayer: Bool {
+        shownLayers == availableLayers
+    }
+
+    var body: some View {
+        Menu {
+            // A picker gives the active preset a system checkmark. A custom
+            // layer mix selects no preset.
+            Picker("Quick Views", selection: quickViewSelection) {
+                ForEach(availableQuickViews) { quickView in
+                    VStack(alignment: .leading) {
+                        Text(verbatim: quickView.title)
+                        Text(verbatim: quickView.subtitle)
+                    }
+                    .tag(MapQuickView?.some(quickView))
+                }
+            }
+            .pickerStyle(.inline)
+
+            Section("Layers") {
+                ForEach(BigSightMapLayer.allCases) { layer in
+                    let hasData = availableLayers.contains(layer)
+                    Toggle(isOn: binding(for: layer)) {
+                        Label {
+                            Text(verbatim: layer.title)
+                            if !hasData {
+                                Text("No data for C\(eventNumber)")
+                            }
+                        } icon: {
+                            LucideIcon(layer.systemImage)
+                        }
+                    }
+                    .disabled(!hasData)
+                }
+            }
+
+            Section {
+                if showsEveryLayer {
+                    Button {
+                        visibleMapLayers = []
+                    } label: {
+                        LucideLabel("Hide All Layers", icon: "eye.slash")
+                    }
+                } else {
+                    Button {
+                        visibleMapLayers = BigSightMapLayer.defaultVisible
+                    } label: {
+                        LucideLabel("Show All Layers", icon: "eye")
+                    }
+                }
+            }
+        } label: {
+            LucideIcon("line.3.horizontal.decrease.circle")
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(showsEveryLayer ? Color.primary : Color.accentColor)
+                .frame(width: 44, height: 44)
+                .background(.thinMaterial, in: .circle)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Map layers")
+        .accessibilityValue(accessibilityValue)
+        .accessibilityIdentifier("map-layer-button")
+    }
+
+    private var availableQuickViews: [MapQuickView] {
+        MapQuickView.allCases.filter { quickView in
+            quickView.requiredLayer.map { availableLayers.contains($0) } ?? true
+        }
+    }
+
+    private var accessibilityValue: String {
+        if let activeQuickView {
+            return activeQuickView.title
+        }
+        return String(localized: "\(shownLayers.count) of \(availableLayers.count) shown")
+    }
+
+    private var quickViewSelection: Binding<MapQuickView?> {
+        Binding(
+            get: { activeQuickView },
+            set: { quickView in
+                guard let quickView else { return }
+                visibleMapLayers = quickView.layers
+            }
+        )
+    }
+
+    private func binding(for layer: BigSightMapLayer) -> Binding<Bool> {
+        Binding(
+            get: { visibleMapLayers.contains(layer) },
+            set: { isVisible in
+                if isVisible {
+                    visibleMapLayers.insert(layer)
+                } else {
+                    visibleMapLayers.remove(layer)
+                }
+            }
+        )
+    }
+}
+
 private struct MapSearchField: View {
     let model: MapScreenModel
-    let onFindByLocation: () -> Void
+    let onGoToSpace: () -> Void
     @State private var text = ""
+    @State private var showsResults = true
     @FocusState private var isFocused: Bool
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         VStack(spacing: 8) {
@@ -1202,55 +1282,217 @@ private struct MapSearchField: View {
                     .foregroundStyle(.secondary)
 
                 TextField(
-                    "Circle, creator, or description",
+                    "Circle, creator, or space (e.g. 東A01a)",
                     text: $text
                 )
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .focused($isFocused)
                 .submitLabel(.search)
-                .accessibilityHint("Search circle names, creators, or descriptions")
+                .accessibilityLabel("Search circles")
+                .accessibilityHint("Search circle names, creators, or space codes on every day")
                 .accessibilityIdentifier("map-search-field")
 
                 if model.isSearching {
                     ProgressView()
                         .controlSize(.small)
-                } else if !model.searchQuery.isEmpty {
-                    Text("\(model.searchMatches.count)")
+                } else if hasQuery {
+                    Text("^[\(model.searchResultCount) circle](inflect: true)")
                         .font(.caption.monospacedDigit().weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .accessibilityLabel("\(model.searchMatches.count) matching circles")
+                        .lineLimit(1)
+                        .fixedSize()
+                        .accessibilityLabel("\(model.searchResultCount) matching circles")
                         .accessibilityIdentifier("map-search-summary")
+                }
+
+                if !text.isEmpty {
+                    Button {
+                        text = ""
+                        isFocused = true
+                    } label: {
+                        LucideIcon("xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 28, minHeight: 44)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
+                    .accessibilityIdentifier("map-search-clear")
                 }
             }
             .padding(.horizontal, 13)
-            .frame(height: 44)
+            .frame(minHeight: 44)
             .background(.regularMaterial, in: .rect(cornerRadius: 14))
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(.white.opacity(0.55), lineWidth: 0.5)
             }
 
+            if showsResults, hasQuery, !model.isSearching || model.searchResultCount > 0 {
+                MapSearchResultsList(model: model) { result in
+                    isFocused = false
+                    showsResults = false
+                    model.select(result)
+                }
+                .frame(maxHeight: horizontalSizeClass == .regular ? 480 : 280)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
             Button {
                 isFocused = false
-                onFindByLocation()
+                onGoToSpace()
             } label: {
-                LucideLabel("Find a circle by table location", icon: "mappin.and.ellipse")
+                LucideLabel("Go to a space by block and number", icon: "mappin.and.ellipse")
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
-            .tint(.accentColor)
+            .tint(.primary)
             .accessibilityHint("Choose the event day, block letter, and space number")
-            .accessibilityIdentifier("map-location-search-button")
+            .accessibilityIdentifier("map-go-to-space-button")
         }
         .onAppear {
             text = model.searchQuery
             isFocused = true
         }
         .onChange(of: text) { _, value in
+            showsResults = true
             model.updateSearchQuery(value)
         }
+        .onChange(of: isFocused) { _, focused in
+            if focused {
+                showsResults = true
+            }
+        }
+    }
+
+    private var hasQuery: Bool {
+        !model.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+/// Search results for every event day, current day first. A tap opens the
+/// circle on the map, switching day and hall when needed.
+private struct MapSearchResultsList: View {
+    let model: MapScreenModel
+    let onSelect: (MapScreenModel.SearchResult) -> Void
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                if let emptyMessage {
+                    Text(emptyMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("map-search-empty")
+                }
+
+                ForEach(model.searchResultGroups) { group in
+                    Section {
+                        ForEach(group.results) { result in
+                            MapSearchResultRow(result: result) {
+                                onSelect(result)
+                            }
+                            if result.id != group.results.last?.id {
+                                Divider()
+                                    .padding(.leading, 14)
+                            }
+                        }
+                    } header: {
+                        Text("Day \(group.day)")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.regularMaterial)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                }
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.immediately)
+        .background(.regularMaterial, in: .rect(cornerRadius: 14))
+        .clipShape(.rect(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(.white.opacity(0.55), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Search results")
+        .accessibilityIdentifier("map-search-results")
+    }
+
+    /// Explains a day without matches. When other days have matches, it
+    /// names the next one so the attendee knows where the circles are.
+    private var emptyMessage: String? {
+        let currentDay = model.selectedDay
+        guard model.searchResultGroups.first?.day != currentDay else { return nil }
+        guard let otherDay = model.searchResultGroups.first else {
+            return String(localized: "No circles match this search")
+        }
+        return String(
+            localized:
+                "No circles on Day \(currentDay) · \(otherDay.results.count) on Day \(otherDay.day)"
+        )
+    }
+}
+
+private struct MapSearchResultRow: View {
+    let result: MapScreenModel.SearchResult
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: displayName)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if !result.penName.isEmpty {
+                        Text(verbatim: result.penName)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 8)
+
+                Text(verbatim: result.address.formatted(.short))
+                    .font(.subheadline.monospaced().weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Shows this circle on the map")
+        .accessibilityIdentifier("map-search-result-\(result.id)")
+    }
+
+    private var displayName: String {
+        result.circleName.isEmpty ? String(localized: "No circle assigned") : result.circleName
+    }
+
+    private var accessibilityLabel: String {
+        [displayName, result.penName, result.address.formatted(.full)]
+            .filter { !$0.isEmpty }
+            .joined(separator: ", ")
     }
 }
 
@@ -2210,6 +2452,7 @@ private struct CircleMapDetailSheet: View {
     let dataSource: CirclemsDataSource?
     let eventNumber: Int
     let mapID: Int
+    let onPinDestination: () -> Void
     let onOpenDetail: (CatalogMapCircle, Bool) -> Void
 
     var body: some View {
@@ -2229,6 +2472,7 @@ private struct CircleMapDetailSheet: View {
                     } else {
                         circleSummaries
                         locationCard
+                        pinDestinationButton
                     }
                 }
                 .padding()
@@ -2302,6 +2546,19 @@ private struct CircleMapDetailSheet: View {
         .accessibilityLabel("Copy \(selection.selectedAddress.canonicalText)")
         .accessibilityHint("Copies the venue-aware circle address and a ComiNavi link")
         .accessibilityIdentifier("map-circle-address-copy")
+    }
+
+    private var pinDestinationButton: some View {
+        Button {
+            onPinDestination()
+        } label: {
+            LucideLabel("Pin as Destination", icon: "mappin.and.ellipse")
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 50)
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityHint("Keeps this space marked on the map until you clear it")
+        .accessibilityIdentifier("map-circle-pin-destination")
     }
 
     private var circleSummaries: some View {
