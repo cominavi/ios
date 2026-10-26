@@ -1657,7 +1657,7 @@ private struct CircleDetailTagsSection: View {
                         LucideLabel(verbatim: tag, icon: "tag")
                             .font(.subheadline.weight(.semibold))
                             .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
+                            .truncationMode(.tail)
                             .padding(.horizontal, 10)
                             .frame(minHeight: 44)
                             .background(Color.accentColor.opacity(0.12), in: .capsule)
@@ -1671,6 +1671,9 @@ private struct CircleDetailTagsSection: View {
     }
 }
 
+/// Wraps tag chips into rows. A chip wider than the container is measured
+/// against the container width, so its label truncates instead of pushing
+/// past the card edge.
 private struct CircleTagFlowLayout: Layout {
     let spacing: CGFloat
 
@@ -1688,34 +1691,42 @@ private struct CircleTagFlowLayout: Layout {
         subviews: Subviews,
         cache: inout ()
     ) {
-        for (index, point) in arrangement(width: bounds.width, subviews: subviews).points.enumerated() {
+        let arrangement = arrangement(width: bounds.width, subviews: subviews)
+        for (index, frame) in arrangement.frames.enumerated() {
             subviews[index].place(
-                at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y),
+                at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
                 anchor: .topLeading,
-                proposal: .unspecified
+                proposal: ProposedViewSize(frame.size)
             )
         }
     }
 
-    private func arrangement(width: CGFloat, subviews: Subviews) -> (size: CGSize, points: [CGPoint]) {
-        var points: [CGPoint] = []
+    private func arrangement(
+        width: CGFloat,
+        subviews: Subviews
+    ) -> (size: CGSize, frames: [CGRect]) {
+        var frames: [CGRect] = []
         var x: CGFloat = 0
         var y: CGFloat = 0
         var rowHeight: CGFloat = 0
         var usedWidth: CGFloat = 0
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            var size = subview.sizeThatFits(.unspecified)
+            if size.width > width {
+                size = subview.sizeThatFits(ProposedViewSize(width: width, height: nil))
+                size.width = min(size.width, width)
+            }
             if x > 0, x + size.width > width {
                 x = 0
                 y += rowHeight + spacing
                 rowHeight = 0
             }
-            points.append(CGPoint(x: x, y: y))
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
             usedWidth = max(usedWidth, x - spacing)
         }
-        return (CGSize(width: min(usedWidth, width), height: y + rowHeight), points)
+        return (CGSize(width: min(usedWidth, width), height: y + rowHeight), frames)
     }
 }
 
