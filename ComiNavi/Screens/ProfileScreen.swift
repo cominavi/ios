@@ -29,11 +29,13 @@ struct ProfileScreen: View {
     private enum PresentedSheet: Identifiable {
         case profileEditor(userID: String)
         case issueReport
+        case signIn
 
         var id: String {
             switch self {
             case .profileEditor(let userID): "profile-editor-\(userID)"
             case .issueReport: "issue-report"
+            case .signIn: "sign-in"
             }
         }
     }
@@ -79,80 +81,7 @@ struct ProfileScreen: View {
 
     var body: some View {
         Form {
-            Section {
-                HStack {
-                    AuthenticatedProfileAvatar(
-                        url: profileStore.profile?.avatarURL,
-                        size: 88,
-                        revision: profileStore.profile?.revision
-                    )
-                    .accessibilityIdentifier("profile-avatar")
-                    .padding(.trailing, 8)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(isLoggedIn ? "ComiNavi account" : "Not signed in")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Text(
-                            profileStore.profile?.displayName
-                                ?? userState.user?.nickname
-                                ?? String(localized: "Not signed in")
-                        )
-                            .font(.title3)
-
-                        if let profile = profileStore.profile {
-                            HStack(spacing: 12) {
-                                if let identity = profile.identities.first(where: {
-                                    $0.provider == "circlems"
-                                }) {
-                                    Label {
-                                        Text("Circle.ms · \(identity.profileDisplayDetail)")
-                                            .lineLimit(1)
-                                    } icon: {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(.green)
-                                    }
-                                    .foregroundStyle(.secondary)
-                                    .accessibilityIdentifier("profile-circlems-status")
-                                } else {
-                                    Button {
-                                        linkCirclemsIdentity(profile.id)
-                                    } label: {
-                                        if circlemsLinkViewModel.state == .authenticating {
-                                            HStack(spacing: 5) {
-                                                ProgressView()
-                                                Text("Linking Circle.ms…")
-                                            }
-                                        } else {
-                                            Label("Link Circle.ms", systemImage: "link")
-                                        }
-                                    }
-                                    .disabled(
-                                        !profileStore.isIdentityVerified
-                                            || circlemsLinkViewModel.state == .authenticating
-                                    )
-                                    .accessibilityIdentifier("profile-link-circlems")
-                                }
-
-                                Spacer(minLength: 0)
-
-                                Button {
-                                    presentedSheet = .profileEditor(userID: profile.id)
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                .disabled(!profileStore.isIdentityVerified)
-                                .accessibilityIdentifier("profile-edit")
-                            }
-                            .font(.caption)
-                            .buttonStyle(.borderless)
-                            .padding(.top, 5)
-                        }
-                    }
-                }
-                .padding(.vertical, 8)
-            }
+            accountHeaderSection
 
             if !nonCirclemsIdentities.isEmpty {
                 Section("Linked accounts") {
@@ -168,14 +97,16 @@ struct ProfileScreen: View {
             if let profileIssue {
                 Section {
                     Text(profileIssue)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
                 }
             }
 
-            if let issue = profileStore.issueMessage, issue != profileIssue {
+            // The sign-in card already asks a signed-out person to sign in, so a
+            // stored session issue is only shown for an account that exists.
+            if isLoggedIn, let issue = profileStore.issueMessage, issue != profileIssue {
                 Section {
                     Text(issue)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
                 }
             }
 
@@ -235,7 +166,7 @@ struct ProfileScreen: View {
             if let favoriteRecoveryIssue {
                 Section {
                     Text(favoriteRecoveryIssue)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
                 }
             }
 
@@ -274,7 +205,7 @@ struct ProfileScreen: View {
                     case .failed(let message):
                         Text(message)
                             .font(.footnote)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.red)
                             .accessibilityIdentifier("profile-sync-circlems-favorites-error")
                     }
                 } header: {
@@ -373,7 +304,7 @@ struct ProfileScreen: View {
             Section("Account") {
                 Button {
                     if !isLoggedIn {
-                        returnToAuthentication()
+                        presentSignIn()
                     } else {
                         isShowingLogoutConfirmation = true
                     }
@@ -410,7 +341,21 @@ struct ProfileScreen: View {
                 }
             case .issueReport:
                 IssueReportScreen()
+            case .signIn:
+                NavigationStack {
+                    SignInView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Cancel") { presentedSheet = nil }
+                                    .accessibilityIdentifier("profile-cancel-sign-in")
+                            }
+                        }
+                }
             }
+        }
+        .onChange(of: verifiedProfileID) { _, newValue in
+            guard newValue != nil, case .signIn? = presentedSheet else { return }
+            finishSignIn()
         }
         .fullScreenCover(isPresented: $isShowingAccountDeletionConfirmation) {
             AccountDeletionConfirmationView {
@@ -436,7 +381,7 @@ struct ProfileScreen: View {
             titleVisibility: .visible
         ) {
             Button("Sign Out", role: .destructive) {
-                returnToAuthentication()
+                signOut()
             }
             .accessibilityIdentifier("profile-confirm-log-out")
 
@@ -480,6 +425,120 @@ struct ProfileScreen: View {
         }
     }
 
+    /// A person who never signed in (the demo catalog and App Review path)
+    /// sees one value sentence and one Sign In action instead of an empty
+    /// account header.
+    @ViewBuilder
+    private var accountHeaderSection: some View {
+        Section {
+            if isLoggedIn {
+                signedInHeader
+            } else {
+                signedOutHeader
+            }
+        }
+    }
+
+    private var signedInHeader: some View {
+        HStack {
+            AuthenticatedProfileAvatar(
+                url: profileStore.profile?.avatarURL,
+                size: 88,
+                revision: profileStore.profile?.revision
+            )
+            .accessibilityIdentifier("profile-avatar")
+            .padding(.trailing, 8)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("ComiNavi account")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(
+                    profileStore.profile?.displayName
+                        ?? userState.user?.nickname
+                        ?? String(localized: "Signed in")
+                )
+                    .font(.title3)
+
+                if let profile = profileStore.profile {
+                    HStack(spacing: 12) {
+                        if let identity = profile.identities.first(where: {
+                            $0.provider == "circlems"
+                        }) {
+                            Label {
+                                Text("Circle.ms · \(identity.profileDisplayDetail)")
+                                    .lineLimit(1)
+                            } icon: {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("profile-circlems-status")
+                        } else {
+                            Button {
+                                linkCirclemsIdentity(profile.id)
+                            } label: {
+                                if circlemsLinkViewModel.state == .authenticating {
+                                    HStack(spacing: 5) {
+                                        ProgressView()
+                                        Text("Linking Circle.ms…")
+                                    }
+                                } else {
+                                    Label("Link Circle.ms", systemImage: "link")
+                                }
+                            }
+                            .disabled(
+                                !profileStore.isIdentityVerified
+                                    || circlemsLinkViewModel.state == .authenticating
+                            )
+                            .accessibilityIdentifier("profile-link-circlems")
+                        }
+
+                        Spacer(minLength: 0)
+
+                        Button {
+                            presentedSheet = .profileEditor(userID: profile.id)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        .disabled(!profileStore.isIdentityVerified)
+                        .accessibilityIdentifier("profile-edit")
+                    }
+                    .font(.caption)
+                    .buttonStyle(.borderless)
+                    .padding(.top, 5)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var signedOutHeader: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 14) {
+                AuthenticatedProfileAvatar(url: nil, size: 56)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Not signed in")
+                        .font(.headline)
+                    Text("Sign in to sync plans and favorites")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
+
+            FocusedActionButton(action: presentSignIn) {
+                Text("Sign In")
+            }
+            .accessibilityIdentifier("profile-sign-in")
+        }
+        .padding(.vertical, 8)
+    }
+
     private var isLoggedIn: Bool {
         profileStore.profile != nil || userState.user != nil
     }
@@ -492,15 +551,33 @@ struct ProfileScreen: View {
         profileStore.profile?.identities.contains { $0.provider == "circlems" } == true
     }
 
-    private func returnToAuthentication() {
-        let dataSource = AppData.circlems
-        guard isLoggedIn else {
+    private var verifiedProfileID: String? {
+        guard profileStore.isIdentityVerified else { return nil }
+        return profileStore.profile?.id
+    }
+
+    private func presentSignIn() {
+        presentedSheet = .signIn
+    }
+
+    /// Sign-in from Profile keeps the current catalog open until the account
+    /// is verified. Cancelling the sheet therefore leaves the demo catalog and
+    /// the person's place in it untouched.
+    private func finishSignIn() {
+        presentedSheet = nil
+        if catalogLibrary.mode == .demo {
+            // A signed-in account reads the ComiNavi catalog, not the bundled
+            // demo data. The app shell loads the new catalog once it is idle.
             withAnimation {
-                catalogLibrary.reset()
+                catalogLibrary.selectMode(.cominavi)
             }
-            return
         }
-        guard !isLoggingOut else { return }
+        Task { await profileStore.load() }
+    }
+
+    private func signOut() {
+        let dataSource = AppData.circlems
+        guard isLoggedIn, !isLoggingOut else { return }
         AppTrack.userIntent(.signOutStarted)
         isLoggingOut = true
         Task {
