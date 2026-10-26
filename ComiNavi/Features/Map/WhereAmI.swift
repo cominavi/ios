@@ -64,6 +64,37 @@ struct ComiketSpaceAddress: Equatable, Sendable {
 
     var nearbyText: String { "\(canonicalText)付近" }
 
+    /// How a space address is shown to attendees. Every screen that names a
+    /// space (Explore cards, circle details, map search, the location sheet)
+    /// uses these styles, so one address reads the same everywhere. The
+    /// Japanese `canonicalText` remains the copy and staff-facing form.
+    enum DisplayStyle: Sendable {
+        /// Hall direction and space code: "West あ02a".
+        case short
+        /// Day, hall, and space code: "Day 1 · West 1 · あ02a".
+        case full
+    }
+
+    /// The English-first hall name, e.g. "East 1" or "West Halls".
+    var localizedHallName: String {
+        BigSightVenue.localizedHallName(forCatalogName: hallName)
+    }
+
+    func formatted(_ style: DisplayStyle) -> String {
+        switch style {
+        case .short:
+            guard let direction = BigSightVenue.direction(matching: hallName) else {
+                return spaceCode
+            }
+            return "\(direction.localizedName) \(spaceCode)"
+        case .full:
+            return String(
+                localized: "Day \(day) · \(localizedHallName) · \(spaceCode)",
+                comment: "Full space address: event day, hall name, and space code"
+            )
+        }
+    }
+
     func selecting(subspace: Int?) -> Self {
         Self(
             day: day,
@@ -123,7 +154,7 @@ struct LocatedMapUser: Identifiable, Equatable, Sendable {
         address.nearbyText
     }
 
-    private var address: ComiketSpaceAddress {
+    var address: ComiketSpaceAddress {
         ComiketSpaceAddress(
             day: sceneID.day,
             hallName: canonicalVenueName,
@@ -150,7 +181,7 @@ struct MapDestination: Identifiable, Equatable, Sendable {
 
     var canonicalLocationText: String { address.canonicalText }
 
-    private var address: ComiketSpaceAddress {
+    var address: ComiketSpaceAddress {
         ComiketSpaceAddress(
             day: sceneID.day,
             hallName: canonicalVenueName,

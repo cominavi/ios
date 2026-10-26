@@ -388,9 +388,9 @@ final class MapScreenModel {
         campusScene = campus
         let hallsByMapID = Dictionary(uniqueKeysWithValues: halls.map { ($0.externalMapId, $0) })
         return campus.venues.map { placement in
-            let hallName = hallsByMapID[placement.id]?.name ?? placement.kind.displayName
-            return WhereAmIVenueOption(
-                displayName: WhereAmIResolver.venueDisplayName(for: hallName),
+            WhereAmIVenueOption(
+                displayName: hallsByMapID[placement.id].map(BigSightVenue.localizedHallName(for:))
+                    ?? placement.kind.displayName,
                 placement: placement
             )
         }
@@ -467,11 +467,10 @@ final class MapScreenModel {
             return nil
         }
 
-        let hallName =
-            halls.first(where: { $0.externalMapId == targetMapID })?.name
-            ?? placement.kind.displayName
         let venue = WhereAmIVenueOption(
-            displayName: WhereAmIResolver.venueDisplayName(for: hallName),
+            displayName: halls.first(where: { $0.externalMapId == targetMapID })
+                .map(BigSightVenue.localizedHallName(for:))
+                ?? placement.kind.displayName,
             placement: placement
         )
         let user = WhereAmIResolver.locatedUser(
@@ -597,6 +596,9 @@ final class MapScreenModel {
         }
     }
 
+    /// The catalog (Japanese) hall name for an address. It feeds the
+    /// canonical Japanese text that staff read, so the last resort stays
+    /// "会場"; the UI shows it through `ComiketSpaceAddress.localizedHallName`.
     private var fallbackHallName: String {
         if let venue = campusScene?.venues.first(where: { $0.id == selectedMapID }) {
             return WhereAmIResolver.canonicalVenueName(for: venue.kind)

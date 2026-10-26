@@ -386,6 +386,87 @@ struct BigSightVenuePlacement: Identifiable, Equatable, Sendable {
     }
 }
 
+/// Maps catalog hall names (東123, 西12, 東1ホール, …) to the English-first
+/// names the map badges use. The catalog codes stay in the Japanese
+/// canonical address; everything an attendee reads in the UI goes through
+/// these helpers so the hall selector, map badges, and addresses agree.
+enum BigSightVenue {
+    enum Direction: Sendable {
+        case east
+        case west
+        case south
+
+        var localizedName: String {
+            switch self {
+            case .east: String(localized: "East", comment: "Short hall direction in a space address, e.g. East あ02a")
+            case .west: String(localized: "West", comment: "Short hall direction in a space address, e.g. West あ02a")
+            case .south: String(localized: "South", comment: "Short hall direction in a space address, e.g. South あ02a")
+            }
+        }
+    }
+
+    static func kind(matching value: String) -> BigSightVenuePlacement.Kind? {
+        let name = normalized(value)
+        if name.contains("東123") || name.contains("E123") || name.contains("EAST123") {
+            return .east123
+        }
+        if name.contains("東456") || name.contains("E456") || name.contains("EAST456") {
+            return .east456
+        }
+        if name.contains("東7") || name.contains("E7") || name.contains("EAST7") {
+            return .east7
+        }
+        if name.contains("西") || name.contains("WEST") || name.contains("W12")
+            || name.contains("W34")
+        {
+            return .west
+        }
+        if name.contains("南") || name.contains("SOUTH") || name.contains("S12")
+            || name.contains("S34")
+        {
+            return .south
+        }
+        return nil
+    }
+
+    static func direction(matching value: String) -> Direction? {
+        let name = normalized(value)
+        if name.contains("東") || name.hasPrefix("EAST") { return .east }
+        if name.contains("西") || name.hasPrefix("WEST") { return .west }
+        if name.contains("南") || name.hasPrefix("SOUTH") { return .south }
+        return nil
+    }
+
+    /// The display name for a hall in the day's hall list, matching the
+    /// venue badge on the map ("East 1–3", "West Halls").
+    static func localizedHallName(for hall: UFDSchema.DayHall) -> String {
+        if let kind = kind(matching: "\(hall.name) \(hall.mapName)") {
+            return kind.displayName
+        }
+        return localizedHallName(forCatalogName: hall.name)
+    }
+
+    /// The display name for a hall or area name taken from a catalog address
+    /// (東1, 西ホール, 東1–3ホール). Area names keep their number so the
+    /// address stays as precise as the Japanese original.
+    static func localizedHallName(forCatalogName value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "会場" {
+            return String(localized: "Venue")
+        }
+        let withoutSuffix =
+            trimmed.hasSuffix("ホール") ? String(trimmed.dropLast("ホール".count)) : trimmed
+        return WhereAmIResolver.venueDisplayName(for: withoutSuffix)
+    }
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .folding(options: [.widthInsensitive], locale: Locale(identifier: "ja_JP"))
+            .uppercased()
+            .replacingOccurrences(of: " ", with: "")
+    }
+}
+
 struct BigSightCampusConnection: Identifiable, Equatable, Sendable {
     let id: String
     let name: String
@@ -564,30 +645,7 @@ enum BigSightCampusLayout {
         hall: UFDSchema.DayHall,
         scene: CatalogMapScene
     ) -> BigSightVenuePlacement.Kind? {
-        let name = "\(hall.name) \(hall.mapName) \(scene.name)"
-            .folding(options: [.caseInsensitive, .widthInsensitive], locale: .current)
-            .replacingOccurrences(of: " ", with: "")
-
-        if name.contains("東123") || name.contains("E123") || name.contains("EAST123") {
-            return .east123
-        }
-        if name.contains("東456") || name.contains("E456") || name.contains("EAST456") {
-            return .east456
-        }
-        if name.contains("東7") || name.contains("E7") || name.contains("EAST7") {
-            return .east7
-        }
-        if name.contains("西") || name.contains("WEST") || name.contains("W12")
-            || name.contains("W34")
-        {
-            return .west
-        }
-        if name.contains("南") || name.contains("SOUTH") || name.contains("S12")
-            || name.contains("S34")
-        {
-            return .south
-        }
-        return nil
+        BigSightVenue.kind(matching: "\(hall.name) \(hall.mapName) \(scene.name)")
     }
 
     private static func venueAnchor(

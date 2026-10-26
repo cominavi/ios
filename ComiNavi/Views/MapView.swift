@@ -1047,29 +1047,24 @@ private struct MapSelectorBar: View {
     var body: some View {
         HStack(spacing: 8) {
             Menu {
-                Button {
-                    model.showCampus()
-                } label: {
-                    if model.scope == .campus {
-                        LucideLabel("Campus", icon: "checkmark")
-                    } else {
-                        Text("Campus")
-                    }
-                }
+                // An inline picker lets the system draw and align the
+                // checkmark for Campus and every hall.
+                Picker("Area", selection: venueSelection) {
+                    Text("Campus")
+                        .tag(Int?.none)
 
-                Divider()
-
-                ForEach(model.halls, id: \.id) { hall in
-                    Button {
-                        model.select(mapID: hall.externalMapId)
-                    } label: {
-                        if model.scope == .venue, hall.externalMapId == model.selectedMapID {
-                            LucideLabel(verbatim: hall.name, icon: "checkmark")
-                        } else {
-                            Text(hall.name)
+                    ForEach(model.halls, id: \.id) { hall in
+                        // The catalog code stays as secondary text so it can
+                        // be matched against printed catalogs and signs.
+                        VStack(alignment: .leading) {
+                            Text(verbatim: BigSightVenue.localizedHallName(for: hall))
+                            Text(verbatim: hall.name)
                         }
+                        .tag(Int?.some(hall.externalMapId))
+                        .accessibilityLabel(Text(verbatim: BigSightVenue.localizedHallName(for: hall)))
                     }
                 }
+                .pickerStyle(.inline)
             } label: {
                 SelectorLabel(
                     title: selectedHallName,
@@ -1183,8 +1178,23 @@ private struct MapSelectorBar: View {
 
     private var selectedHallName: String {
         guard model.scope == .venue else { return String(localized: "Campus") }
-        return model.halls.first(where: { $0.externalMapId == model.selectedMapID })?.name
+        return model.halls.first(where: { $0.externalMapId == model.selectedMapID })
+            .map(BigSightVenue.localizedHallName(for:))
             ?? String(localized: "Venue")
+    }
+
+    /// `nil` represents the campus overview; a map ID selects that hall.
+    private var venueSelection: Binding<Int?> {
+        Binding(
+            get: { model.scope == .venue ? model.selectedMapID : nil },
+            set: { mapID in
+                if let mapID {
+                    model.select(mapID: mapID)
+                } else {
+                    model.showCampus()
+                }
+            }
+        )
     }
 
 }

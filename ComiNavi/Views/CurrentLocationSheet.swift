@@ -78,21 +78,26 @@ struct CurrentLocationSheet: View {
         }
     }
 
+    /// The Japanese address is what venue staff and printed signs use, so it
+    /// stays in Japanese in every locale; the caption explains why.
     private var canonicalLocation: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(location.canonicalLocationText)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Japanese address (for staff and signs)")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(verbatim: location.canonicalLocationText)
                 .font(.title3.weight(.semibold))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .secondarySystemBackground))
-        .clipShape(.rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color(uiColor: .separator).opacity(0.32), lineWidth: 0.5)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(uiColor: .secondarySystemBackground))
+                .clipShape(.rect(cornerRadius: 14))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color(uiColor: .separator).opacity(0.32), lineWidth: 0.5)
+                }
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("current-location-canonical-text")
