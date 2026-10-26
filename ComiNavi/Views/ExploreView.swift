@@ -83,29 +83,34 @@ struct ExploreView<EventDayHeader: View>: View {
         @Bindable var model = model
 
         NavigationStack {
-            VStack(spacing: 0) {
-                ExploreSearchField(model: model)
-
-                Group {
-                    if model.isLoading, model.allCircles.isEmpty {
-                        ExploreLoadingScreen()
-                    } else if model.visibleCircles.isEmpty {
-                        ContentUnavailableView {
-                            LucideLabel("No circles found", icon: "sparkle.magnifyingglass")
-                        } description: {
-                            Text(emptyMessage)
-                        } actions: {
-                            if activeFilterCount > 0 {
-                                Button("Clear filters") {
-                                    model.clearFilters()
-                                }
+            Group {
+                if model.isLoading, model.allCircles.isEmpty {
+                    ExploreLoadingScreen()
+                } else if model.visibleCircles.isEmpty {
+                    ContentUnavailableView {
+                        LucideLabel("No circles found", icon: "sparkle.magnifyingglass")
+                    } description: {
+                        Text(emptyMessage)
+                    } actions: {
+                        if activeFilterCount > 0 {
+                            Button("Clear filters") {
+                                model.clearFilters()
                             }
                         }
-                    } else {
-                        results
                     }
+                } else {
+                    results
                 }
             }
+            // The system search field collapses into the navigation bar on
+            // scroll, which a fixed row above the gallery never did.
+            .searchable(
+                text: $model.searchQuery,
+                placement: .navigationBarDrawer(displayMode: .automatic),
+                prompt: Text("Search circles, creators, tags")
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
             .navigationTitle("Explore")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -296,49 +301,6 @@ private struct ExploreLoadingScreen: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Organizing circles…")
         .accessibilityIdentifier("explore-loading-screen")
-    }
-}
-
-private struct ExploreSearchField: View {
-    let model: ExploreModel
-    @FocusState private var isSearchFocused: Bool
-
-    var body: some View {
-        @Bindable var model = model
-
-        HStack(spacing: 10) {
-            LucideIcon("magnifyingglass")
-                .font(.body.weight(.medium))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-
-            TextField(
-                "Circle, creator, X handle, post, artwork text, or tag",
-                text: $model.searchQuery
-            )
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .submitLabel(.search)
-            .focused($isSearchFocused)
-            .onSubmit { isSearchFocused = false }
-            .accessibilityIdentifier("explore-search-field")
-
-            if !model.searchQuery.isEmpty {
-                Button {
-                    model.searchQuery = ""
-                } label: {
-                    LucideLabel("Clear search", icon: "xmark.circle.fill")
-                }
-                .labelStyle(.iconOnly)
-                .foregroundStyle(.secondary)
-                .accessibilityIdentifier("explore-search-clear-button")
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(minHeight: 44)
-        .background(Color(uiColor: .secondarySystemBackground), in: .capsule)
-        .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
-        .padding(.vertical, 12)
     }
 }
 
