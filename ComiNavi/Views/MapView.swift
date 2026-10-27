@@ -1317,32 +1317,33 @@ private struct MapSearchField: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                LucideIcon("magnifyingglass")
+        VStack(spacing: Spacing.small) {
+            HStack(spacing: Spacing.small) {
+                LucideIcon("magnifyingglass", size: IconSize.inline)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
 
-                TextField(
-                    "Circle, creator, or space (e.g. 東A01a)",
-                    text: $text
-                )
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .focused($isFocused)
-                .submitLabel(.search)
-                .accessibilityLabel("Search circles")
-                .accessibilityHint("Search circle names, creators, or space codes on every day")
-                .accessibilityIdentifier("map-search-field")
+                // A short prompt fits on one line in every language at
+                // XXXL; a cut-off example code helped no one.
+                TextField("Circle, creator, or space", text: $text)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .focused($isFocused)
+                    .submitLabel(.search)
+                    .accessibilityLabel("Search circles")
+                    .accessibilityHint("Search circle names, creators, or space codes on every day")
+                    .accessibilityIdentifier("map-search-field")
 
                 if model.isSearching {
                     ProgressView()
                         .controlSize(.small)
-                } else if hasQuery {
+                } else if hasQuery, model.searchResultCount > 0 {
+                    // No count for zero results: the empty message below
+                    // already says so.
                     Text("^[\(model.searchResultCount) circle](inflect: true)")
-                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .font(.badge.monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .fixedSize()
+                        .singleLineToken()
                         .accessibilityLabel("\(model.searchResultCount) matching circles")
                         .accessibilityIdentifier("map-search-summary")
                 }
@@ -1352,23 +1353,20 @@ private struct MapSearchField: View {
                         text = ""
                         isFocused = true
                     } label: {
-                        LucideIcon("xmark.circle.fill")
+                        LucideIcon("xmark.circle.fill", size: IconSize.inline)
                             .foregroundStyle(.secondary)
-                            .frame(minWidth: 28, minHeight: 44)
-                            .contentShape(.rect)
+                            .minimumHitArea()
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Clear search")
                     .accessibilityIdentifier("map-search-clear")
                 }
             }
-            .padding(.horizontal, 13)
-            .frame(minHeight: 44)
-            .background(.regularMaterial, in: .rect(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(.white.opacity(0.55), lineWidth: 0.5)
-            }
+            .padding(.leading, Spacing.medium)
+            // The clear button draws its own 44 pt target to the edge.
+            .padding(.trailing, text.isEmpty ? Spacing.medium : 0)
+            .frame(minHeight: HitArea.minimum)
+            .mapChromeSurface(.capsule)
 
             if showsResults, hasQuery, !model.isSearching || model.searchResultCount > 0 {
                 MapSearchResultsList(model: model) { result in
@@ -1384,12 +1382,23 @@ private struct MapSearchField: View {
                 isFocused = false
                 onGoToSpace()
             } label: {
-                LucideLabel("Go to a space by block and number", icon: "mappin.and.ellipse")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                Label {
+                    Text("Go to a space by block and number")
+                        .multilineTextAlignment(.leading)
+                        .wrapsFully()
+                } icon: {
+                    LucideIcon("mappin.and.ellipse", size: IconSize.inline)
+                        .accessibilityHidden(true)
+                }
+                .font(.control)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, Spacing.large)
+                .padding(.vertical, Spacing.small)
+                .frame(maxWidth: .infinity, minHeight: HitArea.minimum)
+                .mapChromeSurface(.capsule)
+                .contentShape(.capsule)
             }
-            .buttonStyle(.bordered)
-            .tint(.primary)
+            .buttonStyle(.plain)
             .accessibilityHint("Choose the event day, block letter, and space number")
             .accessibilityIdentifier("map-go-to-space-button")
         }
@@ -1424,10 +1433,11 @@ private struct MapSearchResultsList: View {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                 if let emptyMessage {
                     Text(emptyMessage)
-                        .font(.subheadline)
+                        .font(.rowSubtitle)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
+                        .wrapsFully()
+                        .padding(.horizontal, Spacing.large)
+                        .padding(.vertical, Spacing.medium)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("map-search-empty")
                 }
@@ -1440,30 +1450,27 @@ private struct MapSearchResultsList: View {
                             }
                             if result.id != group.results.last?.id {
                                 Divider()
-                                    .padding(.leading, 14)
+                                    .padding(.leading, Spacing.large)
                             }
                         }
                     } header: {
                         Text("Day \(group.day)")
-                            .font(.footnote.weight(.semibold))
+                            .font(.meta.weight(.semibold))
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, Spacing.large)
+                            .padding(.vertical, Spacing.xSmall)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(.regularMaterial)
                             .accessibilityAddTraits(.isHeader)
                     }
                 }
             }
+            .padding(.vertical, Spacing.xSmall)
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.immediately)
-        .background(.regularMaterial, in: .rect(cornerRadius: 14))
-        .clipShape(.rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(.white.opacity(0.55), lineWidth: 0.5)
-        }
+        .clipShape(.rect(cornerRadius: Radius.panel, style: .continuous))
+        .mapChromeSurface(.panel)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Search results")
         .accessibilityIdentifier("map-search-results")
@@ -1488,50 +1495,72 @@ private struct MapSearchResultRow: View {
     let result: MapScreenModel.SearchResult
     let action: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         Button(action: action) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: displayName)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    if !result.penName.isEmpty {
-                        Text(verbatim: result.penName)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    // At accessibility sizes the address moves below the
+                    // names, so the circle name keeps the full row width.
+                    VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                        names
+                        address
+                    }
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.medium) {
+                        names
+                            .layoutPriority(1)
+                        Spacer(minLength: 0)
+                        address
                     }
                 }
-
-                Spacer(minLength: 8)
-
-                Text(verbatim: result.address.formatted(.short))
-                    .font(.subheadline.monospaced().weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .fixedSize()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, Spacing.large)
+            .padding(.vertical, Spacing.small)
+            .frame(maxWidth: .infinity, minHeight: HitArea.minimum, alignment: .leading)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
+        // The button is already one element. A label on it, with no extra
+        // accessibility container, keeps VoiceOver from finding a second
+        // copy of the row.
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityAddTraits(.isButton)
         .accessibilityHint("Shows this circle on the map")
         .accessibilityIdentifier("map-search-result-\(result.id)")
+    }
+
+    private var names: some View {
+        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+            Text(verbatim: displayName)
+                .font(.rowTitle)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+
+            if !result.penName.isEmpty {
+                // Data, one line: the circle name above identifies the row.
+                Text(verbatim: result.penName)
+                    .font(.rowSubtitle)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var address: some View {
+        Text(verbatim: result.address.displayText(.short))
+            .font(.spaceCode)
+            .foregroundStyle(.secondary)
+            .singleLineToken()
     }
 
     private var displayName: String {
         result.circleName.isEmpty ? String(localized: "No circle assigned") : result.circleName
     }
 
+    /// The same short address as the visible text.
     private var accessibilityLabel: String {
-        [displayName, result.penName, result.address.formatted(.full)]
+        [displayName, result.penName, result.address.formatted(.short)]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }
