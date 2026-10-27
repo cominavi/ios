@@ -1522,6 +1522,11 @@ final class UnifiedBigSightScene: SKScene {
     /// change then fits the overview again; after any pan, zoom, rotation,
     /// or focus, the user's camera stays where it is.
     private var isShowingOverviewFit = false
+    /// The hall that the camera was fitted to, until a gesture moves it. A
+    /// size change fits that hall again, the same as the overview. A focus
+    /// that is asked for before the first layout (a launch route, a restored
+    /// hall) waits here, because the scale needs the viewport size.
+    private var venueFitMapID: Int?
     private var overviewInsets: MapViewportInsets?
     private var lastCameraFitRequestID: UUID?
     /// The overview never opens closer than this, so it stays clear of the
@@ -1890,6 +1895,7 @@ final class UnifiedBigSightScene: SKScene {
 
     func beginGesture() {
         isShowingOverviewFit = false
+        venueFitMapID = nil
         mapCamera.removeAllActions()
     }
 
@@ -1970,6 +1976,7 @@ final class UnifiedBigSightScene: SKScene {
         )
         mapCamera.removeAction(forKey: "compass-rotation")
         isShowingOverviewFit = false
+        venueFitMapID = nil
 
         if reduceMotion {
             mapCamera.zRotation = targetRotation
@@ -2414,8 +2421,15 @@ final class UnifiedBigSightScene: SKScene {
             bounds.width / (size.width * 0.86), bounds.height / (size.height * 0.76))
         maximumCameraScale = max(minimumCameraScale / 180, 0.006)
         let refitsOverview = isShowingOverviewFit && scope == .campus
-        guard force || !hasFittedInitialCamera || refitsOverview else {
+        let refitsVenue = venueFitMapID != nil && scope == .venue
+        guard force || !hasFittedInitialCamera || refitsOverview || refitsVenue else {
             clampCamera()
+            applyLevelOfDetail()
+            return
+        }
+        if scope == .venue, let mapID = venueFitMapID ?? selectedMapID {
+            focusVenue(mapID: mapID, animated: false)
+            hasFittedInitialCamera = true
             applyLevelOfDetail()
             return
         }
@@ -2424,6 +2438,7 @@ final class UnifiedBigSightScene: SKScene {
         mapCamera.setScale(fit.scale)
         mapCamera.zRotation = 0
         isShowingOverviewFit = true
+        venueFitMapID = nil
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-rotated-camera") {
                 mapCamera.zRotation = .pi / 4
@@ -2545,6 +2560,12 @@ final class UnifiedBigSightScene: SKScene {
 
     private func focusVenue(mapID: Int, animated: Bool) {
         guard let venue = campus.venues.first(where: { $0.id == mapID }) else { return }
+        // Without a viewport the scale falls back to the campus limit, and
+        // the camera only turned to the hall. The first layout focuses it.
+        guard size.width > 1, size.height > 1 else {
+            venueFitMapID = mapID
+            return
+        }
         let bounds = UnifiedMapProjection.sceneBounds(fromCampus: venue.bounds)
         let targetScale = max(
             maximumCameraScale,
@@ -2559,6 +2580,7 @@ final class UnifiedBigSightScene: SKScene {
             rotation: -venue.rotation,
             animated: animated
         )
+        venueFitMapID = mapID
     }
 
     private func focus(on user: LocatedMapUser, animated: Bool) {
@@ -2635,6 +2657,7 @@ final class UnifiedBigSightScene: SKScene {
     ) {
         mapCamera.removeAllActions()
         isShowingOverviewFit = false
+        venueFitMapID = nil
         let duration = animated && !reduceMotion ? 0.42 : 0
         guard duration > 0 else {
             mapCamera.position = position
