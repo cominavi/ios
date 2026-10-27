@@ -47,7 +47,7 @@ struct ProfileScreen: View {
         case failed(message: String)
     }
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(SharedLocationClipboardImporter.enabledDefaultsKey)
     private var automaticallyReadsSharedLocations = false
     @State private var isShowingLogoutConfirmation = false
@@ -64,7 +64,6 @@ struct ProfileScreen: View {
     @State private var favoriteRecoveryIssue: String?
     @State private var favoriteRecoveryPendingDiscard: QuarantinedCanonicalFavoriteMutation?
     @State private var favoriteSyncState = FavoriteSyncState.idle
-    @State private var containerWidth: CGFloat = 0
     let favoriteColorLabelStore: FavoriteColorLabelStore
     @StateObject private var circlemsLinkViewModel = SignInViewModel()
     let catalogLibrary: CatalogLibrary
@@ -134,31 +133,43 @@ struct ProfileScreen: View {
             if !favoriteRecoveries.isEmpty {
                 Section("Review favorite changes") {
                     ForEach(favoriteRecoveries) { recovery in
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: Spacing.small) {
                             Text("Favorite change not sent")
-                                .font(.subheadline.weight(.semibold))
+                                .font(.rowTitle)
                             Text(recovery.message)
-                                .font(.caption)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
+                                .wrapsFully()
                             if !recovery.affectedPublicCircleIDs.isEmpty {
                                 Text(
                                     "Affected circles: \(recovery.affectedPublicCircleIDs.count)"
                                 )
-                                .font(.caption.monospacedDigit())
+                                .font(.meta.monospacedDigit())
+                                .foregroundStyle(.secondary)
                                 .textSelection(.enabled)
                             }
 
-                            HStack {
+                            // Equal-width buttons that stack when a translated
+                            // title would wrap next to a one-line sibling.
+                            AdaptiveButtonRow(spacing: Spacing.small) {
                                 ShareLink(item: favoriteRecoveryExport(recovery)) {
-                                    Label("Export", systemImage: "square.and.arrow.up")
+                                    Label {
+                                        Text("Export")
+                                    } icon: {
+                                        LucideIcon("square.and.arrow.up", size: IconSize.inline)
+                                    }
                                 }
+                                .buttonStyle(.secondaryAction)
 
-                                Spacer()
-
-                                Button("Discard", role: .destructive) {
+                                Button(role: .destructive) {
                                     favoriteRecoveryPendingDiscard = recovery
+                                } label: {
+                                    Text("Discard")
+                                        .foregroundStyle(.red)
                                 }
+                                .buttonStyle(.secondaryAction)
                             }
+                            .padding(.top, Spacing.xSmall)
                         }
                         .accessibilityElement(children: .contain)
                     }
@@ -176,6 +187,8 @@ struct ProfileScreen: View {
                 favoritesSection(dataSource)
             }
 
+            // Image cache sits with Toolbox so that every card on the screen
+            // has a header and the section rhythm stays regular.
             Section("Tools") {
                 NavigationLink {
                     ComiketToolboxView(event: catalogLibrary.selectedEvent)
@@ -183,30 +196,7 @@ struct ProfileScreen: View {
                     LucideLabel("Toolbox", icon: "square.grid.2x2")
                 }
                 .accessibilityIdentifier("profile-toolbox")
-            }
 
-            Section {
-                Toggle(
-                    "Detect locations from clipboard",
-                    isOn: $automaticallyReadsSharedLocations
-                )
-                .accessibilityIdentifier("profile-auto-read-shared-location")
-
-                PasteButton(payloadType: String.self) { values in
-                    guard let value = values.first else { return }
-                    sharedLocationInbox.receiveClipboardText(value)
-                }
-                .buttonBorderShape(.roundedRectangle)
-                .accessibilityIdentifier("profile-paste-shared-location")
-            } header: {
-                Text("Settings")
-            } footer: {
-                Text(
-                    "Friends can send you a ComiNavi location link. When this setting is on, ComiNavi checks the clipboard for a new link each time you return to the app. To open a link that you copied, tap Paste."
-                )
-            }
-
-            Section {
                 NavigationLink {
                     ImageCacheManagementScreen()
                 } label: {
@@ -219,11 +209,57 @@ struct ProfileScreen: View {
                 .accessibilityIdentifier("profile-image-cache")
             }
 
+            Section {
+                // Every row in this list has a leading icon, so the text
+                // column starts at one x position.
+                Toggle(isOn: $automaticallyReadsSharedLocations) {
+                    Label {
+                        Text("Detect locations from clipboard")
+                    } icon: {
+                        LucideIcon("doc.on.doc")
+                    }
+                }
+                .accessibilityIdentifier("profile-auto-read-shared-location")
+
+                LabeledContent {
+                    PasteButton(payloadType: String.self) { values in
+                        guard let value = values.first else { return }
+                        sharedLocationInbox.receiveClipboardText(value)
+                    }
+                    .buttonBorderShape(.roundedRectangle(radius: Radius.control))
+                    // PasteButton draws white text. Dark olive keeps it legible
+                    // in light and dark mode; lime behind white text does not.
+                    .tint(Color.accentColor)
+                    // The large size gives the button a 44 pt hit height.
+                    .controlSize(.large)
+                    .accessibilityIdentifier("profile-paste-shared-location")
+                } label: {
+                    Label {
+                        Text("Open a copied link")
+                    } icon: {
+                        LucideIcon("mappin.and.ellipse")
+                    }
+                }
+            } header: {
+                Text("Settings")
+            } footer: {
+                Text(
+                    "Friends can send you a ComiNavi location link. When this setting is on, ComiNavi checks the clipboard for a new link each time you return to the app. To open a link that you copied, tap Paste."
+                )
+            }
+
             Section("Support") {
                 Button {
                     presentedSheet = .issueReport
                 } label: {
-                    Label("Report an issue", systemImage: "exclamationmark.bubble")
+                    // Same icon family, size, and colors as the navigation rows:
+                    // an accent glyph next to a primary title.
+                    Label {
+                        Text("Report an issue")
+                            .foregroundStyle(.primary)
+                    } icon: {
+                        LucideIcon("exclamationmark.circle")
+                    }
                 }
                 .accessibilityIdentifier("profile-report-issue")
             }
@@ -251,13 +287,9 @@ struct ProfileScreen: View {
                 }
             }
         }
-        .contentMargins(.horizontal, readableHorizontalMargin, for: .scrollContent)
-        .onGeometryChange(for: CGFloat.self) { proxy in
-            proxy.size.width
-        } action: { width in
-            containerWidth = width
-        }
+        .readableFormWidth()
         .navigationTitle("Profile")
+        .readableColumnTitleDisplayMode()
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
             case .profileEditor:
@@ -396,14 +428,15 @@ struct ProfileScreen: View {
             syncFavoritesToCirclems(dataSource)
         } label: {
             Label {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     Text("Sync favorites to Circle.ms")
+                        .foregroundStyle(.primary)
                     Text(
                         "Adds or updates your ComiNavi favorites in Circle.ms. Existing Circle.ms memos and unrelated favorites are kept."
                     )
-                    .font(.footnote)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrapsFully()
                 }
             } icon: {
                 if favoriteSyncState == .syncing {
@@ -425,25 +458,20 @@ struct ProfileScreen: View {
         case .succeeded:
             Label {
                 Text("ComiNavi favorites were synced to Circle.ms.")
+                    .wrapsFully()
             } icon: {
-                Image(systemName: "checkmark.circle.fill")
+                LucideIcon("checkmark.circle.fill", size: IconSize.caption)
             }
-            .font(.footnote)
+            .font(.meta)
             .foregroundStyle(.green)
             .accessibilityIdentifier("profile-sync-circlems-favorites-success")
         case .failed(let message):
             Text(message)
-                .font(.footnote)
+                .font(.meta)
                 .foregroundStyle(.red)
+                .wrapsFully()
                 .accessibilityIdentifier("profile-sync-circlems-favorites-error")
         }
-    }
-
-    /// On iPad and other regular-width containers the form keeps a readable
-    /// column of about 700 pt instead of stretching rows to the full width.
-    private var readableHorizontalMargin: CGFloat? {
-        guard horizontalSizeClass == .regular, containerWidth > 0 else { return nil }
-        return max(16, (containerWidth - 700) / 2)
     }
 
     /// A person who never signed in (the demo catalog and App Review path)
@@ -460,104 +488,144 @@ struct ProfileScreen: View {
         }
     }
 
+    /// One avatar size for both account headers, so signing in does not
+    /// move the text column.
+    private static let headerAvatarSize: CGFloat = 56
+
+    /// Avatar beside the text, or above it at accessibility sizes so the
+    /// text keeps the full card width.
+    private var headerLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.medium))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: Spacing.iconToText))
+    }
+
     private var signedInHeader: some View {
-        HStack {
-            AuthenticatedProfileAvatar(
-                url: profileStore.profile?.avatarURL,
-                size: 88,
-                revision: profileStore.profile?.revision
-            )
-            .accessibilityIdentifier("profile-avatar")
-            .padding(.trailing, 8)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("ComiNavi account")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Text(
-                    profileStore.profile?.displayName
-                        ?? userState.user?.nickname
-                        ?? String(localized: "Signed in")
+        VStack(alignment: .leading, spacing: Spacing.medium) {
+            headerLayout {
+                AuthenticatedProfileAvatar(
+                    url: profileStore.profile?.avatarURL,
+                    size: Self.headerAvatarSize,
+                    revision: profileStore.profile?.revision
                 )
-                    .font(.title3)
+                .accessibilityIdentifier("profile-avatar")
 
-                if let profile = profileStore.profile {
-                    HStack(spacing: 12) {
-                        if let identity = profile.identities.first(where: {
-                            $0.provider == "circlems"
-                        }) {
-                            Label {
-                                Text("Circle.ms · \(identity.profileDisplayDetail)")
-                                    .lineLimit(1)
-                            } icon: {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                            }
-                            .foregroundStyle(.secondary)
-                            .accessibilityIdentifier("profile-circlems-status")
-                        } else {
-                            Button {
-                                linkCirclemsIdentity(profile.id)
-                            } label: {
-                                if circlemsLinkViewModel.state == .authenticating {
-                                    HStack(spacing: 5) {
-                                        ProgressView()
-                                        Text("Linking Circle.ms…")
-                                    }
-                                } else {
-                                    Label("Link Circle.ms", systemImage: "link")
-                                }
-                            }
-                            .disabled(
-                                !profileStore.isIdentityVerified
-                                    || circlemsLinkViewModel.state == .authenticating
-                            )
-                            .accessibilityIdentifier("profile-link-circlems")
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                    Text("ComiNavi account")
+                        .font(.meta)
+                        .foregroundStyle(.secondary)
+
+                    Text(
+                        profileStore.profile?.displayName
+                            ?? userState.user?.nickname
+                            ?? String(localized: "Signed in")
+                    )
+                    .font(.sectionTitle)
+                    .wrapsFully()
+
+                    if let profile = profileStore.profile,
+                       let identity = profile.identities.first(where: {
+                           $0.provider == "circlems"
+                       })
+                    {
+                        Label {
+                            // The email comes from data: one line, and the
+                            // middle gives way so both ends stay readable.
+                            Text("Circle.ms · \(identity.profileDisplayDetail)")
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        } icon: {
+                            LucideIcon("checkmark.circle.fill", size: IconSize.caption)
+                                .foregroundStyle(.green)
                         }
-
-                        Spacer(minLength: 0)
-
-                        Button {
-                            presentedSheet = .profileEditor(userID: profile.id)
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
-                        }
-                        .disabled(!profileStore.isIdentityVerified)
-                        .accessibilityIdentifier("profile-edit")
+                        .font(.meta)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, Spacing.xSmall)
+                        .accessibilityIdentifier("profile-circlems-status")
                     }
-                    .font(.caption)
-                    .buttonStyle(.borderless)
-                    .padding(.top, 5)
+                }
+                .layoutPriority(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let profile = profileStore.profile {
+                // Chips keep one line and a 44 pt hit area; the row wraps to
+                // a column only when the titles do not fit side by side.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Spacing.small) {
+                        accountChips(profile)
+                    }
+                    VStack(alignment: .leading, spacing: 0) {
+                        accountChips(profile)
+                    }
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.small)
+    }
+
+    @ViewBuilder
+    private func accountChips(_ profile: CominaviUserProfile) -> some View {
+        Button {
+            presentedSheet = .profileEditor(userID: profile.id)
+        } label: {
+            Text("Edit")
+        }
+        .buttonStyle(.chip)
+        .disabled(!profileStore.isIdentityVerified)
+        .accessibilityIdentifier("profile-edit")
+
+        if !profile.identities.contains(where: { $0.provider == "circlems" }) {
+            Button {
+                linkCirclemsIdentity(profile.id)
+            } label: {
+                if circlemsLinkViewModel.state == .authenticating {
+                    HStack(spacing: Spacing.xSmall) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Linking Circle.ms…")
+                    }
+                } else {
+                    Text("Link Circle.ms")
+                }
+            }
+            .buttonStyle(.chip)
+            .disabled(
+                !profileStore.isIdentityVerified
+                    || circlemsLinkViewModel.state == .authenticating
+            )
+            .accessibilityIdentifier("profile-link-circlems")
+        }
     }
 
     private var signedOutHeader: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 14) {
-                AuthenticatedProfileAvatar(url: nil, size: 56)
+        VStack(alignment: .leading, spacing: Spacing.large) {
+            headerLayout {
+                AuthenticatedProfileAvatar(url: nil, size: Self.headerAvatarSize)
                     .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     Text("Not signed in")
-                        .font(.headline)
+                        .font(.rowTitle)
                     Text("Sign in to sync plans and favorites")
-                        .font(.subheadline)
+                        .font(.rowSubtitle)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .wrapsFully()
                 }
+                .layoutPriority(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .accessibilityElement(children: .combine)
 
-            FocusedActionButton(action: presentSignIn) {
+            // The card's one primary action: a flat lime fill with dark text,
+            // the same in light and dark mode.
+            Button(action: presentSignIn) {
                 Text("Sign in")
             }
+            .buttonStyle(.primaryAction)
             .accessibilityIdentifier("profile-sign-in")
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, Spacing.small)
     }
 
     private var isLoggedIn: Bool {
@@ -781,14 +849,13 @@ struct AuthenticatedProfileAvatar: View {
             if let image {
                 Image(uiImage: image)
                     .renderingMode(.original)
+                    .accessibilityLabel("Profile picture")
             } else {
-                LucideIcon("circle-user", size: Double(size))
-                    .foregroundStyle(.secondary)
+                Self.placeholder
             }
         }
         .frame(width: size, height: size)
         .clipShape(.circle)
-        .accessibilityLabel("Profile picture")
         .task(id: loadID) {
             image = nil
             guard let url else { return }
@@ -821,6 +888,18 @@ struct AuthenticatedProfileAvatar: View {
                 displayScale: displayScale
             )
         }
+    }
+
+    /// The empty avatar. It fills the fixed frame exactly instead of
+    /// scaling with Dynamic Type like `LucideIcon`, which would grow the
+    /// glyph past the circular clip at large text sizes. It is decorative:
+    /// the header text next to it already says that no picture is set.
+    static var placeholder: some View {
+        Image(decorative: LucideIcon.assetName(for: "circle-user"))
+            .resizable()
+            .renderingMode(.template)
+            .scaledToFit()
+            .foregroundStyle(.secondary)
     }
 
     private var loadID: String {
@@ -986,18 +1065,18 @@ private struct AccountDeletionConfirmationView: View {
             tint: .orange
         ) {
             Text("Step 1 of 2")
-                .font(.headline.weight(.semibold))
+                .font(.rowTitle)
                 .foregroundStyle(.orange)
 
             Text("ComiNavi and Circle.ms are separate accounts")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
+                .wrapsFully()
+                .padding(.top, Spacing.small)
 
             Text("Deleting your ComiNavi account will not delete your Circle.ms account. If you connected Circle.ms, you can continue using that account directly on Circle.ms.")
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 12)
+                .wrapsFully()
+                .padding(.top, Spacing.medium)
 
             VStack(spacing: 0) {
                 AccountDeletionScopeRow(
@@ -1016,9 +1095,9 @@ private struct AccountDeletionConfirmationView: View {
                     tint: .green
                 )
             }
-            .padding(.horizontal, 18)
-            .background(.regularMaterial, in: .rect(cornerRadius: 20))
-            .padding(.top, 28)
+            .padding(.horizontal, Spacing.cardPadding)
+            .surface(.card, padding: 0)
+            .padding(.top, Spacing.xxLarge)
 
             countdownStatus(
                 title: flow.canContinue
@@ -1026,9 +1105,9 @@ private struct AccountDeletionConfirmationView: View {
                     : "Read this before continuing",
                 countdown: "Next available in \(flow.secondsRemaining) seconds"
             )
-            .padding(.top, 28)
+            .padding(.top, Spacing.xxLarge)
 
-            VStack(spacing: 12) {
+            VStack(spacing: Spacing.medium) {
                 FocusedActionButton(
                     action: continueToConsequences
                 ) {
@@ -1047,7 +1126,7 @@ private struct AccountDeletionConfirmationView: View {
                 }
                 .accessibilityIdentifier("profile-cancel-delete-account")
             }
-            .padding(.top, 28)
+            .padding(.top, Spacing.xxLarge)
         }
         .accessibilityIdentifier("profile-account-deletion-separation")
     }
@@ -1058,27 +1137,28 @@ private struct AccountDeletionConfirmationView: View {
             tint: .red
         ) {
             Text("Step 2 of 2")
-                .font(.headline.weight(.semibold))
+                .font(.rowTitle)
                 .foregroundStyle(.red)
 
             Text("Deleting your ComiNavi account cannot be undone")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
+                .wrapsFully()
+                .padding(.top, Spacing.small)
 
             Text("Owned Shared Plans will be deleted, and you will leave joined plans. Your profile, favorites, notifications, and pending changes will also be deleted. This cannot be undone.")
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 12)
+                .wrapsFully()
+                .padding(.top, Spacing.medium)
 
             Label {
                 Text("Your Circle.ms account will not be deleted.")
-                    .font(.headline)
+                    .font(.rowTitle)
+                    .wrapsFully()
             } icon: {
                 Image(systemName: "checkmark.shield.fill")
                     .foregroundStyle(.green)
             }
-            .padding(.top, 22)
+            .padding(.top, Spacing.xxLarge)
 
             countdownStatus(
                 title: flow.canDelete
@@ -1086,9 +1166,9 @@ private struct AccountDeletionConfirmationView: View {
                     : "Review the consequences",
                 countdown: "Delete available in \(flow.secondsRemaining) seconds"
             )
-            .padding(.top, 28)
+            .padding(.top, Spacing.xxLarge)
 
-            VStack(spacing: 12) {
+            VStack(spacing: Spacing.medium) {
                 FocusedActionButton(
                     role: .destructive,
                     tint: .red,
@@ -1112,7 +1192,7 @@ private struct AccountDeletionConfirmationView: View {
                 }
                 .accessibilityIdentifier("profile-cancel-delete-account")
             }
-            .padding(.top, 28)
+            .padding(.top, Spacing.xxLarge)
         }
         .accessibilityIdentifier("profile-account-deletion-consequences")
     }
@@ -1121,9 +1201,9 @@ private struct AccountDeletionConfirmationView: View {
         title: LocalizedStringKey,
         countdown: LocalizedStringKey
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             Text(title)
-                .font(.headline)
+                .font(.rowTitle)
 
             if flow.secondsRemaining > 0 {
                 ProgressView(
@@ -1179,24 +1259,30 @@ private struct AccountDeletionScopeRow: View {
     let tint: Color
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: Spacing.iconToText) {
+            // SF Symbols: the Lucide set in the app has no trash or shield
+            // glyph. A fixed-width column keeps both titles on one x position.
             Image(systemName: systemImage)
-                .font(.title3)
+                .font(.rowTitle)
+                .imageScale(.large)
                 .foregroundStyle(tint)
+                // 28 pt: the width of a large rowTitle symbol, so both
+                // titles start at one x position.
                 .frame(width: 28)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(title)
-                    .font(.headline)
+                    .font(.rowTitle)
                 Text(status)
-                    .font(.subheadline)
+                    .font(.rowSubtitle)
                     .foregroundStyle(tint)
             }
+            .wrapsFully()
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 15)
+        .padding(.vertical, Spacing.cardPadding)
         .accessibilityElement(children: .combine)
     }
 }
