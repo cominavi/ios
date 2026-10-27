@@ -69,14 +69,14 @@ struct ExploreFilterForm: View {
                     .accessibilityIdentifier("explore-tag-picker")
                 }
 
-                ExploreExpandedFilterField(title: "Shinagaki") {
-                    ExploreFilterFlowLayout {
+                ExploreExpandedFilterField(title: "Item list") {
+                    ExploreFilterFlowLayout(verticalSpacing: ExploreFilterFlowLayout.chipRowSpacing) {
                         ForEach(ExploreShinagakiFilter.allCases) { filter in
                             ExploreFilterChoice(
                                 isSelected: model.shinagakiFilter == filter,
                                 action: { model.shinagakiFilter = filter }
                             ) {
-                                Text(filter.title)
+                                Text(filter.choiceTitle)
                             }
                             .accessibilityIdentifier("explore-shinagaki-\(filter.rawValue)")
                         }
@@ -84,13 +84,13 @@ struct ExploreFilterForm: View {
                 }
 
                 ExploreExpandedFilterField(title: "Attendance") {
-                    ExploreFilterFlowLayout {
+                    ExploreFilterFlowLayout(verticalSpacing: ExploreFilterFlowLayout.chipRowSpacing) {
                         ForEach(ExploreAttendanceFilter.allCases) { filter in
                             ExploreFilterChoice(
                                 isSelected: model.attendanceFilter == filter,
                                 action: { model.attendanceFilter = filter }
                             ) {
-                                Text(filter.title)
+                                Text(filter.choiceTitle)
                             }
                             .accessibilityIdentifier("explore-attendance-\(filter.rawValue)")
                         }
@@ -98,13 +98,13 @@ struct ExploreFilterForm: View {
                 }
 
                 ExploreExpandedFilterField(title: "Space") {
-                    ExploreFilterFlowLayout {
+                    ExploreFilterFlowLayout(verticalSpacing: ExploreFilterFlowLayout.chipRowSpacing) {
                         ForEach(ExploreSpaceFilter.allCases) { filter in
                             ExploreFilterChoice(
                                 isSelected: model.spaceFilter == filter,
                                 action: { model.spaceFilter = filter }
                             ) {
-                                Text(filter.title)
+                                Text(filter.choiceTitle)
                             }
                             .accessibilityIdentifier("explore-space-\(filter.rawValue)")
                         }
@@ -122,13 +122,13 @@ struct ExploreFilterForm: View {
 
             Section("Your plan") {
                 ExploreExpandedFilterField(title: "Saved") {
-                    ExploreFilterFlowLayout {
+                    ExploreFilterFlowLayout(verticalSpacing: ExploreFilterFlowLayout.chipRowSpacing) {
                         ForEach(ExploreFavoriteFilter.allCases) { filter in
                             ExploreFilterChoice(
                                 isSelected: model.favoriteFilter == filter,
                                 action: { model.favoriteFilter = filter }
                             ) {
-                                Text(filter.title)
+                                Text(filter.choiceTitle)
                             }
                             .accessibilityIdentifier("explore-saved-\(filter.rawValue)")
                         }
@@ -178,16 +178,18 @@ struct ExploreTagFilterList: View {
                     Button {
                         model.toggleDiscoveryTerm(term.id)
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: Spacing.medium) {
                             Text(verbatim: term.title)
                                 .foregroundStyle(.primary)
+                                .layoutPriority(1)
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
                             Text(term.count, format: .number)
-                                .font(.subheadline.monospacedDigit())
+                                .font(.rowSubtitle.monospacedDigit())
                                 .foregroundStyle(.secondary)
+                                .singleLineToken()
 
-                            LucideIcon("checkmark")
+                            LucideIcon("checkmark", size: IconSize.inline)
                                 .foregroundStyle(Color.accentColor)
                                 .opacity(isSelected ? 1 : 0)
                         }
@@ -249,10 +251,11 @@ struct ExploreExpandedFilterField<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.control)
                 .foregroundStyle(.secondary)
+                .wrapsFully()
 
             content
         }
@@ -266,32 +269,12 @@ struct ExploreFilterChoice<Label: View>: View {
     @ViewBuilder let label: Label
 
     var body: some View {
+        // One-line chip titles: a long choice moves to the next row of the
+        // flow layout instead of wrapping inside its chip.
         Button(action: action) {
             label
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .frame(minWidth: 48, minHeight: 44)
-                .background(
-                    isSelected
-                        ? Color.accentColor.opacity(0.14)
-                        : Color(uiColor: .secondarySystemGroupedBackground),
-                    in: .rect(cornerRadius: 10)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(
-                            isSelected
-                                ? Color.accentColor.opacity(0.8)
-                                : Color(uiColor: .separator).opacity(0.45),
-                            lineWidth: 1
-                        )
-                }
-                .contentShape(.rect)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chip(selected: isSelected))
         // The selected trait already announces "Selected"; a matching value
         // would make VoiceOver say it twice.
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -312,7 +295,7 @@ struct ExploreFavoriteColorFilter: View {
 
     var body: some View {
         ExploreExpandedFilterField(title: "Color") {
-            ExploreFilterFlowLayout(horizontalSpacing: 8, verticalSpacing: 8) {
+            ExploreFilterFlowLayout(horizontalSpacing: Spacing.small, verticalSpacing: Spacing.small) {
                 ForEach(BookmarkColor.selectableColors) { color in
                     let isSelected = selection.contains(color)
 
@@ -335,8 +318,12 @@ struct ExploreFavoriteColorFilter: View {
 }
 
 struct ExploreFilterFlowLayout: Layout {
-    var horizontalSpacing: CGFloat = 8
-    var verticalSpacing: CGFloat = 8
+    var horizontalSpacing: CGFloat = Spacing.small
+    var verticalSpacing: CGFloat = Spacing.small
+
+    /// The row gap for `.chip` buttons. The chip style already pads its 32 pt
+    /// capsule to a 44 pt hit area, so the drawn capsules stay 12 pt apart.
+    static let chipRowSpacing: CGFloat = 0
 
     func sizeThatFits(
         proposal: ProposedViewSize,

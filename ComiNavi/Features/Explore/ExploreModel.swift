@@ -34,7 +34,7 @@ enum ExploreSort: String, CaseIterable, Identifiable, Sendable {
     var title: LocalizedStringResource {
         switch self {
         case .catalog: "Catalog order"
-        case .latestShinagaki: "Latest shinagaki"
+        case .latestShinagaki: "Latest item lists"
         }
     }
 
@@ -56,8 +56,18 @@ enum ExploreShinagakiFilter: String, CaseIterable, Identifiable, Sendable {
     var title: LocalizedStringResource {
         switch self {
         case .all: "All circles"
-        case .available: "Has shinagaki"
-        case .highConfidence: "High-confidence shinagaki"
+        case .available: "Has item list"
+        case .highConfidence: "High-confidence item list"
+        }
+    }
+
+    /// The one-line choice title in the filter sheet, where the field title
+    /// ("Item list") already gives the context.
+    var choiceTitle: LocalizedStringResource {
+        switch self {
+        case .all: "All"
+        case .available: "Has item list"
+        case .highConfidence: "High confidence"
         }
     }
 }
@@ -72,6 +82,15 @@ enum ExploreFavoriteFilter: String, CaseIterable, Identifiable, Sendable {
     var title: LocalizedStringResource {
         switch self {
         case .all: "All save states"
+        case .saved: "Saved only"
+        case .notSaved: "Not saved"
+        }
+    }
+
+    /// The one-line choice title in the filter sheet.
+    var choiceTitle: LocalizedStringResource {
+        switch self {
+        case .all: "All"
         case .saved: "Saved only"
         case .notSaved: "Not saved"
         }
@@ -92,6 +111,15 @@ enum ExploreAttendanceFilter: String, CaseIterable, Identifiable, Sendable {
         case .withdrawn: "Withdrawn circles"
         }
     }
+
+    /// The one-line choice title in the filter sheet.
+    var choiceTitle: LocalizedStringResource {
+        switch self {
+        case .all: "All"
+        case .attending: "Confirmed"
+        case .withdrawn: "Withdrawn"
+        }
+    }
 }
 
 enum ExploreSpaceFilter: String, CaseIterable, Identifiable, Sendable {
@@ -106,6 +134,15 @@ enum ExploreSpaceFilter: String, CaseIterable, Identifiable, Sendable {
         case .all: "All space types"
         case .combinedAB: "A+B circles"
         case .singleSpace: "Single-space circles"
+        }
+    }
+
+    /// The one-line choice title in the filter sheet.
+    var choiceTitle: LocalizedStringResource {
+        switch self {
+        case .all: "All"
+        case .combinedAB: "A+B"
+        case .singleSpace: "Single space"
         }
     }
 }
@@ -179,6 +216,9 @@ struct ExploreCircle: Identifiable {
     let blockName: String
     var tags: [String]
     var enrichment: CatalogCircleEnrichment? = nil
+    /// The catalog hall name ("西12", "東123") when the catalog layout knows
+    /// it. It adds the hall direction to `spaceLabel`.
+    var hallName: String? = nil
 
     var id: Int { circle.id }
     var circles: [CirclemsDataSchema.ComiketCircleWC] {
@@ -200,10 +240,27 @@ struct ExploreCircle: Identifiable {
         circle.description?.nilIfBlank
     }
 
+    /// The short space address, "West あ01a", in the same format as map
+    /// search. Without a known hall it falls back to the bare code "あ01a".
     var spaceLabel: String {
-        guard let number = circle.spaceNo, number > 0 else { return blockName }
-        let side = isCombinedAB ? "a+b" : (circle.spaceNoSub == 1 ? "b" : "a")
-        return "\(blockName)\(String(format: "%02d", number))\(side)"
+        spaceAddress?.formatted(.short) ?? blockName
+    }
+
+    /// The bare space code, "あ01a", for cards too narrow for the hall.
+    var spaceCode: String {
+        spaceAddress?.spaceCode ?? blockName
+    }
+
+    private var spaceAddress: ComiketSpaceAddress? {
+        guard let number = circle.spaceNo, number > 0 else { return nil }
+        return ComiketSpaceAddress(
+            day: day,
+            hallName: hallName ?? "",
+            blockName: blockName,
+            spaceNumber: number,
+            subspace: circle.spaceNoSub == 1 ? 1 : 0,
+            isCombinedAB: isCombinedAB
+        )
     }
 
     var preferredCoverURLs: [URL] {
@@ -576,6 +633,11 @@ final class ExploreModel {
         let blocksByID = Dictionary(uniqueKeysWithValues: dataSource.comiket.blocks.map {
             ($0.externalBlockId, $0.name)
         })
+        let hallNamesByBlockID = await Self.hallNamesByBlockID(
+            circles: circles,
+            dataSource: dataSource
+        )
+        guard !Task.isCancelled, revision == loadRevision else { return }
         let extensionsByCircleID = Dictionary(uniqueKeysWithValues: extensions.map { ($0.id, $0) })
         let pairedCircles = CatalogCirclePairing.groups(
             circles: circles,
@@ -597,7 +659,8 @@ final class ExploreModel {
                 genreName: circle.genreId.flatMap { genresByID[$0] },
                 blockName: circle.blockId.flatMap { blocksByID[$0] } ?? "",
                 tags: enrichment?.tagLabels ?? [],
-                enrichment: enrichment
+                enrichment: enrichment,
+                hallName: circle.blockId.flatMap { hallNamesByBlockID[$0] }
             )
         })
         rebuildSearchDocuments()
@@ -1263,6 +1326,46 @@ final class ExploreModel {
             isDiscoveryLoading = false
             recomputeVisibleCircles()
         }
+    }
+
+    /// Resolves each block's hall from the catalog layout. A block sits in
+    /// one hall, so one sample circle per block is enough, and the query stays
+    /// a few hundred rows instead of one per circle.
+    private static func hallNamesByBlockID(
+        circles: [CirclemsDataSchema.ComiketCircleWC],
+        dataSource: CirclemsDataSource
+    ) async -> [Int: String] {
+        let catalog: (any MapCatalog)? = dataSource.mapCatalog
+        guard let catalog else { return [:] }
+
+        var sampleUpdateIDs: [Int: Int] = [:]
+        for circle in circles {
+            guard let blockID = circle.blockId,
+                  let updateID = circle.updateId,
+                  (circle.spaceNo ?? 0) > 0,
+                  sampleUpdateIDs[blockID] == nil
+            else { continue }
+            sampleUpdateIDs[blockID] = updateID
+        }
+        guard !sampleUpdateIDs.isEmpty,
+              let locations = try? await catalog.bookmarkLocations(
+                  updateIDs: Array(sampleUpdateIDs.values)
+              )
+        else { return [:] }
+
+        var hallNamesByMapID: [Int: String] = [:]
+        for day in dataSource.comiket.days {
+            for hall in day.halls where hallNamesByMapID[hall.externalMapId] == nil {
+                hallNamesByMapID[hall.externalMapId] = hall.name
+            }
+        }
+
+        var result: [Int: String] = [:]
+        for location in locations {
+            guard let hallName = hallNamesByMapID[location.mapID] else { continue }
+            result[location.tableID.blockID] = hallName
+        }
+        return result
     }
 
     private static func sorted(_ circles: [ExploreCircle]) -> [ExploreCircle] {
