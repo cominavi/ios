@@ -28,6 +28,7 @@ struct ContentView: View {
     @SceneStorage("ContentView.standaloneSelectedTab") private var standaloneSelection: AppTab = .map
     @State private var selectedDay = 1
     @State private var showsCatalogSettings = false
+    @State private var exploreColumnWidth: CGFloat?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let externalSelection: Binding<AppTab>?
@@ -80,10 +81,18 @@ struct ContentView: View {
                             event: catalogLibrary.selectedEvent,
                             days: circle.comiket.days,
                             selectedDay: selectedDay,
-                            isDemo: catalogLibrary.mode == .demo
+                            isDemo: catalogLibrary.mode == .demo,
+                            columnWidth: exploreColumnWidth
                         ) {
                             showsCatalogSettings = true
                         }
+                    }
+                    // The toolbar capsule fits its content to this width;
+                    // on iPad it excludes the sidebar.
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.width
+                    } action: { width in
+                        exploreColumnWidth = width
                     }
                 }
             }
@@ -229,8 +238,8 @@ struct ContentView: View {
         selection.wrappedValue = .map
     }
 
-    /// iPhone uses the same one-line capsule as the Explore toolbar; wide
-    /// layouts have room for the card with the date.
+    /// iPhone uses the same one-line capsule and fitting rule as the Explore
+    /// toolbar; wide layouts have room for the card with the date.
     private func eventDayBanner(for circle: CirclemsDataSource) -> CatalogEventDayBanner {
         CatalogEventDayBanner(
             event: catalogLibrary.selectedEvent,

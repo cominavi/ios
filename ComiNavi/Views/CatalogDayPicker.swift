@@ -201,33 +201,91 @@ private struct CatalogEventDayTitleRow: View {
     }
 }
 
-/// The event context that fits the width it gets. It drops the date first,
-/// then the Past capsule, and only at the end the Demo capsule.
+/// The title line of the two-line card, which shows the date on its second
+/// line. It drops the Past capsule first, and only at the end the Demo
+/// capsule.
 private struct CatalogEventDayFittingTitle: View {
     let summary: CatalogEventDaySummary
-    /// False when another line already shows the date.
-    var includesDate = true
 
     var body: some View {
-        if includesDate {
-            ViewThatFits(in: .horizontal) {
-                row(includesDate: true, statusLimit: 2)
-                row(includesDate: true, statusLimit: 1)
-                row(includesDate: false, statusLimit: 2)
-                row(includesDate: false, statusLimit: 1)
-                row(includesDate: false, statusLimit: 0)
-            }
-        } else {
-            ViewThatFits(in: .horizontal) {
-                row(includesDate: false, statusLimit: 2)
-                row(includesDate: false, statusLimit: 1)
-                row(includesDate: false, statusLimit: 0)
-            }
+        ViewThatFits(in: .horizontal) {
+            row(statusLimit: 2)
+            row(statusLimit: 1)
+            row(statusLimit: 0)
         }
     }
 
-    private func row(includesDate: Bool, statusLimit: Int) -> CatalogEventDayTitleRow {
-        CatalogEventDayTitleRow(summary: summary, includesDate: includesDate, statusLimit: statusLimit)
+    private func row(statusLimit: Int) -> CatalogEventDayTitleRow {
+        CatalogEventDayTitleRow(summary: summary, includesDate: false, statusLimit: statusLimit)
+    }
+}
+
+/// The one-line day capsule that fits the width it gets. The map pill and
+/// the Explore toolbar both use it, so both show one content set and drop
+/// parts by one rule: the date first, then the Past capsule, then the
+/// calendar icon, and only at the end the Demo capsule. The full content
+/// stays in the accessibility label.
+private struct CatalogEventDayFittingCapsule: View {
+    let summary: CatalogEventDaySummary
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            capsule(showsIcon: true, includesDate: true, statusLimit: 2)
+            capsule(showsIcon: true, includesDate: false, statusLimit: 2)
+            capsule(showsIcon: true, includesDate: false, statusLimit: 1)
+            capsule(showsIcon: false, includesDate: false, statusLimit: 1)
+            capsule(showsIcon: false, includesDate: false, statusLimit: 0)
+        }
+    }
+
+    private func capsule(
+        showsIcon: Bool,
+        includesDate: Bool,
+        statusLimit: Int
+    ) -> some View {
+        CatalogEventDayCapsule(showsIcon: showsIcon) {
+            CatalogEventDayTitleRow(
+                summary: summary,
+                includesDate: includesDate,
+                statusLimit: statusLimit
+            )
+        }
+    }
+}
+
+/// Proposes at most `maxWidth` to its one subview. A principal toolbar item
+/// proposes no width, so a `ViewThatFits` in it always picked its widest
+/// candidate; this layout gives it the width that the bar really has.
+private struct WidthCapLayout: Layout {
+    /// Nil before the width is known: the proposal passes through.
+    let maxWidth: CGFloat?
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        guard let subview = subviews.first else { return .zero }
+        return subview.sizeThatFits(cappedProposal(proposal))
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        subviews.first?.place(
+            at: bounds.origin,
+            anchor: .topLeading,
+            proposal: ProposedViewSize(width: bounds.width, height: bounds.height)
+        )
+    }
+
+    private func cappedProposal(_ proposal: ProposedViewSize) -> ProposedViewSize {
+        guard let maxWidth else { return proposal }
+        let width = min(proposal.width ?? maxWidth, maxWidth)
+        return ProposedViewSize(width: max(0, width), height: proposal.height)
     }
 }
 
@@ -326,9 +384,7 @@ struct CatalogEventDayBanner: View {
             case .card:
                 cardLabel
             case .compact:
-                CatalogEventDayCapsule {
-                    CatalogEventDayFittingTitle(summary: summary)
-                }
+                CatalogEventDayFittingCapsule(summary: summary)
             case .inline(let statusLimit):
                 CatalogEventDayCapsule {
                     CatalogEventDayTitleRow(
@@ -361,7 +417,7 @@ struct CatalogEventDayBanner: View {
             VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 // The second line shows the date with its weekday, so the
                 // title line leaves it out.
-                CatalogEventDayFittingTitle(summary: summary, includesDate: false)
+                CatalogEventDayFittingTitle(summary: summary)
 
                 if let selectedDate = summary.selectedDate {
                     Text(
@@ -403,22 +459,20 @@ extension CatalogEventDayBanner {
     }
 }
 
-/// The day control in the Explore navigation bar. It uses the map capsule,
-/// so both tabs show one control.
+/// The day control in the Explore navigation bar. It uses the map capsule
+/// and its fitting rule, so both tabs show one control with one content set.
 ///
-/// A principal toolbar item gets no width limit, so a `ViewThatFits` there
-/// always picks its widest candidate and runs under the trailing toolbar
-/// group. This control therefore decides its content from the size class
-/// and the text size instead.
+/// A principal toolbar item gets no width limit, so the caller passes the
+/// width of the Explore column, and the control fits its content to the part
+/// of the bar that the trailing toolbar buttons leave free.
 struct CatalogEventDayToolbarButton: View {
     let event: CatalogEvent?
     let days: [UFDSchema.Day]
     let selectedDay: Int
     let isDemo: Bool
+    /// The width of the Explore column, or nil before it is measured.
+    var columnWidth: CGFloat? = nil
     let action: () -> Void
-
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var summary: CatalogEventDaySummary {
         CatalogEventDaySummary(
@@ -429,31 +483,9 @@ struct CatalogEventDayToolbarButton: View {
         )
     }
 
-    private var isWide: Bool { horizontalSizeClass == .regular }
-
-    /// iPhone has room for the date only at default text sizes and only
-    /// when no status capsule needs the space.
-    private var includesDate: Bool {
-        isWide || (summary.statuses.isEmpty && dynamicTypeSize <= .large)
-    }
-
-    /// Demo implies old data, so iPhone keeps only the last status. Above
-    /// the default text size the statuses move to the accessibility label
-    /// and the sheet, so the event context ("C104 · Day 1") never truncates.
-    private var statusLimit: Int {
-        if isWide { return 2 }
-        return dynamicTypeSize <= .large ? 1 : 0
-    }
-
     var body: some View {
         Button(action: action) {
-            CatalogEventDayCapsule(showsIcon: isWide || dynamicTypeSize <= .large) {
-                CatalogEventDayTitleRow(
-                    summary: summary,
-                    includesDate: includesDate,
-                    statusLimit: statusLimit
-                )
-            }
+            CatalogEventDayToolbarLabel(summary: summary, columnWidth: columnWidth)
         }
         // Navigation bar chrome: like the system bar title, the capsule
         // stops growing at XXXL, so "C104 · Day 1" fits between the toolbar
@@ -463,6 +495,36 @@ struct CatalogEventDayToolbarButton: View {
         .accessibilityLabel(summary.accessibilityLabel)
         .accessibilityHint("Change event day or Comiket")
         .accessibilityIdentifier("global-event-day-toolbar-button")
+    }
+}
+
+/// The toolbar capsule inside the XXXL cap, so its scaled metric stops
+/// growing with the capsule text.
+private struct CatalogEventDayToolbarLabel: View {
+    let summary: CatalogEventDaySummary
+    let columnWidth: CGFloat?
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // 112 pt: the trailing filter and view-option buttons in one glass group
+    // (about 100 pt) plus the gap to the title item; the glyphs scale with
+    // the text.
+    @ScaledMetric(relativeTo: .body) private var trailingToolbarWidth = 112.0
+
+    /// iPhone puts the capsule in one row with the trailing buttons. iPad
+    /// gives the principal item its own centered row below the tab bar.
+    private var maxWidth: CGFloat? {
+        guard let columnWidth, columnWidth > 0 else { return nil }
+        let margins = 2 * Spacing.large
+        if horizontalSizeClass == .regular {
+            return columnWidth - margins
+        }
+        return columnWidth - margins - trailingToolbarWidth
+    }
+
+    var body: some View {
+        WidthCapLayout(maxWidth: maxWidth) {
+            CatalogEventDayFittingCapsule(summary: summary)
+        }
     }
 }
 
