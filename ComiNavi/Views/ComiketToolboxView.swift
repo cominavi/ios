@@ -5,6 +5,7 @@ import UIKit
 /// then links to the checklist, reminders, and official links.
 struct ComiketToolboxView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var checklistStore: ComiketChecklistStore
     @State private var reminderStore: ComiketReminderStore
     @State private var searchText = ""
@@ -35,6 +36,13 @@ struct ComiketToolboxView: View {
 
     private var searchResults: [ComiketToolboxSection] {
         ComiketToolboxCatalog.sections(for: edition, matching: searchText)
+    }
+
+    /// The navigation-bar drawer spans the full screen width, so on iPad it would
+    /// not line up with the readable column. Regular width puts the field in the
+    /// toolbar instead.
+    private var searchPlacement: SearchFieldPlacement {
+        horizontalSizeClass == .regular ? .toolbar : .navigationBarDrawer(displayMode: .always)
     }
 
     var body: some View {
@@ -97,7 +105,7 @@ struct ComiketToolboxView: View {
         .navigationTitle("Toolbox")
         .searchable(
             text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
+            placement: searchPlacement,
             prompt: "Search official links"
         )
         .task {
@@ -118,11 +126,12 @@ struct ComiketToolboxView: View {
     }
 }
 
-/// Keeps grouped lists at a readable column width in regular width instead of
-/// stretching rows across the whole iPad screen.
+/// Keeps grouped lists at `ReadableWidth.content` in regular width instead of
+/// stretching rows across the whole iPad screen. A `List` needs content margins
+/// rather than `.readableWidth()`, so its scroll area still spans the screen.
 private struct ToolboxReadableWidth: ViewModifier {
-    private static let maxContentWidth: CGFloat = 680
-    private static let minimumMargin: CGFloat = 20
+    private static let maxContentWidth: CGFloat = ReadableWidth.content
+    private static let minimumMargin: CGFloat = Spacing.screenGutter
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var containerWidth: CGFloat = 0
