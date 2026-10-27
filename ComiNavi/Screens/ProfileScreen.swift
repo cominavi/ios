@@ -296,6 +296,9 @@ struct ProfileScreen: View {
         .readableFormWidth(alignment: .titleLeading)
         .navigationTitle("Profile")
         .readableColumnTitleDisplayMode()
+        #if DEBUG
+        .modifier(ProfileLaunchRouteModifier(catalogLibrary: catalogLibrary))
+        #endif
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
             case .profileEditor:
@@ -1296,3 +1299,38 @@ private struct AccountDeletionScopeRow: View {
 #Preview {
     ProfileScreen()
 }
+
+#if DEBUG
+/// UI-test launch routes for screenshots. `-cominavi-ui-testing-open-toolbox`,
+/// `-cominavi-ui-testing-open-checklist`, and
+/// `-cominavi-ui-testing-open-official-links` push the Toolbox once. The
+/// Toolbox pushes the checklist or the official links itself.
+private struct ProfileLaunchRouteModifier: ViewModifier {
+    private static let toolboxArguments = [
+        "-cominavi-ui-testing-open-toolbox",
+        "-cominavi-ui-testing-open-checklist",
+        "-cominavi-ui-testing-open-official-links",
+    ]
+
+    let catalogLibrary: CatalogLibrary
+    @State private var showsToolbox = false
+    @State private var hasHandledLaunchRoute = false
+
+    func body(content: Content) -> some View {
+        content
+            .navigationDestination(isPresented: $showsToolbox) {
+                ComiketToolboxView(event: catalogLibrary.selectedEvent)
+            }
+            .onAppear {
+                // Only the first appearance: the Profile screen appears again
+                // when the Toolbox is popped.
+                guard !hasHandledLaunchRoute else { return }
+                hasHandledLaunchRoute = true
+                let arguments = ProcessInfo.processInfo.arguments
+                if Self.toolboxArguments.contains(where: arguments.contains) {
+                    showsToolbox = true
+                }
+            }
+    }
+}
+#endif
