@@ -53,6 +53,8 @@ struct MapView: View {
     @State private var gpsSession: GPSLocationSession?
     @State private var locationBeforeManualPicker: LocatedMapUser?
     @State private var isMapLegendExpanded = true
+    /// Set once the UI-testing launch route (DEBUG only) has run.
+    @State private var didApplyLaunchRoute = false
     /// Layer choices persist across launches; an empty value means every
     /// layer is hidden, so the default applies only before the first choice.
     @AppStorage("map.visibleLayers") private var storedVisibleMapLayers =
@@ -214,6 +216,9 @@ struct MapView: View {
             if model.scene == nil, model.campusScene == nil {
                 model.load()
             }
+        }
+        .task(id: model.phase == .ready) {
+            applyLaunchRouteIfNeeded()
         }
         .onAppear {
             configureLocationService()
@@ -536,6 +541,34 @@ struct MapView: View {
 
     private func selectManualLocationMode() {
         locationMode = .manual
+    }
+
+    /// Screenshot and UI-test routes. Each argument sets the same state as
+    /// the tap that it replaces, once the map is ready:
+    ///
+    /// - `-cominavi-ui-testing-open-hall-west`: the West Halls item of the
+    ///   venue menu.
+    /// - `-cominavi-ui-testing-open-map-search`: the search button.
+    ///
+    /// `-cominavi-ui-testing-open-map-layers` has no state to set: the layers
+    /// control is a SwiftUI `Menu`, which has no API to open it. A driver
+    /// taps `map-layer-button` after launch instead.
+    private func applyLaunchRouteIfNeeded() {
+        #if DEBUG
+            guard !didApplyLaunchRoute, model.phase == .ready else { return }
+            didApplyLaunchRoute = true
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("-cominavi-ui-testing-open-hall-west"),
+                let west = model.halls.first(where: { hall in
+                    BigSightVenue.kind(matching: "\(hall.name) \(hall.mapName)") == .west
+                })
+            {
+                model.select(mapID: west.externalMapId)
+            }
+            if arguments.contains("-cominavi-ui-testing-open-map-search") {
+                model.setSearchPresented(true)
+            }
+        #endif
     }
 
     /// The location button's tap: show the user's position when there is
