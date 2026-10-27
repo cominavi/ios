@@ -13,32 +13,29 @@ struct CurrentLocationSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                locationHeader
-                canonicalLocation
-                sensorDetails
-                shareActions
+            // The sheet opens at the medium detent; at large text sizes the
+            // content scrolls instead of being cut off.
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.large) {
+                    locationHeader
+                    canonicalLocation
+                    sensorDetails
+                    actions
+                }
+                .padding(.horizontal, Spacing.screenGutter)
+                .padding(.top, Spacing.small)
+                .padding(.bottom, Spacing.xLarge)
+                .readableWidth(ReadableWidth.form)
             }
-            .frame(maxWidth: 620)
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 18)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .scrollBounceBehavior(.basedOnSize)
             .navigationTitle("Your location")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    MapSheetCloseButton {
                         dismiss()
                     }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Update") {
-                        dismiss()
-                        onUpdateLocation()
-                    }
-                    .accessibilityLabel("Update location")
-                    .accessibilityIdentifier("current-location-update")
+                    .accessibilityIdentifier("current-location-close")
                 }
             }
         }
@@ -46,25 +43,35 @@ struct CurrentLocationSheet: View {
     }
 
     private var locationHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(location.spaceCode)
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .monospaced()
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            // The same short address as map search and the circle sheet.
+            Text(verbatim: location.address.displayText(.short))
+                .font(.largeTitle.monospacedDigit().bold())
                 .foregroundStyle(.primary)
+                .accessibilityLabel(Text(verbatim: location.address.formatted(.short)))
                 .accessibilityIdentifier("current-location-space-code")
 
-            Text("Day \(location.sceneID.day) · \(location.venueDisplayName)")
-                .font(.title3.weight(.semibold))
+            Text(verbatim: dayAndVenue)
+                .font(.sectionTitle)
                 .foregroundStyle(.secondary)
 
             LucideLabel(
                 resource: sourcePresentation.title,
                 icon: sourcePresentation.icon
             )
-            .font(.subheadline.weight(.semibold))
+            .font(.control)
             .foregroundStyle(.secondary)
         }
+        .wrapsFully()
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// "Day 1 · West 1", in which neither unit can break across lines.
+    private var dayAndVenue: String {
+        String(localized: "Day \(location.sceneID.day) · \(location.venueDisplayName)")
+            .components(separatedBy: " · ")
+            .map(NonBreaking.spaces)
+            .joined(separator: " · ")
     }
 
     private var sourcePresentation: (title: LocalizedStringResource, icon: String) {
@@ -81,23 +88,19 @@ struct CurrentLocationSheet: View {
     /// The Japanese address is what venue staff and printed signs use, so it
     /// stays in Japanese in every locale; the caption explains why.
     private var canonicalLocation: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             Text("Japanese address (for staff and signs)")
-                .font(.footnote.weight(.semibold))
+                .font(.meta.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .wrapsFully()
 
+            // A card, not an inset tile: it is not inside another card.
             Text(verbatim: location.canonicalLocationText)
-                .font(.title3.weight(.semibold))
+                .font(.sectionTitle)
                 .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(16)
+                .wrapsFully()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(uiColor: .secondarySystemBackground))
-                .clipShape(.rect(cornerRadius: 14))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color(uiColor: .separator).opacity(0.32), lineWidth: 0.5)
-                }
+                .surface(.card)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("current-location-canonical-text")
@@ -106,7 +109,7 @@ struct CurrentLocationSheet: View {
     @ViewBuilder
     private var sensorDetails: some View {
         if location.locationReading != nil || location.headingDegrees != nil {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Spacing.small) {
                 if let reading = location.locationReading {
                     LucideLabel(
                         "GPS reference · about \(Int(reading.horizontalAccuracy.rounded())) m accuracy",
@@ -120,13 +123,31 @@ struct CurrentLocationSheet: View {
                     )
                 }
             }
-            .font(.body)
+            .font(.rowSubtitle)
             .foregroundStyle(.secondary)
+            .wrapsFully()
             .accessibilityElement(children: .combine)
         }
     }
 
-    private var shareActions: some View {
+    /// Copy is the one primary action. Update reopens Where am I? and sits
+    /// beside it, or below it when a title would wrap.
+    private var actions: some View {
+        AdaptiveButtonRow {
+            copyButton
+
+            Button {
+                dismiss()
+                onUpdateLocation()
+            } label: {
+                LucideLabel("Update location", icon: "location.viewfinder")
+            }
+            .buttonStyle(ActionButtonStyle(role: .secondary, size: .large))
+            .accessibilityIdentifier("current-location-update")
+        }
+    }
+
+    private var copyButton: some View {
         Button {
             let sharedLocation = SharedComiketLocation(
                 location: location,
@@ -145,11 +166,8 @@ struct CurrentLocationSheet: View {
                     : LocalizedStringResource("Copy location"),
                 icon: copied ? "checkmark" : "doc.on.doc"
             )
-            .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 58)
-            .contentShape(.rect)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
         .accessibilityHint("Copies the venue location and a link that opens it in ComiNavi")
         .accessibilityIdentifier("current-location-copy")
         .animation(.default, value: copied)
