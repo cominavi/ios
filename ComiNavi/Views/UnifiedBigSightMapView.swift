@@ -6,21 +6,23 @@ import SwiftUI
 import UIKit
 
 enum MapChromeLayout {
-    static let edgeInset: CGFloat = 16
-    static let controlSize: CGFloat = 44
-    static let controlSpacing: CGFloat = 8
-    static let locationControlCount: CGFloat = 2
+    static let edgeInset: CGFloat = Spacing.large
+    static let controlSize: CGFloat = HitArea.minimum
+    static let controlSpacing: CGFloat = Spacing.small
 
-    static var locationControlsWidth: CGFloat {
-        controlSize * locationControlCount + controlSpacing * (locationControlCount - 1)
+    /// Width of the SwiftUI location controls at the trailing end of the
+    /// bottom row. MapView shows "Where am I?" alone, or with the destination
+    /// pin when a destination exists.
+    static func locationControlsWidth(count: Int) -> CGFloat {
+        let count = CGFloat(max(count, 0))
+        return controlSize * count + controlSpacing * max(count - 1, 0)
     }
 
-    static var adjacentChromeTrailingInset: CGFloat {
-        edgeInset + locationControlsWidth + controlSpacing
-    }
-
-    static func attributionTrailingInset(showsCompass: Bool) -> CGFloat {
-        adjacentChromeTrailingInset + (showsCompass ? controlSize + controlSpacing : 0)
+    /// Trailing inset of the compass, which sits just before the location
+    /// controls with one `controlSpacing` gap.
+    static func adjacentChromeTrailingInset(locationControlCount: Int) -> CGFloat {
+        edgeInset + locationControlsWidth(count: locationControlCount)
+            + (locationControlCount > 0 ? controlSpacing : 0)
     }
 }
 
@@ -200,6 +202,9 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             overviewInsets: overviewChromeInsets,
             cameraFitRequest: cameraFitRequest
         )
+        // MapLocationControls shows the destination pin beside "Where am I?"
+        // only while a destination exists.
+        host.updateLocationControlCount(destination == nil ? 1 : 2)
         host.updateBasemap(camera: renderer.basemapCamera)
         host.updateAccessibility(renderer: renderer, scope: scope)
     }
@@ -459,6 +464,9 @@ final class UnifiedMapHostView: UIView {
         forKey: UnifiedMapHostView.campusHintSeenKey
     )
     private(set) var basemapState = UnifiedBasemapState.loading
+    /// Number of SwiftUI location buttons trailing the compass.
+    private(set) var locationControlCount = 1
+    private var compassTrailingConstraint: NSLayoutConstraint!
 
     private enum CompassState: Equatable {
         case north
@@ -523,9 +531,10 @@ final class UnifiedMapHostView: UIView {
         venueAccessibilityProxy.isAccessibilityElement = false
         venueAccessibilityProxy.accessibilityIdentifier = "interactive-map-canvas"
 
-        var configuration = UIButton.Configuration.filled()
+        // The compass draws its own material circle, so it matches the
+        // SwiftUI location buttons beside it.
+        var configuration = UIButton.Configuration.plain()
         configuration.baseForegroundColor = .label
-        configuration.baseBackgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
         configuration.cornerStyle = .capsule
         compassButton.configuration = configuration
         compassButton.accessibilityLabel = String(localized: "Align map to venue grid")
@@ -540,24 +549,26 @@ final class UnifiedMapHostView: UIView {
             UIConfigurationTextAttributesTransformer {
                 incoming in
                 var outgoing = incoming
-                // Caption 2 follows Dynamic Type; the cap keeps the credit on
-                // one line beside the bottom controls at accessibility sizes.
+                // Caption 2 follows Dynamic Type. The 13 pt cap keeps the
+                // credit one compact line beside the bottom controls at
+                // accessibility sizes, so it does not cover the map.
                 outgoing.font = UIFontMetrics(forTextStyle: .caption2).scaledFont(
                     for: .systemFont(ofSize: 11, weight: .regular),
-                    maximumPointSize: 17
+                    maximumPointSize: 13
                 )
                 return outgoing
             }
         attributionConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 3,
-            leading: 6,
-            bottom: 3,
-            trailing: 6
+            top: Spacing.xSmall,
+            leading: Spacing.small,
+            bottom: Spacing.xSmall,
+            trailing: Spacing.small
         )
         dataAttributionButton.configuration = attributionConfiguration
         dataAttributionButton.contentHorizontalAlignment = .trailing
         dataAttributionButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.72)
-        dataAttributionButton.layer.cornerRadius = 6
+        // A pill, like the other floating map chrome. The button sets the
+        // capsule radius from its height in `layoutSubviews`.
         dataAttributionButton.layer.cornerCurve = .continuous
         dataAttributionButton.accessibilityLabel = String(localized: "Map data attribution")
         dataAttributionButton.accessibilityValue =
@@ -595,9 +606,11 @@ final class UnifiedMapHostView: UIView {
         statusChipStack.addArrangedSubview(basemapStatusChip)
         addSubview(statusChipStack)
 
-        let dataAttributionTrailingConstraint = dataAttributionButton.trailingAnchor.constraint(
+        compassTrailingConstraint = compassButton.trailingAnchor.constraint(
             equalTo: safeAreaLayoutGuide.trailingAnchor,
-            constant: -MapChromeLayout.attributionTrailingInset(showsCompass: true)
+            constant: -MapChromeLayout.adjacentChromeTrailingInset(
+                locationControlCount: locationControlCount
+            )
         )
 
         NSLayoutConstraint.activate([
@@ -611,22 +624,23 @@ final class UnifiedMapHostView: UIView {
             mapView.bottomAnchor.constraint(equalTo: bottomAnchor),
             compassButton.widthAnchor.constraint(equalToConstant: MapChromeLayout.controlSize),
             compassButton.heightAnchor.constraint(equalToConstant: MapChromeLayout.controlSize),
-            compassButton.trailingAnchor.constraint(
-                equalTo: safeAreaLayoutGuide.trailingAnchor,
-                constant: -MapChromeLayout.adjacentChromeTrailingInset
-            ),
+            compassTrailingConstraint,
             compassButton.bottomAnchor.constraint(
                 equalTo: safeAreaLayoutGuide.bottomAnchor,
                 constant: -MapChromeLayout.edgeInset
             ),
             dataAttributionButton.leadingAnchor.constraint(
                 greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor,
-                constant: 10
+                constant: MapChromeLayout.edgeInset
             ),
-            dataAttributionTrailingConstraint,
-            dataAttributionButton.bottomAnchor.constraint(
-                equalTo: safeAreaLayoutGuide.bottomAnchor,
-                constant: -10
+            // The credit follows the compass, so the bottom row keeps one
+            // gap size and one center line.
+            dataAttributionButton.trailingAnchor.constraint(
+                equalTo: compassButton.leadingAnchor,
+                constant: -MapChromeLayout.controlSpacing
+            ),
+            dataAttributionButton.centerYAnchor.constraint(
+                equalTo: compassButton.centerYAnchor
             ),
             venueAccessibilityContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
             venueAccessibilityContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -758,6 +772,16 @@ final class UnifiedMapHostView: UIView {
         )
     }
 
+    /// Moves the compass next to the visible location buttons, so the gap
+    /// between every bottom control stays `MapChromeLayout.controlSpacing`.
+    func updateLocationControlCount(_ count: Int) {
+        guard count != locationControlCount else { return }
+        locationControlCount = count
+        compassTrailingConstraint.constant =
+            -MapChromeLayout.adjacentChromeTrailingInset(locationControlCount: count)
+        setNeedsLayout()
+    }
+
     func updateBasemap(camera: UnifiedBasemapCamera) {
         requestedBasemapCamera = camera
         applyRequestedBasemapCamera()
@@ -799,7 +823,6 @@ final class UnifiedMapHostView: UIView {
         let palette = appearance.palette
         var compassConfiguration = compassButton.configuration
         compassConfiguration?.baseForegroundColor = palette.primaryText
-        compassConfiguration?.baseBackgroundColor = palette.chromeBackground
         compassButton.configuration = compassConfiguration
         compassButton.updateIndicatorColor(
             palette.primaryText,
@@ -950,6 +973,11 @@ final class UnifiedMapHostView: UIView {
 /// The map data credit stays visually compact, but accepts touches across a
 /// full 44-point target around its label.
 final class MapAttributionButton: UIButton {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.cornerRadius = bounds.height / 2
+    }
+
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
         let minimumSide = MapChromeLayout.controlSize
         let target = bounds.insetBy(
@@ -1013,9 +1041,12 @@ extension UnifiedMapHostView: MLNMapViewDelegate {
 
 /// A compact material chip for passive map status text. It never intercepts
 /// touches, so the map stays fully interactive underneath it.
+///
+/// It is floating map chrome: a capsule while the text fits on one line, and
+/// a `Radius.panel` rounded rectangle when the text wraps.
 final class MapStatusChip: UIView {
     private let effectView = UIVisualEffectView(
-        effect: UIBlurEffect(style: .systemThinMaterial)
+        effect: UIBlurEffect(style: .systemMaterial)
     )
     private let label = UILabel()
 
@@ -1024,6 +1055,7 @@ final class MapStatusChip: UIView {
         set {
             label.text = newValue
             accessibilityLabel = newValue
+            setNeedsLayout()
         }
     }
 
@@ -1034,8 +1066,8 @@ final class MapStatusChip: UIView {
         accessibilityTraits = .staticText
 
         effectView.translatesAutoresizingMaskIntoConstraints = false
-        effectView.layer.cornerRadius = 12
         effectView.layer.cornerCurve = .continuous
+        effectView.layer.borderWidth = 0.5
         effectView.clipsToBounds = true
         addSubview(effectView)
 
@@ -1043,6 +1075,7 @@ final class MapStatusChip: UIView {
         label.font = .preferredFont(forTextStyle: .footnote)
         label.adjustsFontForContentSizeCategory = true
         label.textColor = .label
+        // A status sentence wraps fully; it never truncates.
         label.numberOfLines = 0
         effectView.contentView.addSubview(label)
 
@@ -1051,18 +1084,40 @@ final class MapStatusChip: UIView {
             effectView.trailingAnchor.constraint(equalTo: trailingAnchor),
             effectView.topAnchor.constraint(equalTo: topAnchor),
             effectView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            label.leadingAnchor.constraint(equalTo: effectView.contentView.leadingAnchor, constant: 12),
+            label.leadingAnchor.constraint(
+                equalTo: effectView.contentView.leadingAnchor, constant: Spacing.medium),
             label.trailingAnchor.constraint(
-                equalTo: effectView.contentView.trailingAnchor, constant: -12),
-            label.topAnchor.constraint(equalTo: effectView.contentView.topAnchor, constant: 8),
-            label.bottomAnchor.constraint(equalTo: effectView.contentView.bottomAnchor, constant: -8),
+                equalTo: effectView.contentView.trailingAnchor, constant: -Spacing.medium),
+            label.topAnchor.constraint(
+                equalTo: effectView.contentView.topAnchor, constant: Spacing.small),
+            label.bottomAnchor.constraint(
+                equalTo: effectView.contentView.bottomAnchor, constant: -Spacing.small),
         ])
         self.text = text
+        updateBorderColor()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
+            (chip: MapStatusChip, _: UITraitCollection) in
+            chip.updateBorderColor()
+        }
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let isSingleLine = label.bounds.height <= label.font.lineHeight * 1.5
+        effectView.layer.cornerRadius =
+            isSingleLine ? bounds.height / 2 : min(Radius.panel, bounds.height / 2)
+    }
+
+    private func updateBorderColor() {
+        // `Color.hairline` in UIKit form: separator at 24 % opacity.
+        effectView.layer.borderColor =
+            UIColor.separator.withAlphaComponent(0.24)
+            .resolvedColor(with: traitCollection).cgColor
     }
 }
 
@@ -1142,6 +1197,9 @@ enum UnifiedMapLevelOfDetail {
 
 @MainActor
 final class MapCompassButton: UIButton {
+    /// The same material as the SwiftUI location buttons (`.regularMaterial`),
+    /// so the bottom control row reads as one set of floating chrome.
+    private let materialView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
     private let indicatorView = UIView(frame: .zero)
     private let northNeedleLayer = CAShapeLayer()
     private let southNeedleLayer = CAShapeLayer()
@@ -1151,12 +1209,15 @@ final class MapCompassButton: UIButton {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
+        materialView.isUserInteractionEnabled = false
+        materialView.clipsToBounds = true
+        insertSubview(materialView, at: 0)
         indicatorView.isUserInteractionEnabled = false
         indicatorView.layer.addSublayer(southNeedleLayer)
         indicatorView.layer.addSublayer(northNeedleLayer)
         indicatorView.layer.addSublayer(centerCapLayer)
         addSubview(indicatorView)
-        layer.cornerRadius = 22
+        layer.cornerRadius = MapChromeLayout.controlSize / 2
         layer.borderWidth = 0.5
     }
 
@@ -1178,15 +1239,19 @@ final class MapCompassButton: UIButton {
             isGridAligned ? accentColor : color.withAlphaComponent(0.72)
         ).cgColor
         centerCapLayer.fillColor = UIColor.systemBackground.cgColor
+        // `Color.hairline` in UIKit form: separator at 24 % opacity.
         layer.borderColor = (
             isGridAligned
                 ? accentColor.withAlphaComponent(0.58)
-                : UIColor.separator.withAlphaComponent(0.35)
+                : UIColor.separator.withAlphaComponent(0.24)
         ).cgColor
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        materialView.frame = bounds
+        materialView.layer.cornerRadius = bounds.height / 2
+        sendSubviewToBack(materialView)
         bringSubviewToFront(indicatorView)
         indicatorView.bounds = CGRect(x: 0, y: 0, width: 30, height: 30)
         indicatorView.center = CGPoint(x: bounds.midX, y: bounds.midY)
