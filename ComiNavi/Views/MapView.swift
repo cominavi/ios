@@ -2524,7 +2524,7 @@ private struct CircleMapDetailSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: Spacing.large) {
                     if selection.isLoading {
                         ProgressView("Loading circles…")
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -2541,16 +2541,14 @@ private struct CircleMapDetailSheet: View {
                         pinDestinationButton
                     }
                 }
-                .padding()
+                .padding(Spacing.screenGutter)
             }
             .navigationTitle("Circle details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
+                    MapSheetCloseButton {
                         dismiss()
-                    } label: {
-                        LucideLabel("Close", icon: "xmark")
                     }
                     .accessibilityIdentifier("map-circle-sheet-close")
                 }
@@ -2577,38 +2575,44 @@ private struct CircleMapDetailSheet: View {
             copiedAddress = true
             hapticFeedback?.play(.copyConfirmation)
         } label: {
-            HStack(spacing: 14) {
-                LucideIcon(copiedAddress ? "checkmark.circle.fill" : "mappin.and.ellipse")
-                    .font(.title2)
-                    .foregroundStyle(copiedAddress ? .green : .accent)
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.iconToText) {
+                LucideIcon(
+                    copiedAddress ? "checkmark.circle.fill" : "mappin.and.ellipse",
+                    size: IconSize.row
+                )
+                .foregroundStyle(copiedAddress ? Color.green : Color.accentColor)
+                .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(selection.selectedAddress.spaceCode)
-                        .font(.title2.monospaced().weight(.bold))
+                // The short address is the one shown everywhere on the map
+                // path. The Japanese address is only the captioned staff
+                // line, because venue staff and signs use it.
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                    Text(verbatim: selection.selectedAddress.displayText(.short))
+                        .font(.spaceCode)
                         .foregroundStyle(.primary)
 
-                    Text(selection.selectedAddress.canonicalText)
-                        .font(.subheadline.weight(.medium))
+                    Text("Japanese address (for staff and signs)")
+                        .font(.meta)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, Spacing.xSmall)
+
+                    Text(verbatim: selection.selectedAddress.canonicalText)
+                        .font(.rowSubtitle)
                         .foregroundStyle(.secondary)
                 }
-
-                Spacer(minLength: 8)
+                .wrapsFully()
+                .layoutPriority(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(copiedAddress ? "Copied" : "Copy")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(copiedAddress ? .green : .accentColor)
+                    .font(.control)
+                    .foregroundStyle(copiedAddress ? Color.green : Color.accentColor)
+                    .singleLineToken()
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
+            .surface(.card)
+            .contentShape(.rect(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(.plain)
-        .background(Color(uiColor: .secondarySystemBackground))
-        .clipShape(.rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color(uiColor: .separator).opacity(0.32), lineWidth: 0.5)
-        }
         .accessibilityLabel("Copy \(selection.selectedAddress.canonicalText)")
         .accessibilityHint("Copies the venue-aware circle address and a ComiNavi link")
         .accessibilityIdentifier("map-circle-address-copy")
@@ -2619,16 +2623,14 @@ private struct CircleMapDetailSheet: View {
             onPinDestination()
         } label: {
             LucideLabel("Pin as Destination", icon: "mappin.and.ellipse")
-                .font(.headline)
-                .frame(maxWidth: .infinity, minHeight: 50)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
         .accessibilityHint("Keeps this space marked on the map until you clear it")
         .accessibilityIdentifier("map-circle-pin-destination")
     }
 
     private var circleSummaries: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Spacing.medium) {
             ForEach(circleGroups.indices, id: \.self) { index in
                 let circles = circleGroups[index]
                 let circle = circles[0]
@@ -2682,9 +2684,9 @@ private struct CircleMapSummaryCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 if !isCombinedAB {
                     Text(circle.subspace == 0 ? "A" : "B")
-                        .font(.headline.monospaced().weight(.bold))
+                        .font(.rowTitle.monospaced())
                         .foregroundStyle(.secondary)
-                        .padding(10)
+                        .padding(Spacing.medium)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -2695,54 +2697,45 @@ private struct CircleMapSummaryCard: View {
                                 ProgressView()
                                     .controlSize(.small)
                             } else {
-                                LucideIcon("arrow.up.right")
-                                    .font(.caption2.weight(.bold))
+                                LucideIcon("arrow.up.right", size: IconSize.chipAccessory)
                             }
                         }
                         .foregroundStyle(.primary)
+                        // 28 pt: a compact marker on the artwork. The whole
+                        // card is the button, so it needs no own hit area.
                         .frame(width: 28, height: 28)
                         .background(.regularMaterial, in: .circle)
-                        .padding(6)
+                        .padding(Spacing.xSmall)
                         .accessibilityHidden(true)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.top, isCombinedAB ? 10 : 0)
+                    .padding(.horizontal, Spacing.medium)
+                    .padding(.top, isCombinedAB ? Spacing.medium : 0)
 
-                VStack(alignment: .leading, spacing: 7) {
+                VStack(alignment: .leading, spacing: Spacing.xSmall) {
+                    // A dense two-column grid: a circle name may use two lines.
                     Text(displayName)
-                        .font(.subheadline.weight(.bold))
+                        .font(.rowTitle)
                         .foregroundStyle(.primary)
                         .lineLimit(2)
 
-                    Text(locationLabel)
-                        .font(.caption.monospaced().weight(.semibold))
+                    Text(nonBreaking: locationLabel)
+                        .font(.spaceCode)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
 
                     if !circle.penName.isEmpty {
                         Text(circle.penName)
-                            .font(.caption)
+                            .font(.meta)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
-                .padding(10)
+                .padding(Spacing.medium)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .contentShape(.rect)
-            .background(
-                Color(uiColor: .secondarySystemBackground)
-            )
-            .compositingGroup()
-            .clipShape(.rect(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        Color(uiColor: .separator).opacity(0.3),
-                        lineWidth: 0.5
-                    )
-            }
+            .surface(.card, padding: 0)
+            .contentShape(.rect(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(.plain)
         .navigationDestination(isPresented: $showsDetail) {
@@ -2813,10 +2806,10 @@ private struct CircleMapSummaryCard: View {
         .aspectRatio(180 / 256, contentMode: .fit)
         .frame(maxWidth: .infinity)
         .background(Color(uiColor: .secondarySystemFill))
-        .clipShape(.rect(cornerRadius: 8))
+        .clipShape(.rect(cornerRadius: artworkRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(uiColor: .separator).opacity(0.25), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: artworkRadius, style: .continuous)
+                .strokeBorder(Color.hairline, lineWidth: 0.5)
         }
         .overlay {
             CircleFavoriteMark(color: favoriteColor)
@@ -2829,6 +2822,11 @@ private struct CircleMapSummaryCard: View {
 
     private var circle: CatalogMapCircle { circles[0] }
     private var isCombinedAB: Bool { circles.count == 2 }
+    /// The artwork sits `Spacing.medium` inside the card, so its corners
+    /// share a center with the card's corners.
+    private var artworkRadius: CGFloat {
+        Radius.concentric(outer: Radius.card, inset: Spacing.medium)
+    }
 }
 
 #if DEBUG
