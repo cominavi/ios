@@ -316,11 +316,26 @@ private struct CatalogAmbientBackdrop: View {
     @State private var isFloating = false
 
     var body: some View {
-        Image(LucideIcon.assetName(for: symbolName))
-            .resizable()
-            .renderingMode(.template)
-            .scaledToFit()
-            .foregroundStyle(tint.opacity(0.045))
+        // A Canvas, not an Image: an accessibility identifier on the parent
+        // surface exposed the hidden image again as "lucide-…", 1.5 screens
+        // wide. A Canvas draws no accessibility element.
+        Canvas { context, size in
+            var glyph = context.resolve(
+                Image(LucideIcon.assetName(for: symbolName)).renderingMode(.template)
+            )
+            glyph.shading = .color(tint.opacity(0.045))
+            let side = min(size.width, size.height)
+            context.draw(
+                glyph,
+                in: CGRect(
+                    x: (size.width - side) / 2,
+                    y: (size.height - side) / 2,
+                    width: side,
+                    height: side
+                )
+            )
+        }
+            .aspectRatio(1, contentMode: .fit)
             .containerRelativeFrame(.horizontal) { width, _ in
                 width * 1.5
             }
