@@ -273,23 +273,23 @@ struct ContentView: View {
     }
 }
 
-/// The Day & Comiket sheet size. iPad shows a form-sized sheet that fits
-/// both sections; a medium detent there cut the Comiket row or left a large
-/// empty area. iPhone starts at the large detent at accessibility sizes,
-/// where the medium detent hid the Comiket section.
+/// The Day & Comiket sheet size. iPad shows a fixed form sheet; a medium
+/// detent there cut the Comiket row, and a sheet fitted to its content
+/// height opened at its title bar before the rows were measured. iPhone
+/// starts at the large detent at accessibility sizes, where the medium
+/// detent hid the Comiket section.
 private struct CatalogEventDaySheetPresentation: ViewModifier {
     let isRegularWidth: Bool
     let isAccessibilitySize: Bool
 
     func body(content: Content) -> some View {
         if isRegularWidth {
-            // A form sheet as tall as its rows, so a short day list does
-            // not leave an empty lower half on iPad. The sheet's scroll views
-            // report their measured content height as their ideal height
-            // (`fittingSheetHeight`); without it the sheet showed only its
-            // title bar.
+            // The standard form size holds both days and the Comiket
+            // section. `.form.fitted(vertical:)` sized the sheet from the
+            // first layout pass, before the rows reported their height, and
+            // showed only the header and the top of "Day 1".
             content
-                .presentationSizing(.form.fitted(horizontal: false, vertical: true))
+                .presentationSizing(.form)
         } else if isAccessibilitySize {
             content.presentationDetents([.large])
         } else {
