@@ -385,6 +385,11 @@ private struct LargeVenueButton: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .surface(.card)
             .contentShape(.rect(cornerRadius: Radius.card, style: .continuous))
+            // One text element for the whole label. A plain-style button
+            // still exposed the badge glyphs (東, EAST) as separate texts,
+            // even with the badge hidden.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(venue.displayName)
         }
         .buttonStyle(.plain)
         // The button is one element with the venue name as its label. An
@@ -438,6 +443,9 @@ private struct CharacterSelectionScreen: View {
                     }
                     .font(.rowTitle)
                     .foregroundStyle(.secondary)
+                    // The hall name only; the badge glyphs repeat it.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(venue.displayName)
 
                     if isShowingSearch {
                         characterSearchField

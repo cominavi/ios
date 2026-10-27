@@ -65,7 +65,10 @@ struct BigSightVenueBadge: View {
         }
         .aspectRatio(1, contentMode: .fit)
         // The row or button beside the badge already names the hall, so the
-        // glyphs (東, EAST) are decoration for VoiceOver.
+        // glyphs (東, EAST) are decoration for VoiceOver. Collapse the glyph
+        // texts into one element first: inside a plain-style button label,
+        // `accessibilityHidden` alone left them exposed as static texts.
+        .accessibilityElement(children: .ignore)
         .accessibilityHidden(true)
     }
 
