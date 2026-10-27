@@ -90,6 +90,12 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
         longPress.delegate = context.coordinator
         collectionView.addGestureRecognizer(longPress)
 
+        context.coordinator.updateArtworkAspectRatio(
+            ExploreLayoutMetrics.galleryArtworkAspectRatio(
+                for: context.environment.horizontalSizeClass
+            ),
+            in: collectionView
+        )
         context.coordinator.install(on: collectionView)
         return collectionView
     }
@@ -97,6 +103,12 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
         context.coordinator.updateHorizontalInset(
             ExploreLayoutMetrics.horizontalContentInset(
+                for: context.environment.horizontalSizeClass
+            ),
+            in: collectionView
+        )
+        context.coordinator.updateArtworkAspectRatio(
+            ExploreLayoutMetrics.galleryArtworkAspectRatio(
                 for: context.environment.horizontalSizeClass
             ),
             in: collectionView
@@ -125,6 +137,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
         private weak var collectionView: UICollectionView?
         private var circleIDs: [Int]
         private var columnCount: CGFloat = 2
+        private var artworkAspectRatio = ExploreLayoutMetrics.circleArtworkAspectRatio
         private var renderedCardDetail: ExploreGalleryCardDetail = .full
         private var leadingPlaceholderCount = 0
         private var pinchAnchor: PinchAnchor?
@@ -180,6 +193,16 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             updateCardDetailIfNeeded(in: collectionView)
             refreshVisibleArtworkIfNeeded(in: collectionView)
             flowLayout.invalidateLayout()
+        }
+
+        /// The card frame follows the size class (see
+        /// `ExploreLayoutMetrics.galleryArtworkAspectRatio`), so a split-view
+        /// or window resize that changes it re-sizes and re-renders the cells.
+        func updateArtworkAspectRatio(_ ratio: CGFloat, in collectionView: UICollectionView) {
+            guard artworkAspectRatio != ratio else { return }
+            artworkAspectRatio = ratio
+            collectionView.collectionViewLayout.invalidateLayout()
+            collectionView.reconfigureItems(at: collectionView.indexPathsForVisibleItems)
         }
 
         func update(parent: ExploreGalleryCollection) {
@@ -252,6 +275,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                     model: parent.model,
                     favoriteColorLabels: parent.favoriteColorLabels,
                     artworkPixelSize: artworkPixelSize,
+                    artworkAspectRatio: artworkAspectRatio,
                     detail: renderedCardDetail,
                     onOpen: { onSelect(circle.id) },
                     onViewArtwork: { onLongPress(circle.id) }
@@ -279,7 +303,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             sizeForItemAt indexPath: IndexPath
         ) -> CGSize {
             let width = itemWidth(in: collectionView)
-            let artworkHeight = width / ExploreLayoutMetrics.circleArtworkAspectRatio
+            let artworkHeight = width / artworkAspectRatio
             if renderedCardDetail == .artworkOnly {
                 return CGSize(width: width, height: artworkHeight)
             }
