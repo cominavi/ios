@@ -154,6 +154,9 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     /// Measured map chrome, so camera fits frame content in the uncovered
     /// area. When `nil`, the renderer estimates the chrome from the safe area.
     var overviewChromeInsets: MapViewportInsets? = nil
+    /// Screen rects of SwiftUI chrome over the map, in this view's
+    /// coordinates. Facility icons and titles stay out of them.
+    var chromeObstacles: [CGRect] = []
     /// Frames a campus target once per request `id`.
     var cameraFitRequest: MapCameraFitRequest? = nil
 
@@ -221,6 +224,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             visibleMapLayers: visibleMapLayers,
             locationFocusBottomInset: locationFocusBottomInset,
             overviewInsets: overviewChromeInsets,
+            chromeObstacles: chromeObstacles,
             cameraFitRequest: cameraFitRequest
         )
         // MapLocationControls shows the destination pin beside "Where am I?"
@@ -716,6 +720,7 @@ final class UnifiedMapHostView: UIView {
             mapView.preferredFramesPerSecond = screen.maximumFramesPerSecond
         }
         synchronizeBasemapFromScene()
+        updateReservedChrome()
 
         // SpriteKit applies `.resizeFill` after the SKView receives its final
         // bounds. Re-read the fitted camera on the next main-loop turn so the
@@ -723,6 +728,18 @@ final class UnifiedMapHostView: UIView {
         DispatchQueue.main.async { [weak self] in
             self?.synchronizeBasemapFromScene()
         }
+    }
+
+    /// Tells the renderer which screen rects the UIKit chrome covers: the
+    /// bottom row of attribution and compass, and any visible status chip.
+    /// The SKView fills this view, so the frames need no conversion.
+    private func updateReservedChrome() {
+        guard let renderer = mapView.scene as? UnifiedBigSightScene else { return }
+        var rects = [dataAttributionButton.frame.union(compassButton.frame)]
+        if statusChipStack.arrangedSubviews.contains(where: { !$0.isHidden }) {
+            rects.append(statusChipStack.frame)
+        }
+        renderer.hostChromeRects = rects.filter { !$0.isEmpty }
     }
 
     func updateAppearance(_ appearance: UnifiedMapAppearance) {
@@ -759,6 +776,7 @@ final class UnifiedMapHostView: UIView {
         let isHidden = state != .unavailable
         guard basemapStatusChip.isHidden != isHidden else { return }
         basemapStatusChip.isHidden = isHidden
+        setNeedsLayout()
         if !isHidden {
             UIAccessibility.post(notification: .announcement, argument: basemapStatusChip.text)
         }
@@ -940,6 +958,9 @@ final class UnifiedMapHostView: UIView {
                 ?? MapVenueAccessibilityElement(accessibilityContainer: venueAccessibilityContainer)
             venueAccessibilityElements[target.venueID] = element
             element.accessibilityLabel = target.title
+            element.accessibilityValue = target.matchCount.map {
+                String(localized: "\($0) matching circles")
+            }
             element.accessibilityHint = String(localized: "Opens the floor map for this hall.")
             element.accessibilityTraits = .button
             element.accessibilityIdentifier = "map-venue-badge-\(target.venueID)"
@@ -981,6 +1002,7 @@ final class UnifiedMapHostView: UIView {
         let isHidden = scope != .campus || hasSeenCampusHint || isSearchActive
         if campusHintChip.isHidden != isHidden {
             campusHintChip.isHidden = isHidden
+            setNeedsLayout()
         }
     }
 
@@ -1354,6 +1376,62 @@ enum UnifiedMapMarkerMetrics {
     static func backingSize(for icon: BigSightMapIcon, iconSize: CGFloat) -> CGFloat {
         iconSize + (icon.venueBadge == nil ? 6 : 10)
     }
+
+    /// The rounded bold face of every map title.
+    static func titleFont(size: CGFloat) -> UIFont {
+        let base = UIFont.systemFont(ofSize: size, weight: .bold)
+        return base.fontDescriptor.withDesign(.rounded)
+            .map { UIFont(descriptor: $0, size: size) } ?? base
+    }
+
+    static func titleWidth(_ text: String, fontSize: CGFloat) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: titleFont(size: fontSize)]).width)
+    }
+
+    /// A facility title laid out for at most two lines of `maxWidth`.
+    ///
+    /// A title that fits stays on one line. A longer title breaks at the word
+    /// boundary that gives the two most equal lines, so "エントランスプラザ喫煙所"
+    /// becomes "エントランスプラザ / 喫煙所", never "エントランスプラ / ザ喫煙所".
+    /// The returned text holds the break as "\n", and `width` is the wrap
+    /// width that keeps both lines whole. `nil` means that no word boundary
+    /// gives two lines that fit: the map then shows the icon without a title.
+    static func facilityTitle(
+        _ text: String,
+        fontSize: CGFloat,
+        maxWidth: CGFloat
+    ) -> (text: String, width: CGFloat)? {
+        guard !text.isEmpty else { return (text, maxWidth) }
+        if titleWidth(text, fontSize: fontSize) <= maxWidth {
+            return (text, maxWidth)
+        }
+        // ICU word boundaries also split Japanese and Chinese into words.
+        var wordStarts: [String.Index] = []
+        text.enumerateSubstrings(
+            in: text.startIndex..<text.endIndex,
+            options: [.byWords, .substringNotRequired]
+        ) { _, range, _, _ in
+            if range.lowerBound > text.startIndex {
+                wordStarts.append(range.lowerBound)
+            }
+        }
+        var best: (text: String, width: CGFloat)?
+        for index in wordStarts {
+            let first = text[..<index].trimmingCharacters(in: .whitespaces)
+            let second = text[index...].trimmingCharacters(in: .whitespaces)
+            guard !first.isEmpty, !second.isEmpty else { continue }
+            let width = max(
+                titleWidth(first, fontSize: fontSize),
+                titleWidth(second, fontSize: fontSize)
+            )
+            guard width <= maxWidth else { continue }
+            if best.map({ width < $0.width }) ?? true {
+                best = ("\(first)\n\(second)", width)
+            }
+        }
+        // One point of slack, so rounding never wraps a line a second time.
+        return best.map { ($0.text, $0.width + 1) }
+    }
 }
 
 @MainActor
@@ -1393,7 +1471,12 @@ final class UnifiedBigSightScene: SKScene {
         let venueID: Int
         let title: String
         let frame: CGRect
+        /// Search matches in this hall, or `nil` outside search mode.
+        var matchCount: Int? = nil
     }
+
+    private static let venueTitlePlateName = "map-venue-title-plate"
+    private static let venueMatchCountName = "map-venue-match-count"
 
     private static let darkArtworkShader = SKShader(
         source: """
@@ -1465,6 +1548,20 @@ final class UnifiedBigSightScene: SKScene {
     /// Halls that contain at least one search match. Their badges stay at
     /// full opacity in search mode; the other halls dim.
     private var searchMatchedVenueIDs: Set<Int> = []
+    /// Matches per hall on the current day, shown as a count on each badge
+    /// in search mode.
+    private(set) var searchMatchCountsByVenue: [Int: Int] = [:]
+    /// Screen rects (SKView points) of SwiftUI chrome that MapView measures:
+    /// the selector panel and the bottom-trailing control column.
+    private var overlayChromeRects: [CGRect] = []
+    /// Screen rects of the host's UIKit chrome: the attribution chip, the
+    /// compass, and the status chips. The host sets them on layout.
+    var hostChromeRects: [CGRect] = [] {
+        didSet {
+            guard hostChromeRects != oldValue else { return }
+            applyLevelOfDetail()
+        }
+    }
     /// Opacity of the floor plans while search highlights are shown. High
     /// enough that hall outlines stay readable around the matches.
     private static let searchBaseMapAlpha: CGFloat = 0.5
@@ -1637,6 +1734,7 @@ final class UnifiedBigSightScene: SKScene {
         self.appearance = appearance
         lastDynamicFingerprint = nil
         buildStaticScene()
+        updateVenueMatchCountBadges()
     }
 
     @available(*, unavailable)
@@ -1685,8 +1783,10 @@ final class UnifiedBigSightScene: SKScene {
         visibleMapLayers: Set<BigSightMapLayer> = BigSightMapLayer.defaultVisible,
         locationFocusBottomInset: CGFloat = 0,
         overviewInsets: MapViewportInsets? = nil,
+        chromeObstacles: [CGRect] = [],
         cameraFitRequest: MapCameraFitRequest? = nil
     ) {
+        overlayChromeRects = chromeObstacles
         if overviewInsets != self.overviewInsets {
             self.overviewInsets = overviewInsets
             if hasFittedInitialCamera, isShowingOverviewFit, self.scope == .campus {
@@ -1698,6 +1798,7 @@ final class UnifiedBigSightScene: SKScene {
             lastDynamicFingerprint = nil
             lastRenderedLocatedUser = nil
             buildStaticScene()
+            updateVenueMatchCountBadges()
             hasFittedInitialCamera = false
             fitCameraIfNeeded(force: true)
         }
@@ -1718,6 +1819,13 @@ final class UnifiedBigSightScene: SKScene {
         self.visibleMapLayers = visibleMapLayers
         isSearchActive = searchActive
         searchMatchedVenueIDs = searchActive ? Set(searchMatches.map(\.mapID)) : []
+        let matchCounts =
+            searchActive
+            ? Dictionary(grouping: searchMatches, by: \.mapID).mapValues(\.count) : [:]
+        if matchCounts != searchMatchCountsByVenue {
+            searchMatchCountsByVenue = matchCounts
+            updateVenueMatchCountBadges()
+        }
         applyLevelOfDetail()
         artworkCount = circleArtwork.count
         favoriteCount = bookmarks.count
@@ -2010,7 +2118,12 @@ final class UnifiedBigSightScene: SKScene {
         blockLabels = []
         staticRoot.addChild(campusDetailRoot)
         staticRoot.addChild(pedestrianRoot)
-        staticRoot.addChild(markerRoot)
+        // Markers sit outside `staticRoot`, whose alpha dims the floor plans
+        // in search mode. Hall badges keep their own search opacity, so a
+        // hall with matches stays at full strength.
+        if markerRoot.parent == nil {
+            addChild(markerRoot)
+        }
         staticRoot.addChild(venueRoot)
         staticRoot.addChild(tableRoot)
         staticRoot.addChild(blockLabelRoot)
@@ -2620,6 +2733,14 @@ final class UnifiedBigSightScene: SKScene {
                 maximumZoom: marker.maximumZoom
             )
             marker.label.isHidden = marker.label.alpha <= 0
+            if let venueID = marker.venueID {
+                // Inside the open hall the title sits on the floor plan, so a
+                // plate keeps the table glyphs from running through it.
+                marker.label.childNode(withName: Self.venueTitlePlateName)?.isHidden =
+                    !(scope == .venue && venueID == selectedMapID)
+                marker.node.childNode(withName: Self.venueMatchCountName)?.isHidden =
+                    !isSearchActive || (searchMatchCountsByVenue[venueID] ?? 0) == 0
+            }
         }
         for label in blockLabels {
             label.setScale(mapCamera.xScale)
@@ -2651,7 +2772,9 @@ final class UnifiedBigSightScene: SKScene {
     ///    uncovered viewport is hidden, and its icon stays.
     ///
     /// The viewport excludes the top and bottom map chrome, so no title runs
-    /// under the compass, the attribution, or off the screen edge.
+    /// under the compass, the attribution, or off the screen edge. The
+    /// measured chrome rects are obstacles too, so an icon under a control is
+    /// hidden instead of drawn beneath it.
     private func layoutMarkerLabels() {
         guard let view else { return }
         let insets = effectiveOverviewInsets
@@ -2667,6 +2790,10 @@ final class UnifiedBigSightScene: SKScene {
         var obstacles = venues.map(badgeViewRect)
 
         let badgeRects = obstacles
+        // Map chrome claims its rects before any title or facility icon, so
+        // the attribution chip, the compass, and the control columns never
+        // cover a restroom or a bus stop.
+        obstacles += (overlayChromeRects + hostChromeRects).filter { !$0.isEmpty }
         for marker in venues {
             guard marker.label.alpha > 0 else { continue }
             let ownBadge = badgeViewRect(marker)
@@ -2818,7 +2945,8 @@ final class UnifiedBigSightScene: SKScene {
             return VenueBadgeTarget(
                 venueID: venueID,
                 title: marker.label.text ?? "",
-                frame: frame
+                frame: frame,
+                matchCount: isSearchActive ? searchMatchCountsByVenue[venueID] ?? 0 : nil
             )
         }
     }
@@ -3240,36 +3368,25 @@ final class UnifiedBigSightScene: SKScene {
         label.position = position
         label.zPosition = zPosition
         if let maxWidth {
-            // Long facility names wrap to two lines instead of running off
-            // the screen. Japanese breaks between characters, which is fine
-            // for map labels.
+            // Long facility names take two lines, broken only between words.
+            // A name that cannot fit loses its title; the icon stays.
             label.numberOfLines = 2
             label.lineBreakMode = .byWordWrapping
-            label.preferredMaxLayoutWidth = balancedWrapWidth(
-                for: text,
+            if let title = UnifiedMapMarkerMetrics.facilityTitle(
+                text,
                 fontSize: fontSize,
                 maxWidth: maxWidth
-            )
+            ) {
+                label.text = title.text
+                label.preferredMaxLayoutWidth = title.width
+            } else {
+                label.text = ""
+            }
         }
-        if halo, !text.isEmpty {
-            label.addChild(haloNode(for: label, text: text, fontSize: fontSize))
+        if halo, let shownText = label.text, !shownText.isEmpty {
+            label.addChild(haloNode(for: label, text: shownText, fontSize: fontSize))
         }
         return label
-    }
-
-    /// The wrap width that splits a two-line title into two lines of about
-    /// equal length, so no single word or character ("所" of 喫煙所) is left
-    /// alone on the second line. A title that fits keeps `maxWidth`.
-    private func balancedWrapWidth(for text: String, fontSize: CGFloat, maxWidth: CGFloat) -> CGFloat {
-        let base = UIFont.systemFont(ofSize: fontSize, weight: .bold)
-        let font =
-            base.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: fontSize) }
-            ?? base
-        let width = ceil((text as NSString).size(withAttributes: [.font: font]).width)
-        guard width > maxWidth else { return maxWidth }
-        // Half the line plus two em of slack, so word wrapping in English
-        // still finds a break within two lines.
-        return min(maxWidth, width / 2 + fontSize * 2)
     }
 
     /// The halo behind a map label: copies of the label in the floor color,
@@ -3413,8 +3530,75 @@ final class UnifiedBigSightScene: SKScene {
             x: 0,
             y: -(backingSize / 2 + UnifiedMapMarkerMetrics.labelClearance + label.frame.height / 2)
         )
+        if icon.venueBadge != nil, !title.isEmpty {
+            label.addChild(venueTitlePlate(for: label))
+        }
         container.addChild(label)
         return (container, label)
+    }
+
+    /// A capsule behind a hall title, shown only while that hall is open.
+    /// It moves with the title wherever the collision pass places it.
+    private func venueTitlePlate(for label: SKLabelNode) -> SKShapeNode {
+        let textSize = label.frame.size
+        let size = CGSize(
+            width: textSize.width + Spacing.small * 2,
+            height: textSize.height + Spacing.xSmall
+        )
+        let plate = SKShapeNode(
+            rectOf: size,
+            cornerRadius: size.height / 2
+        )
+        plate.name = Self.venueTitlePlateName
+        plate.fillColor = appearance.palette.chromeBackground
+        plate.strokeColor = appearance.palette.markerStroke
+        plate.lineWidth = 0.5
+        // Below the halo copies (-0.05) and the text.
+        plate.zPosition = -0.1
+        plate.isHidden = true
+        return plate
+    }
+
+    /// Adds or refreshes the match count on every hall badge. The count is a
+    /// lime capsule with dark text, like `StatusBadge(tone: .accent)`, at the
+    /// top-trailing corner of the badge.
+    private func updateVenueMatchCountBadges() {
+        let fontSize: CGFloat = 11
+        for marker in venueMarkers {
+            guard let venueID = marker.venueID else { continue }
+            marker.node.childNode(withName: Self.venueMatchCountName)?.removeFromParent()
+            guard let count = searchMatchCountsByVenue[venueID], count > 0 else { continue }
+
+            let text = count.formatted()
+            let label = SKLabelNode(fontNamed: ".AppleSystemUIFontRounded-Bold")
+            label.text = text
+            label.fontSize = fontSize
+            label.fontColor = UIColor(named: "OnAccentFill") ?? .black
+            label.horizontalAlignmentMode = .center
+            label.verticalAlignmentMode = .center
+            label.zPosition = 0.1
+
+            let width = max(
+                UnifiedMapMarkerMetrics.titleWidth(text, fontSize: fontSize) + Spacing.small,
+                fontSize + Spacing.xSmall
+            )
+            let height = fontSize + Spacing.xSmall
+            let capsule = SKShapeNode(
+                rectOf: CGSize(width: width, height: height),
+                cornerRadius: height / 2
+            )
+            capsule.name = Self.venueMatchCountName
+            capsule.fillColor = UIColor(named: "AccentFill") ?? .systemYellow
+            capsule.strokeColor = appearance.palette.markerStroke
+            capsule.lineWidth = 0.5
+            // Above the plate and glyphs of the badge, below its title.
+            capsule.zPosition = 1.5
+            let corner = marker.badgeSize / 2 - Spacing.xxSmall
+            capsule.position = CGPoint(x: corner, y: corner)
+            capsule.isHidden = !isSearchActive
+            capsule.addChild(label)
+            marker.node.addChild(capsule)
+        }
     }
 
     private func markerIconColor(_ icon: BigSightMapIcon) -> UIColor {

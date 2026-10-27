@@ -27,6 +27,48 @@ private struct GPSLocationTaskID: Equatable {
     let sessionID: UUID?
 }
 
+/// Frames of the map and of its SwiftUI chrome, in global coordinates.
+/// They give the unified map its measured chrome insets and obstacles, in
+/// place of an estimate from the safe area.
+private struct MapChromeFrames: Equatable {
+    var map: CGRect = .zero
+    /// The day banner and the hall and tool row, without the search panel.
+    var selectors: CGRect = .zero
+    /// Everything at the top, including the search field and results.
+    var panel: CGRect = .zero
+    /// The location buttons at the bottom trailing corner.
+    var locationControls: CGRect = .zero
+    /// The location buttons plus the genre legend above them.
+    var trailingColumn: CGRect = .zero
+
+    private var hasMap: Bool { map.width > 1 && map.height > 1 }
+
+    private func local(_ rect: CGRect) -> CGRect {
+        rect.offsetBy(dx: -map.minX, dy: -map.minY)
+    }
+
+    /// The area of the map that no control covers, as edge insets. The top
+    /// edge follows the selectors only, so opening search does not refit the
+    /// campus overview.
+    var viewportInsets: MapViewportInsets? {
+        guard hasMap, !selectors.isEmpty, !locationControls.isEmpty else { return nil }
+        let selectors = local(self.selectors)
+        let controls = local(locationControls)
+        return MapViewportInsets(
+            top: (selectors.maxY + Spacing.small).rounded(),
+            left: max(0, selectors.minX).rounded(),
+            bottom: max(0, map.height - controls.minY + Spacing.small).rounded(),
+            right: max(0, map.width - controls.maxX).rounded()
+        )
+    }
+
+    /// Rects that markers must not sit under, in map coordinates.
+    var obstacles: [CGRect] {
+        guard hasMap else { return [] }
+        return [panel, trailingColumn].filter { !$0.isEmpty }.map { local($0).integral }
+    }
+}
+
 private struct GPSLocationSession {
     let id = UUID()
     let startedAt: Date
@@ -53,6 +95,9 @@ struct MapView: View {
     @State private var gpsSession: GPSLocationSession?
     @State private var locationBeforeManualPicker: LocatedMapUser?
     @State private var isMapLegendExpanded = true
+    /// Set once the UI-testing launch route (DEBUG only) has run.
+    @State private var didApplyLaunchRoute = false
+    @State private var chromeFrames = MapChromeFrames()
     /// Layer choices persist across launches; an empty value means every
     /// layer is hidden, so the default applies only before the first choice.
     @AppStorage("map.visibleLayers") private var storedVisibleMapLayers =
@@ -138,6 +183,9 @@ struct MapView: View {
         ZStack(alignment: .topLeading) {
             mapContent
                 .ignoresSafeArea()
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    chromeFrames.map = $0
+                }
 
             if locationMode == .manual, isManualCompassEnabled {
                 ManualCompassOverlay(
@@ -154,8 +202,12 @@ struct MapView: View {
                 visibleMapLayers: visibleMapLayersBinding,
                 onGoToSpace: {
                     showsDestinationPicker = true
-                }
+                },
+                onSelectorsFrameChange: { chromeFrames.selectors = $0 }
             )
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                chromeFrames.panel = $0
+            }
             .padding(.horizontal, MapChromeLayout.edgeInset)
             .safeAreaPadding(.top, Spacing.small)
 
@@ -187,6 +239,12 @@ struct MapView: View {
                         model.clearDestination()
                     }
                 )
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    chromeFrames.locationControls = $0
+                }
+            }
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                chromeFrames.trailingColumn = $0
             }
             .padding(.trailing, MapChromeLayout.edgeInset)
             .safeAreaPadding(.bottom, MapChromeLayout.edgeInset)
@@ -214,6 +272,9 @@ struct MapView: View {
             if model.scene == nil, model.campusScene == nil {
                 model.load()
             }
+        }
+        .task(id: model.phase == .ready) {
+            applyLaunchRouteIfNeeded()
         }
         .onAppear {
             configureLocationService()
@@ -456,7 +517,9 @@ struct MapView: View {
                         ) != nil {
                             showsCurrentLocation = true
                         }
-                    }
+                    },
+                    overviewChromeInsets: chromeFrames.viewportInsets,
+                    chromeObstacles: chromeFrames.obstacles
                 )
                 .allowsHitTesting(model.phase == .ready)
             } else if let scene = model.scene {
@@ -536,6 +599,34 @@ struct MapView: View {
 
     private func selectManualLocationMode() {
         locationMode = .manual
+    }
+
+    /// Screenshot and UI-test routes. Each argument sets the same state as
+    /// the tap that it replaces, once the map is ready:
+    ///
+    /// - `-cominavi-ui-testing-open-hall-west`: the West Halls item of the
+    ///   venue menu.
+    /// - `-cominavi-ui-testing-open-map-search`: the search button.
+    ///
+    /// `-cominavi-ui-testing-open-map-layers` has no state to set: the layers
+    /// control is a SwiftUI `Menu`, which has no API to open it. A driver
+    /// taps `map-layer-button` after launch instead.
+    private func applyLaunchRouteIfNeeded() {
+        #if DEBUG
+            guard !didApplyLaunchRoute, model.phase == .ready else { return }
+            didApplyLaunchRoute = true
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("-cominavi-ui-testing-open-hall-west"),
+                let west = model.halls.first(where: { hall in
+                    BigSightVenue.kind(matching: "\(hall.name) \(hall.mapName)") == .west
+                })
+            {
+                model.select(mapID: west.externalMapId)
+            }
+            if arguments.contains("-cominavi-ui-testing-open-map-search") {
+                model.setSearchPresented(true)
+            }
+        #endif
     }
 
     /// The location button's tap: show the user's position when there is
@@ -732,6 +823,9 @@ private struct MapControlPanel: View {
     let eventDaySelector: CatalogEventDayBanner?
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
     let onGoToSpace: () -> Void
+    /// Reports the global frame of the banner and selector rows, without the
+    /// search panel below them.
+    var onSelectorsFrameChange: (CGRect) -> Void = { _ in }
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -739,6 +833,9 @@ private struct MapControlPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
             selectors
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    onSelectorsFrameChange($0)
+                }
             if model.isSearchPresented {
                 MapSearchField(model: model, onGoToSpace: onGoToSpace)
             }
@@ -1118,9 +1215,10 @@ private struct MapSelectorBar: View {
         .accessibilityIdentifier("map-venue-selector")
     }
 
-    /// The same tools in every scope, so the chrome does not reflow when the
-    /// attendee opens a hall. Genre colors exist only inside a hall; on the
-    /// campus the button stays in place and is disabled.
+    /// Layers and search in every scope. The genre overlay exists only
+    /// inside a hall, so its button shows only there. A disabled glass
+    /// circle on the campus read as a faint gap in the row. The HStack keeps
+    /// one `Spacing.small` gap between the buttons that show.
     private var tools: some View {
         HStack(spacing: Spacing.small) {
             MapLayerMenu(
@@ -1129,26 +1227,18 @@ private struct MapSelectorBar: View {
                 visibleMapLayers: $visibleMapLayers
             )
 
-            Button {
-                model.toggleGenreOverlay()
-            } label: {
-                MapChromeIconLabel(
-                    icon: "paintbrush",
-                    isActive: isGenreOverlayAvailable && model.showsGenreOverlay
+            if isGenreOverlayAvailable {
+                Button {
+                    model.toggleGenreOverlay()
+                } label: {
+                    MapChromeIconLabel(icon: "paintbrush", isActive: model.showsGenreOverlay)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    model.showsGenreOverlay ? "Hide genre overlay" : "Show genre overlay"
                 )
+                .accessibilityIdentifier("map-genre-button")
             }
-            .buttonStyle(.plain)
-            // MapChromeIconLabel dims only the glyph when disabled, so the
-            // button keeps its surface beside the other tools.
-            .disabled(!isGenreOverlayAvailable)
-            .accessibilityLabel(
-                isGenreOverlayAvailable && model.showsGenreOverlay
-                    ? "Hide genre overlay" : "Show genre overlay"
-            )
-            .accessibilityHint(
-                isGenreOverlayAvailable ? Text(verbatim: "") : Text("Open a hall to show genre colors.")
-            )
-            .accessibilityIdentifier("map-genre-button")
 
             Button {
                 model.setSearchPresented(!model.isSearchPresented)

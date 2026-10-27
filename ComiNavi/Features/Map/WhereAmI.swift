@@ -54,8 +54,10 @@ struct ComiketSpaceAddress: Equatable, Sendable {
         "\(Self.canonicalHallName(hallName)) \(spaceCode)"
     }
 
+    /// The space as one unit, in the same short format as the rest of the
+    /// app ("East Ａ01a"), not the staff-facing hall and code.
     var navigationSubtitle: String {
-        String(localized: "Day \(day) · \(venueLocationText)")
+        formatted(.short)
     }
 
     var canonicalText: String {
