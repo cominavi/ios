@@ -274,32 +274,35 @@ struct ShinagakiLightbox: View {
                         maxHeight: .infinity,
                         alignment: .topLeading
                     )
-                    .padding(.top, 8)
-                    .padding(.leading, 16)
+                    .padding(.top, Spacing.small)
+                    .padding(.leading, Spacing.large)
 
                 Button {
                     dismiss()
                 } label: {
-                    LucideIcon("xmark")
-                        .font(.body.weight(.bold))
+                    LucideIcon("xmark", size: IconSize.inline)
                         .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(.ultraThinMaterial, in: .circle)
+                        .frame(width: HitArea.minimum, height: HitArea.minimum)
+                        .surface(.floating, padding: 0)
+                        .contentShape(.circle)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close")
                 .accessibilityIdentifier("shinagaki-lightbox-close")
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.top, 8)
-                .padding(.trailing, 16)
+                .padding(.top, Spacing.small)
+                .padding(.trailing, Spacing.large)
 
                 if pages.count > 1 {
+                    // The floating surface's 24 pt radius makes a capsule at
+                    // this 44 pt height.
                     Text("Page \(selectedPageIndex + 1) of \(pages.count)")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.control)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 44)
-                        .background(.ultraThinMaterial, in: .capsule)
+                        .singleLineToken()
+                        .padding(.horizontal, Spacing.medium)
+                        .frame(minHeight: HitArea.minimum)
+                        .surface(.floating, padding: 0)
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel(
                             "Page \(selectedPageIndex + 1) of \(pages.count)"
@@ -318,7 +321,7 @@ struct ShinagakiLightbox: View {
                             maxHeight: .infinity,
                             alignment: .bottom
                         )
-                        .padding(.bottom, 16)
+                        .padding(.bottom, Spacing.large)
                 }
             }
         }
@@ -404,7 +407,7 @@ struct ShinagakiLightbox: View {
     }
 
     private var imageActionControls: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.small) {
             Button {
                 startImageAction(.share)
             } label: {
@@ -438,17 +441,17 @@ struct ShinagakiLightbox: View {
             } else {
                 switch kind {
                 case .share:
-                    LucideIcon("square.and.arrow.up")
-                        .font(.body.weight(.bold))
+                    LucideIcon("square.and.arrow.up", size: IconSize.inline)
                 case .save:
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.body.weight(.bold))
+                    LucideIcon("download", size: IconSize.inline)
                 }
             }
         }
         .foregroundStyle(.white)
-        .frame(width: 44, height: 44)
-        .background(.ultraThinMaterial, in: .circle)
+        .frame(width: HitArea.minimum, height: HitArea.minimum)
+        // The floating surface's 24 pt radius rounds this 44 pt square into
+        // a circle.
+        .surface(.floating, padding: 0)
         .contentShape(.circle)
     }
 
