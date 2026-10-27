@@ -17,7 +17,6 @@ final class LocalizationTests: XCTestCase {
             "Event",
             "Favorite circles",
             "Favorite map",
-            "Favorites",
             "Label",
             "Labels are shown in the PDF legend and circle list.",
             "Map pages",
