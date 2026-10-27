@@ -21,6 +21,13 @@ extension Font {
     static var largeControl: Font { .headline }
     /// Space codes such as `東A01a`. Digits keep one width, so codes align.
     static var spaceCode: Font { .headline.monospacedDigit() }
+    /// The hero title of a full-screen focused state (`FocusedActionSurface`),
+    /// such as "Downloading catalog". A documented exception to the type
+    /// roles: the rounded large title is the identity of these one-message
+    /// screens. It still scales with Dynamic Type.
+    static var focusedSurfaceTitle: Font {
+        .system(.largeTitle, design: .rounded, weight: .bold)
+    }
 }
 
 extension View {
