@@ -46,38 +46,41 @@ struct SharedPlanInvitationSheet: View {
                 animatesBackdrop: true
             ) {
                 Text("Checking invitation…")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(.focusedSurfaceTitle)
+                    .wrapsFully()
                 Text("ComiNavi is securely checking the plan name and the account that will join.")
                     .foregroundStyle(.secondary)
-                    .padding(.top, 12)
+                    .wrapsFully()
+                    .padding(.top, Spacing.medium)
                 CatalogActivityIndicator(accessibilityLabel: "Checking invitation…")
-                    .padding(.top, 30)
+                    .padding(.top, Spacing.xxLarge)
             }
         } else if let preview {
             FocusedActionSurface(symbolName: "person.crop.circle.badge.plus") {
                 Text("C\(preview.comiketNo) · Shared Plan")
-                    .font(.headline.weight(.semibold))
+                    .font(.rowTitle)
                     .foregroundStyle(Color.accentColor)
                     .accessibilityIdentifier("shared-plan-invitation-comiket")
 
                 Text(preview.planName)
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 10)
+                    .font(.focusedSurfaceTitle)
+                    .wrapsFully()
+                    .padding(.top, Spacing.small)
                     .accessibilityIdentifier("shared-plan-invitation-plan-name")
 
                 if profileStore.isIdentityVerified, let profile = profileStore.profile {
-                    HStack(spacing: 12) {
+                    HStack(spacing: Spacing.iconToText) {
                         AuthenticatedProfileAvatar(url: profile.avatarURL, size: 44)
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                             Text(profile.displayName)
-                                .font(.headline)
+                                .font(.rowTitle)
                             Text("You will join with this account")
-                                .font(.subheadline)
+                                .font(.rowSubtitle)
                                 .foregroundStyle(.secondary)
                         }
+                        .wrapsFully()
                     }
-                    .padding(.top, 24)
+                    .padding(.top, Spacing.xxLarge)
 
                     if let issue {
                         invitationIssue(issue)
@@ -91,28 +94,31 @@ struct SharedPlanInvitationSheet: View {
                         }
                     }
                     .disabled(isAccepting)
-                    .padding(.top, 28)
+                    .padding(.top, Spacing.xxLarge)
                 } else {
                     Text("The plan shows your name and profile picture to its members. Sign in to continue.")
                         .foregroundStyle(.secondary)
-                        .padding(.top, 18)
+                        .wrapsFully()
+                        .padding(.top, Spacing.large)
 
                     FocusedActionButton(action: onSignIn ?? onDismiss) {
                         LucideLabel("Sign in to continue", icon: "circle-user")
                     }
-                    .padding(.top, 28)
+                    .padding(.top, Spacing.xxLarge)
                     .accessibilityIdentifier("shared-plan-invitation-sign-in")
 
                     Text("Your invitation opens again after you sign in.")
-                        .font(.footnote)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
-                        .padding(.top, 10)
+                        .wrapsFully()
+                        .padding(.top, Spacing.small)
                 }
 
                 Text("All members can edit the plan after they join. Share invitation links only with people you trust.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .padding(.top, 18)
+                    .font(.meta)
+                    .foregroundStyle(.secondary)
+                    .wrapsFully()
+                    .padding(.top, Spacing.large)
             }
         } else {
             FocusedActionSurface(
@@ -120,11 +126,11 @@ struct SharedPlanInvitationSheet: View {
                 tint: .orange
             ) {
                 Text("Cannot open invitation")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(.focusedSurfaceTitle)
                 Text(issue ?? String(localized: "This invitation link cannot be used."))
                     .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 12)
+                    .wrapsFully()
+                    .padding(.top, Spacing.medium)
                     .accessibilityIdentifier("shared-plan-invitation-error")
 
                 if canRetryPreview {
@@ -133,20 +139,20 @@ struct SharedPlanInvitationSheet: View {
                     }) {
                         LucideLabel("Check again", icon: "arrow.clockwise")
                     }
-                    .padding(.top, 28)
+                    .padding(.top, Spacing.xxLarge)
                 }
             }
         }
     }
 
     private func invitationIssue(_ message: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            LucideIcon("exclamationmark.circle", size: 20)
+        HStack(alignment: .top, spacing: Spacing.small) {
+            LucideIcon("exclamationmark.circle", size: IconSize.inline)
             Text(message)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrapsFully()
         }
         .foregroundStyle(.orange)
-        .padding(.top, 18)
+        .padding(.top, Spacing.large)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("shared-plan-invitation-error")
     }

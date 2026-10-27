@@ -1342,29 +1342,31 @@ private struct SharedPlanInformationScreen: View {
                     if !quarantinedChanges.isEmpty {
                         Section("Changes to review") {
                             Text("This is the latest version of the plan. Review your remaining changes.")
-                                .font(.callout)
+                                .font(.rowSubtitle)
                                 .foregroundStyle(.orange)
                             ForEach(quarantinedChanges) { write in
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: Spacing.xSmall) {
                                     Text(quarantinedTitle(write))
-                                        .font(.headline)
+                                        .font(.rowTitle)
                                     if let message = write.quarantineMessage {
                                         Text(message)
-                                            .font(.caption)
+                                            .font(.meta)
                                             .foregroundStyle(.secondary)
                                     }
                                     Button("Discard this change", role: .destructive) {
                                         discard(write)
                                     }
-                                    .font(.callout)
+                                    .font(.control)
                                 }
                             }
                             if features.writesEnabled,
                                quarantinedChanges.allSatisfy({
                                 $0.quarantineReason == .revisionConflict
                             }) {
+                                // Lime fill with dark text; the system prominent
+                                // style would draw white text on the lime tint.
                                 Button("Try again with the latest plan") { retryConflict() }
-                                    .buttonStyle(.borderedProminent)
+                                    .buttonStyle(.primaryAction)
                                 Button("Discard all remaining changes", role: .destructive) {
                                     discardAllConflicts()
                                 }
@@ -1393,14 +1395,14 @@ private struct SharedPlanInformationScreen: View {
                             showsFavoriteImport = true
                         } label: {
                             Label {
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                                     Text("Import Circle.ms favorites")
                                     Text("Review and add only the circles that are not in this plan yet.")
-                                        .font(.caption)
+                                        .font(.meta)
                                         .foregroundStyle(.secondary)
                                 }
                             } icon: {
-                                Image(systemName: "square.and.arrow.down")
+                                LucideIcon("download")
                             }
                         }
                     }
@@ -1414,14 +1416,14 @@ private struct SharedPlanInformationScreen: View {
                                     dataSource: catalogDataSource
                                 )
                             } label: {
-                                Label("Export sharing plan", systemImage: "archivebox")
+                                LucideLabel("Export sharing plan", icon: "archive")
                             }
                             .accessibilityIdentifier("shared-plan-export-button")
                         }
                     }
 
                     if features.writesEnabled, plan.role == .owner {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: Spacing.small) {
                             Button(role: plan.lifecycle == .active ? .destructive : nil) {
                                 if plan.lifecycle == .active {
                                     confirmation = .archive
@@ -1429,12 +1431,13 @@ private struct SharedPlanInformationScreen: View {
                                     toggleArchive(plan)
                                 }
                             } label: {
-                                HStack {
-                                    Text(archiveButtonTitle(for: plan))
-                                    Spacer(minLength: 0)
-                                }
+                                Text(archiveButtonTitle(for: plan))
+                                    .font(.control)
+                                    .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.roundedRectangle(radius: Radius.control))
+                            .controlSize(.large)
                             .tint(plan.lifecycle == .active ? .red : .accentColor)
                             .frame(maxWidth: .infinity)
                             .disabled(!quarantinedChanges.isEmpty)
@@ -1442,10 +1445,16 @@ private struct SharedPlanInformationScreen: View {
                             Text(plan.lifecycle == .active
                                 ? String(localized: "Archived plans remain available but cannot be edited.")
                                 : String(localized: "Reopen this plan to make it editable again."))
-                                .font(.footnote)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
+                                .wrapsFully()
                         }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(
+                            top: Spacing.small,
+                            leading: Spacing.large,
+                            bottom: Spacing.small,
+                            trailing: Spacing.large
+                        ))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     }
@@ -1515,10 +1524,12 @@ private struct SharedPlanInformationScreen: View {
                     tint: .orange
                 ) {
                     Text("Plan not found")
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .font(.focusedSurfaceTitle)
+                        .wrapsFully()
                     Text("This plan was deleted, or you no longer have access to it.")
                         .foregroundStyle(.secondary)
-                        .padding(.top, 12)
+                        .wrapsFully()
+                        .padding(.top, Spacing.medium)
                 }
             }
         }
