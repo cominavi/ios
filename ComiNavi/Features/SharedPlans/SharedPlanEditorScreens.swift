@@ -889,110 +889,75 @@ struct SharedPlanEditorScreen: View {
 struct SharedPlanEmptyCirclesView: View {
     let canEdit: Bool
 
-    @ScaledMetric(relativeTo: .title3) private var iconContainerSize = 72.0
-    @ScaledMetric(relativeTo: .title3) private var iconSize = 30.0
-
     var body: some View {
-        VStack(spacing: 16) {
-            Circle()
-                .fill(Color.accentColor.opacity(0.12))
-                .frame(width: iconContainerSize, height: iconContainerSize)
-                .overlay {
-                    LucideIcon("building-2", size: iconSize)
-                        .foregroundStyle(Color.accentColor)
-                }
-                .accessibilityHidden(true)
+        emptyState
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("shared-plan-empty-circles")
+            .listRowInsets(EdgeInsets(top: Spacing.small, leading: 0, bottom: Spacing.large, trailing: 0))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
 
-            VStack(spacing: 7) {
-                Text("No circles in this plan")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.center)
-
-                if canEdit {
-                    Text("Open a circle from the catalog to add a purchase request to this plan.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Circles and purchase requests will appear here.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
+    @ViewBuilder
+    private var emptyState: some View {
+        if canEdit {
+            EmptyStateView(
+                "No circles in this plan",
+                icon: "building-2",
+                message: "Open a circle from the catalog to add a purchase request to this plan."
+            )
+        } else {
+            EmptyStateView(
+                "No circles in this plan",
+                icon: "building-2",
+                message: "Circles and purchase requests will appear here."
+            )
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 30)
-        .background(.background, in: .rect(cornerRadius: 24))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24)
-                .strokeBorder(Color.accentColor.opacity(0.16), lineWidth: 1)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("shared-plan-empty-circles")
-        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 16, trailing: 0))
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
     }
 }
 
 struct SharedPlanProgressOverview: View {
     let progress: SharedPlanProgressSummary
 
-    @ScaledMetric(relativeTo: .body) private var barHeight = 12.0
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         if progress.wanted == 0 {
             Label {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     Text("No purchase requests yet")
-                        .font(.headline)
+                        .font(.rowTitle)
                     Text("Add a purchase request to start tracking this plan.")
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
                 }
+                .wrapsFully()
             } icon: {
-                LucideIcon("shopping-cart")
+                LucideIcon("shopping-cart", size: IconSize.row)
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
         } else {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(verbatim: "\(progress.fulfilledPercentage)%")
-                        .font(.system(.title, design: .rounded, weight: .bold))
-                    Text("bought")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(progress.outstanding) remaining")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                GeometryReader { geometry in
-                    let width = geometry.size.width
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(.secondary.opacity(0.18))
-                        Capsule()
-                            .fill(.orange)
-                            .frame(width: width * progress.assignedFraction)
-                        Capsule()
-                            .fill(.green)
-                            .frame(width: width * progress.fulfilledFraction)
+            VStack(alignment: .leading, spacing: Spacing.medium) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+                        boughtSummary
+                        Spacer(minLength: Spacing.small)
+                        remainingText
                     }
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
+                    VStack(alignment: .leading, spacing: Spacing.xSmall) {
+                        boughtSummary
+                        remainingText
                     }
                 }
-                .frame(height: barHeight)
-                .accessibilityHidden(true)
 
-                HStack(spacing: 8) {
+                CapsuleProgressBar(segments: [
+                    .init(fraction: progress.assignedFraction, color: .orange),
+                    .init(fraction: progress.fulfilledFraction, color: .green),
+                ])
+
+                metricsLayout {
                     SharedPlanProgressMetric(
                         title: String(localized: "Requested"),
                         value: progress.wanted,
@@ -1016,6 +981,34 @@ struct SharedPlanProgressOverview: View {
                 "Requested \(progress.wanted), assigned \(progress.assigned), bought \(progress.fulfilled), \(progress.outstanding) remaining"
             )
         }
+    }
+
+    private var boughtSummary: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+            // The hero number of the plan: one step above the type roles.
+            Text(verbatim: "\(progress.fulfilledPercentage)%")
+                .font(.title.bold())
+                .monospacedDigit()
+                .singleLineToken()
+            Text("bought")
+                .font(.rowSubtitle.weight(.medium))
+                .foregroundStyle(.secondary)
+                .singleLineToken()
+        }
+    }
+
+    private var remainingText: some View {
+        Text("\(progress.outstanding) remaining")
+            .font(.rowSubtitle)
+            .foregroundStyle(.secondary)
+            .singleLineToken()
+    }
+
+    /// Three metric columns, or one column at accessibility sizes.
+    private var metricsLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.small))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: Spacing.small))
     }
 }
 
@@ -1052,17 +1045,18 @@ private struct SharedPlanProgressMetric: View {
     let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: Spacing.xSmall) {
+            HStack(spacing: Spacing.xSmall) {
                 Circle()
                     .fill(color)
-                    .frame(width: 7, height: 7)
+                    .frame(width: 6, height: 6)
                 Text(title)
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
+                    .wrapsFully()
             }
             Text(value, format: .number)
-                .font(.headline)
+                .font(.rowTitle)
                 .monospacedDigit()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1884,27 +1878,12 @@ private struct SharedPlanPurchaseStageBar: View {
     let progress: SharedPlanPurchaseProgressPresentation
     let accessibilityIdentifier: String
 
-    @ScaledMetric(relativeTo: .caption) private var barHeight = 10.5
-
     var body: some View {
-        VStack(spacing: 3) {
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(.secondary.opacity(0.22))
-                    Capsule()
-                        .fill(.orange)
-                        .frame(width: geometry.size.width * progress.assignedFraction)
-                    Capsule()
-                        .fill(.green)
-                        .frame(width: geometry.size.width * progress.boughtFraction)
-                }
-                .overlay {
-                    Capsule()
-                        .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
-                }
-            }
-            .frame(height: barHeight)
+        VStack(spacing: Spacing.xSmall) {
+            CapsuleProgressBar(segments: [
+                .init(fraction: progress.assignedFraction, color: .orange),
+                .init(fraction: progress.boughtFraction, color: .green),
+            ])
 
             HStack(spacing: 0) {
                 quantityLabel(progress.requested, color: .secondary)
@@ -1941,97 +1920,82 @@ private struct SharedPlanNeedEditorRow: View {
     let onDelete: () -> Void
 
     @ScaledMetric(relativeTo: .body) private var avatarSize = 60.0
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    private var layout: AnyLayout {
-        dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-            : AnyLayout(HStackLayout(spacing: 8))
-    }
 
     var body: some View {
-        layout {
-            VStack(alignment: .leading, spacing: 5) {
-                ZStack(alignment: .topLeading) {
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Text(verbatim: " \n ")
-                            .font(.headline)
-                            .hidden()
-                            .accessibilityHidden(true)
-                    }
-
+        VStack(alignment: .leading, spacing: Spacing.medium) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     Text(displayItemName)
-                        .font(.headline)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .font(.rowTitle)
+                    if let unitPrice = need.unitPrice {
+                        Text(
+                            unitPrice,
+                            format: .currency(code: "JPY").precision(.fractionLength(0))
+                        )
+                        .font(.meta)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    }
                 }
+                .wrapsFully()
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
 
-                if let unitPrice = need.unitPrice {
-                    Text(
-                        unitPrice,
-                        format: .currency(code: "JPY").precision(.fractionLength(0))
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                } else {
-                    Text(verbatim: "0")
-                        .font(.caption)
-                        .hidden()
-                        .accessibilityHidden(true)
-                }
                 if canEdit {
-                    Button(action: onEditProgress) {
-                        progressBar
-                            .contentShape(.rect)
+                    Menu {
+                        Button("Purchase progress", action: onEditProgress)
+                        Button("Assign a buyer", action: onAddAllocation)
+                            .disabled(activeMembers.isEmpty)
+                        Button("Remove request", role: .destructive, action: onDelete)
+                    } label: {
+                        LucideIcon("ellipsis", size: IconSize.action)
+                            .minimumHitArea()
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Purchase progress")
-                    .accessibilityValue(
-                        "Requested \(progress.requested), assigned \(progress.assigned), bought \(progress.bought)"
-                    )
-                    .accessibilityIdentifier(
-                        SharedPlanEditorAccessibilityID.needProgress(need.id)
-                    )
-                } else {
-                    progressBar
+                    // Center the glyph on the cap height of the first title line.
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
+                    .accessibilityLabel("More actions for \(displayItemName)")
                 }
             }
-            .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 102, alignment: .leading)
+
+            if canEdit {
+                Button(action: onEditProgress) {
+                    progressBar
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Purchase progress")
+                .accessibilityValue(
+                    "Requested \(progress.requested), assigned \(progress.assigned), bought \(progress.bought)"
+                )
+                .accessibilityIdentifier(
+                    SharedPlanEditorAccessibilityID.needProgress(need.id)
+                )
+            } else {
+                progressBar
+            }
 
             ScrollView(.horizontal) {
-                HStack(alignment: .center, spacing: 8) {
+                HStack(alignment: .center, spacing: Spacing.small) {
                     ForEach(participants) { participant in
                         participantAvatar(participant)
                     }
                 }
-                .padding(.vertical, 2)
+                // Room for the quantity badges that hang below each avatar.
+                .padding(.vertical, Spacing.xSmall)
             }
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
-            .frame(maxWidth: .infinity, minHeight: avatarSize + 4, alignment: .leading)
-
-            if canEdit {
-                Menu {
-                    Button("Purchase progress", action: onEditProgress)
-                    Button("Assign a buyer", action: onAddAllocation)
-                        .disabled(activeMembers.isEmpty)
-                    Button("Remove request", role: .destructive, action: onDelete)
-                } label: {
-                    LucideIcon("ellipsis", size: 22)
-                        .frame(width: 44, height: 44)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("More actions for \(displayItemName)")
-            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-        .background(rowBackground, in: .rect(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(statusColor.opacity(0.32), lineWidth: 1)
+        .surface(.card, padding: Spacing.medium)
+        .overlay(alignment: .leading) {
+            // The purchase state as a leading bar, so the card keeps the
+            // hairline that every other card uses.
+            Capsule()
+                .fill(statusColor)
+                .frame(width: Spacing.xSmall)
+                .padding(.vertical, Spacing.large)
+                .accessibilityHidden(true)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilitySummary)
@@ -2046,7 +2010,7 @@ private struct SharedPlanNeedEditorRow: View {
         )
             .overlay { Circle().strokeBorder(.background, lineWidth: 3) }
             .overlay(alignment: .bottom) {
-                HStack(spacing: 3) {
+                HStack(spacing: Spacing.xxSmall) {
                     if let requestedQuantity = participant.requestedQuantity {
                         quantityBadge(requestedQuantity, color: .secondary)
                     }
@@ -2083,8 +2047,10 @@ private struct SharedPlanNeedEditorRow: View {
             .font(.caption2.weight(.bold))
             .monospacedDigit()
             .foregroundStyle(.white)
+            .singleLineToken()
+            // 6 pt: the same compact capsule inset as StatusBadge.
             .padding(.horizontal, 6)
-            .padding(.vertical, 3)
+            .padding(.vertical, Spacing.xxSmall)
             .background(color, in: .capsule)
     }
 
@@ -2139,15 +2105,6 @@ private struct SharedPlanNeedEditorRow: View {
         case .partiallyAssigned, .assigned: .orange
         case .partiallyBought, .bought: .green
         case .needsReview: .red
-        }
-    }
-
-    private var rowBackground: Color {
-        switch progress.state {
-        case .requested: Color(uiColor: .secondarySystemGroupedBackground)
-        case .partiallyAssigned, .assigned: .orange.opacity(0.08)
-        case .partiallyBought, .bought: .green.opacity(0.08)
-        case .needsReview: .red.opacity(0.08)
         }
     }
 
