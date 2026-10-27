@@ -105,7 +105,7 @@ struct ComiketToolboxView: View {
                 ContentUnavailableView.search(text: searchText)
             }
         }
-        .modifier(ToolboxReadableWidth())
+        .readableFormWidth()
         .navigationTitle("Toolbox")
         .searchable(
             text: $searchText,
@@ -130,32 +130,6 @@ struct ComiketToolboxView: View {
     }
 }
 
-/// Keeps grouped lists at `ReadableWidth.content` in regular width instead of
-/// stretching rows across the whole iPad screen. A `List` needs content margins
-/// rather than `.readableWidth()`, so its scroll area still spans the screen.
-private struct ToolboxReadableWidth: ViewModifier {
-    private static let maxContentWidth: CGFloat = ReadableWidth.content
-    private static let minimumMargin: CGFloat = Spacing.screenGutter
-
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var containerWidth: CGFloat = 0
-
-    private var horizontalMargin: CGFloat? {
-        guard horizontalSizeClass == .regular else { return nil }
-        return max(Self.minimumMargin, (containerWidth - Self.maxContentWidth) / 2)
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .contentMargins(.horizontal, horizontalMargin, for: .scrollContent)
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.width
-            } action: { width in
-                containerWidth = width
-            }
-    }
-}
-
 private struct ToolboxChecklistScreen: View {
     let store: ComiketChecklistStore
 
@@ -163,7 +137,7 @@ private struct ToolboxChecklistScreen: View {
         List {
             ToolboxChecklistSection(store: store)
         }
-        .modifier(ToolboxReadableWidth())
+        .readableFormWidth()
         .navigationTitle("Day-of checklist")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -177,7 +151,7 @@ private struct ToolboxReminderScreen: View {
         List {
             ToolboxReminderSection(store: store, edition: edition)
         }
-        .modifier(ToolboxReadableWidth())
+        .readableFormWidth()
         .navigationTitle("Event reminders")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -192,7 +166,7 @@ private struct ToolboxResourcesScreen: View {
                 ToolboxResourceSectionView(section: section)
             }
         }
-        .modifier(ToolboxReadableWidth())
+        .readableFormWidth()
         .navigationTitle("Official links")
         .navigationBarTitleDisplayMode(.inline)
     }
