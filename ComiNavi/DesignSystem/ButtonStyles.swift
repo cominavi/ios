@@ -54,6 +54,7 @@ struct ActionButtonStyle: ButtonStyle {
         case .primary: .onAccentFill
         case .secondary: .primary
         case .tertiary: .accentColor
+        case .destructive: .red
         }
     }
 
