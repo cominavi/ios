@@ -238,93 +238,75 @@ struct ShinagakiLightbox: View {
     }
 
     var body: some View {
-        GeometryReader { _ in
-            ZStack {
-                Color.black
-                    .opacity(backdropOpacity)
-                    .ignoresSafeArea()
-
-                TabView(selection: $selectedPageID) {
-                    ForEach(pages) { page in
-                        ShinagakiLightboxPageView(page: page) { isZoomed in
-                            if isZoomed {
-                                zoomedPageIDs.insert(page.id)
-                            } else {
-                                zoomedPageIDs.remove(page.id)
-                            }
-                        }
-                        .tag(page.id)
-                        .accessibilityIdentifier(
-                            "shinagaki-lightbox-page-\(page.id)"
-                        )
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .accessibilityIdentifier("shinagaki-lightbox")
+        ZStack {
+            Color.black
+                .opacity(backdropOpacity)
                 .ignoresSafeArea()
+
+            pager
                 .offset(y: dismissDragOffset)
                 .simultaneousGesture(
                     dismissDragGesture,
                     including: canDragToDismiss ? .all : .subviews
                 )
 
-                imageActionControls
+            imageActionControls
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topLeading
+                )
+                .padding(.top, Spacing.small)
+                .padding(.leading, Spacing.large)
+
+            Button {
+                dismiss()
+            } label: {
+                LucideIcon("xmark", size: IconSize.inline)
+                    .foregroundStyle(.white)
+                    .frame(width: HitArea.minimum, height: HitArea.minimum)
+                    .surface(.floating, padding: 0)
+                    .contentShape(.circle)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close")
+            .accessibilityIdentifier("shinagaki-lightbox-close")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.top, Spacing.small)
+            .padding(.trailing, Spacing.large)
+
+            if pages.count > 1 {
+                // The floating surface's 24 pt radius makes a capsule at
+                // this 44 pt height.
+                Text("Page \(selectedPageIndex + 1) of \(pages.count)")
+                    .font(.control)
+                    .foregroundStyle(.white)
+                    .singleLineToken()
+                    .padding(.horizontal, Spacing.medium)
+                    .frame(minHeight: HitArea.minimum)
+                    .surface(.floating, padding: 0)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(
+                        "Page \(selectedPageIndex + 1) of \(pages.count)"
+                    )
+                    .accessibilityValue(
+                        "\(selectedPageIndex + 1)/\(pages.count)"
+                    )
+                    .accessibilityAdjustableAction { direction in
+                        movePage(direction)
+                    }
+                    .accessibilityIdentifier(
+                        "shinagaki-lightbox-page-indicator"
+                    )
                     .frame(
                         maxWidth: .infinity,
                         maxHeight: .infinity,
-                        alignment: .topLeading
+                        alignment: .bottom
                     )
-                    .padding(.top, Spacing.small)
-                    .padding(.leading, Spacing.large)
-
-                Button {
-                    dismiss()
-                } label: {
-                    LucideIcon("xmark", size: IconSize.inline)
-                        .foregroundStyle(.white)
-                        .frame(width: HitArea.minimum, height: HitArea.minimum)
-                        .surface(.floating, padding: 0)
-                        .contentShape(.circle)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close")
-                .accessibilityIdentifier("shinagaki-lightbox-close")
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.top, Spacing.small)
-                .padding(.trailing, Spacing.large)
-
-                if pages.count > 1 {
-                    // The floating surface's 24 pt radius makes a capsule at
-                    // this 44 pt height.
-                    Text("Page \(selectedPageIndex + 1) of \(pages.count)")
-                        .font(.control)
-                        .foregroundStyle(.white)
-                        .singleLineToken()
-                        .padding(.horizontal, Spacing.medium)
-                        .frame(minHeight: HitArea.minimum)
-                        .surface(.floating, padding: 0)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(
-                            "Page \(selectedPageIndex + 1) of \(pages.count)"
-                        )
-                        .accessibilityValue(
-                            "\(selectedPageIndex + 1)/\(pages.count)"
-                        )
-                        .accessibilityAdjustableAction { direction in
-                            movePage(direction)
-                        }
-                        .accessibilityIdentifier(
-                            "shinagaki-lightbox-page-indicator"
-                        )
-                        .frame(
-                            maxWidth: .infinity,
-                            maxHeight: .infinity,
-                            alignment: .bottom
-                        )
-                        .padding(.bottom, Spacing.large)
-                }
+                    .padding(.bottom, Spacing.large)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         // A drag-to-dismiss presentation uses a clear presentation background,
         // so the backdrop above fades to reveal the screen underneath.
         .background(isDragToDismissEnabled ? Color.clear : Color.black)
@@ -384,7 +366,7 @@ struct ShinagakiLightbox: View {
         DragGesture(minimumDistance: 24)
             .onChanged { value in
                 let translation = value.translation
-                // Horizontal drags page through the TabView; only a
+                // Horizontal drags page through the pager; only a
                 // mostly-downward drag moves the image.
                 guard translation.height > 0,
                       abs(translation.height) > abs(translation.width)
@@ -404,6 +386,68 @@ struct ShinagakiLightbox: View {
                     }
                 }
             }
+    }
+
+    /// Full-bleed horizontal pager. A paged `TabView` is backed by a UIKit
+    /// collection view that still applies the window's safe-area insets to
+    /// its content offset, so on a device with an asymmetric side inset
+    /// (iPhone Duo, landscape iPhone) each page sat shifted by that inset and
+    /// the next page showed at the edge. A SwiftUI scroll view that ignores
+    /// the safe area pages by its own full width instead. Each page takes the
+    /// full container size, including the top and bottom insets; the
+    /// controls stay in the safe container.
+    private var pager: some View {
+        GeometryReader { proxy in
+            ScrollViewReader { reader in
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(pages) { page in
+                            ShinagakiLightboxPageView(page: page) { isZoomed in
+                                if isZoomed {
+                                    zoomedPageIDs.insert(page.id)
+                                } else {
+                                    zoomedPageIDs.remove(page.id)
+                                }
+                            }
+                            .frame(
+                                width: proxy.size.width,
+                                height: proxy.size.height
+                            )
+                            .accessibilityIdentifier(
+                                "shinagaki-lightbox-page-\(page.id)"
+                            )
+                            .id(page.id)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: scrolledPageID)
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                .accessibilityIdentifier("shinagaki-lightbox")
+                .onAppear {
+                    reader.scrollTo(selectedPageID)
+                }
+                // Keep the selected page in place when the window resizes
+                // (rotation, iPad multitasking, iPhone Duo pose changes).
+                .onChange(of: proxy.size) {
+                    reader.scrollTo(selectedPageID)
+                }
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    private var scrolledPageID: Binding<ShinagakiLightboxPage.ID?> {
+        Binding(
+            get: { selectedPageID },
+            set: { newValue in
+                if let newValue, newValue != selectedPageID {
+                    selectedPageID = newValue
+                }
+            }
+        )
     }
 
     private var imageActionControls: some View {
