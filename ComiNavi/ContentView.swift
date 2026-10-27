@@ -29,6 +29,9 @@ struct ContentView: View {
     @State private var selectedDay = 1
     @State private var showsCatalogSettings = false
     @State private var exploreColumnWidth: CGFloat?
+    #if DEBUG
+        @State private var didOpenDayPickerForUITesting = false
+    #endif
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let externalSelection: Binding<AppTab>?
@@ -141,6 +144,7 @@ struct ContentView: View {
         .onChange(of: readyDataSourceID, initial: true) {
             restoreRememberedDay()
             handlePendingSharedLocation()
+            openDayPickerForUITesting()
         }
         .onChange(of: selectedDay) { _, day in
             guard let circle = readyDataSource else { return }
@@ -198,6 +202,22 @@ struct ContentView: View {
                 resetAction: catalogResetAction
             )
         }
+    }
+
+    /// `-cominavi-ui-testing-open-day-picker` opens the Day & Comiket sheet
+    /// once the first catalog is ready, so screenshot scripts reach it
+    /// without a tap.
+    private func openDayPickerForUITesting() {
+        #if DEBUG
+            guard !didOpenDayPickerForUITesting,
+                  readyDataSource != nil,
+                  ProcessInfo.processInfo.arguments.contains(
+                      "-cominavi-ui-testing-open-day-picker"
+                  )
+            else { return }
+            didOpenDayPickerForUITesting = true
+            showsCatalogSettings = true
+        #endif
     }
 
     private func restoreRememberedDay() {

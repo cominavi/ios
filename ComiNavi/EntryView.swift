@@ -77,6 +77,7 @@ struct EntryView: View {
     var body: some View {
         appContent
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onAppear(perform: applyUITestingInitialTab)
             .onOpenURL { url in
                 if GoogleSignInIDTokenProvider.handle(url) {
                     return
@@ -676,6 +677,20 @@ struct EntryView: View {
             case unexpectedImage
         }
     #endif
+
+    /// `-cominavi-ui-testing-initial-tab map|explore|plans|profile` opens
+    /// the app on that tab, so screenshot scripts reach a tab without a
+    /// tap. Taps from simulator tools do not reach the app on every device.
+    private func applyUITestingInitialTab() {
+        #if DEBUG
+            let arguments = ProcessInfo.processInfo.arguments
+            guard let index = arguments.firstIndex(of: "-cominavi-ui-testing-initial-tab"),
+                  arguments.indices.contains(index + 1),
+                  let tab = AppTab(rawValue: arguments[index + 1])
+            else { return }
+            selectedTab = tab
+        #endif
+    }
 
     private func leaveForcedSignIn() {
         #if DEBUG
