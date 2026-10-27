@@ -1354,6 +1354,62 @@ enum UnifiedMapMarkerMetrics {
     static func backingSize(for icon: BigSightMapIcon, iconSize: CGFloat) -> CGFloat {
         iconSize + (icon.venueBadge == nil ? 6 : 10)
     }
+
+    /// The rounded bold face of every map title.
+    static func titleFont(size: CGFloat) -> UIFont {
+        let base = UIFont.systemFont(ofSize: size, weight: .bold)
+        return base.fontDescriptor.withDesign(.rounded)
+            .map { UIFont(descriptor: $0, size: size) } ?? base
+    }
+
+    static func titleWidth(_ text: String, fontSize: CGFloat) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: titleFont(size: fontSize)]).width)
+    }
+
+    /// A facility title laid out for at most two lines of `maxWidth`.
+    ///
+    /// A title that fits stays on one line. A longer title breaks at the word
+    /// boundary that gives the two most equal lines, so "エントランスプラザ喫煙所"
+    /// becomes "エントランスプラザ / 喫煙所", never "エントランスプラ / ザ喫煙所".
+    /// The returned text holds the break as "\n", and `width` is the wrap
+    /// width that keeps both lines whole. `nil` means that no word boundary
+    /// gives two lines that fit: the map then shows the icon without a title.
+    static func facilityTitle(
+        _ text: String,
+        fontSize: CGFloat,
+        maxWidth: CGFloat
+    ) -> (text: String, width: CGFloat)? {
+        guard !text.isEmpty else { return (text, maxWidth) }
+        if titleWidth(text, fontSize: fontSize) <= maxWidth {
+            return (text, maxWidth)
+        }
+        // ICU word boundaries also split Japanese and Chinese into words.
+        var wordStarts: [String.Index] = []
+        text.enumerateSubstrings(
+            in: text.startIndex..<text.endIndex,
+            options: [.byWords, .substringNotRequired]
+        ) { _, range, _, _ in
+            if range.lowerBound > text.startIndex {
+                wordStarts.append(range.lowerBound)
+            }
+        }
+        var best: (text: String, width: CGFloat)?
+        for index in wordStarts {
+            let first = text[..<index].trimmingCharacters(in: .whitespaces)
+            let second = text[index...].trimmingCharacters(in: .whitespaces)
+            guard !first.isEmpty, !second.isEmpty else { continue }
+            let width = max(
+                titleWidth(first, fontSize: fontSize),
+                titleWidth(second, fontSize: fontSize)
+            )
+            guard width <= maxWidth else { continue }
+            if best.map({ width < $0.width }) ?? true {
+                best = ("\(first)\n\(second)", width)
+            }
+        }
+        // One point of slack, so rounding never wraps a line a second time.
+        return best.map { ($0.text, $0.width + 1) }
+    }
 }
 
 @MainActor
@@ -3240,36 +3296,25 @@ final class UnifiedBigSightScene: SKScene {
         label.position = position
         label.zPosition = zPosition
         if let maxWidth {
-            // Long facility names wrap to two lines instead of running off
-            // the screen. Japanese breaks between characters, which is fine
-            // for map labels.
+            // Long facility names take two lines, broken only between words.
+            // A name that cannot fit loses its title; the icon stays.
             label.numberOfLines = 2
             label.lineBreakMode = .byWordWrapping
-            label.preferredMaxLayoutWidth = balancedWrapWidth(
-                for: text,
+            if let title = UnifiedMapMarkerMetrics.facilityTitle(
+                text,
                 fontSize: fontSize,
                 maxWidth: maxWidth
-            )
+            ) {
+                label.text = title.text
+                label.preferredMaxLayoutWidth = title.width
+            } else {
+                label.text = ""
+            }
         }
-        if halo, !text.isEmpty {
-            label.addChild(haloNode(for: label, text: text, fontSize: fontSize))
+        if halo, let shownText = label.text, !shownText.isEmpty {
+            label.addChild(haloNode(for: label, text: shownText, fontSize: fontSize))
         }
         return label
-    }
-
-    /// The wrap width that splits a two-line title into two lines of about
-    /// equal length, so no single word or character ("所" of 喫煙所) is left
-    /// alone on the second line. A title that fits keeps `maxWidth`.
-    private func balancedWrapWidth(for text: String, fontSize: CGFloat, maxWidth: CGFloat) -> CGFloat {
-        let base = UIFont.systemFont(ofSize: fontSize, weight: .bold)
-        let font =
-            base.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: fontSize) }
-            ?? base
-        let width = ceil((text as NSString).size(withAttributes: [.font: font]).width)
-        guard width > maxWidth else { return maxWidth }
-        // Half the line plus two em of slack, so word wrapping in English
-        // still finds a break within two lines.
-        return min(maxWidth, width / 2 + fontSize * 2)
     }
 
     /// The halo behind a map label: copies of the label in the floor color,

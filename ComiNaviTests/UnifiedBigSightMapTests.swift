@@ -510,6 +510,41 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertLessThan(luminance(host.backgroundColor), 0.1)
     }
 
+    func testFacilityTitlesBreakOnlyBetweenWords() throws {
+        let maxWidth = UnifiedMapMarkerMetrics.facilityLabelMaxWidth
+
+        let short = try XCTUnwrap(
+            UnifiedMapMarkerMetrics.facilityTitle("ATM", fontSize: 11, maxWidth: maxWidth)
+        )
+        XCTAssertEqual(short.text, "ATM")
+
+        let japanese = try XCTUnwrap(
+            UnifiedMapMarkerMetrics.facilityTitle(
+                "エントランスプラザ喫煙所", fontSize: 11, maxWidth: maxWidth)
+        )
+        let japaneseLines = japanese.text.components(separatedBy: "\n")
+        XCTAssertEqual(japaneseLines.count, 2)
+        // The break falls between words, never inside プラザ.
+        XCTAssertFalse(japaneseLines[0].hasSuffix("プラ"))
+        XCTAssertTrue(japanese.text.replacingOccurrences(of: "\n", with: "") == "エントランスプラザ喫煙所")
+
+        let english = try XCTUnwrap(
+            UnifiedMapMarkerMetrics.facilityTitle(
+                "Entrance Plaza Smoking Area", fontSize: 11, maxWidth: maxWidth)
+        )
+        XCTAssertEqual(english.text, "Entrance Plaza\nSmoking Area")
+        for line in english.text.components(separatedBy: "\n") {
+            XCTAssertLessThanOrEqual(
+                UnifiedMapMarkerMetrics.titleWidth(line, fontSize: 11), english.width)
+        }
+
+        // One long word cannot break, so the map drops the title.
+        XCTAssertNil(
+            UnifiedMapMarkerMetrics.facilityTitle(
+                String(repeating: "W", count: 40), fontSize: 11, maxWidth: maxWidth)
+        )
+    }
+
     func testDarkPalettePreservesContrastForMapGeometry() {
         let palette = UnifiedMapAppearance.dark.palette
 
