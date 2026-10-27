@@ -34,7 +34,7 @@ enum ExploreSort: String, CaseIterable, Identifiable, Sendable {
     var title: LocalizedStringResource {
         switch self {
         case .catalog: "Catalog order"
-        case .latestShinagaki: "Latest shinagaki"
+        case .latestShinagaki: "Latest item lists"
         }
     }
 
@@ -56,8 +56,18 @@ enum ExploreShinagakiFilter: String, CaseIterable, Identifiable, Sendable {
     var title: LocalizedStringResource {
         switch self {
         case .all: "All circles"
-        case .available: "Has shinagaki"
-        case .highConfidence: "High-confidence shinagaki"
+        case .available: "Has item list"
+        case .highConfidence: "High-confidence item list"
+        }
+    }
+
+    /// The one-line choice title in the filter sheet, where the field title
+    /// ("Item list") already gives the context.
+    var choiceTitle: LocalizedStringResource {
+        switch self {
+        case .all: "All"
+        case .available: "Has item list"
+        case .highConfidence: "High confidence"
         }
     }
 }
@@ -72,6 +82,15 @@ enum ExploreFavoriteFilter: String, CaseIterable, Identifiable, Sendable {
     var title: LocalizedStringResource {
         switch self {
         case .all: "All save states"
+        case .saved: "Saved only"
+        case .notSaved: "Not saved"
+        }
+    }
+
+    /// The one-line choice title in the filter sheet.
+    var choiceTitle: LocalizedStringResource {
+        switch self {
+        case .all: "All"
         case .saved: "Saved only"
         case .notSaved: "Not saved"
         }
@@ -92,6 +111,15 @@ enum ExploreAttendanceFilter: String, CaseIterable, Identifiable, Sendable {
         case .withdrawn: "Withdrawn circles"
         }
     }
+
+    /// The one-line choice title in the filter sheet.
+    var choiceTitle: LocalizedStringResource {
+        switch self {
+        case .all: "All"
+        case .attending: "Confirmed"
+        case .withdrawn: "Withdrawn"
+        }
+    }
 }
 
 enum ExploreSpaceFilter: String, CaseIterable, Identifiable, Sendable {
@@ -106,6 +134,15 @@ enum ExploreSpaceFilter: String, CaseIterable, Identifiable, Sendable {
         case .all: "All space types"
         case .combinedAB: "A+B circles"
         case .singleSpace: "Single-space circles"
+        }
+    }
+
+    /// The one-line choice title in the filter sheet.
+    var choiceTitle: LocalizedStringResource {
+        switch self {
+        case .all: "All"
+        case .combinedAB: "A+B"
+        case .singleSpace: "Single space"
         }
     }
 }
