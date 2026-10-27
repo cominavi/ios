@@ -1324,8 +1324,9 @@ enum UnifiedMapMarkerMetrics {
     static let facilityLabelMaxWidth: CGFloat = 120
     /// Gap between a marker backing and its title.
     static let labelClearance: CGFloat = Spacing.xSmall
-    /// Width of the halo stroke behind map text, in points.
-    static let labelHaloWidth: CGFloat = 3
+    /// Distance by which the halo extends past the outline of map text,
+    /// in points.
+    static let labelHaloWidth: CGFloat = 1.5
 
     // Shared by the SpriteKit badge and `BigSightVenueBadge`, so the two
     // renderers keep one shape.
@@ -2654,23 +2655,30 @@ final class UnifiedBigSightScene: SKScene {
     private func layoutMarkerLabels() {
         guard let view else { return }
         let insets = effectiveOverviewInsets
+        // Titles keep the 8 pt gap from the screen edges too, so no title
+        // touches the edge of the display.
         let viewport = CGRect(
             x: insets.left,
             y: insets.top,
             width: view.bounds.width - insets.left - insets.right,
             height: view.bounds.height - insets.top - insets.bottom
-        )
+        ).insetBy(dx: Spacing.small, dy: 0)
         let venues = venueMarkers.filter { !$0.node.isHidden }
         var obstacles = venues.map(badgeViewRect)
 
+        let badgeRects = obstacles
         for marker in venues {
             guard marker.label.alpha > 0 else { continue }
+            let ownBadge = badgeViewRect(marker)
             place(
                 marker.label,
                 of: marker,
                 sides: [.below, .trailing, .leading, .above],
                 in: viewport,
-                obstacles: &obstacles
+                obstacles: &obstacles,
+                // A hall title must sit closer to its own badge than to any
+                // other badge, or "East 7" reads as the name of East 4–6.
+                otherBadges: badgeRects.filter { $0 != ownBadge }
             )
         }
 
@@ -2712,13 +2720,21 @@ final class UnifiedBigSightScene: SKScene {
     /// Moves `label` to the first side of its marker whose rect stays inside
     /// `viewport` and clear of `obstacles`, then adds that rect to
     /// `obstacles`. Hides the label when no side is clear.
+    ///
+    /// The own badge only needs to stay clear of the label; every other
+    /// obstacle keeps an 8 pt gap, so two titles never stack into one block
+    /// and a title never touches a neighbor badge. With `otherBadges`, a side
+    /// is also rejected when the label would sit nearer to one of those
+    /// badges than to its own.
     private func place(
         _ label: SKLabelNode,
         of marker: ScreenSpaceMarker,
         sides: [LabelSide],
         in viewport: CGRect,
-        obstacles: inout [CGRect]
+        obstacles: inout [CGRect],
+        otherBadges: [CGRect] = []
     ) {
+        let ownBadge = badgeViewRect(marker)
         let center = markerViewCenter(marker)
         let size = label.frame.size
         let clearance = marker.badgeSize / 2 + UnifiedMapMarkerMetrics.labelClearance
@@ -2737,11 +2753,15 @@ final class UnifiedBigSightScene: SKScene {
                 width: size.width,
                 height: size.height
             )
-            // Keep a small gap to neighbors, so two titles never read as
-            // one block.
-            let probe = rect.insetBy(dx: -Spacing.xxSmall, dy: -Spacing.xxSmall)
+            let probe = rect.insetBy(dx: -Spacing.small, dy: -Spacing.small)
+            let ownDistance = Self.distance(between: rect, and: ownBadge)
             guard viewport.contains(rect),
-                !obstacles.contains(where: { $0.intersects(probe) })
+                !obstacles.contains(where: { obstacle in
+                    obstacle == ownBadge ? obstacle.intersects(rect) : obstacle.intersects(probe)
+                }),
+                !otherBadges.contains(where: {
+                    Self.distance(between: rect, and: $0) <= ownDistance + Spacing.xSmall
+                })
             else { continue }
             // The marker is scaled and rotated to stay screen-upright, so one
             // local unit is one screen point with the y axis pointing up.
@@ -2751,6 +2771,13 @@ final class UnifiedBigSightScene: SKScene {
             return
         }
         label.isHidden = true
+    }
+
+    /// The shortest gap between two rects; zero when they touch or overlap.
+    private static func distance(between a: CGRect, and b: CGRect) -> CGFloat {
+        let dx = max(0, max(a.minX - b.maxX, b.minX - a.maxX))
+        let dy = max(0, max(a.minY - b.maxY, b.minY - a.maxY))
+        return hypot(dx, dy)
     }
 
     private func markerViewCenter(_ marker: ScreenSpaceMarker) -> CGPoint {
@@ -3218,7 +3245,11 @@ final class UnifiedBigSightScene: SKScene {
             // for map labels.
             label.numberOfLines = 2
             label.lineBreakMode = .byWordWrapping
-            label.preferredMaxLayoutWidth = maxWidth
+            label.preferredMaxLayoutWidth = balancedWrapWidth(
+                for: text,
+                fontSize: fontSize,
+                maxWidth: maxWidth
+            )
         }
         if halo, !text.isEmpty {
             label.addChild(haloNode(for: label, text: text, fontSize: fontSize))
@@ -3226,39 +3257,57 @@ final class UnifiedBigSightScene: SKScene {
         return label
     }
 
-    /// A copy of the label drawn behind it with a thick stroke in the floor
-    /// color, the same halo the basemap uses for its own labels.
-    private func haloNode(for label: SKLabelNode, text: String, fontSize: CGFloat) -> SKLabelNode {
+    /// The wrap width that splits a two-line title into two lines of about
+    /// equal length, so no single word or character ("所" of 喫煙所) is left
+    /// alone on the second line. A title that fits keeps `maxWidth`.
+    private func balancedWrapWidth(for text: String, fontSize: CGFloat, maxWidth: CGFloat) -> CGFloat {
         let base = UIFont.systemFont(ofSize: fontSize, weight: .bold)
         let font =
             base.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: fontSize) }
             ?? base
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
-        paragraph.lineBreakMode = label.lineBreakMode
+        let width = ceil((text as NSString).size(withAttributes: [.font: font]).width)
+        guard width > maxWidth else { return maxWidth }
+        // Half the line plus two em of slack, so word wrapping in English
+        // still finds a break within two lines.
+        return min(maxWidth, width / 2 + fontSize * 2)
+    }
+
+    /// The halo behind a map label: copies of the label in the floor color,
+    /// offset in eight directions by the halo width, so roads and floor
+    /// artwork never cut through the text.
+    ///
+    /// The copies use the same font, wrap width, and alignment as the label,
+    /// so they line up glyph for glyph. A stroked `attributedText` copy did
+    /// not: SpriteKit draws attributed text with other metrics and clips the
+    /// stroke at the glyph bounds, so the halo drew as a smear beside the
+    /// text.
+    private func haloNode(for label: SKLabelNode, text: String, fontSize: CGFloat) -> SKNode {
         let haloColor = appearance.palette.labelHalo
-        let halo = SKLabelNode()
-        halo.name = "map-label-halo"
-        halo.attributedText = NSAttributedString(
-            string: text,
-            attributes: [
-                .font: font,
-                .foregroundColor: haloColor,
-                .strokeColor: haloColor,
-                // A negative width strokes and fills. The value is a
-                // percentage of the point size.
-                .strokeWidth: -(UnifiedMapMarkerMetrics.labelHaloWidth * 100 / fontSize),
-                .paragraphStyle: paragraph,
-            ]
-        )
-        halo.numberOfLines = label.numberOfLines
-        halo.lineBreakMode = label.lineBreakMode
-        halo.preferredMaxLayoutWidth = label.preferredMaxLayoutWidth
-        halo.horizontalAlignmentMode = .center
-        halo.verticalAlignmentMode = .center
-        halo.position = .zero
-        halo.zPosition = -0.05
-        return halo
+        let radius = UnifiedMapMarkerMetrics.labelHaloWidth
+        let container = SKNode()
+        container.name = "map-label-halo"
+        container.zPosition = -0.05
+        let diagonal = radius * 0.7071
+        let offsets: [CGPoint] = [
+            CGPoint(x: radius, y: 0), CGPoint(x: -radius, y: 0),
+            CGPoint(x: 0, y: radius), CGPoint(x: 0, y: -radius),
+            CGPoint(x: diagonal, y: diagonal), CGPoint(x: -diagonal, y: diagonal),
+            CGPoint(x: diagonal, y: -diagonal), CGPoint(x: -diagonal, y: -diagonal),
+        ]
+        for offset in offsets {
+            let copy = SKLabelNode(fontNamed: label.fontName)
+            copy.text = text
+            copy.fontSize = fontSize
+            copy.fontColor = haloColor
+            copy.numberOfLines = label.numberOfLines
+            copy.lineBreakMode = label.lineBreakMode
+            copy.preferredMaxLayoutWidth = label.preferredMaxLayoutWidth
+            copy.horizontalAlignmentMode = label.horizontalAlignmentMode
+            copy.verticalAlignmentMode = label.verticalAlignmentMode
+            copy.position = offset
+            container.addChild(copy)
+        }
+        return container
     }
 
     private func markerNode(
