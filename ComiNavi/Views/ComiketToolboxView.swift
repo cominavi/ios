@@ -536,26 +536,24 @@ private struct ToolboxActionRow: View {
     }
 }
 
-/// A row title with an optional external-link glyph on its first line. The
-/// glyph sits after the title instead of in a trailing column, so the subtitle
-/// below can use the full width of the row.
+/// A row title with an optional external-link glyph. The glyph is drawn at
+/// the end of the text and wraps with the last word (`TrailingGlyphText`), so
+/// it never splits the title or leaves a word alone on the next line.
 private struct ToolboxRowTitle: View {
     let title: Text
     let opensExternally: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.xSmall) {
-            title
-                .font(.rowTitle)
-                .foregroundStyle(.primary)
-                .wrapsFully()
-                .layoutPriority(1)
-
+        Group {
             if opensExternally {
-                LucideIcon("external-link", size: IconSize.caption)
-                    .foregroundStyle(.tertiary)
+                TrailingGlyphText(title, glyph: "external-link")
+            } else {
+                title
             }
         }
+        .font(.rowTitle)
+        .foregroundStyle(.primary)
+        .wrapsFully()
     }
 }
 
