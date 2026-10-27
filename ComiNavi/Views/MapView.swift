@@ -1132,12 +1132,14 @@ private struct MapSelectorBar: View {
             }
             .buttonStyle(.plain)
             .disabled(!isGenreOverlayAvailable)
+            // A plain button does not dim when disabled.
+            .opacity(isGenreOverlayAvailable ? 1 : 0.45)
             .accessibilityLabel(
                 isGenreOverlayAvailable && model.showsGenreOverlay
                     ? "Hide genre overlay" : "Show genre overlay"
             )
             .accessibilityHint(
-                isGenreOverlayAvailable ? Text("") : Text("Open a hall to show genre colors.")
+                isGenreOverlayAvailable ? Text(verbatim: "") : Text("Open a hall to show genre colors.")
             )
             .accessibilityIdentifier("map-genre-button")
 
