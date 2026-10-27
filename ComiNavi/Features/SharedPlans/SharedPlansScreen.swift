@@ -522,14 +522,14 @@ private struct SharedPlanHomeActionButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
-                LucideIcon(icon, size: 22)
+            HStack(spacing: Spacing.iconToText) {
+                LucideIcon(icon, size: IconSize.action)
                     .foregroundStyle(isProminent ? Color.onAccentFill : Color.accentColor)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     Text(title)
-                        .font(.headline)
+                        .font(.rowTitle)
                     Text(subtitle)
-                        .font(.subheadline)
+                        .font(.rowSubtitle)
                         .foregroundStyle(isProminent ? Color.onAccentFill.opacity(0.8) : Color.secondary)
                 }
                 .multilineTextAlignment(.leading)
@@ -537,15 +537,15 @@ private struct SharedPlanHomeActionButton: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .foregroundStyle(isProminent ? Color.onAccentFill : Color.primary)
-            .padding(16)
+            .padding(Spacing.cardPadding)
             .frame(maxWidth: .infinity, minHeight: 64)
             .background(
                 isProminent
                     ? Color.accentFill
                     : Color(uiColor: .secondarySystemGroupedBackground),
-                in: .rect(cornerRadius: 16)
+                in: .rect(cornerRadius: Radius.card, style: .continuous)
             )
-            .contentShape(.rect(cornerRadius: 16))
+            .contentShape(.rect(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(.plain)
         .opacity(isEnabled ? 1 : 0.5)

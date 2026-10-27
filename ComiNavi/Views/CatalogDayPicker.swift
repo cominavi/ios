@@ -173,14 +173,7 @@ private struct CatalogEventStatusBadge: View {
     let status: CatalogEventStatus
 
     var body: some View {
-        Text(status.title)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .fixedSize()
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color(uiColor: .tertiarySystemFill), in: .capsule)
+        StatusBadge(Text(status.title))
     }
 }
 
