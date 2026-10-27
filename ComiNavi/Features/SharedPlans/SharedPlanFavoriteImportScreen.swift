@@ -26,35 +26,26 @@ struct SharedPlanFavoriteImportScreen: View {
         NavigationStack {
             Group {
                 if model.isLoading, model.items.isEmpty {
-                    FocusedActionSurface(
-                        symbolName: "star",
-                        animatesBackdrop: true
+                    EmptyStateView(
+                        "Checking favorites…",
+                        icon: "star",
+                        message: "ComiNavi is looking in Circle.ms for circles that are not in this plan yet."
                     ) {
-                        Text("Checking favorites…")
-                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                        Text("ComiNavi is looking in Circle.ms for circles that are not in this plan yet.")
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 12)
                         CatalogActivityIndicator(
                             accessibilityLabel: "Checking Circle.ms favorites…"
                         )
-                        .padding(.top, 30)
                     }
                 } else if let issue = model.issueMessage, model.items.isEmpty {
-                    FocusedActionSurface(
-                        symbolName: "exclamationmark.triangle.fill",
-                        tint: .orange
-                    ) {
-                        Text("Cannot load favorites")
-                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    EmptyStateView("Cannot load favorites", icon: "triangle-alert") {
                         Text(issue)
+                            .font(.rowSubtitle)
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 12)
-                        FocusedActionButton(action: load) {
+                            .multilineTextAlignment(.center)
+                            .wrapsFully()
+                        Button(action: load) {
                             LucideLabel("Try Again", icon: "arrow.clockwise")
                         }
-                        .padding(.top, 28)
+                        .buttonStyle(.primaryAction)
                     }
                 } else {
                     favoritesList
@@ -95,11 +86,11 @@ struct SharedPlanFavoriteImportScreen: View {
             if !model.failures.isEmpty {
                 Section("Circles not added") {
                     ForEach(model.failures) { failure in
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                             Text("A selected circle")
-                                .font(.headline)
+                                .font(.rowTitle)
                             Text(failure.message)
-                                .font(.caption)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -125,11 +116,11 @@ struct SharedPlanFavoriteImportScreen: View {
                                 set: { model.setSelected($0, wcID: item.wcID) }
                             )
                         ) {
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                                 Text(item.circleName.isEmpty ? String(localized: "Unnamed circle") : item.circleName)
                                 if !item.memo.isEmpty {
                                     Text(item.memo)
-                                        .font(.caption)
+                                        .font(.meta)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(2)
                                 }
@@ -154,8 +145,7 @@ struct SharedPlanFavoriteImportScreen: View {
         .overlay {
             if model.isImporting {
                 ProgressView("Adding circles…")
-                    .padding()
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .surface(.floating, padding: Spacing.large)
             }
         }
     }
