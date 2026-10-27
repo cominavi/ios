@@ -945,14 +945,20 @@ private struct CircleDetailHeader<Actions: View>: View {
 
     private var mapButton: some View {
         Button(action: onOpenMap) {
-            HStack(spacing: Spacing.xSmall) {
-                Text("Show on map")
-                if isOpeningMap {
+            if isOpeningMap {
+                HStack(spacing: Spacing.xSmall) {
+                    Text("Show on map")
                     ProgressView()
                         .controlSize(.small)
-                } else {
-                    LucideIcon("chevron.forward", size: IconSize.caption)
                 }
+            } else {
+                // The chevron is in the text run, so at accessibility sizes
+                // it wraps with "map" instead of taking its own column.
+                TrailingGlyphText(
+                    Text("Show on map"),
+                    glyph: "chevron.forward",
+                    glyphStyle: .primary
+                )
             }
         }
         .buttonStyle(.tertiaryAction)
