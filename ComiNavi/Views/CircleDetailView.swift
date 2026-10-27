@@ -1160,39 +1160,39 @@ private struct CircleUserPlanSection: View {
         @Bindable var model = model
 
         CircleDetailSection("Favorite settings") {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .top, spacing: 12) {
-                    LucideIcon("star.fill", size: 20)
+            VStack(alignment: .leading, spacing: Spacing.large) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.iconToText) {
+                    LucideIcon("star.fill", size: IconSize.row)
                         .foregroundStyle(Color.accentColor)
-                        .frame(width: 42, height: 42)
-                        .background(Color.accentColor.opacity(0.12), in: .circle)
 
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                         Text("Saved to favorites")
-                            .font(.body.weight(.semibold))
+                            .font(.rowTitle)
                         Text("Choose a label color for this favorite.")
-                            .font(.caption)
+                            .font(.rowSubtitle)
                             .foregroundStyle(.secondary)
                     }
+                    .wrapsFully()
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Spacer(minLength: 8)
-
+                    // The badge keeps its size; the text beside it wraps.
                     if let selectedColor = model.selectedColor {
                         FavoriteColorLabelBadge(
                             color: selectedColor,
                             label: colorLabelStore.customLabels[selectedColor]
                         )
+                        .layoutPriority(1)
                     }
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("circle-favorite-status")
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: Spacing.small) {
                     Text("Label color")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.control)
 
                     ScrollView(.horizontal) {
-                        HStack(spacing: 10) {
+                        HStack(spacing: Spacing.small) {
                             ForEach(BookmarkColor.selectableColors) { color in
                                 CirclePlanColorButton(
                                     color: color,
@@ -1206,25 +1206,23 @@ private struct CircleUserPlanSection: View {
                     .scrollIndicators(.hidden)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Spacing.small) {
                     Text("Private note")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.control)
 
                     TextEditor(text: $model.memo)
                         .focused($isNoteFocused)
                         .frame(minHeight: 92)
-                        .padding(10)
+                        .padding(Spacing.small)
                         .scrollContentBackground(.hidden)
                         .background(
                             Color(uiColor: .tertiarySystemGroupedBackground),
-                            in: .rect(cornerRadius: 12)
+                            in: .rect(cornerRadius: Radius.control, style: .continuous)
                         )
                         .overlay {
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(
-                                    isNoteFocused
-                                        ? Color.accentColor
-                                        : Color(uiColor: .separator).opacity(0.3),
+                            RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                                .strokeBorder(
+                                    isNoteFocused ? Color.accentColor : Color.hairline,
                                     lineWidth: isNoteFocused ? 1.5 : 0.5
                                 )
                         }
@@ -1300,6 +1298,7 @@ private struct CircleDetailPrincipalTitle: View {
                 .font(.headline)
                 .lineLimit(1)
 
+            // Bar chrome: one line each, truncated at the tail.
             if let subtitle {
                 Text(subtitle)
                     .font(.caption)
@@ -1316,39 +1315,36 @@ private struct CircleWithdrawalNotice: View {
 
     var body: some View {
         if let claim = claims.first {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+            let shape = RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+            VStack(alignment: .leading, spacing: Spacing.small) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
                     LucideLabel("Reported not attending", icon: "person.crop.circle.badge.xmark")
-                        .font(.headline)
+                        .font(.rowTitle)
                         .foregroundStyle(.red)
+                        .wrapsFully()
+                        .layoutPriority(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Spacer(minLength: 8)
-
-                    Text(claim.confidence.title)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.red.opacity(0.12), in: .capsule)
+                    StatusBadge(Text(claim.confidence.title), tone: .warning)
                 }
 
                 Text("A public X post says this allocated circle will not attend. Its official catalog placement remains shown.")
-                    .font(.subheadline)
+                    .font(.rowSubtitle)
                     .foregroundStyle(.secondary)
+                    .wrapsFully()
 
                 Link(destination: claim.postURL) {
                     LucideLabel("View attendance evidence on X", icon: "arrow.up.right")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(minHeight: 44)
                 }
+                .buttonStyle(.tertiaryAction)
                 .accessibilityHint("Opens the original public post")
             }
-            .padding(16)
+            .padding(Spacing.cardPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.red.opacity(0.08), in: .rect(cornerRadius: 16))
+            // A destructive-status card: the red tint replaces the grouped fill.
+            .background(Color.red.opacity(0.08), in: shape)
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.red.opacity(0.24), lineWidth: 0.5)
+                shape.strokeBorder(Color.red.opacity(0.24), lineWidth: 0.5)
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("circle-withdrawal-notice")
@@ -1405,12 +1401,14 @@ private struct CircleDetailDataSourcesSheet: View {
         Section("Public X evidence") {
             ForEach(xEvidence) { evidence in
                 Link(destination: evidence.url) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                         Text(evidence.title)
                             .foregroundStyle(.primary)
                         Text(verbatim: "@\(evidence.authorHandle)")
-                            .font(.caption)
+                            .font(.meta)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                     }
                 }
                 .accessibilityHint("Opens the original public post")
@@ -1452,43 +1450,31 @@ private struct CatalogXEvidence: Identifiable {
 
 private struct CircleDetailSection<Content: View>: View {
     let title: LocalizedStringResource
-    let contentInsets: EdgeInsets
+    let contentPadding: CGFloat
     let content: Content
 
+    /// - Parameter contentPadding: The card's inner padding. Pass 0 when the
+    ///   rows draw their own insets.
     init(
         _ title: LocalizedStringResource,
-        contentInsets: EdgeInsets = EdgeInsets(
-            top: 16,
-            leading: 16,
-            bottom: 16,
-            trailing: 16
-        ),
+        contentPadding: CGFloat = Spacing.cardPadding,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
-        self.contentInsets = contentInsets
+        self.contentPadding = contentPadding
         self.content = content()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.medium) {
             Text(title)
-                .font(.title3.weight(.bold))
+                .font(.sectionTitle)
+                .wrapsFully()
+                .accessibilityAddTraits(.isHeader)
 
             content
-                .padding(contentInsets)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    Color(uiColor: .secondarySystemGroupedBackground),
-                    in: .rect(cornerRadius: 16)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(
-                            Color(uiColor: .separator).opacity(0.22),
-                            lineWidth: 0.5
-                        )
-                }
+                .surface(.card, padding: contentPadding)
         }
     }
 }
@@ -1503,7 +1489,7 @@ private struct CircleDetailSharedPlanSection: View {
     @State private var model = SharedPlanCirclePurchasePreviewModel()
 
     var body: some View {
-        CircleDetailSection("Shared Plans", contentInsets: EdgeInsets()) {
+        CircleDetailSection("Shared Plans", contentPadding: 0) {
             if model.groups.isEmpty {
                 emptyPurchaseButton
             } else {
@@ -1519,23 +1505,25 @@ private struct CircleDetailSharedPlanSection: View {
                     }
 
                     Divider()
-                        .padding(.leading, 16)
+                        .padding(.leading, Spacing.cardPadding)
 
                     Button {
                         isShowingRequest = true
                     } label: {
-                        HStack(spacing: 12) {
-                            LucideIcon("plus", size: 20)
+                        HStack(spacing: Spacing.iconToText) {
+                            LucideIcon("plus", size: IconSize.row)
                                 .foregroundStyle(.accent)
                                 .accessibilityHidden(true)
                             Text("Add purchase request")
-                                .font(.body.weight(.semibold))
-                            Spacer(minLength: 8)
-                            LucideIcon("chevron-right", size: 17)
+                                .font(.rowTitle)
+                                .wrapsFully()
+                                .layoutPriority(1)
+                            Spacer(minLength: Spacing.small)
+                            LucideIcon("chevron-right", size: IconSize.caption)
                                 .foregroundStyle(.tertiary)
                                 .accessibilityHidden(true)
                         }
-                        .padding(16)
+                        .padding(Spacing.cardPadding)
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
@@ -1567,21 +1555,23 @@ private struct CircleDetailSharedPlanSection: View {
         Button {
             isShowingRequest = true
         } label: {
-            HStack(spacing: 12) {
-                LucideIcon("shopping-cart", size: 22)
+            HStack(spacing: Spacing.iconToText) {
+                LucideIcon("shopping-cart", size: IconSize.row)
                     .foregroundStyle(.accent)
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     Text("Add a purchase request")
-                        .font(.body.weight(.semibold))
+                        .font(.rowTitle)
                     Text("Choose a plan, name the item, and set how many you need.")
-                        .font(.caption)
+                        .font(.rowSubtitle)
                         .foregroundStyle(.secondary)
                 }
-                Spacer(minLength: 8)
-                LucideIcon("chevron-right", size: 17)
+                .wrapsFully()
+                .layoutPriority(1)
+                Spacer(minLength: Spacing.small)
+                LucideIcon("chevron-right", size: IconSize.caption)
                     .foregroundStyle(.tertiary)
             }
-            .padding(16)
+            .padding(Spacing.cardPadding)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -1599,16 +1589,17 @@ private struct CircleDetailSharedPlanPurchaseGroup: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(group.planName)
-                .font(.caption.weight(.semibold))
+                .font(.meta.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+                .wrapsFully()
+                .padding(.horizontal, Spacing.cardPadding)
+                .padding(.top, Spacing.medium)
 
             ForEach(group.purchases) { purchase in
                 VStack(spacing: 0) {
                     if purchase.id != group.purchases.first?.id {
                         Divider()
-                            .padding(.leading, 16)
+                            .padding(.leading, Spacing.cardPadding)
                     }
 
                     NavigationLink {
@@ -1624,7 +1615,7 @@ private struct CircleDetailSharedPlanPurchaseGroup: View {
                             need: purchase.need,
                             hasConflict: purchase.hasConflict
                         )
-                        .padding(16)
+                        .padding(Spacing.cardPadding)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier(
@@ -1644,7 +1635,9 @@ private struct CircleDetailTagsSection: View {
 
     var body: some View {
         CircleDetailSection("Tags") {
-            CircleTagFlowLayout(spacing: 8) {
+            // The chips pad themselves to a 44 pt target, so rows need no
+            // extra line spacing.
+            CircleTagFlowLayout(spacing: Spacing.small, lineSpacing: 0) {
                 ForEach(tags, id: \.self) { tag in
                     NavigationLink {
                         ExploreTagPage(
@@ -1654,13 +1647,23 @@ private struct CircleDetailTagsSection: View {
                             favoriteColorLabelStore: favoriteColorLabelStore
                         )
                     } label: {
-                        LucideLabel(verbatim: tag, icon: "tag")
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .padding(.horizontal, 10)
-                            .frame(minHeight: 44)
-                            .background(Color.accentColor.opacity(0.12), in: .capsule)
+                        // A tag is a data value: one line, truncated in the
+                        // middle when it is wider than the card. The accent
+                        // tint keeps the chips visible on the card fill.
+                        HStack(spacing: Spacing.xSmall) {
+                            LucideIcon("tag", size: IconSize.caption)
+                            Text(verbatim: tag)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .font(.control)
+                        .padding(.horizontal, Spacing.medium)
+                        // 6 pt and 32 pt match the chip style's capsule.
+                        .padding(.vertical, 6)
+                        .frame(minHeight: 32)
+                        .background(Color.accentColor.opacity(0.12), in: .capsule)
+                        .padding(.vertical, (HitArea.minimum - 32) / 2)
+                        .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint("Shows circles with this tag")
@@ -1738,21 +1741,14 @@ private struct CircleDetailShinagakiSection: View {
     let posts: [CatalogShinagakiPost]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Item list")
-                    .font(.title3.weight(.bold))
-
-                Text("Shinagaki: the circle's items and prices")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
+        VStack(alignment: .leading, spacing: Spacing.medium) {
+            SectionHeader("Item list", subtitle: "The circle's items and prices")
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
 
             ShinagakiMatchNotice()
 
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Spacing.large) {
                 ForEach(posts) { post in
                     ShinagakiPostCard(post: post)
                 }
@@ -1765,20 +1761,11 @@ private struct CircleDetailShinagakiSection: View {
 
 private struct ShinagakiMatchNotice: View {
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            LucideIcon("exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-                .accessibilityHidden(true)
-
-            Text("Automatically matched from public X posts. Check the confidence and booth before relying on it.")
-                .foregroundStyle(.secondary)
-        }
-        .font(.footnote)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.1), in: .rect(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
+        InlineBanner(
+            "Automatically matched from public X posts. Check the confidence and space before relying on it.",
+            icon: "exclamationmark.triangle.fill",
+            tone: .warning
+        )
         .accessibilityIdentifier("shinagaki-match-notice")
     }
 }
@@ -1786,9 +1773,11 @@ private struct ShinagakiMatchNotice: View {
 private struct ShinagakiPostCard: View {
     let post: CatalogShinagakiPost
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.medium) {
+            HStack(alignment: .top, spacing: Spacing.xSmall) {
                 Link(destination: post.authorProfileURL ?? post.postURL) {
                     CircleXProfileRow(
                         profile: CircleXProfile(
@@ -1803,8 +1792,6 @@ private struct ShinagakiPostCard: View {
                 .buttonStyle(.plain)
                 .accessibilityHint("Opens in your browser")
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                Spacer(minLength: 8)
 
                 ShinagakiConfidenceIndicator(post: post)
             }
@@ -1824,34 +1811,56 @@ private struct ShinagakiPostCard: View {
                 postID: post.id
             )
 
-            HStack(spacing: 12) {
-                if let createdAt = post.createdAt {
-                    Text(
-                        createdAt,
-                        format: CatalogDateFormatting.full(for: createdAt)
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+            footer
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surface(.card)
+        .accessibilityElement(children: .contain)
+    }
 
-                Spacer(minLength: 8)
-
-                Link(destination: post.postURL) {
-                    LucideLabel("Open item list on X", icon: "arrow.up.right")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(minHeight: 44)
+    /// The post date and the link side by side, or stacked when they do not
+    /// both fit on one line (Japanese, large text sizes).
+    @ViewBuilder
+    private var footer: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Spacing.xSmall) {
+                postDate
+                openLink
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.medium) {
+                    postDate
+                    Spacer(minLength: Spacing.small)
+                    openLink
                 }
-                .accessibilityHint("Opens the original public post")
-                .accessibilityIdentifier("circle-shinagaki-post-\(post.id)")
+                VStack(alignment: .leading, spacing: Spacing.xSmall) {
+                    postDate
+                    openLink
+                }
             }
         }
-        .padding(16)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(uiColor: .separator).opacity(0.24), lineWidth: 0.5)
+    }
+
+    @ViewBuilder
+    private var postDate: some View {
+        if let createdAt = post.createdAt {
+            // ViewThatFits picks the row only when the date fits on one line
+            // at its ideal width; in the column the date may wrap.
+            Text(createdAt, format: CatalogDateFormatting.full(for: createdAt))
+                .font(.meta)
+                .foregroundStyle(.secondary)
+                .wrapsFully()
         }
-        .accessibilityElement(children: .contain)
+    }
+
+    private var openLink: some View {
+        Link(destination: post.postURL) {
+            LucideLabel("Open item list on X", icon: "arrow.up.right")
+        }
+        .buttonStyle(.tertiaryAction)
+        .accessibilityHint("Opens the original public post")
+        .accessibilityIdentifier("circle-shinagaki-post-\(post.id)")
     }
 
     private var displayableMedia: [CatalogShinagakiMedia] {
@@ -1881,10 +1890,8 @@ private struct ExpandableShinagakiText: View {
                 Button(isExpanded ? "Show less" : "Show more") {
                     toggleExpansion()
                 }
-                .font(.subheadline.weight(.semibold))
-                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.accentColor)
+                .buttonStyle(.tertiaryAction)
+                .frame(minWidth: HitArea.minimum, alignment: .leading)
                 .accessibilityIdentifier("shinagaki-post-expand-\(postID)")
             }
         }
@@ -1914,16 +1921,18 @@ private struct ShinagakiConfidenceIndicator: View {
         Button {
             isShowingDetails = true
         } label: {
-            VStack(spacing: 2) {
+            VStack(spacing: Spacing.xxSmall) {
                 confidenceLight(for: post.postConfidence)
                 confidenceLight(for: post.placementConfidence)
                 confidenceLight(for: overallConfidence)
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 5)
-            .background(Color.secondary.opacity(0.1), in: .rect(cornerRadius: 8))
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(.rect)
+            // 6 pt: a compact tile around the three 4 pt lights.
+            .padding(6)
+            .background(
+                Color(uiColor: .tertiarySystemFill),
+                in: .rect(cornerRadius: Radius.small, style: .continuous)
+            )
+            .minimumHitArea()
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Match confidence")
@@ -1989,7 +1998,7 @@ private struct ShinagakiConfidenceSheet: View {
                     confidenceRow(
                         title: "Placement confidence",
                         confidence: placementConfidence,
-                        explanation: "How strongly the post is linked to this circle and its catalog booth placement."
+                        explanation: "How strongly the post is linked to this circle and its catalog space placement."
                     )
                     confidenceRow(
                         title: "Overall confidence",
@@ -1997,7 +2006,7 @@ private struct ShinagakiConfidenceSheet: View {
                         explanation: "The lower of the two confidence levels above, so a weak post or placement match lowers the overall result."
                     )
                 } footer: {
-                    Text("These are automatic estimates from public information. Check the original post and booth before relying on them.")
+                    Text("These are automatic estimates from public information. Check the original post and space before relying on them.")
                 }
             }
             .navigationTitle("Match confidence")
@@ -2018,30 +2027,31 @@ private struct ShinagakiConfidenceSheet: View {
         confidence: CatalogConfidence,
         explanation: LocalizedStringResource
     ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Spacing.medium) {
             Capsule()
                 .fill(confidence.indicatorColor)
                 .frame(width: 6, height: 28)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: Spacing.xSmall) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.medium) {
                     Text(title)
-                        .font(.headline)
-
-                    Spacer(minLength: 12)
+                        .font(.rowTitle)
+                        .layoutPriority(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     Text(confidence.title)
-                        .font(.subheadline.weight(.semibold))
+                        .font(.control)
                         .foregroundStyle(confidence.indicatorColor)
+                        .singleLineToken()
                 }
 
                 Text(explanation)
-                    .font(.subheadline)
+                    .font(.rowSubtitle)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.xSmall)
         .accessibilityElement(children: .combine)
     }
 }
@@ -2091,12 +2101,11 @@ private struct ShinagakiRemoteImage: View {
                     ZStack(alignment: .bottomTrailing) {
                         FittedArtworkImage(image: Image(uiImage: image))
 
-                        LucideIcon("arrow.up.left.and.arrow.down.right")
-                            .font(.caption.weight(.bold))
+                        LucideIcon("arrow.up.left.and.arrow.down.right", size: IconSize.caption)
                             .foregroundStyle(.primary)
                             .frame(width: 32, height: 32)
                             .background(.regularMaterial, in: .circle)
-                            .padding(8)
+                            .padding(Spacing.small)
                             .accessibilityHidden(true)
                     }
                     .contentShape(.rect)
@@ -2119,10 +2128,10 @@ private struct ShinagakiRemoteImage: View {
             }
         }
         .background(Color(uiColor: .secondarySystemFill))
-        .clipShape(.rect(cornerRadius: 12))
+        .clipShape(.rect(cornerRadius: Radius.control, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(uiColor: .separator).opacity(0.25), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                .strokeBorder(Color.hairline, lineWidth: 0.5)
         }
         .aspectRatio(
             ShinagakiArtworkLayout.previewAspectRatio(for: image?.size ?? .zero),
@@ -2173,7 +2182,7 @@ private struct ShinagakiMediaGallery: View {
 
     var body: some View {
         ScrollView(.horizontal) {
-            LazyHStack(alignment: .top, spacing: 12) {
+            LazyHStack(alignment: .top, spacing: Spacing.medium) {
                 ForEach(pages) { page in
                     ShinagakiRemoteImage(
                         page: page,
