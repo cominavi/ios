@@ -27,6 +27,9 @@ struct LucideIcon: View {
             .renderingMode(.template)
             .scaledToFit()
             .frame(width: dimension, height: dimension)
+            // A decorative glyph is not an element at all, so a combined row or
+            // a `LucideLabel` exposes its text once and no empty image node.
+            .accessibilityHidden(accessibilityLabel == nil)
     }
 
     private var icon: Image {
@@ -77,7 +80,41 @@ struct LucideIcon: View {
         "arrow.triangle.turn.up.right.diamond.fill": "navigation",
         "arrow.up.left.and.arrow.down.right": "maximize-2",
         "arrow.up.right": "external-link",
+        "arrow.down.circle": "circle-arrow-down",
         "arrow.down.circle.fill": "circle-arrow-down",
+        "arrow.right": "arrow-right",
+        "archivebox": "archive",
+        "bell": "bell",
+        "bell.slash": "bell-off",
+        "bubble.left.and.bubble.right": "messages-square",
+        "camera": "camera",
+        "camera.fill": "camera",
+        "cart.badge.minus": "shopping-cart-minus",
+        "cart.badge.plus": "shopping-cart-plus",
+        "checkmark.circle": "circle-check",
+        "checkmark.shield": "shield-check",
+        "checkmark.shield.fill": "shield-check",
+        "chevron.backward": "chevron-left",
+        "clock.arrow.circlepath": "rotate-ccw-clock",
+        "doc.on.clipboard": "clipboard",
+        "ellipsis.circle": "circle-ellipsis",
+        "exclamationmark.bubble": "message-circle-warning",
+        "exclamationmark.triangle": "triangle-alert",
+        "link": "link",
+        "link.badge.plus": "link",
+        "list.bullet.clipboard": "clipboard-list",
+        "lock": "lock",
+        "lock.fill": "lock",
+        "note.text": "notebook-text",
+        "number.circle": "hash",
+        "person.2": "users",
+        "person.2.slash": "user-round-x",
+        "person.badge.plus": "user-round-plus",
+        "questionmark.circle": "circle-question-mark",
+        "rectangle.2.swap": "arrow-left-right",
+        "trash": "trash",
+        "trash.fill": "trash",
+        "xmark.circle": "circle-x",
         "at": "at-sign",
         "building.2": "building-2",
         "building.2.crop.circle": "building-2",

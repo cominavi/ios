@@ -105,7 +105,7 @@ struct ComiketToolboxView: View {
                 ContentUnavailableView.search(text: searchText)
             }
         }
-        .modifier(ToolboxReadableWidth())
+        .readableFormWidth()
         .navigationTitle("Toolbox")
         .searchable(
             text: $searchText,
@@ -130,32 +130,6 @@ struct ComiketToolboxView: View {
     }
 }
 
-/// Keeps grouped lists at `ReadableWidth.content` in regular width instead of
-/// stretching rows across the whole iPad screen. A `List` needs content margins
-/// rather than `.readableWidth()`, so its scroll area still spans the screen.
-private struct ToolboxReadableWidth: ViewModifier {
-    private static let maxContentWidth: CGFloat = ReadableWidth.content
-    private static let minimumMargin: CGFloat = Spacing.screenGutter
-
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var containerWidth: CGFloat = 0
-
-    private var horizontalMargin: CGFloat? {
-        guard horizontalSizeClass == .regular else { return nil }
-        return max(Self.minimumMargin, (containerWidth - Self.maxContentWidth) / 2)
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .contentMargins(.horizontal, horizontalMargin, for: .scrollContent)
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.width
-            } action: { width in
-                containerWidth = width
-            }
-    }
-}
-
 private struct ToolboxChecklistScreen: View {
     let store: ComiketChecklistStore
 
@@ -163,7 +137,7 @@ private struct ToolboxChecklistScreen: View {
         List {
             ToolboxChecklistSection(store: store)
         }
-        .modifier(ToolboxReadableWidth())
+        .readableFormWidth()
         .navigationTitle("Day-of checklist")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -177,7 +151,7 @@ private struct ToolboxReminderScreen: View {
         List {
             ToolboxReminderSection(store: store, edition: edition)
         }
-        .modifier(ToolboxReadableWidth())
+        .readableFormWidth()
         .navigationTitle("Event reminders")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -192,7 +166,7 @@ private struct ToolboxResourcesScreen: View {
                 ToolboxResourceSectionView(section: section)
             }
         }
-        .modifier(ToolboxReadableWidth())
+        .readableFormWidth()
         .navigationTitle("Official links")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -218,7 +192,7 @@ private struct ToolboxReminderSection: View {
 
     var body: some View {
         Section {
-            ToolboxIconRow(icon: "calendar-clock", iconStyle: .orange, textStyle: .headline) {
+            IconRow(icon: "calendar-clock", iconStyle: .orange, textStyle: .headline) {
                 VStack(alignment: .leading, spacing: Spacing.xSmall) {
                     Text("\(edition.shortName) event reminders")
                         .font(.rowTitle)
@@ -329,7 +303,7 @@ private struct ToolboxReminderWarning: View {
     let message: Text
 
     var body: some View {
-        ToolboxIconRow(
+        IconRow(
             icon: "exclamationmark.triangle.fill",
             iconSize: IconSize.caption,
             iconStyle: .orange,
@@ -409,7 +383,7 @@ private struct ToolboxEditionNotice: View {
                 }
                 .accessibilityElement(children: .combine)
             } label: {
-                ToolboxIconRow(icon: "circle-alert", iconStyle: .orange, textStyle: .headline) {
+                IconRow(icon: "circle-alert", iconStyle: .orange, textStyle: .headline) {
                     Text("\(edition.shortName) notices")
                         .font(.rowTitle)
                         .wrapsFully()
@@ -441,21 +415,34 @@ private struct ToolboxNoEditionNote: View {
 }
 
 /// A hub row: a leading icon, a title that wraps, and an optional trailing
-/// accessory such as a count. The accessory stays on the first line and never
-/// wraps, so the row keeps one layout at every text size.
+/// accessory such as a count. The accessory sits next to the title while the
+/// title fits on one line beside it. When it does not (long translations,
+/// accessibility sizes), the accessory moves under the title as a `Font.meta`
+/// line, so the title gets the full width and never breaks inside a word.
 private struct ToolboxHubRow<Accessory: View>: View {
     let title: LocalizedStringResource
     let icon: String
     @ViewBuilder let accessory: Accessory
 
     var body: some View {
-        ToolboxIconRow(icon: icon, textStyle: .body) {
-            HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
-                Text(title)
-                    .wrapsFully()
-                    .layoutPriority(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                accessory
+        IconRow(icon: icon, textStyle: .body) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+                    Text(title)
+                        .wrapsFully()
+                        .layoutPriority(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    accessory
+                }
+
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                    Text(title)
+                        .wrapsFully()
+                    accessory
+                        .font(.meta)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -464,58 +451,6 @@ private struct ToolboxHubRow<Accessory: View>: View {
 extension ToolboxHubRow where Accessory == EmptyView {
     init(title: LocalizedStringResource, icon: String) {
         self.init(title: title, icon: icon) { EmptyView() }
-    }
-}
-
-/// A row with a leading icon centered on the first line of the text beside it.
-/// A system `Label` centers the icon on the whole text block, and at
-/// accessibility sizes it lets the text wrap under the icon; this keeps the icon
-/// next to the title and the text column at one x position in every row.
-private struct ToolboxIconRow<Content: View>: View {
-    let icon: String
-    var iconSize: Double = IconSize.row
-    var iconStyle: Color = .accentColor
-    @ViewBuilder let content: Content
-    /// The line height of the first text line, scaled with Dynamic Type.
-    @ScaledMetric private var firstLineHeight: CGFloat
-
-    init(
-        icon: String,
-        iconSize: Double = IconSize.row,
-        iconStyle: Color = .accentColor,
-        textStyle: UIFont.TextStyle,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.icon = icon
-        self.iconSize = iconSize
-        self.iconStyle = iconStyle
-        self.content = content()
-        let baseline = UIFont.preferredFont(
-            forTextStyle: textStyle,
-            compatibleWith: UITraitCollection(preferredContentSizeCategory: .large)
-        ).lineHeight
-        _firstLineHeight = ScaledMetric(wrappedValue: baseline, relativeTo: Self.fontTextStyle(textStyle))
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: Spacing.iconToText) {
-            LucideIcon(icon, size: iconSize)
-                .foregroundStyle(iconStyle)
-                .frame(minHeight: firstLineHeight)
-
-            content
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private static func fontTextStyle(_ style: UIFont.TextStyle) -> Font.TextStyle {
-        switch style {
-        case .headline: .headline
-        case .subheadline: .subheadline
-        case .footnote: .footnote
-        case .caption1: .caption
-        default: .body
-        }
     }
 }
 
@@ -574,7 +509,7 @@ private struct ToolboxActionRow: View {
     let accessory: Accessory
 
     var body: some View {
-        ToolboxIconRow(icon: icon, textStyle: .headline) {
+        IconRow(icon: icon, textStyle: .headline) {
             VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 ToolboxRowTitle(title: Text(title), opensExternally: accessory == .externalLink)
                 Text(detail)
@@ -588,26 +523,24 @@ private struct ToolboxActionRow: View {
     }
 }
 
-/// A row title with an optional external-link glyph on its first line. The
-/// glyph sits after the title instead of in a trailing column, so the subtitle
-/// below can use the full width of the row.
+/// A row title with an optional external-link glyph. The glyph is drawn at
+/// the end of the text and wraps with the last word (`TrailingGlyphText`), so
+/// it never splits the title or leaves a word alone on the next line.
 private struct ToolboxRowTitle: View {
     let title: Text
     let opensExternally: Bool
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.xSmall) {
-            title
-                .font(.rowTitle)
-                .foregroundStyle(.primary)
-                .wrapsFully()
-                .layoutPriority(1)
-
+        Group {
             if opensExternally {
-                LucideIcon("external-link", size: IconSize.caption)
-                    .foregroundStyle(.tertiary)
+                TrailingGlyphText(title, glyph: "external-link")
+            } else {
+                title
             }
         }
+        .font(.rowTitle)
+        .foregroundStyle(.primary)
+        .wrapsFully()
     }
 }
 
@@ -627,7 +560,7 @@ private struct ToolboxChecklistSection: View {
                 } label: {
                     // The check circle leads, like Reminders, and is the only icon, so
                     // titles and details keep the full row width before they wrap.
-                    ToolboxIconRow(
+                    IconRow(
                         icon: isCompleted ? "checkmark.circle.fill" : "circle",
                         iconStyle: isCompleted ? Color.accentColor : Color.secondary,
                         textStyle: .body
@@ -674,7 +607,7 @@ private struct ToolboxResourceRow: View {
     let resource: ComiketToolboxResource
 
     var body: some View {
-        ToolboxIconRow(icon: resource.icon, textStyle: .headline) {
+        IconRow(icon: resource.icon, textStyle: .headline) {
             VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 ToolboxRowTitle(title: Text(resource.title), opensExternally: true)
 

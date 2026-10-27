@@ -7,15 +7,6 @@
 
 import SwiftUI
 
-extension Font {
-    /// The hero title of a full-screen focused state, such as "Downloading
-    /// catalog". A documented exception to the type roles: the rounded
-    /// large title is the identity of these one-message screens.
-    static var focusedSurfaceTitle: Font {
-        .system(.largeTitle, design: .rounded, weight: .bold)
-    }
-}
-
 /// A focused full-screen state with one persistent orientation cue and a
 /// bottom-anchored message. The scroll view keeps the layout usable at large
 /// Dynamic Type sizes without giving short content an arbitrary vertical center.
@@ -77,9 +68,10 @@ struct FocusedActionSurface<Content: View>: View {
 }
 
 /// The full-width action of a focused state. It uses the design-system
-/// action buttons; a custom tint (red for a destructive action, secondary
-/// for cancel) colors the title of a secondary button, or fills a primary
-/// one with the system prominent style.
+/// action buttons. A primary destructive action uses the `destructive` style
+/// (red text on a pale red fill). A custom tint (red for a destructive action,
+/// secondary for cancel) colors the title of a secondary button, or fills a
+/// primary one with the system prominent style.
 struct FocusedActionButton<Label: View>: View {
     enum Emphasis {
         case primary
@@ -108,6 +100,9 @@ struct FocusedActionButton<Label: View>: View {
 
     var body: some View {
         switch (emphasis, tint) {
+        case (.primary, _) where role == .destructive:
+            Button(role: role, action: action, label: label)
+                .buttonStyle(ActionButtonStyle(role: .destructive, size: .large))
         case (.primary, .none):
             Button(role: role, action: action, label: label)
                 .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
@@ -445,39 +440,6 @@ private struct DatabaseProgressRow: View {
         case .image:
             "photo.stack"
         }
-    }
-}
-
-/// A stacked capsule progress bar. Every progress bar in the app that is not a
-/// plain system `ProgressView` uses this one track, at one height.
-///
-/// Segments are drawn in order from the back, so list the largest fraction
-/// first: `CapsuleProgressBar(segments: [.init(fraction: 0.6, color: .orange),
-/// .init(fraction: 0.3, color: .green)])`.
-struct CapsuleProgressBar: View {
-    struct Segment {
-        var fraction: Double
-        var color: Color
-    }
-
-    let segments: [Segment]
-    @ScaledMetric(relativeTo: .body) private var height = 8.0
-
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color(uiColor: .tertiarySystemFill))
-                ForEach(segments.indices, id: \.self) { index in
-                    let fraction = min(max(segments[index].fraction, 0), 1)
-                    Capsule()
-                        .fill(segments[index].color)
-                        .frame(width: geometry.size.width * fraction)
-                }
-            }
-        }
-        .frame(height: height)
-        .accessibilityHidden(true)
     }
 }
 

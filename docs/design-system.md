@@ -61,6 +61,10 @@ except in the documented exceptions below.
 | `Font.largeControl` | `.headline` | Large primary buttons (onboarding, sign-in). |
 | `Font.spaceCode` | `.headline.monospacedDigit()` | Space codes such as `東A01a`. |
 
+`Font.focusedSurfaceTitle` (`.largeTitle`, rounded, bold) is the one
+non-system role. It is only the hero title of a `FocusedActionSurface`
+("Downloading catalog"). It still scales with Dynamic Type.
+
 Exceptions to Dynamic Type: map chrome that is drawn in map coordinates
 (`MapView`, `UnifiedBigSightMapView`), venue badges (`BigSightVenueBadge`), and
 the circle cut image. These use fixed sizes because they scale with the map,
@@ -94,6 +98,8 @@ Migration map: 4 → 6, 7/9/10 → 8 or 12, 13/14 → 12 (control) or 16 (card),
 | Card | `.surface(.card)` | Secondary grouped fill, 16 pt radius, 0.5 pt hairline, 16 pt padding. |
 | Inset tile | `.surface(.inset)` | Tertiary fill, 12 pt radius, no stroke, 12 pt padding. Only inside a card. |
 | Floating map chrome | `.surface(.floating)` | Liquid Glass on iOS 26, `.regularMaterial` before it, 24 pt radius. |
+| Map control | `.mapChromeSurface(.capsule / .circle / .card)` | The floating surface for controls over the map. In `Features/Map/MapChrome.swift`. |
+| Focused state | `FocusedActionSurface(symbolName:) { … }` | Full-screen, one message. In `DownloadProgressView.swift`. |
 | Sheet | system `.sheet` | Use detents. Do not draw a custom sheet background. |
 
 Rules:
@@ -111,6 +117,7 @@ Rules:
 | Primary button | `.buttonStyle(.primaryAction)` | Lime fill, dark text. One per screen or card. |
 | Secondary button | `.buttonStyle(.secondaryAction)` | Grouped fill, hairline, primary text. |
 | Tertiary button | `.buttonStyle(.tertiaryAction)` | Accent text, no fill ("Show on map"). |
+| Destructive button | `.buttonStyle(.destructiveAction)` | Red text on a 0.12 red fill. Use with `Button(role: .destructive)`. |
 | Large button | `ActionButtonStyle(role: .primary, size: .large)` | 50 pt min height for onboarding and sign-in. |
 | Button row | `AdaptiveButtonRow { … }` | Equal widths, or a column when a title would wrap. |
 | Chip | `.buttonStyle(.chip(selected:))` | 32 pt capsule, 44 pt hit area, one line. |
@@ -119,6 +126,31 @@ Rules:
 | Empty state | `EmptyStateView("No favorites yet", icon: "star")` | Wraps `ContentUnavailableView`. |
 | Banner | `InlineBanner("…", icon: "info.circle")` | A notice, not a button. |
 | Row | `List` row or `Label` | Icon `IconSize.row`, 12 pt to text, title `rowTitle`. |
+| Icon row | `IconRow(icon:textStyle:) { … }` | Icon centered on the first text line; the text column starts at one x in every row. Use when the text can wrap. |
+| Title with glyph | `TrailingGlyphText(Text(title), glyph: "external-link")` | A glyph inside the text run, joined to the last word. |
+| Progress bar | `CapsuleProgressBar(segments:)` | The one custom progress track, 8 pt (scaled), capsule. |
+| Color swatch | `ColorSwatch(color:size:)` | A favorite label color: filled circle, hairline. `IconSize.row` in rows. |
+| Focused action | `FocusedActionButton { … }` | Full-width large action of a `FocusedActionSurface`. |
+| Map icon control | `MapChromeIconLabel`, `MapSheetCloseButton` | 44 pt round map controls and the close "x" of sheets over the map. In `Features/Map/MapChrome.swift`. |
+| Readable list | `.readableFormWidth()` | Centers a `Form` or `List` at `ReadableWidth.content` on iPad by content margins. In `Screens/ReadableFormWidth.swift`. |
+
+### Focused states
+
+`FocusedActionSurface` is the hero style for a screen with one message and
+one or two actions: catalog download, errors, sign-in prompts, and
+invitations. Its layout is fixed:
+
+- An `IconSize.hero` Lucide glyph in the tint color at the top leading edge,
+  and a faint, large copy of it as the backdrop.
+- The message at the bottom: an optional eyebrow, the
+  `Font.focusedSurfaceTitle` title, and a `rowSubtitle` subtitle.
+- `FocusedActionButton` actions under the message, at full width
+  (`ActionButtonStyle` large). A destructive primary action uses the
+  destructive role. Do not put white text on a red fill.
+- The content stays in `ReadableWidth.form` on iPad.
+
+Do not use the hero style for a notice inside a screen. Use `InlineBanner` or
+`EmptyStateView` there.
 
 System `.bordered` and `.borderedProminent` stay valid inside alerts, forms,
 and `List` rows. Do not use `.bordered` over the map: its translucent grey fill
@@ -136,6 +168,9 @@ has low contrast on map tiles. Use `.surface(.floating)` or `.glass` there.
 | `IconSize.row` | 20 | Leading icon of a row or card. |
 | `IconSize.action` | 22 | Leading icon of a large action card; toolbar glyphs. |
 | `IconSize.hero` | 34 | Empty-state glyph. |
+
+Icons without an `accessibilityLabel` are decorative: `LucideIcon` hides them
+from accessibility, so a row or a `LucideLabel` exposes its text once.
 
 Every row in one list uses the same icon size, so the text column starts at one
 x position. Banners use the same leading inset as the rows below them.
@@ -192,6 +227,21 @@ Rules:
   `.singleLineToken()`.
 - Align the accessory with `.firstTextBaseline` when the label can wrap.
   Center it only when the label is one line by design.
+- When a title and a count must share one line, use
+  `ViewThatFits(in: .horizontal) { HStack { title; count } VStack { title; count } }`.
+  The count moves under the title as a `Font.meta` line before the title
+  breaks inside a word. See `ToolboxHubRow`.
+
+### Glyphs after a title
+
+- A glyph that follows a title (external link, lock, badge) goes inside the
+  text run with `TrailingGlyphText`. It is joined to the last word with a
+  no-break space and wraps with that word.
+- Do not put such a glyph in its own `HStack` column. The column sits next to
+  the first line, so the title splits around it and its last word can end
+  up alone on the next line.
+- The glyph is hidden from VoiceOver. Say what it means in the hint, for
+  example "Opens in browser".
 
 ### Button rows
 
@@ -213,6 +263,15 @@ Rules:
 - Hall names such as `West 1–2` and event context such as `C104 · Day 1`:
   `NonBreaking.spaces(_:)` on each unit. Keep the ` · ` separators as ordinary
   spaces, so the line can break between units.
+
+### System line breaking
+
+- iOS avoids a single short word on the last line of a paragraph. It moves
+  the word before it down too ("…to set / your position."). The text box is
+  then narrower than its column. This is not a layout fault: check the frame
+  of the container, not the measured width of the text.
+- Japanese text breaks at phrase boundaries ("…現在地を設定 / できます。").
+  Do not fight either rule with manual breaks or a smaller font.
 
 ### CJK
 
