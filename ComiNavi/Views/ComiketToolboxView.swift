@@ -379,6 +379,8 @@ private struct ToolboxEditionNotice: View {
     }
 
     var body: some View {
+        // Read the scaled metric once; alignment guide closures are Sendable.
+        let lift = bulletLift
         Section {
             DisclosureGroup(isExpanded: $isExpanded) {
                 VStack(alignment: .leading, spacing: Spacing.medium) {
@@ -388,7 +390,7 @@ private struct ToolboxEditionNotice: View {
                                 .fill(.orange)
                                 .frame(width: Self.bulletSize, height: Self.bulletSize)
                                 .alignmentGuide(.firstTextBaseline) { dimensions in
-                                    dimensions[VerticalAlignment.center] + bulletLift
+                                    dimensions[VerticalAlignment.center] + lift
                                 }
                                 .accessibilityHidden(true)
                             Text(notice.text)

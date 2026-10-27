@@ -882,12 +882,14 @@ struct SignInView: View {
 
     private func valueRow(_ title: LocalizedStringKey, icon: String) -> some View {
         // The icon starts on the column edge and stays on the first line when
-        // the label wraps at large sizes.
-        HStack(alignment: .firstTextBaseline, spacing: Spacing.iconToText) {
+        // the label wraps at large sizes. The scaled metric is read once,
+        // because alignment guide closures are Sendable.
+        let lift = bodyCapHalfHeight
+        return HStack(alignment: .firstTextBaseline, spacing: Spacing.iconToText) {
             LucideIcon(icon, size: IconSize.row)
                 .foregroundStyle(Color.accentColor)
                 .alignmentGuide(.firstTextBaseline) { dimensions in
-                    dimensions[VerticalAlignment.center] + bodyCapHalfHeight
+                    dimensions[VerticalAlignment.center] + lift
                 }
 
             Text(title)

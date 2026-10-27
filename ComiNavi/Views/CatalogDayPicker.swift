@@ -741,10 +741,12 @@ private struct CatalogSettingRowLabel<Accessory: View>: View {
     @ScaledMetric(relativeTo: .headline) private var halfCapHeight = 6.0
 
     var body: some View {
+        // Read the scaled metric once; alignment guide closures are Sendable.
+        let lift = halfCapHeight
         HStack(alignment: .firstTextBaseline, spacing: Spacing.iconToText) {
             LucideIcon(systemImage, size: IconSize.row)
                 .foregroundStyle(iconColor)
-                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + halfCapHeight }
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + lift }
 
             VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(title)
@@ -762,7 +764,7 @@ private struct CatalogSettingRowLabel<Accessory: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             accessory
-                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + halfCapHeight }
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + lift }
         }
         .padding(.horizontal, Spacing.cardPadding)
         .padding(.vertical, Spacing.medium)

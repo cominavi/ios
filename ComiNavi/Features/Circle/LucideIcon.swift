@@ -211,17 +211,19 @@ struct LucideLabel: View {
     private let title: Text
     private let icon: String
 
-    init(_ title: LocalizedStringKey, icon: String) {
+    // Nonisolated so that labels can be built in Sendable label closures,
+    // such as the PhotosPicker label.
+    nonisolated init(_ title: LocalizedStringKey, icon: String) {
         self.title = Text(title)
         self.icon = icon
     }
 
-    init(resource title: LocalizedStringResource, icon: String) {
+    nonisolated init(resource title: LocalizedStringResource, icon: String) {
         self.title = Text(title)
         self.icon = icon
     }
 
-    init(verbatim title: String, icon: String) {
+    nonisolated init(verbatim title: String, icon: String) {
         self.title = Text(verbatim: title)
         self.icon = icon
     }
