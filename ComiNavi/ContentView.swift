@@ -22,25 +22,38 @@ enum AppTab: String, Hashable {
 struct ContentView: View {
     @State private var catalogLibrary: CatalogLibrary
     @State private var sharedLocationInbox: SharedLocationInbox
-    @SceneStorage("ContentView.selectedTab") private var selection: AppTab = .map
+    /// The tab when no parent owns it, as in previews and UI test hosts.
+    /// EntryView owns the app's tab under the "ContentView.selectedTab" key,
+    /// so this one uses another key.
+    @SceneStorage("ContentView.standaloneSelectedTab") private var standaloneSelection: AppTab = .map
     @State private var selectedDay = 1
     @State private var showsCatalogSettings = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private let externalSelection: Binding<AppTab>?
     private let catalogResetAction: CatalogResetAction?
 
+    /// Pass `selection` when a parent needs to change the tab, for example
+    /// to open Profile for sign-in from a sheet that it presents.
     @MainActor
     init(
         catalogLibrary: CatalogLibrary = AppData.catalogLibrary,
         sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox,
+        selection: Binding<AppTab>? = nil,
         catalogResetAction: CatalogResetAction? = nil
     ) {
         _catalogLibrary = State(initialValue: catalogLibrary)
         _sharedLocationInbox = State(initialValue: sharedLocationInbox)
+        externalSelection = selection
         self.catalogResetAction = catalogResetAction
     }
 
+    private var selection: Binding<AppTab> {
+        externalSelection ?? $standaloneSelection
+    }
+
     var body: some View {
-        TabView(selection: $selection) {
+        TabView(selection: selection) {
             Tab(
                 "Map",
                 image: LucideIcon.assetName(for: "map"),
@@ -84,7 +97,7 @@ struct ContentView: View {
                     store: AppData.sharedPlanStore,
                     comiketNo: readyDataSource?.comiket.number,
                     currentUserID: AppData.profileStore.profile?.id,
-                    onRequestSignIn: { selection = .profile }
+                    onRequestSignIn: { selection.wrappedValue = .profile }
                 )
             }
 
@@ -136,7 +149,12 @@ struct ContentView: View {
                 catalogLibrary: catalogLibrary,
                 selectedDay: $selectedDay
             )
-            .presentationDetents([.medium, .large])
+            .modifier(
+                CatalogEventDaySheetPresentation(
+                    isRegularWidth: horizontalSizeClass == .regular,
+                    isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+                )
+            )
             .presentationDragIndicator(.visible)
             .presentationContentInteraction(.scrolls)
         }
@@ -208,7 +226,7 @@ struct ContentView: View {
         }
 
         selectedDay = location.sceneID.day
-        selection = .map
+        selection.wrappedValue = .map
     }
 
     /// iPhone uses the same one-line capsule as the Explore toolbar; wide
@@ -222,6 +240,27 @@ struct ContentView: View {
             style: horizontalSizeClass == .regular ? .card : .compact
         ) {
             showsCatalogSettings = true
+        }
+    }
+}
+
+/// The Day & Comiket sheet size. iPad shows a form-sized sheet that fits
+/// both sections; a medium detent there cut the Comiket row or left a large
+/// empty area. iPhone starts at the large detent at accessibility sizes,
+/// where the medium detent hid the Comiket section.
+private struct CatalogEventDaySheetPresentation: ViewModifier {
+    let isRegularWidth: Bool
+    let isAccessibilitySize: Bool
+
+    func body(content: Content) -> some View {
+        if isRegularWidth {
+            content
+                .presentationSizing(.form)
+                .presentationDetents([.large])
+        } else if isAccessibilitySize {
+            content.presentationDetents([.large])
+        } else {
+            content.presentationDetents([.medium, .large])
         }
     }
 }
@@ -309,7 +348,7 @@ private struct CatalogLibraryLoadingSurface: View {
             CatalogActivityIndicator(accessibilityLabel: title)
 
             CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
-                .padding(.top, 24)
+                .padding(.top, Spacing.sectionGap)
         }
     }
 
@@ -326,7 +365,7 @@ private struct CatalogLibraryLoadingSurface: View {
             DownloadProgressView(progresses: progresses)
 
             CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
-                .padding(.top, 24)
+                .padding(.top, Spacing.sectionGap)
         }
     }
 }
@@ -390,12 +429,15 @@ private struct ProfileTabLabel: View {
             Text("Profile")
         } icon: {
             if let avatarURL = profileStore.profile?.avatarURL {
+                // The toolbar glyph size, so the photo matches the
+                // "person.circle" glyph that it replaces.
                 AuthenticatedProfileAvatar(
                     url: avatarURL,
-                    size: 24,
+                    size: IconSize.action,
                     revision: profileStore.profile?.revision
                 )
-                    .accessibilityHidden(true)
+                .clipShape(.circle)
+                .accessibilityHidden(true)
             } else {
                 Image(LucideIcon.assetName(for: "person.circle"))
             }
@@ -423,7 +465,8 @@ private struct CatalogLoadingEventPicker: View {
             } label: {
                 LucideLabel("Choose another Comiket", icon: "arrow.left.arrow.right")
             }
-            .buttonStyle(.bordered)
+            .menuStyle(.button)
+            .buttonStyle(.secondaryAction)
             .accessibilityIdentifier("catalog-loading-event-selector")
         }
     }
