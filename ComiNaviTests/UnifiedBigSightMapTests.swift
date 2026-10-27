@@ -94,6 +94,47 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
+    func testSearchCountsMatchesPerHallAndClearsWhenSearchCloses() throws {
+        let campus = makeSingleVenueCampus()
+        let venue = try XCTUnwrap(campus.venues.first)
+        let table = try XCTUnwrap(venue.scene.tables.first)
+        let renderer = UnifiedBigSightScene(campus: campus)
+        renderer.reduceMotion = true
+        let matches = [0, 1].map { subspace in
+            CatalogMapSearchMatch(
+                id: 10 + subspace,
+                mapID: venue.id,
+                tableID: table.id,
+                subspace: subspace,
+                circleName: "Circle \(subspace)",
+                penName: ""
+            )
+        }
+
+        func update(searchActive: Bool) {
+            renderer.update(
+                campus: campus,
+                scope: .campus,
+                selectedMapID: venue.id,
+                selectedTableID: nil,
+                circlePlacements: [],
+                circleArtwork: [:],
+                searchMatches: matches,
+                searchActive: searchActive,
+                genrePlacements: [],
+                bookmarks: [],
+                locatedUser: nil
+            )
+        }
+
+        update(searchActive: true)
+        XCTAssertEqual(renderer.searchMatchCountsByVenue, [venue.id: 2])
+
+        update(searchActive: false)
+        XCTAssertEqual(renderer.searchMatchCountsByVenue, [:])
+    }
+
+    @MainActor
     func testSearchAndFavoritesOverlayEveryVenueRegardlessOfSelectedVenue() {
         let tableID = CatalogMapTable.ID(blockID: 1, spaceNumber: 1)
         let firstScene = CatalogMapScene(
