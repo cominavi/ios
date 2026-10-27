@@ -466,7 +466,9 @@ struct CatalogEventDaySheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: Spacing.sectionGap) {
+                // A plain VStack: a few rows, and the iPad form sheet fits its
+                // height to their measured size.
+                VStack(alignment: .leading, spacing: Spacing.sectionGap) {
                     daySection
                     eventNavigationSection
                 }
