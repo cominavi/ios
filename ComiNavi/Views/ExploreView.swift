@@ -75,6 +75,9 @@ struct ExploreView<EventDayHeader: View>: View {
     @State private var showsFilters = false
     @State private var showsGalleryZoomOnboarding = false
     @State private var didApplyAccessibilityLayout = false
+    #if DEBUG
+    @State private var didOpenFirstCircleForUITesting = false
+    #endif
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let eventDayHeader: EventDayHeader
@@ -192,6 +195,9 @@ struct ExploreView<EventDayHeader: View>: View {
             applyAccessibilityLayoutIfNeeded()
             model.select(day: selectedDay)
             await model.load()
+            #if DEBUG
+            openFirstCircleForUITestingIfNeeded()
+            #endif
             presentGalleryZoomOnboardingIfNeeded()
         }
         .onAppear {
@@ -320,7 +326,8 @@ struct ExploreView<EventDayHeader: View>: View {
     private func presentGalleryZoomOnboardingIfNeeded() {
         guard model.layout == .gallery,
               !model.visibleCircles.isEmpty,
-              !showsGalleryZoomOnboarding
+              !showsGalleryZoomOnboarding,
+              selectedCircle == nil
         else { return }
 
         let arguments = ProcessInfo.processInfo.arguments
@@ -341,6 +348,21 @@ struct ExploreView<EventDayHeader: View>: View {
         onboardingStore.markCompleted(.exploreGalleryZoom)
     }
 
+    #if DEBUG
+    /// Launch route for screenshot and UI-test runs: opens the first visible
+    /// circle's detail through the normal navigation destination, once per
+    /// launch, so a capture script does not have to tap a card.
+    private func openFirstCircleForUITestingIfNeeded() {
+        guard !didOpenFirstCircleForUITesting,
+              ProcessInfo.processInfo.arguments.contains(
+                  "-cominavi-ui-testing-open-circle-first"
+              ),
+              let firstCircle = model.visibleCircles.first
+        else { return }
+        didOpenFirstCircleForUITesting = true
+        selectedCircle = firstCircle
+    }
+    #endif
 }
 
 /// Static placeholder cards in the same grid shape as the gallery, so the
