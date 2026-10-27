@@ -108,10 +108,10 @@ struct FocusedActionButton<Label: View>: View {
 
     var body: some View {
         switch (emphasis, tint) {
-        case (.primary, nil):
+        case (.primary, .none):
             Button(role: role, action: action, label: label)
                 .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
-        case (.primary, let tint?):
+        case (.primary, .some(let tint)):
             // A tinted primary action, such as a red destructive button. The
             // system prominent style draws white text on the tint.
             Button(role: role, action: action) {
