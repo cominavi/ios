@@ -424,17 +424,17 @@ struct CatalogEventDayToolbarButton: View {
         isWide || (summary.statuses.isEmpty && dynamicTypeSize <= .large)
     }
 
-    /// Demo implies old data, so iPhone keeps only the last status. At
-    /// accessibility sizes the statuses move to the accessibility label and
-    /// the sheet.
+    /// Demo implies old data, so iPhone keeps only the last status. Above
+    /// the default text size the statuses move to the accessibility label
+    /// and the sheet, so the event context ("C104 · Day 1") never truncates.
     private var statusLimit: Int {
         if isWide { return 2 }
-        return dynamicTypeSize.isAccessibilitySize ? 0 : 1
+        return dynamicTypeSize <= .large ? 1 : 0
     }
 
     var body: some View {
         Button(action: action) {
-            CatalogEventDayCapsule(showsIcon: isWide || !dynamicTypeSize.isAccessibilitySize) {
+            CatalogEventDayCapsule(showsIcon: isWide || dynamicTypeSize <= .large) {
                 CatalogEventDayTitleRow(
                     summary: summary,
                     includesDate: includesDate,
@@ -442,6 +442,10 @@ struct CatalogEventDayToolbarButton: View {
                 )
             }
         }
+        // Navigation bar chrome: like the system bar title, the capsule
+        // stops growing at XXXL, so "C104 · Day 1" fits between the toolbar
+        // buttons at accessibility sizes.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .buttonStyle(.plain)
         .accessibilityLabel(summary.accessibilityLabel)
         .accessibilityHint("Change event day or Comiket")
