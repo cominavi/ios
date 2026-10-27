@@ -184,34 +184,6 @@
         }
       }
     },
-    "%@ · Day %lld" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ · %lld日目"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ · %lld일차"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ · 第%lld天"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ · 第%lld天"
-          }
-        }
-      }
-    },
     "%@ (%lld)" : {
       "localizations" : {
         "en" : {
@@ -1429,19 +1401,19 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$lld 서클 중 %1$lld건"
+            "value" : "%2$lld개 서클 중 %1$lld개"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$lld个社团中%1$lld件"
+            "value" : "%2$lld 个社团中的 %1$lld 个"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$lld個社團中%1$lld件"
+            "value" : "%2$lld 個社團中的 %1$lld 個"
           }
         }
       }
@@ -1745,6 +1717,622 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld個社團"
+          }
+        }
+      }
+    },
+    "A+B" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A+B"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A+B"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A+B"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A+B"
+          }
+        }
+      }
+    },
+    "Automatically matched from public X posts. Check the confidence and space before relying on it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開されているXの投稿から自動照合しています。利用前に確度とスペースを確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "공개된 X의 게시물에서 자동으로 대조하고 있습니다. 사용하기 전에 정확도와 부스를 확인해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根据公开 X 帖子自动匹配，使用前请检查可信度和摊位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "根據公開 X 貼文自動匹配，使用前請檢查可信度和攤位"
+          }
+        }
+      }
+    },
+    "Circle, creator, or space" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークル・作家・スペース"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서클, 작가, 부스"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "社团、作者或摊位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "社團、作者或攤位"
+          }
+        }
+      }
+    },
+    "Circle.ms runs the official Comic Market Web Catalog." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msはコ⁠ミ⁠ッ⁠ク⁠マ⁠ー⁠ケ⁠ッ⁠ト公式W⁠e⁠b⁠カ⁠タ⁠ロ⁠グを運営しています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms는 Comic Market 공식 웹 카탈로그를 운영합니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms 运营 Comic Market 官方网络目录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms 營運 Comic Market 官方網路目錄"
+          }
+        }
+      }
+    },
+    "Confirmed" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加確定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "참가 확정"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认参加"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確認參加"
+          }
+        }
+      }
+    },
+    "Copies the address and a Maps link." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "住所とマップのリンクをコピーします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "주소와 지도 링크를 복사합니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制地址和地图链接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷貝地址和地圖連結"
+          }
+        }
+      }
+    },
+    "Copies the Japanese address for staff and signs" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スタッフや案内表示用の日本語の住所をコピーします"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스태프·안내 표시용 일본어 주소를 복사합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制供工作人员和指示牌对照的日文地址"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷貝供工作人員和指示牌對照的日文地址"
+          }
+        }
+      }
+    },
+    "Couldn't find this space on the map" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このスペースを地図上で見つけられませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지도에서 이 부스를 찾을 수 없습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法在地图上找到此摊位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法在地圖上找到此攤位"
+          }
+        }
+      }
+    },
+    "Has item list" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お品書きあり"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "판매 목록이 있습니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有商品一览"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有商品一覽"
+          }
+        }
+      }
+    },
+    "High-confidence item list" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確度の高いお品書き"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "정확도가 높은 판매 목록"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高可信度商品一览"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高可信度商品一覽"
+          }
+        }
+      }
+    },
+    "How strongly the post is linked to this circle and its catalog space placement." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "投稿がこのサークルとカタログ上の配置に結び付く可能性の高さを示します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "게시물이 이 서클 및 카탈로그의 부스 배치와 연결된 정도입니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帖子与该社团及其在目录中的摊位位置相关的可信程度"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "貼文與此社團及其在場刊中的攤位配置相關的可信程度"
+          }
+        }
+      }
+    },
+    "It opens in a secure browser sheet, and ComiNavi never sees your password." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全なブ⁠ラ⁠ウ⁠ザ⁠シ⁠ー⁠トで開くため、ComiNaviがパスワードを見ることはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "안전한 브라우저 시트에서 열리므로 ComiNavi는 비밀번호를 볼 수 없습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录页面会在安全的浏览器面板中打开，ComiNavi 不会看到你的密码"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登入頁面會在安全的瀏覽器面板中開啟，ComiNavi 不會看到你的密碼"
+          }
+        }
+      }
+    },
+    "Join a plan" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プランに参加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "플랜 참여"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入计划"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入計畫"
+          }
+        }
+      }
+    },
+    "Latest item lists" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お品書きの新着順"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최신 판매 목록"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新商品一览"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新商品一覽"
+          }
+        }
+      }
+    },
+    "Open a copied link" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーしたリンクを開く"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "복사한 링크 열기"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开复制的链接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟拷貝的連結"
+          }
+        }
+      }
+    },
+    "Open a hall to show genre colors." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホールを開くとジャンルの色分けを表示できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "홀을 열면 장르 색상을 표시할 수 있습니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开展馆即可显示类型颜色"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開啟展館即可顯示類型顏色"
+          }
+        }
+      }
+    },
+    "Public-transit directions in Maps." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マップで公共交通の経路を開きます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지도에서 대중교통 경로를 엽니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在地图中打开公共交通路线"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在地圖中開啟公共交通路線"
+          }
+        }
+      }
+    },
+    "Sign in to add to plan" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ログインしてプランに追加"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그인하고 플랜에 추가"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录后添加到计划"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登入後加入計畫"
+          }
+        }
+      }
+    },
+    "Sign in with your Circle.ms account." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.msアカウントでログインします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circle.ms 계정으로 로그인합니다."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你的 Circle.ms 账户登录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用你的 Circle.ms 帳號登入"
+          }
+        }
+      }
+    },
+    "Single space" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "片側スペース"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "단일 부스"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单摊位"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "單攤位"
+          }
+        }
+      }
+    },
+    "The circle's items and prices" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サークルの頒布物と価格"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서클의 판매물과 가격"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "社团的商品与价格"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "社團的商品與價格"
+          }
+        }
+      }
+    },
+    "These are automatic estimates from public information. Check the original post and space before relying on them." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公開情報をもとに自動で推定しています。判断に使う前に、元の投稿と配置を確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "공개 정보를 바탕으로 자동 추정한 결과입니다. 활용하기 전에 원본 게시물과 부스 위치를 확인하세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些是根据公开信息自动估算的结果。请先确认原帖和摊位位置，再据此判断"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這些是根據公開資訊自動推算的結果。請先確認原始貼文和攤位配置，再據此判斷"
           }
         }
       }
@@ -2146,7 +2734,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "共有プランは、C%lldで回るサークルの買い物リストです。メンバー全員がサークルを追加し、欲しいものを頼み、買ったものを記録できます。"
+            "value" : "共有プランは、C%lldで回るサークルの買⁠い⁠物⁠リ⁠ス⁠トです。メンバー全員がサークルを追加し、欲しいものを頼み、買ったものを記録できます。"
           }
         },
         "ko" : {
@@ -3547,34 +4135,6 @@
         }
       }
     },
-    "All Plans" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "すべてのプラン"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "모든 플랜"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "所有计划"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "所有計畫"
-          }
-        }
-      }
-    },
     "All save states" : {
       "localizations" : {
         "ja" : {
@@ -4079,34 +4639,6 @@
         }
       }
     },
-    "Area" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "エリア"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "구역"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "区域"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "區域"
-          }
-        }
-      }
-    },
     "Ariake Corridor Restroom" : {
       "localizations" : {
         "ja" : {
@@ -4495,34 +5027,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "認證失敗。請再試一次"
-          }
-        }
-      }
-    },
-    "Automatically matched from public X posts. Check the confidence and booth before relying on it." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "公開されているXの投稿から自動照合しています。利用前に確度とスペースを確認してください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "공개된 X의 게시물에서 자동으로 대조하고 있습니다. 사용하기 전에 정확도와 부스를 확인해 주세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "根据公开 X 帖子自动匹配，使用前请检查可信度和摊位"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "根據公開 X 貼文自動匹配，使用前請檢查可信度和攤位"
           }
         }
       }
@@ -7228,34 +7732,6 @@
         }
       }
     },
-    "Circle, creator, or space (e.g. 東A01a)" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サークル名、作家名、スペース（例：東A01a）"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "서클명, 작가명, 부스(예: 東A01a)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "社团名、作家名或摊位（例：東A01a）"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "社團名、作家名或攤位（例：東A01a）"
-          }
-        }
-      }
-    },
     "Circle, purchase, and conflict updates will appear here." : {
       "localizations" : {
         "ja" : {
@@ -8141,7 +8617,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コミナビ"
+            "value" : "ComiNavi"
           }
         },
         "ko" : {
@@ -8365,7 +8841,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ComiNaviは非公式アプリです。コミックマーケットおよびCircle.msとは関係ありません。"
+            "value" : "ComiNaviは非公式アプリです。コ⁠ミ⁠ッ⁠ク⁠マ⁠ー⁠ケ⁠ッ⁠トおよびCircle.msとは関係ありません。"
           }
         },
         "ko" : {
@@ -8944,62 +9420,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已複製"
-          }
-        }
-      }
-    },
-    "Copies %@" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "部数 %@"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "부수 %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "份数 %@"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "份數 %@"
-          }
-        }
-      }
-    },
-    "Copies the address and an Apple Maps link." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "住所とAppleマップのリンクをコピーします。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "주소와 Apple 지도 링크를 복사합니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "复制地址和 Apple 地图链接"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拷貝地址和 Apple 地圖連結"
           }
         }
       }
@@ -9672,34 +10092,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法建立計畫匯出"
-          }
-        }
-      }
-    },
-    "Couldn't find this booth on the map" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このスペースを地図上で見つけられませんでした"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "지도에서 이 부스를 찾을 수 없습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法在地图上找到此摊位"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "無法在地圖上找到此攤位"
           }
         }
       }
@@ -12642,7 +13034,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "エレベーター・階段"
+            "value" : "昇降設備"
           }
         },
         "ko" : {
@@ -15021,7 +15413,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "入退場口・チケット"
+            "value" : "入場・チケット"
           }
         },
         "ko" : {
@@ -15604,34 +15996,6 @@
         }
       }
     },
-    "Has shinagaki" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "お品書きあり"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "판매 목록가 있습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "有商品一览"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "有商品一覽"
-          }
-        }
-      }
-    },
     "Heat protection" : {
       "localizations" : {
         "ja" : {
@@ -15665,7 +16029,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "すべてのレイヤーを隠す"
+            "value" : "レイヤーを非表示"
           }
         },
         "ko" : {
@@ -15768,34 +16132,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "高可信度"
-          }
-        }
-      }
-    },
-    "High-confidence shinagaki" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "確度の高いお品書き"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "정확도가 높은 판매 목록"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高可信度商品一览"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "高可信度商品一覽"
           }
         }
       }
@@ -15914,34 +16250,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "實際購買數量"
-          }
-        }
-      }
-    },
-    "How strongly the post is linked to this circle and its catalog booth placement." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "投稿がこのサークルとカタログ上の配置に結び付く可能性の高さを示します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "게시물이 이 서클 및 카탈로그의 부스 배치와 연결된 정도입니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "帖子与该社团及其在目录中的摊位位置相关的可信程度"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "貼文與此社團及其在場刊中的攤位配置相關的可信程度"
           }
         }
       }
@@ -16378,34 +16686,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "In favorites" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "お気に入り登録済み"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "즐겨찾기 등록 완료"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已收藏"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已加入收藏"
           }
         }
       }
@@ -17279,34 +17559,6 @@
         }
       }
     },
-    "Join a Plan" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "プランに参加"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "플랜 참여"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加入计划"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "加入計畫"
-          }
-        }
-      }
-    },
     "Join from invitation" : {
       "localizations" : {
         "ja" : {
@@ -17724,34 +17976,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Comic Market 籌備委員會的最新公告與當日變更"
-          }
-        }
-      }
-    },
-    "Latest shinagaki" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "お品書きの新着順"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "최신 판매 목록"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最新商品一览"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最新商品一覽"
           }
         }
       }
@@ -21618,34 +21842,6 @@
         }
       }
     },
-    "Open current public-transit directions in Maps." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "マップで最新の公共交通経路を開きます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "지도에서 최신 대중교통 경로를 엽니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在地图上打开最新的公共交通路线"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在地圖上開啟最新的公共交通路線"
-          }
-        }
-      }
-    },
     "Open item list on X" : {
       "localizations" : {
         "ja" : {
@@ -22570,40 +22766,12 @@
         }
       }
     },
-    "Paste a link that a friend sent you." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "友達から届いたリンクを貼り付けます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "친구가 보낸 링크를 붙여넣습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "粘贴朋友发给你的链接"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "貼上朋友傳給你的連結"
-          }
-        }
-      }
-    },
     "Paste the link that a plan member sent you. ComiNavi shows the plan before you join." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "プランのメンバーから届いたリンクを貼り付けてください。参加する前にプランを確認できます。"
+            "value" : "プランのメンバーから届いたリンクを貼⁠り⁠付⁠けてください。参加する前にプランを確認できます。"
           }
         },
         "ko" : {
@@ -23299,34 +23467,6 @@
         }
       }
     },
-    "Plans for C%lld" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C%lldのプラン"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C%lld 플랜"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C%lld 的计划"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "C%lld 的計畫"
-          }
-        }
-      }
-    },
     "Please describe the issue before sending." : {
       "localizations" : {
         "ja" : {
@@ -23547,35 +23687,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "人氣標籤"
-          }
-        }
-      }
-    },
-    "Positioned from your map press" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "地図の長押しで設定"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "지도에서 길게 눌러 설정"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "长按地图进行设置"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已透過長按地圖定位"
           }
         }
       }
@@ -24758,34 +24869,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "快速取用"
-          }
-        }
-      }
-    },
-    "Quick Views" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "クイック表示"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "빠른 표시"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "快捷视图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "快速檢視"
           }
         }
       }
@@ -28290,62 +28373,6 @@
         }
       }
     },
-    "Shinagaki" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "お品書き"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "판매 목록"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "商品一览"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "商品一覽"
-          }
-        }
-      }
-    },
-    "Shinagaki: the circle's items and prices" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "サークルの頒布物と価格の一覧"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "판매 목록: 서클의 판매물과 가격"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "商品一览：社团的商品与价格"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "商品一覽：社團的商品與價格"
-          }
-        }
-      }
-    },
     "Shop the event together" : {
       "localizations" : {
         "ja" : {
@@ -28379,7 +28406,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "すべてのレイヤーを表示"
+            "value" : "レイヤーを表示"
           }
         },
         "ko" : {
@@ -28941,34 +28968,6 @@
         }
       }
     },
-    "Sign in to add requests" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ログインするとリクエストを追加できます"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "로그인하면 요청을 추가할 수 있습니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登录后即可添加请求"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登入後即可新增請求"
-          }
-        }
-      }
-    },
     "Sign in to Circle.ms to open this catalog." : {
       "localizations" : {
         "ja" : {
@@ -29021,34 +29020,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "請登入 ComiNavi 以建立計畫"
-          }
-        }
-      }
-    },
-    "Sign in to ComiNavi to create or join a plan." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ComiNaviにログインして、プランを作成または参加します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "플랜을 만들거나 참여하려면 ComiNavi에 로그인하세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登录 ComiNavi 以创建或加入计划"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登入 ComiNavi 以建立或加入計畫"
           }
         }
       }
@@ -29329,34 +29300,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Google 登入目前無法使用"
-          }
-        }
-      }
-    },
-    "Sign in with your Circle.ms account. Circle.ms runs the official Comic Market Web Catalog. It opens in a secure browser sheet, and ComiNavi never sees your password." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.msアカウントでログインします。Circle.msはコミックマーケット公式Webカタログを運営しています。安全なブラウザシートで開くため、ComiNaviがパスワードを見ることはありません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.ms 계정으로 로그인합니다. Circle.ms는 Comic Market 공식 웹 카탈로그를 운영합니다. 안전한 브라우저 시트에서 열리므로 ComiNavi는 비밀번호를 볼 수 없습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用你的 Circle.ms 账户登录。Circle.ms 运营 Comic Market 官方网络目录。登录页面会在安全的浏览器面板中打开，ComiNavi 不会看到你的密码"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用你的 Circle.ms 帳號登入。Circle.ms 營運 Comic Market 官方網路目錄。登入頁面會在安全的瀏覽器面板中開啟，ComiNavi 不會看到你的密碼"
           }
         }
       }
@@ -30386,34 +30329,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新下載。刪除未完成的資料，驗證新的目錄後再開啟"
-          }
-        }
-      }
-    },
-    "Start a new list, then invite friends." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新しいリストを作って、友達を招待します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "새 목록을 만들고 친구를 초대합니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "创建新列表，然后邀请朋友"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "建立新清單，然後邀請朋友"
           }
         }
       }
@@ -32384,34 +32299,6 @@
         }
       }
     },
-    "These are automatic estimates from public information. Check the original post and booth before relying on them." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "公開情報をもとに自動で推定しています。判断に使う前に、元の投稿と配置を確認してください。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "공개 정보를 바탕으로 자동 추정한 결과입니다. 활용하기 전에 원본 게시물과 부스 위치를 확인하세요."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这些是根据公开信息自动估算的结果。请先确认原帖和摊位位置，再据此判断"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "這些是根據公開資訊自動推算的結果。請先確認原始貼文和攤位配置，再據此判斷"
-          }
-        }
-      }
-    },
     "These changes are too large to send. Make them smaller and try again." : {
       "localizations" : {
         "ja" : {
@@ -34183,34 +34070,6 @@
         }
       }
     },
-    "Try again" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "もう一度試す"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다시 시도합니다"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "再试一次"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "再試一次"
-          }
-        }
-      }
-    },
     "Try Again" : {
       "localizations" : {
         "ja" : {
@@ -34553,34 +34412,6 @@
         }
       }
     },
-    "Update" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更新"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "업데이트"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更新"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "更新"
-          }
-        }
-      }
-    },
     "Update location" : {
       "localizations" : {
         "ja" : {
@@ -34605,35 +34436,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更新目前位置"
-          }
-        }
-      }
-    },
-    "Updated automatically with GPS" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GPSで自動更新"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "GPS로 자동 업데이트됨"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通过 GPS 自动更新"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "透過 GPS 自動更新"
           }
         }
       }
@@ -35707,7 +35509,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "コミナビへようこそ！"
+            "value" : "ComiNaviへようこそ！"
           }
         },
         "ko" : {

@@ -69,15 +69,15 @@ final class LocalizationTests: XCTestCase {
                 value: nil,
                 table: nil
             ),
-            "コミナビへようこそ！"
+            "ComiNaviへようこそ！"
         )
         XCTAssertEqual(
-            japaneseBundle.localizedString(forKey: "Shinagaki", value: nil, table: nil),
+            japaneseBundle.localizedString(forKey: "Item list", value: nil, table: nil),
             "お品書き"
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
-                forKey: "Latest shinagaki",
+                forKey: "Latest item lists",
                 value: nil,
                 table: nil
             ),
@@ -232,7 +232,7 @@ final class LocalizationTests: XCTestCase {
                 "Find circles. Know where they are.": "找到社团，确认位置",
                 "Sign in with Circle.ms": "使用 Circle.ms 登录",
                 "East 1–3": "东1–3馆",
-                "Shinagaki": "商品一览",
+                "Item list": "商品一览",
                 "Members and invitations": "成员与邀请",
                 "Shared Plans": "共享计划",
                 "Circle": "社团",
@@ -253,7 +253,7 @@ final class LocalizationTests: XCTestCase {
                 "Find circles. Know where they are.": "尋找社團，確認位置",
                 "Sign in with Circle.ms": "使用 Circle.ms 登入",
                 "East 1–3": "東1–3館",
-                "Shinagaki": "商品一覽",
+                "Item list": "商品一覽",
                 "Members and invitations": "成員與邀請",
                 "Shared Plans": "共享計畫",
                 "Circle": "社團",
@@ -274,7 +274,7 @@ final class LocalizationTests: XCTestCase {
                 "Find circles. Know where they are.": "서클을 찾고 위치를 확인하세요.",
                 "Sign in with Circle.ms": "Circle.ms로 로그인",
                 "East 1–3": "동 1–3홀",
-                "Shinagaki": "판매 목록",
+                "Item list": "판매 목록",
                 "Members and invitations": "멤버 및 초대",
                 "Shared Plans": "공유 플랜",
                 "Circle": "서클",

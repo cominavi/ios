@@ -2147,11 +2147,11 @@ final class ComiNaviUITests: XCTestCase {
         takeScreenshot(named: "WhereAmI-Located")
         app.buttons["current-location-copy"].tap()
         XCTAssertEqual(app.buttons["current-location-copy"].label, "Copied")
-        let done = app.buttons["Done"]
-        done.tap()
+        let close = app.buttons["current-location-close"]
+        close.tap()
         expectation(
             for: NSPredicate(format: "exists == false"),
-            evaluatedWith: done
+            evaluatedWith: close
         )
         waitForExpectations(timeout: 3)
 

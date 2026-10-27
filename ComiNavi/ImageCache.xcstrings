@@ -69,7 +69,7 @@
         }
       }
     },
-    "Circle artwork" : {
+    "Circle cut images" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -80,25 +80,25 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "サークル画像"
+            "value" : "サークルカット画像"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "서클 이미지"
+            "value" : "서클 컷 이미지"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "社团图片"
+            "value" : "社团图"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "社團圖片"
+            "value" : "社團圖"
           }
         }
       }
@@ -205,7 +205,7 @@
         }
       }
     },
-    "Clear Cache" : {
+    "Clear cache" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -477,7 +477,41 @@
         }
       }
     },
-    "Product previews and Shinagaki images shown in Explore and circle details." : {
+    "Item list images" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shinagaki images"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "お品書き画像"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "판매 목록 이미지"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "商品一览图片"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "商品一覽圖片"
+          }
+        }
+      }
+    },
+    "Product previews and item list images shown in Explore and circle details." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -488,25 +522,25 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Exploreやサークル詳細に表示される頒布物プレビューとお品書き画像。"
+            "value" : "「探す」やサークル詳細に表示される頒布物プレビューとお品書き画像。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "둘러보기와 서클 상세 화면에 표시되는 판매 목록 및 상품 미리보기 이미지입니다."
+            "value" : "탐색과 서클 상세 화면에 표시되는 상품 미리보기와 판매 목록 이미지입니다."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "“发现”和社团详情中显示的商品预览与摊位商品图。"
+            "value" : "“探索”和社团详情中显示的商品预览与商品一览图片"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "「探索」與社團詳細資訊中顯示的商品預覽及攤位商品圖。"
+            "value" : "「探索」與社團詳細資訊中顯示的商品預覽及商品一覽圖片"
           }
         }
       }
@@ -545,7 +579,7 @@
         }
       }
     },
-    "Refresh Cache Statistics" : {
+    "Refresh cache statistics" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -575,40 +609,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新整理快取資訊"
-          }
-        }
-      }
-    },
-    "Shinagaki images" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shinagaki images"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "お品書き画像"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "판매 목록 이미지"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "摊位商品图"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "攤位商品圖"
           }
         }
       }
