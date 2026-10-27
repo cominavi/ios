@@ -1130,7 +1130,9 @@ final class MapStatusChip: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        let isSingleLine = label.bounds.height <= label.font.lineHeight * 1.5
+        // Measured from the chip's own height, which is final here; the
+        // label inside the effect view may not have its frame yet.
+        let isSingleLine = bounds.height < label.font.lineHeight * 1.5 + Spacing.small * 2
         effectView.layer.cornerRadius =
             isSingleLine ? bounds.height / 2 : min(Radius.panel, bounds.height / 2)
     }
