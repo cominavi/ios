@@ -1141,7 +1141,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
         // Caption 2 (11 pt at the default size) in a capsule with 8 pt insets.
         XCTAssertLessThan(badge.frame.width, 120)
         XCTAssertLessThan(badge.frame.height, 24)
-        XCTAssertEqual(badge.titleLabel?.font.pointSize ?? 0, 8, accuracy: 0.1)
+        XCTAssertEqual(badge.titleLabel?.font.pointSize ?? 0, 11, accuracy: 0.1)
         XCTAssertEqual(badge.configuration?.title, "© OpenStreetMap")
         XCTAssertEqual(badge.menu?.title, "Map data attribution")
         XCTAssertEqual(badge.menu?.children.count, 4)
