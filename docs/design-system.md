@@ -140,7 +140,7 @@ Rules:
 one or two actions: catalog download, errors, sign-in prompts, and
 invitations. Its layout is fixed:
 
-- A `IconSize.hero` Lucide glyph in the tint color at the top leading edge,
+- An `IconSize.hero` Lucide glyph in the tint color at the top leading edge,
   and a faint, large copy of it as the backdrop.
 - The message at the bottom: an optional eyebrow, the
   `Font.focusedSurfaceTitle` title, and a `rowSubtitle` subtitle.
