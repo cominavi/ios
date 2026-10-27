@@ -52,22 +52,20 @@ struct ComiketToolboxView: View {
 
                 if let edition {
                     ToolboxEditionNotice(edition: edition, isExpanded: $isNoticeExpanded)
-                } else {
-                    ToolboxNoEditionNotice(event: event)
                 }
 
                 Section {
                     NavigationLink {
                         ToolboxChecklistScreen(store: checklistStore)
                     } label: {
-                        LabeledContent {
+                        ToolboxHubRow(title: "Day-of checklist", icon: "list-checks") {
                             Text(
                                 verbatim:
                                     "\(checklistStore.completedCount)/\(ComiketChecklistCatalog.items.count)"
                             )
                             .monospacedDigit()
-                        } label: {
-                            LucideLabel(resource: "Day-of checklist", icon: "list-checks")
+                            .foregroundStyle(.secondary)
+                            .singleLineToken()
                         }
                     }
                     .accessibilityIdentifier("toolbox-open-checklist")
@@ -76,7 +74,7 @@ struct ComiketToolboxView: View {
                         NavigationLink {
                             ToolboxReminderScreen(store: reminderStore, edition: edition)
                         } label: {
-                            LucideLabel(resource: "Event reminders", icon: "calendar-clock")
+                            ToolboxHubRow(title: "Event reminders", icon: "calendar-clock")
                         }
                         .accessibilityIdentifier("toolbox-open-reminders")
                     }
@@ -86,9 +84,15 @@ struct ComiketToolboxView: View {
                             sections: ComiketToolboxCatalog.sections(for: edition)
                         )
                     } label: {
-                        LucideLabel(resource: "Official links", icon: "globe")
+                        ToolboxHubRow(title: "Official links", icon: "globe")
                     }
                     .accessibilityIdentifier("toolbox-open-official-links")
+                } footer: {
+                    // Without an edition, a footnote explains the missing notices and
+                    // reminders instead of a separate card that competes with the actions.
+                    if edition == nil {
+                        ToolboxNoEditionNote(event: event)
+                    }
                 }
             } else {
                 ForEach(searchResults) { section in
@@ -364,25 +368,101 @@ private struct ToolboxEditionNotice: View {
     }
 }
 
-/// Shown instead of notices and reminders when no edition matches the selected
-/// event or the matching edition has ended.
-private struct ToolboxNoEditionNotice: View {
+/// Footer of the hub links, shown instead of notices and reminders when no
+/// edition matches the selected event or the matching edition has ended.
+private struct ToolboxNoEditionNote: View {
     let event: CatalogEvent?
 
     var body: some View {
-        Section {
-            Label {
-                if let event {
-                    Text("Event notices and reminders for \(event.shortName) are not available.")
-                } else {
-                    Text("Event notices and reminders are not available.")
-                }
-            } icon: {
-                LucideIcon("info", size: 18)
+        Group {
+            if let event {
+                Text("Event notices and reminders for \(event.shortName) are not available.")
+            } else {
+                Text("Event notices and reminders are not available.")
             }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .accessibilityIdentifier("toolbox-no-edition")
+        }
+        .font(.meta)
+        .foregroundStyle(.secondary)
+        .wrapsFully()
+        .accessibilityIdentifier("toolbox-no-edition")
+    }
+}
+
+/// A hub row: a leading icon, a title that wraps, and an optional trailing
+/// accessory such as a count. The accessory stays on the first line and never
+/// wraps, so the row keeps one layout at every text size.
+private struct ToolboxHubRow<Accessory: View>: View {
+    let title: LocalizedStringResource
+    let icon: String
+    @ViewBuilder let accessory: Accessory
+
+    var body: some View {
+        ToolboxIconRow(icon: icon, textStyle: .body) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+                Text(title)
+                    .wrapsFully()
+                    .layoutPriority(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                accessory
+            }
+        }
+    }
+}
+
+extension ToolboxHubRow where Accessory == EmptyView {
+    init(title: LocalizedStringResource, icon: String) {
+        self.init(title: title, icon: icon) { EmptyView() }
+    }
+}
+
+/// A row with a leading icon centered on the first line of the text beside it.
+/// A system `Label` centers the icon on the whole text block, and at
+/// accessibility sizes it lets the text wrap under the icon; this keeps the icon
+/// next to the title and the text column at one x position in every row.
+private struct ToolboxIconRow<Content: View>: View {
+    let icon: String
+    var iconSize: Double = IconSize.row
+    var iconStyle: Color = .accentColor
+    @ViewBuilder let content: Content
+    /// The line height of the first text line, scaled with Dynamic Type.
+    @ScaledMetric private var firstLineHeight: CGFloat
+
+    init(
+        icon: String,
+        iconSize: Double = IconSize.row,
+        iconStyle: Color = .accentColor,
+        textStyle: UIFont.TextStyle,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.icon = icon
+        self.iconSize = iconSize
+        self.iconStyle = iconStyle
+        self.content = content()
+        let baseline = UIFont.preferredFont(
+            forTextStyle: textStyle,
+            compatibleWith: UITraitCollection(preferredContentSizeCategory: .large)
+        ).lineHeight
+        _firstLineHeight = ScaledMetric(wrappedValue: baseline, relativeTo: Self.fontTextStyle(textStyle))
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Spacing.iconToText) {
+            LucideIcon(icon, size: iconSize)
+                .foregroundStyle(iconStyle)
+                .frame(minHeight: firstLineHeight)
+
+            content
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private static func fontTextStyle(_ style: UIFont.TextStyle) -> Font.TextStyle {
+        switch style {
+        case .headline: .headline
+        case .subheadline: .subheadline
+        case .footnote: .footnote
+        case .caption1: .caption
+        default: .body
         }
     }
 }
