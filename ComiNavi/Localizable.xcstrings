@@ -11237,30 +11237,30 @@
         }
       }
     },
-    "Detect locations from clipboard" : {
+    "Check clipboard for links" : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "クリップボードから共有場所を検出"
+            "value" : "クリップボードを確認"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "클립보드에서 공유 위치를 감지합니다"
+            "value" : "클립보드 링크 확인"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从剪贴板中检测位置"
+            "value" : "检查剪贴板链接"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "偵測剪貼簿中的位置"
+            "value" : "檢查剪貼簿連結"
           }
         }
       }

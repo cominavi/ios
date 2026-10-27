@@ -214,7 +214,7 @@ struct ProfileScreen: View {
                 // column starts at one x position.
                 Toggle(isOn: $automaticallyReadsSharedLocations) {
                     Label {
-                        Text("Detect locations from clipboard")
+                        Text("Check clipboard for links")
                     } icon: {
                         LucideIcon("doc.on.doc")
                     }
