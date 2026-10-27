@@ -36,6 +36,9 @@ struct EntryView: View {
     @State private var profileStore = AppData.profileStore
     @State private var userState = AppData.userState
     @State private var showsInvitationConfirmation = false
+    /// The app's tab. It lives here, not in ContentView, so the invitation
+    /// sheet can open Profile for sign-in.
+    @SceneStorage("ContentView.selectedTab") private var selectedTab: AppTab = .map
     @State private var googleSpecialEntryActive = false
     @State private var accountDeletionPending = AppData.isAccountDeletionPending
     @State private var accountDeletionIssue: String?
@@ -205,7 +208,13 @@ struct EntryView: View {
                         pending: pending,
                         profileStore: profileStore,
                         invitationInbox: invitationInbox,
-                        onDismiss: { showsInvitationConfirmation = false }
+                        onDismiss: { showsInvitationConfirmation = false },
+                        // The invitation stays pending, so the sheet opens
+                        // again after sign-in completes.
+                        onSignIn: {
+                            showsInvitationConfirmation = false
+                            selectedTab = .profile
+                        }
                     )
                 }
             }
@@ -480,6 +489,7 @@ struct EntryView: View {
             ContentView(
                 catalogLibrary: catalogLibrary,
                 sharedLocationInbox: sharedLocationInbox,
+                selection: $selectedTab,
                 catalogResetAction: catalogResetAction
             )
         }
@@ -830,20 +840,23 @@ private struct AccountDeletionPendingView: View {
             symbolName: "person.crop.circle.badge.xmark",
             tint: issue == nil ? .accentColor : .orange
         ) {
+            // The same title style as the catalog status and error surfaces.
             Text("Deleting your account")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .wrapsFully()
 
             if let issue {
                 Text(issue)
                     .foregroundStyle(.orange)
-                    .padding(.top, 18)
+                    .wrapsFully()
+                    .padding(.top, Spacing.large)
             }
 
             FocusedActionButton(action: retry) {
-                LucideLabel("Try again", icon: "arrow.clockwise")
+                LucideLabel("Try Again", icon: "arrow.clockwise")
             }
-                .padding(.top, 28)
-                .accessibilityIdentifier("account-deletion-retry")
+            .padding(.top, Spacing.xxLarge)
+            .accessibilityIdentifier("account-deletion-retry")
         }
     }
 }

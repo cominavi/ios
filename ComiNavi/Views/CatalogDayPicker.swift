@@ -61,6 +61,23 @@ enum CatalogDateFormatting {
         return (startDate..<endDate).formatted(format)
     }
 
+    /// The short month and day ("Aug 11", "8月11日") that every event day
+    /// control shows after the day number.
+    static let monthDay: Date.FormatStyle = .dateTime.month(.abbreviated).day()
+
+    /// `formatted` with its month-and-day part made unbreakable, so a wrapped
+    /// date never splits "August 12" across two lines. The weekday and the
+    /// year can still move to the next line.
+    static func protectingMonthDay(
+        in formatted: String,
+        of date: Date,
+        month: Date.FormatStyle.Symbol.Month
+    ) -> String {
+        let monthDay = date.formatted(.dateTime.month(month).day())
+        guard formatted.contains(monthDay) else { return formatted }
+        return formatted.replacingOccurrences(of: monthDay, with: NonBreaking.unit(monthDay))
+    }
+
     private static func addingYearWhenNeeded(
         to format: Date.FormatStyle,
         date: Date,
@@ -88,6 +105,14 @@ enum CatalogEventStatus: Hashable, Identifiable {
         case .demo: String(localized: "Demo")
         }
     }
+
+    /// Demo data is a warning; a past event is only a fact.
+    var tone: StatusBadge.Tone {
+        switch self {
+        case .past: .neutral
+        case .demo: .warning
+        }
+    }
 }
 
 /// What every day control says about the active catalog: which Comiket and
@@ -100,10 +125,20 @@ struct CatalogEventDaySummary {
     var referenceDate: Date = .now
     var calendar: Calendar = .current
 
-    /// "C104 · Day 1", or "Day 1" before the event is known.
-    var title: String {
-        guard let event else { return String(localized: "Day \(selectedDay)") }
-        return String(localized: "\(event.shortName) · Day \(selectedDay)")
+    /// "C104 · Day 1 · Aug 11", or "Day 1 · Aug 11" before the event is known.
+    var title: String { title(includingDate: true) }
+
+    /// The event context as units joined by " · ". Each unit is unbreakable,
+    /// and the separators keep ordinary spaces, so a line can break only
+    /// between units.
+    func title(includingDate: Bool) -> String {
+        var units: [String] = []
+        if let event { units.append(event.shortName) }
+        units.append(String(localized: "Day \(selectedDay)"))
+        if includingDate, let selectedDate {
+            units.append(selectedDate.formatted(CatalogDateFormatting.monthDay))
+        }
+        return units.map(NonBreaking.unit).joined(separator: " · ")
     }
 
     var selectedDate: Date? {
@@ -144,47 +179,108 @@ struct CatalogEventDaySummary {
     }
 }
 
-/// The event and day title with its status capsules. Narrow containers drop
-/// the capsules before they truncate the title.
-private struct CatalogEventDayTitle: View {
+/// One line of event context: the title and at most `statusLimit` status
+/// capsules. The title truncates before a capsule does, because the capsule
+/// is the warning that the data is old or fake.
+private struct CatalogEventDayTitleRow: View {
     let summary: CatalogEventDaySummary
+    let includesDate: Bool
+    let statusLimit: Int
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            row(summary.statuses)
-            row(Array(summary.statuses.suffix(1)))
-            row([])
-        }
-    }
-
-    private func row(_ statuses: [CatalogEventStatus]) -> some View {
-        HStack(spacing: 6) {
-            Text(summary.title)
+        HStack(spacing: Spacing.small) {
+            Text(verbatim: summary.title(includingDate: includesDate))
+                .font(.control)
+                .foregroundStyle(.primary)
                 .lineLimit(1)
 
-            ForEach(statuses) { status in
-                CatalogEventStatusBadge(status: status)
+            ForEach(summary.statuses.suffix(statusLimit)) { status in
+                StatusBadge(Text(status.title), tone: status.tone)
             }
         }
     }
 }
 
-private struct CatalogEventStatusBadge: View {
-    let status: CatalogEventStatus
+/// The event context that fits the width it gets. It drops the date first,
+/// then the Past capsule, and only at the end the Demo capsule.
+private struct CatalogEventDayFittingTitle: View {
+    let summary: CatalogEventDaySummary
+    /// False when another line already shows the date.
+    var includesDate = true
 
     var body: some View {
-        StatusBadge(Text(status.title))
+        if includesDate {
+            ViewThatFits(in: .horizontal) {
+                row(includesDate: true, statusLimit: 2)
+                row(includesDate: true, statusLimit: 1)
+                row(includesDate: false, statusLimit: 2)
+                row(includesDate: false, statusLimit: 1)
+                row(includesDate: false, statusLimit: 0)
+            }
+        } else {
+            ViewThatFits(in: .horizontal) {
+                row(includesDate: false, statusLimit: 2)
+                row(includesDate: false, statusLimit: 1)
+                row(includesDate: false, statusLimit: 0)
+            }
+        }
+    }
+
+    private func row(includesDate: Bool, statusLimit: Int) -> CatalogEventDayTitleRow {
+        CatalogEventDayTitleRow(summary: summary, includesDate: includesDate, statusLimit: statusLimit)
+    }
+}
+
+/// The one capsule that every one-line day control uses: calendar icon,
+/// event context, and a chevron that says "this opens a picker".
+private struct CatalogEventDayCapsule<Title: View>: View {
+    var showsIcon = true
+    @ViewBuilder let title: Title
+
+    var body: some View {
+        HStack(spacing: Spacing.medium) {
+            if showsIcon {
+                LucideIcon("calendar.badge.clock", size: IconSize.inline)
+                    .foregroundStyle(Color.accentColor)
+            }
+
+            HStack(spacing: Spacing.small) {
+                title
+                    .layoutPriority(1)
+
+                LucideIcon("chevron.down", size: IconSize.chipAccessory)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, Spacing.medium)
+        .frame(minHeight: HitArea.minimum)
+        .contentShape(.capsule)
+        .floatingCapsule()
+    }
+}
+
+private extension View {
+    /// `.surface(.floating)` in a capsule shape, for one-line map chrome.
+    @ViewBuilder
+    func floatingCapsule() -> some View {
+        if #available(iOS 26.0, *) {
+            glassEffect(.regular, in: .capsule)
+        } else {
+            background(.regularMaterial, in: .capsule)
+                .overlay { Capsule().strokeBorder(Color.hairline, lineWidth: 0.5) }
+        }
     }
 }
 
 struct CatalogEventDayBanner: View {
     enum Style: Equatable {
-        /// A two-line card with the date, for wide layouts.
+        /// A two-line floating card with the date, for wide layouts.
         case card
-        /// A one-line capsule that matches the Explore toolbar control.
+        /// The day capsule at the width its container offers. It drops the
+        /// date and the status capsules one at a time before it truncates.
         case compact
-        /// A tighter capsule with no chevron that shares one row with the
-        /// map selectors. It shows at most `statusLimit` status capsules;
+        /// The day capsule at its ideal width, for a row that it shares with
+        /// the map selectors. It shows at most `statusLimit` status capsules;
         /// the full statuses stay in the accessibility label.
         case inline(statusLimit: Int)
     }
@@ -197,11 +293,10 @@ struct CatalogEventDayBanner: View {
     let action: () -> Void
 
     @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @ScaledMetric(relativeTo: .body) private var minimumHeight = 54.0
-
-    private var adaptiveMinimumHeight: CGFloat {
-        verticalSizeClass == .compact || style != .card ? 44 : minimumHeight
-    }
+    // 54 pt: the 30 pt icon tile plus a 12 pt inset above and below it.
+    @ScaledMetric(relativeTo: .subheadline) private var cardMinimumHeight = 54.0
+    // 30 pt: the icon tile; it scales with the text beside it.
+    @ScaledMetric(relativeTo: .subheadline) private var iconTileSize = 30.0
 
     private var summary: CatalogEventDaySummary {
         CatalogEventDaySummary(
@@ -215,9 +310,20 @@ struct CatalogEventDayBanner: View {
     var body: some View {
         Button(action: action) {
             switch style {
-            case .card: cardLabel
-            case .compact: compactLabel
-            case .inline(let statusLimit): inlineLabel(statusLimit: statusLimit)
+            case .card:
+                cardLabel
+            case .compact:
+                CatalogEventDayCapsule {
+                    CatalogEventDayFittingTitle(summary: summary)
+                }
+            case .inline(let statusLimit):
+                CatalogEventDayCapsule {
+                    CatalogEventDayTitleRow(
+                        summary: summary,
+                        includesDate: true,
+                        statusLimit: statusLimit
+                    )
+                }
             }
         }
         .buttonStyle(.plain)
@@ -227,66 +333,50 @@ struct CatalogEventDayBanner: View {
     }
 
     private var cardLabel: some View {
-        HStack(spacing: 11) {
-            LucideIcon("calendar.badge.clock")
-                .font(.callout.weight(.semibold))
+        HStack(spacing: Spacing.medium) {
+            LucideIcon("calendar.badge.clock", size: IconSize.inline)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 30, height: 30)
-                .background(Color.accentColor.opacity(0.12), in: .rect(cornerRadius: 9))
+                .frame(width: iconTileSize, height: iconTileSize)
+                .background(
+                    Color.accentColor.opacity(0.12),
+                    in: .rect(
+                        cornerRadius: Radius.concentric(outer: Radius.panel, inset: Spacing.medium),
+                        style: .continuous
+                    )
+                )
 
-            VStack(alignment: .leading, spacing: 1) {
-                CatalogEventDayTitle(summary: summary)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                // The second line shows the date with its weekday, so the
+                // title line leaves it out.
+                CatalogEventDayFittingTitle(summary: summary, includesDate: false)
 
                 if let selectedDate = summary.selectedDate {
                     Text(
                         selectedDate,
                         format: CatalogDateFormatting.abbreviated(for: selectedDate)
                     )
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 }
             }
+            .layoutPriority(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 8)
-
-            LucideIcon("chevron.down")
-                .font(.caption2.weight(.bold))
+            LucideIcon("chevron.down", size: IconSize.chipAccessory)
                 .foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 13)
-        .frame(maxWidth: 340, minHeight: adaptiveMinimumHeight, alignment: .leading)
-        .contentShape(.rect)
-        .background(.regularMaterial, in: .rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
-        }
-    }
-
-    private var compactLabel: some View {
-        HStack(spacing: 8) {
-            LucideIcon("calendar.badge.clock")
-                .foregroundStyle(Color.accentColor)
-
-            CatalogEventDayTitle(summary: summary)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            LucideIcon("chevron.down")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 14)
-        .frame(minHeight: adaptiveMinimumHeight)
-        .contentShape(.capsule)
-        .background(.regularMaterial, in: .capsule)
-        .overlay {
-            Capsule()
-                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
-        }
+        .padding(.horizontal, Spacing.medium)
+        .padding(.vertical, Spacing.small)
+        // The card fills the map control column, so its trailing edge lines
+        // up with the search field and the selectors below it.
+        .frame(
+            maxWidth: .infinity,
+            minHeight: verticalSizeClass == .compact ? HitArea.minimum : cardMinimumHeight,
+            alignment: .leading
+        )
+        .contentShape(.rect(cornerRadius: Radius.panel, style: .continuous))
+        .surface(.floating, padding: 0)
     }
 }
 
@@ -298,40 +388,24 @@ extension CatalogEventDayBanner {
         copy.style = style
         return copy
     }
-
-    fileprivate func inlineLabel(statusLimit: Int) -> some View {
-        HStack(spacing: 6) {
-            LucideIcon("calendar.badge.clock")
-                .foregroundStyle(Color.accentColor)
-
-            HStack(spacing: 6) {
-                Text(summary.title)
-                    .lineLimit(1)
-
-                ForEach(summary.statuses.suffix(statusLimit)) { status in
-                    CatalogEventStatusBadge(status: status)
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.primary)
-        }
-        .padding(.horizontal, 12)
-        .frame(minHeight: 44)
-        .contentShape(.capsule)
-        .background(.regularMaterial, in: .capsule)
-        .overlay {
-            Capsule()
-                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
-        }
-    }
 }
 
+/// The day control in the Explore navigation bar. It uses the map capsule,
+/// so both tabs show one control.
+///
+/// A principal toolbar item gets no width limit, so a `ViewThatFits` there
+/// always picks its widest candidate and runs under the trailing toolbar
+/// group. This control therefore decides its content from the size class
+/// and the text size instead.
 struct CatalogEventDayToolbarButton: View {
     let event: CatalogEvent?
     let days: [UFDSchema.Day]
     let selectedDay: Int
     let isDemo: Bool
     let action: () -> Void
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var summary: CatalogEventDaySummary {
         CatalogEventDaySummary(
@@ -342,16 +416,33 @@ struct CatalogEventDayToolbarButton: View {
         )
     }
 
+    private var isWide: Bool { horizontalSizeClass == .regular }
+
+    /// iPhone has room for the date only at default text sizes and only
+    /// when no status capsule needs the space.
+    private var includesDate: Bool {
+        isWide || (summary.statuses.isEmpty && dynamicTypeSize <= .large)
+    }
+
+    /// Demo implies old data, so iPhone keeps only the last status. At
+    /// accessibility sizes the statuses move to the accessibility label and
+    /// the sheet.
+    private var statusLimit: Int {
+        if isWide { return 2 }
+        return dynamicTypeSize.isAccessibilitySize ? 0 : 1
+    }
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                LucideIcon("calendar.badge.clock")
-
-                CatalogEventDayTitle(summary: summary)
-                    .minimumScaleFactor(0.85)
+            CatalogEventDayCapsule(showsIcon: isWide || !dynamicTypeSize.isAccessibilitySize) {
+                CatalogEventDayTitleRow(
+                    summary: summary,
+                    includesDate: includesDate,
+                    statusLimit: statusLimit
+                )
             }
-            .font(.subheadline.weight(.semibold))
         }
+        .buttonStyle(.plain)
         .accessibilityLabel(summary.accessibilityLabel)
         .accessibilityHint("Change event day or Comiket")
         .accessibilityIdentifier("global-event-day-toolbar-button")
@@ -363,18 +454,20 @@ struct CatalogEventDaySheet: View {
     @Binding var selectedDay: Int
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    // 72 and 64 pt: two-line rows with a 12 pt inset; they scale with the text.
     @ScaledMetric(relativeTo: .body) private var eventRowHeight = 72.0
     @ScaledMetric(relativeTo: .body) private var dayRowHeight = 64.0
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 22) {
+                LazyVStack(alignment: .leading, spacing: Spacing.sectionGap) {
                     daySection
                     eventNavigationSection
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 20)
+                .padding(.horizontal, Spacing.screenGutter)
+                .padding(.vertical, Spacing.xLarge)
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Day & Comiket")
@@ -400,49 +493,27 @@ struct CatalogEventDaySheet: View {
     }
 
     private var eventNavigationSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Comiket")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            SectionHeader("Comiket")
 
             NavigationLink {
                 CatalogEventSelectionView(catalogLibrary: catalogLibrary)
             } label: {
-                HStack(spacing: 14) {
-                    LucideIcon("calendar.badge.clock")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 30)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        // The open catalog, not the one that is loading: the
-                        // days above still belong to it until the switch ends.
-                        Text(catalogLibrary.selectedEvent?.shortName ?? String(localized: "Comiket"))
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                        Text("Choose another Comiket")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer(minLength: 8)
-
-                    LucideIcon("chevron.forward")
-                        .font(.subheadline.weight(.semibold))
+                CatalogSettingRowLabel(
+                    // The open catalog, not the one that is loading: the
+                    // days above still belong to it until the switch ends.
+                    title: catalogLibrary.selectedEvent?.shortName ?? String(localized: "Comiket"),
+                    detail: String(localized: "Choose another Comiket"),
+                    systemImage: "calendar.badge.clock",
+                    iconColor: Color.accentColor,
+                    minimumHeight: eventRowHeight
+                ) {
+                    LucideIcon("chevron.forward", size: IconSize.caption)
                         .foregroundStyle(.tertiary)
                 }
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, minHeight: eventRowHeight)
-                .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .background(
-                Color(uiColor: .secondarySystemGroupedBackground),
-                in: .rect(cornerRadius: 14)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(uiColor: .separator).opacity(0.25), lineWidth: 0.5)
-            }
+            .surface(.card, padding: 0)
             .accessibilityHint("Choose another Comiket")
             .accessibilityIdentifier("catalog-event-selection-link")
 
@@ -452,20 +523,21 @@ struct CatalogEventDaySheet: View {
 
     @ViewBuilder
     private var daySection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Event day")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            SectionHeader("Event day")
 
             if availableDays.isEmpty {
-                HStack(spacing: 12) {
+                HStack(spacing: Spacing.iconToText) {
                     ProgressView()
                     Text(openingLabel)
-                        .font(.subheadline)
+                        .font(.rowSubtitle)
                         .foregroundStyle(.secondary)
+                        .wrapsFully()
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.cardPadding)
+                .padding(.vertical, Spacing.medium)
                 .frame(maxWidth: .infinity, minHeight: dayRowHeight, alignment: .leading)
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+                .surface(.card, padding: 0)
             } else {
                 ForEach(availableDays) { day in
                     CatalogSettingRow(
@@ -505,9 +577,22 @@ struct CatalogEventDaySheet: View {
         return String(localized: "Opening catalog…")
     }
 
+    /// "Sunday, August 11, 2024", or "Sun, Aug 11, 2024" at accessibility
+    /// sizes. The month and day never split across lines.
     private func formattedDate(_ day: UFDSchema.Day) -> String? {
         guard let date = Calendar.current.date(from: day.date) else { return nil }
-        return date.formatted(CatalogDateFormatting.full(for: date))
+        if dynamicTypeSize.isAccessibilitySize {
+            return CatalogDateFormatting.protectingMonthDay(
+                in: date.formatted(CatalogDateFormatting.abbreviated(for: date)),
+                of: date,
+                month: .abbreviated
+            )
+        }
+        return CatalogDateFormatting.protectingMonthDay(
+            in: date.formatted(CatalogDateFormatting.full(for: date)),
+            of: date,
+            month: .wide
+        )
     }
 }
 
@@ -516,25 +601,38 @@ struct CatalogEventDaySheet: View {
 private struct CatalogSwitchProgress: View {
     let catalogLibrary: CatalogLibrary
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         if let event = catalogLibrary.switchTarget {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    if fractionCompleted == nil {
-                        ProgressView()
+            VStack(alignment: .leading, spacing: Spacing.small) {
+                // At accessibility sizes the status gets the full width and
+                // Cancel moves below it.
+                let layout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xSmall))
+                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: Spacing.medium))
+
+                layout {
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+                        if fractionCompleted == nil {
+                            ProgressView()
+                        }
+
+                        Text(statusText(for: event))
+                            .font(.rowSubtitle)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .wrapsFully()
                     }
-
-                    Text(statusText(for: event))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-
-                    Spacer(minLength: 8)
+                    .layoutPriority(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     Button("Cancel", role: .cancel) {
                         catalogLibrary.cancelPendingLoad()
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tertiaryAction)
+                    .lineLimit(1)
+                    .fixedSize()
                     .accessibilityHint(
                         Text("Stops the switch and keeps \(catalogLibrary.selectedEvent?.shortName ?? "") open.")
                     )
@@ -547,12 +645,8 @@ private struct CatalogSwitchProgress: View {
                         .accessibilityHidden(true)
                 }
             }
-            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                Color(uiColor: .secondarySystemGroupedBackground),
-                in: .rect(cornerRadius: 14)
-            )
+            .surface(.card)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("catalog-switch-progress")
         }
@@ -577,11 +671,12 @@ private struct CatalogEventSelectionView: View {
 
     @Environment(\.calendar) private var calendar
     @Environment(\.locale) private var locale
+    // 72 pt: a two-line row with a 12 pt inset; it scales with the text.
     @ScaledMetric(relativeTo: .body) private var rowHeight = 72.0
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 8) {
+            LazyVStack(alignment: .leading, spacing: Spacing.small) {
                 CatalogSwitchProgress(catalogLibrary: catalogLibrary)
 
                 ForEach(catalogLibrary.events) { event in
@@ -610,8 +705,8 @@ private struct CatalogEventSelectionView: View {
                     .accessibilityIdentifier("catalog-event-\(event.id)")
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 20)
+            .padding(.horizontal, Spacing.screenGutter)
+            .padding(.vertical, Spacing.xLarge)
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Comiket")
@@ -630,6 +725,52 @@ private struct CatalogEventSelectionView: View {
     }
 }
 
+/// The content of a sheet row: a leading icon, a title with a detail line
+/// that wraps, and a trailing accessory. The icon and the accessory sit on
+/// the first line, so they stay beside the title when the detail wraps.
+private struct CatalogSettingRowLabel<Accessory: View>: View {
+    let title: String
+    let detail: String?
+    let systemImage: String
+    let iconColor: Color
+    let minimumHeight: CGFloat
+    @ViewBuilder let accessory: Accessory
+
+    /// Half the cap height of the headline title. It centers the icons on
+    /// the first line of text.
+    @ScaledMetric(relativeTo: .headline) private var halfCapHeight = 6.0
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.iconToText) {
+            LucideIcon(systemImage, size: IconSize.row)
+                .foregroundStyle(iconColor)
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + halfCapHeight }
+
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                Text(title)
+                    .font(.rowTitle)
+                    .foregroundStyle(.primary)
+                    .wrapsFully()
+                if let detail {
+                    Text(detail)
+                        .font(.rowSubtitle)
+                        .foregroundStyle(.secondary)
+                        .wrapsFully()
+                }
+            }
+            .layoutPriority(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            accessory
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + halfCapHeight }
+        }
+        .padding(.horizontal, Spacing.cardPadding)
+        .padding(.vertical, Spacing.medium)
+        .frame(maxWidth: .infinity, minHeight: minimumHeight, alignment: .leading)
+        .contentShape(.rect)
+    }
+}
+
 private struct CatalogSettingRow: View {
     let title: String
     let detail: String?
@@ -640,49 +781,30 @@ private struct CatalogSettingRow: View {
     let action: () -> Void
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
         Button(action: action) {
-            HStack(spacing: 14) {
-                LucideIcon(systemImage)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                    .frame(width: 30)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    if let detail {
-                        Text(detail)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Spacer(minLength: 8)
-
+            CatalogSettingRowLabel(
+                title: title,
+                detail: detail,
+                systemImage: systemImage,
+                iconColor: isSelected ? Color.accentColor : Color.secondary,
+                minimumHeight: minimumHeight
+            ) {
                 if isLoading {
                     ProgressView()
                 } else if isSelected {
-                    LucideIcon("checkmark.circle.fill")
-                        .font(.title3)
+                    LucideIcon("checkmark.circle.fill", size: IconSize.row)
                         .foregroundStyle(Color.accentColor)
                 }
             }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, minHeight: minimumHeight)
-            .contentShape(.rect)
+            .background(isSelected ? Color.accentColor.opacity(0.08) : Color.clear, in: shape)
         }
         .buttonStyle(.plain)
-        .background(
-            isSelected ? Color.accentColor.opacity(0.08) : Color(uiColor: .secondarySystemGroupedBackground),
-            in: .rect(cornerRadius: 14)
-        )
+        .surface(.card, padding: 0)
         .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(
-                    isSelected ? Color.accentColor.opacity(0.45) : Color(uiColor: .separator).opacity(0.25),
-                    lineWidth: isSelected ? 1 : 0.5
-                )
+            if isSelected {
+                shape.strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+            }
         }
         // The trait alone announces "Selected"; a value would repeat it.
         .accessibilityAddTraits(isSelected ? .isSelected : [])
