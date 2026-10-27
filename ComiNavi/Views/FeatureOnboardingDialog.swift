@@ -94,8 +94,8 @@ private struct FeatureOnboardingDialogModifier<Illustration: View>: ViewModifier
                     onDismiss: dismiss,
                     illustration: illustration
                 )
-                .padding(.horizontal, 24)
-                .padding(.vertical, 32)
+                .padding(.horizontal, Spacing.screenGutter)
+                .padding(.vertical, Spacing.xxxLarge)
                 .transition(
                     accessibilityReduceMotion
                         ? .opacity
@@ -117,6 +117,7 @@ private struct FeatureOnboardingDialogModifier<Illustration: View>: ViewModifier
 }
 
 private struct FeatureOnboardingDialog<Illustration: View>: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let accessibilityIdentifier: String
     let title: LocalizedStringResource
     let message: LocalizedStringResource
@@ -125,44 +126,58 @@ private struct FeatureOnboardingDialog<Illustration: View>: View {
     let illustration: Illustration
 
     var body: some View {
+        VStack(spacing: Spacing.xxLarge) {
+            // The text scrolls only when it does not fit, so large text or a
+            // landscape iPhone never pushes the button off the card.
+            ViewThatFits(in: .vertical) {
+                explanation
+
+                ScrollView {
+                    explanation
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+
+            Button(action: onDismiss) {
+                Text(dismissButtonTitle)
+            }
+            .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
+            .accessibilityIdentifier("\(accessibilityIdentifier)-dismiss")
+        }
+        .padding(Spacing.xxLarge)
+        .frame(maxWidth: ReadableWidth.floatingCard)
+        .background(
+            Color(uiColor: .secondarySystemBackground),
+            in: RoundedRectangle(cornerRadius: Radius.panel, style: .continuous)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+        .accessibilityAction(.escape, onDismiss)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var explanation: some View {
         VStack(spacing: 0) {
-            illustration
+            // At accessibility sizes the illustration takes the room the text
+            // needs, and the text already explains the gesture.
+            if !dynamicTypeSize.isAccessibilitySize {
+                illustration
+                    .padding(.bottom, Spacing.xLarge)
+            }
 
             Text(title)
-                .font(.system(.title2, design: .rounded, weight: .bold))
+                .font(.sectionTitle)
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 22)
+                .wrapsFully()
 
             Text(message)
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-
-            Button(action: onDismiss) {
-                Text(dismissButtonTitle)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
-            .controlSize(.large)
-            .tint(Color.accentColor)
-            .padding(.top, 24)
-            .accessibilityIdentifier("\(accessibilityIdentifier)-dismiss")
+                .wrapsFully()
+                .padding(.top, Spacing.small)
         }
-        .padding(24)
-        .frame(maxWidth: 360)
-        .background(Color(uiColor: .secondarySystemBackground))
-        .compositingGroup()
-        .clipShape(.rect(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.2), radius: 24, x: 0, y: 12)
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isModal)
-        .accessibilityAction(.escape, onDismiss)
-        .accessibilityIdentifier(accessibilityIdentifier)
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -230,7 +245,7 @@ private struct ExploreGalleryZoomOnboardingScene: View {
         ZStack {
             Color(uiColor: .tertiarySystemBackground)
 
-            HStack(spacing: 10) {
+            HStack(spacing: Spacing.small) {
                 ForEach(0 ..< 5, id: \.self) { index in
                     ExploreGalleryZoomOnboardingTile(index: index)
                 }
@@ -253,7 +268,7 @@ private struct ExploreGalleryZoomOnboardingScene: View {
             }
         }
         .compositingGroup()
-        .clipShape(.rect(cornerRadius: 14))
+        .clipShape(.rect(cornerRadius: Radius.control, style: .continuous))
     }
 }
 
@@ -261,11 +276,11 @@ private struct ExploreGalleryZoomOnboardingTile: View {
     let index: Int
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 8)
+        RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
             .fill(tileColor)
             .frame(width: 52, height: 78)
             .overlay {
-                LucideIcon("photo.stack", size: 22)
+                LucideIcon("photo.stack", size: IconSize.action)
                     .foregroundStyle(iconColor)
             }
     }
