@@ -157,7 +157,7 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testSharedPlanEmptyHomeOffersAddAndJoinAsTwoSquareActions() {
+    func testSharedPlanEmptyHomeOffersCreateAndJoinAsStackedActions() {
         let app = XCUIApplication()
         app.launchArguments += [
             "-cominavi-ui-testing-hide-debugger",
@@ -166,15 +166,19 @@ final class ComiNaviUITests: XCTestCase {
         ]
         app.launch()
 
-        let add = app.buttons["Add"]
-        let join = app.buttons["Join"]
-        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        // One primary action (Create) above the secondary Join action, in
+        // one column that shares its leading and trailing edges.
+        let create = app.buttons["shared-plan-create-button"]
+        let join = app.buttons["shared-plan-join-button"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
         XCTAssertTrue(join.waitForExistence(timeout: 5))
-        XCTAssertEqual(add.frame.midY, join.frame.midY, accuracy: 2)
-        XCTAssertEqual(add.frame.width, add.frame.height, accuracy: 3)
-        XCTAssertEqual(join.frame.width, join.frame.height, accuracy: 3)
+        XCTAssertLessThan(create.frame.maxY, join.frame.minY + 1)
+        XCTAssertEqual(create.frame.minX, join.frame.minX, accuracy: 2)
+        XCTAssertEqual(create.frame.width, join.frame.width, accuracy: 2)
+        XCTAssertGreaterThanOrEqual(create.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(join.frame.height, 44)
 
-        add.tap()
+        create.tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["shared-plan-create-test-surface"]
                 .waitForExistence(timeout: 5)
@@ -183,6 +187,7 @@ final class ComiNaviUITests: XCTestCase {
         app.terminate()
         app.launch()
         XCTAssertTrue(join.waitForExistence(timeout: 5))
+        makeHittable(join, in: app)
         join.tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["shared-plan-join-guide"]
@@ -265,7 +270,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertEqual(boughtStepper.label, "Bought, 0")
         XCTAssertEqual(requestedStepper.value as? String, "2")
         XCTAssertEqual(boughtStepper.value as? String, "0")
-        app.buttons["Done"].tap()
+        app.sheetCloseButton.tap()
         XCTAssertFalse(app.navigationBars["Purchase progress"].waitForExistence(timeout: 2))
 
         let firstRowMenu = app.buttons["More actions for 新刊セット"]
@@ -626,7 +631,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(app.buttons["explore-attendance-all"].exists)
         XCTAssertTrue(app.buttons["explore-space-all"].exists)
         takeScreenshot(named: "Explore-Filters-Expanded")
-        app.buttons["Done"].tap()
+        app.sheetCloseButton.tap()
 
         app.buttons["global-event-day-toolbar-button"].tap()
         XCTAssertTrue(app.otherElements["catalog-event-day-sheet"].waitForExistence(timeout: 5))
@@ -823,19 +828,31 @@ final class ComiNaviUITests: XCTestCase {
     func testExploreEventDaySelectorStaysAtTopLeading() {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")
+        app.launchArguments += XCUIApplication.initialTabArguments("explore")
         app.launch()
 
-        XCTAssertTrue(app.buttons["global-event-day-banner"].waitForExistence(timeout: 20))
-
-        app.buttons["Explore"].firstMatch.tap()
-        XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 30))
         let eventDaySelector = app.buttons["global-event-day-toolbar-button"]
         XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 5))
+        // The capsule shows the same content as the map pill; it may drop
+        // the date or a status capsule to fit, but never the day.
+        XCTAssertTrue(eventDaySelector.label.contains("Day 1"))
 
         let filterButton = app.buttons["explore-filter-button"]
         XCTAssertTrue(filterButton.exists)
-        XCTAssertLessThan(eventDaySelector.frame.midX, app.frame.midX)
-        XCTAssertLessThan(eventDaySelector.frame.maxX, filterButton.frame.minX)
+        let selector = eventDaySelector.frame
+        // The capsule starts in the leading half of the bar and stays in the
+        // window, whatever width its content takes.
+        XCTAssertLessThan(selector.minX, app.frame.midX)
+        XCTAssertTrue(app.frame.contains(selector), "The capsule must not leave the window")
+        XCTAssertLessThan(selector.minY, app.frame.height / 4)
+        // iPhone puts the capsule in the row of the trailing buttons, so it
+        // must end before them; iPad gives it its own row below them.
+        let sharesRow = selector.minY < filterButton.frame.maxY
+            && selector.maxY > filterButton.frame.minY
+        if sharesRow {
+            XCTAssertLessThanOrEqual(selector.maxX, filterButton.frame.minX)
+        }
         takeScreenshot(named: "Explore-Selector-Top-Leading")
     }
 
@@ -1023,7 +1040,7 @@ final class ComiNaviUITests: XCTestCase {
         lastFavoriteColor.tap()
         XCTAssertEqual(lastFavoriteColor.value as? String, "Selected")
 
-        XCTAssertTrue(app.buttons["Done"].isHittable)
+        XCTAssertTrue(app.sheetCloseButton.isHittable)
         takeScreenshot(named: "Explore-Filters-Expanded")
     }
 

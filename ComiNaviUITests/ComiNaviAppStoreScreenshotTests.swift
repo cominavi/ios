@@ -22,15 +22,13 @@ final class ComiNaviAppStoreScreenshotTests: XCTestCase {
 
     @MainActor
     func test02ExploreGallery() throws {
-        let app = launchJapaneseDemo()
+        // The launch route opens Explore without a tab tap, which iPad's
+        // floating tab bar and iPhone Duo's vertical bar expose differently.
+        let app = launchJapaneseDemo(
+            additionalArguments: XCUIApplication.initialTabArguments("explore")
+        )
 
-        // iPad's floating tab bar exposes a wrapper and its cell with the same
-        // localized label. Either points at the same control.
-        let exploreTab = app.buttons["探す"].firstMatch
-        XCTAssertTrue(exploreTab.waitForExistence(timeout: 30))
-        exploreTab.tap()
-
-        XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 40))
         let gallery = app.collectionViews["explore-gallery"]
         XCTAssertTrue(gallery.waitForExistence(timeout: 20))
         XCTAssertGreaterThan(gallery.cells.count, 0)

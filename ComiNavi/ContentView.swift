@@ -28,6 +28,10 @@ struct ContentView: View {
     @SceneStorage("ContentView.standaloneSelectedTab") private var standaloneSelection: AppTab = .map
     @State private var selectedDay = 1
     @State private var showsCatalogSettings = false
+    @State private var exploreColumnWidth: CGFloat?
+    #if DEBUG
+        @State private var didOpenDayPickerForUITesting = false
+    #endif
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let externalSelection: Binding<AppTab>?
@@ -80,10 +84,18 @@ struct ContentView: View {
                             event: catalogLibrary.selectedEvent,
                             days: circle.comiket.days,
                             selectedDay: selectedDay,
-                            isDemo: catalogLibrary.mode == .demo
+                            isDemo: catalogLibrary.mode == .demo,
+                            columnWidth: exploreColumnWidth
                         ) {
                             showsCatalogSettings = true
                         }
+                    }
+                    // The toolbar capsule fits its content to this width;
+                    // on iPad it excludes the sidebar.
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.width
+                    } action: { width in
+                        exploreColumnWidth = width
                     }
                 }
             }
@@ -132,6 +144,7 @@ struct ContentView: View {
         .onChange(of: readyDataSourceID, initial: true) {
             restoreRememberedDay()
             handlePendingSharedLocation()
+            openDayPickerForUITesting()
         }
         .onChange(of: selectedDay) { _, day in
             guard let circle = readyDataSource else { return }
@@ -191,6 +204,22 @@ struct ContentView: View {
         }
     }
 
+    /// `-cominavi-ui-testing-open-day-picker` opens the Day & Comiket sheet
+    /// once the first catalog is ready, so screenshot scripts reach it
+    /// without a tap.
+    private func openDayPickerForUITesting() {
+        #if DEBUG
+            guard !didOpenDayPickerForUITesting,
+                  readyDataSource != nil,
+                  ProcessInfo.processInfo.arguments.contains(
+                      "-cominavi-ui-testing-open-day-picker"
+                  )
+            else { return }
+            didOpenDayPickerForUITesting = true
+            showsCatalogSettings = true
+        #endif
+    }
+
     private func restoreRememberedDay() {
         guard let circle = readyDataSource,
               let rememberedDay = catalogLibrary.preferredDay(
@@ -229,8 +258,8 @@ struct ContentView: View {
         selection.wrappedValue = .map
     }
 
-    /// iPhone uses the same one-line capsule as the Explore toolbar; wide
-    /// layouts have room for the card with the date.
+    /// iPhone uses the same one-line capsule and fitting rule as the Explore
+    /// toolbar; wide layouts have room for the card with the date.
     private func eventDayBanner(for circle: CirclemsDataSource) -> CatalogEventDayBanner {
         CatalogEventDayBanner(
             event: catalogLibrary.selectedEvent,
@@ -255,7 +284,10 @@ private struct CatalogEventDaySheetPresentation: ViewModifier {
     func body(content: Content) -> some View {
         if isRegularWidth {
             // A form sheet as tall as its rows, so a short day list does
-            // not leave an empty lower half on iPad.
+            // not leave an empty lower half on iPad. The sheet's scroll views
+            // report their measured content height as their ideal height
+            // (`fittingSheetHeight`); without it the sheet showed only its
+            // title bar.
             content
                 .presentationSizing(.form.fitted(horizontal: false, vertical: true))
         } else if isAccessibilitySize {
