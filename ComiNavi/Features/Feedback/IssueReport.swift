@@ -314,6 +314,7 @@ struct IssueReportScreen: View {
                     reportForm
                 }
             }
+            .readableFormWidth(ReadableWidth.form)
             .navigationTitle("Report an issue")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -361,6 +362,8 @@ struct IssueReportScreen: View {
                 if model.message.isEmpty {
                     Text("What happened, and what did you expect?")
                         .foregroundStyle(.tertiary)
+                        // 5 and 8 pt: the TextEditor's own text inset, so the
+                        // placeholder sits exactly where typed text starts.
                         .padding(.horizontal, 5)
                         .padding(.vertical, 8)
                         .allowsHitTesting(false)
@@ -371,12 +374,13 @@ struct IssueReportScreen: View {
             }
 
             Text(verbatim: "\(model.message.count) / \(IssueReportModel.maximumMessageLength)")
-                .font(.caption.monospacedDigit())
+                .font(.meta.monospacedDigit())
                 .foregroundStyle(
                     model.message.count > IssueReportModel.maximumMessageLength
                         ? .red
                         : .secondary
                 )
+                .singleLineToken()
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
 
@@ -395,7 +399,7 @@ struct IssueReportScreen: View {
                     .resizable()
                     .scaledToFit()
                     .frame(maxHeight: 260)
-                    .clipShape(.rect(cornerRadius: 12))
+                    .clipShape(.rect(cornerRadius: Radius.control, style: .continuous))
                     .accessibilityLabel("Selected screenshot")
 
                 PhotosPicker(
@@ -403,15 +407,17 @@ struct IssueReportScreen: View {
                     matching: .screenshots,
                     preferredItemEncoding: .current
                 ) {
-                    Label("Choose another screenshot", systemImage: "photo.badge.plus")
+                    LucideLabel("Choose another screenshot", icon: "photo.stack")
                 }
 
-                Button("Remove screenshot", systemImage: "trash", role: .destructive) {
+                Button(role: .destructive) {
                     selectedScreenshotItem = nil
                     model.removeScreenshot()
+                } label: {
+                    LucideLabel("Remove screenshot", icon: "xmark")
                 }
             } else if model.isLoadingScreenshot {
-                HStack(spacing: 12) {
+                HStack(spacing: Spacing.iconToText) {
                     ProgressView()
                     Text("Preparing screenshot…")
                         .foregroundStyle(.secondary)
@@ -422,42 +428,52 @@ struct IssueReportScreen: View {
                     matching: .screenshots,
                     preferredItemEncoding: .current
                 ) {
-                    Label("Choose screenshot from Photos", systemImage: "photo.badge.plus")
+                    LucideLabel("Choose screenshot from Photos", icon: "photo.stack")
                 }
                 .accessibilityIdentifier("issue-report-choose-screenshot")
             }
 
             if let screenshotErrorMessage = model.screenshotErrorMessage {
-                Label(screenshotErrorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .font(.footnote)
-                    .foregroundStyle(.red)
+                Label {
+                    Text(screenshotErrorMessage)
+                        .wrapsFully()
+                } icon: {
+                    LucideIcon("exclamationmark.triangle.fill", size: IconSize.caption)
+                }
+                .font(.meta)
+                .foregroundStyle(.red)
             }
 
             Text("ComiNavi can access only the screenshot you choose.")
-                .font(.footnote)
+                .font(.meta)
                 .foregroundStyle(.secondary)
         }
 
         Section("Included diagnostics") {
             if let publicUserID = model.context.publicUserID {
                 LabeledContent("ComiNavi account ID") {
-                    Text(publicUserID)
-                        .font(.caption.monospaced())
+                    // An ID is a value from data: one line, both ends kept.
+                    Text(verbatim: publicUserID)
+                        .font(.meta.monospaced())
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                         .textSelection(.enabled)
                 }
             }
 
             LabeledContent("App installation ID") {
-                Text(model.context.installationID)
-                    .font(.caption.monospaced())
+                Text(verbatim: model.context.installationID)
+                    .font(.meta.monospaced())
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                     .textSelection(.enabled)
             }
 
-            Label("App version, device model, and operating system", systemImage: "iphone")
-            Label("Recent app actions and network breadcrumbs", systemImage: "list.bullet.rectangle")
+            LucideLabel("App version, device model, and operating system", icon: "smartphone")
+            LucideLabel("Recent app actions and network breadcrumbs", icon: "list.bullet")
 
             Text("Passwords, authentication tokens, and catalog contents are not included. A screenshot is attached only when you choose one.")
-                .font(.footnote)
+                .font(.meta)
                 .foregroundStyle(.secondary)
         }
     }
@@ -465,22 +481,23 @@ struct IssueReportScreen: View {
     @ViewBuilder
     private func submittedContent(referenceID: String) -> some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.largeTitle)
+            VStack(alignment: .leading, spacing: Spacing.medium) {
+                LucideIcon("checkmark.circle.fill", size: IconSize.hero)
                     .foregroundStyle(Color.accentColor)
-                    .accessibilityHidden(true)
                 Text("Report queued")
-                    .font(.title2.weight(.semibold))
+                    .font(.sectionTitle)
                 Text("Thanks. Your report and diagnostics have been queued for delivery.")
                     .foregroundStyle(.secondary)
+                    .wrapsFully()
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, Spacing.small)
         }
 
         Section("Reference ID") {
-            Text(referenceID)
-                .font(.caption.monospaced())
+            Text(verbatim: referenceID)
+                .font(.meta.monospaced())
+                .lineLimit(1)
+                .truncationMode(.middle)
                 .textSelection(.enabled)
         }
     }

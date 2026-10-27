@@ -65,23 +65,19 @@ struct FavoriteColorLabelsScreen: View {
         Form {
             Section {
                 ForEach(BookmarkColor.selectableColors) { color in
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(color.swiftUIColor)
-                            .overlay {
-                                Circle().stroke(.black.opacity(0.12), lineWidth: 0.5)
-                            }
-                            .frame(width: 18, height: 18)
-                            .accessibilityHidden(true)
+                    HStack(spacing: Spacing.iconToText) {
+                        ColorSwatch(color: color.swiftUIColor, size: IconSize.row)
 
-                        VStack(alignment: .leading, spacing: 3) {
+                        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                             Text(String(localized: color.displayName))
-                                .font(.caption)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
+                            // The color name is already above the field, so the
+                            // prompt names the field instead of repeating it.
                             TextField(
                                 "Label",
                                 text: binding(for: color),
-                                prompt: Text(String(localized: color.displayName))
+                                prompt: Text("Label")
                             )
                             .textInputAutocapitalization(.sentences)
                             .accessibilityIdentifier("favorite-color-label-\(color.rawValue)")
@@ -92,6 +88,7 @@ struct FavoriteColorLabelsScreen: View {
                 Text("Labels are shown in the PDF legend and circle list.")
             }
         }
+        .readableFormWidth()
         .navigationTitle("Color labels")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
@@ -760,25 +757,33 @@ struct FavoriteMapPDFScreen: View {
                 ProgressView("Preparing map…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .empty:
-                ContentUnavailableView(
+                EmptyStateView(
                     "No favorite circles",
-                    systemImage: "map",
-                    description: Text("Add favorites to create a printable map.")
+                    icon: "map",
+                    message: "Add favorites to create a printable map."
                 )
             case .loaded(let document, _):
                 documentSummary(document)
             case .failed(let message):
+                // Not `EmptyStateView`: the message is a runtime error string,
+                // not a localization key. The layout matches it.
                 ContentUnavailableView {
-                    Label("Couldn’t create the favorite map", systemImage: "exclamationmark.triangle")
+                    VStack(spacing: Spacing.medium) {
+                        LucideIcon("exclamationmark.triangle.fill", size: IconSize.hero)
+                            .foregroundStyle(.secondary)
+                        Text("Couldn’t create the favorite map")
+                    }
                 } description: {
                     Text(message)
                 } actions: {
                     Button("Try Again") { reloadID &+= 1 }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.primaryAction)
+                        .frame(maxWidth: ReadableWidth.floatingCard)
                 }
             }
         }
-        .navigationTitle("Favorite map")
+        // The same name as the Profile row that opens this screen.
+        .navigationTitle("Printable favorite map")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -794,7 +799,7 @@ struct FavoriteMapPDFScreen: View {
                     ShareLink(
                         item: url,
                         preview: SharePreview(
-                            String(localized: "Favorite map"),
+                            String(localized: "Printable favorite map"),
                             image: Image(systemName: "map")
                         )
                     ) {
@@ -827,27 +832,27 @@ struct FavoriteMapPDFScreen: View {
             ForEach(document.halls) { hall in
                 Section {
                     ForEach(hall.groupedCircles, id: \.color) { group in
-                        HStack(spacing: 10) {
-                            Circle()
-                                .fill(group.color.swiftUIColor)
-                                .overlay {
-                                    Circle().stroke(.black.opacity(0.12), lineWidth: 0.5)
-                                }
-                                .frame(width: 13, height: 13)
-                                .accessibilityHidden(true)
+                        HStack(spacing: Spacing.small) {
+                            ColorSwatch(color: group.color.swiftUIColor, size: IconSize.caption)
                             Text(group.label)
-                            Spacer()
+                                .layoutPriority(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             Text("\(group.circles.count)")
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
+                                .singleLineToken()
                         }
                         .accessibilityElement(children: .combine)
                     }
                 } header: {
-                    Text("\(String(localized: "Day \(hall.scene.id.day)")) · \(hall.name)")
+                    // Each unit stays whole; the line can break at " · ".
+                    Text(
+                        "\(NonBreaking.spaces(String(localized: "Day \(hall.scene.id.day)"))) · \(NonBreaking.spaces(hall.name))"
+                    )
                 }
             }
         }
+        .readableFormWidth()
     }
 
     private func load() async {

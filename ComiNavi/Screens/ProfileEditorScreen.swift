@@ -29,21 +29,26 @@ struct ProfileEditorScreen: View {
                 Button {
                     isShowingAvatarPicker = true
                 } label: {
-                    VStack(spacing: 10) {
+                    VStack(spacing: Spacing.medium) {
                         editorAvatar
                             .overlay(alignment: .bottomTrailing) {
+                                // SF Symbol: the bundled Lucide set has no camera.
                                 Image(systemName: "camera.fill")
-                                    .font(.caption.weight(.semibold))
+                                    .font(.badge)
                                     .foregroundStyle(Color.onAccentFill)
-                                    .padding(7)
+                                    .padding(Spacing.small)
                                     .background(Color.accentFill, in: .circle)
+                                    .overlay {
+                                        Circle().strokeBorder(Color.hairline, lineWidth: 0.5)
+                                    }
                             }
 
                         Text("Change Picture")
-                            .font(.subheadline)
+                            .font(.control)
+                            .foregroundStyle(Color.accentColor)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, Spacing.small)
                 }
                 .buttonStyle(.plain)
                 .disabled(isSavingChanges || profileStore.isSaving)
@@ -99,13 +104,17 @@ struct ProfileEditorScreen: View {
         .interactiveDismissDisabled(isSavingChanges)
     }
 
+    /// The editor shows the picture larger than the Profile header, so the
+    /// crop is easy to check.
+    private static let avatarSize: CGFloat = 104
+
     @ViewBuilder
     private var editorAvatar: some View {
         switch avatarChange {
         case .unchanged:
             AuthenticatedProfileAvatar(
                 url: profileStore.profile?.avatarURL,
-                size: 104,
+                size: Self.avatarSize,
                 revision: profileStore.profile?.revision
             )
         case .selected(let image):
@@ -113,14 +122,14 @@ struct ProfileEditorScreen: View {
                 .resizable()
                 .renderingMode(.original)
                 .scaledToFill()
-                .frame(width: 104, height: 104)
+                .frame(width: Self.avatarSize, height: Self.avatarSize)
                 .clipShape(.circle)
                 .accessibilityLabel("Profile picture")
         case .removed:
-            Image(systemName: "person.crop.circle.fill")
-                .resizable()
-                .foregroundStyle(.secondary)
-                .frame(width: 104, height: 104)
+            // The same empty glyph as the Profile header.
+            AuthenticatedProfileAvatar.placeholder
+                .frame(width: Self.avatarSize, height: Self.avatarSize)
+                .accessibilityElement()
                 .accessibilityLabel("No profile picture")
         }
     }
