@@ -86,7 +86,13 @@ struct ComiketSpaceAddress: Equatable, Sendable {
             guard let direction = BigSightVenue.direction(matching: hallName) else {
                 return spaceCode
             }
-            return "\(direction.localizedName) \(spaceCode)"
+            let name = direction.localizedName
+            // A kanji direction joins the code with no space ("西あ01a"),
+            // like the venue signs, so the address reads as one unit.
+            // Latin and Hangul names keep the space ("West あ01a").
+            let isIdeographic =
+                name.unicodeScalars.last?.properties.isIdeographic ?? false
+            return isIdeographic ? "\(name)\(spaceCode)" : "\(name) \(spaceCode)"
         case .full:
             return String(
                 localized: "Day \(day) · \(localizedHallName) · \(spaceCode)",
