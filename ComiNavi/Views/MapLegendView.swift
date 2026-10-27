@@ -32,20 +32,22 @@ struct MapLegendView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 10) {
-                    LucideIcon("square.3.layers.3d.top.filled")
+                HStack(spacing: Spacing.small) {
+                    // The same glyph as the genre button in the top chrome.
+                    LucideIcon("paintbrush", size: IconSize.inline)
                         .foregroundStyle(Color.accentColor)
                         .accessibilityHidden(true)
                     Text("Genre overlay")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer(minLength: 12)
-                    LucideIcon(isExpanded ? "chevron.down" : "chevron.up")
-                        .font(.caption.weight(.semibold))
+                        .font(.control)
+                        .foregroundStyle(.primary)
+                        .layoutPriority(1)
+                    Spacer(minLength: Spacing.medium)
+                    LucideIcon(isExpanded ? "chevron.down" : "chevron.up", size: IconSize.caption)
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                 }
-                .padding(.horizontal, 14)
-                .frame(minHeight: 44)
+                .padding(.horizontal, Spacing.large)
+                .frame(minHeight: HitArea.minimum)
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
@@ -54,25 +56,26 @@ struct MapLegendView: View {
 
             if isExpanded {
                 Divider()
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, Spacing.large)
 
                 if genres.isEmpty {
-                    HStack(spacing: 10) {
+                    HStack(spacing: Spacing.small) {
                         ProgressView()
                         Text("Loading genre colors…")
-                            .font(.caption)
+                            .font(.meta)
                             .foregroundStyle(.secondary)
+                            .wrapsFully()
                     }
-                    .padding(14)
+                    .padding(Spacing.large)
                 } else {
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 10) {
+                        LazyVStack(alignment: .leading, spacing: Spacing.small) {
                             ForEach(genres) { genre in
                                 GenreLegendRow(genre: genre)
                             }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
+                        .padding(.horizontal, Spacing.large)
+                        .padding(.vertical, Spacing.medium)
                     }
                     .frame(maxHeight: 260)
                     .clipped()
@@ -84,12 +87,9 @@ struct MapLegendView: View {
                 }
             }
         }
-        .frame(maxWidth: 286)
-        .background(.regularMaterial, in: .rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
-        }
+        .frame(maxWidth: ReadableWidth.floatingCard)
+        .clipShape(.rect(cornerRadius: Radius.panel, style: .continuous))
+        .mapChromeSurface(.panel)
     }
 }
 
@@ -103,25 +103,28 @@ private struct GenreLegendRow: View {
     let genre: GenreLegendEntry
 
     var body: some View {
-        HStack(spacing: 11) {
-            RoundedRectangle(cornerRadius: 4)
+        HStack(alignment: .top, spacing: Spacing.medium) {
+            RoundedRectangle(cornerRadius: Radius.xSmall, style: .continuous)
                 .fill(genreColor.opacity(0.72))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(genreColor, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Radius.xSmall, style: .continuous)
+                        .strokeBorder(genreColor, lineWidth: 1)
                 }
+                // 34 × 24 pt: the swatch keeps the proportion of a table
+                // on the map.
                 .frame(width: 34, height: 24)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(genre.name)
-                    .font(.caption.weight(.semibold))
+                    .font(.meta.weight(.semibold))
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
                 Text("\(genre.spaceCount) table spaces")
-                    .font(.caption2)
+                    .font(.badge)
                     .foregroundStyle(.secondary)
             }
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(genre.name), \(genre.spaceCount) table spaces")

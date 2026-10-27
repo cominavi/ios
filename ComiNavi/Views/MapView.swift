@@ -157,9 +157,9 @@ struct MapView: View {
                 }
             )
             .padding(.horizontal, MapChromeLayout.edgeInset)
-            .safeAreaPadding(.top, 8)
+            .safeAreaPadding(.top, Spacing.small)
 
-            VStack(alignment: .trailing, spacing: 8) {
+            VStack(alignment: .trailing, spacing: Spacing.small) {
                 if model.phase == .ready, model.scope == .venue, model.showsGenreOverlay {
                     MapLegendView(
                         genrePlacements: model.genrePlacements,
@@ -736,7 +736,7 @@ private struct MapControlPanel: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             selectors
             if model.isSearchPresented {
                 MapSearchField(model: model, onGoToSpace: onGoToSpace)
@@ -748,29 +748,29 @@ private struct MapControlPanel: View {
         )
     }
 
-    /// One row when the day selector and the map tools fit side by side,
-    /// which keeps more of the map visible; two rows otherwise.
+    /// One row when the day selector, with every status, and the map tools
+    /// fit side by side (iPhone landscape); two rows otherwise (iPhone
+    /// portrait, iPad). The tools are the same in every scope and the day
+    /// selector never drops a status, so opening a hall does not reflow the
+    /// chrome or change what the day selector shows.
     @ViewBuilder
     private var selectors: some View {
         if horizontalSizeClass == .regular {
             stackedSelectors
         } else {
-            // The day capsule drops its status capsules, one at a time,
-            // before the chrome falls back to two rows.
             ViewThatFits(in: .horizontal) {
-                singleRowSelectors(statusLimit: 2)
-                singleRowSelectors(statusLimit: 1)
-                singleRowSelectors(statusLimit: 0)
+                singleRowSelectors
                 stackedSelectors
             }
         }
     }
 
-    private func singleRowSelectors(statusLimit: Int) -> some View {
-        HStack(alignment: .center, spacing: 8) {
+    private var singleRowSelectors: some View {
+        HStack(alignment: .center, spacing: Spacing.small) {
             if let eventDaySelector {
                 eventDaySelector
-                    .style(.inline(statusLimit: statusLimit))
+                    // Two statuses at most: "Past event" and "Demo".
+                    .style(.inline(statusLimit: 2))
                     .fixedSize(horizontal: true, vertical: false)
             }
             MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
@@ -778,9 +778,12 @@ private struct MapControlPanel: View {
     }
 
     private var stackedSelectors: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             if let eventDaySelector {
+                // Every row of the stack shares the leading and trailing
+                // edges of the column.
                 eventDaySelector
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             MapSelectorBar(model: model, visibleMapLayers: $visibleMapLayers)
         }
@@ -1004,45 +1007,41 @@ private struct LocationPermissionRecoveryOverlay: View {
                 .ignoresSafeArea()
                 .accessibilityHidden(true)
 
-            VStack(spacing: 16) {
-                Image(systemName: "location.slash.fill")
-                    .font(.system(size: 32, weight: .semibold))
+            VStack(spacing: Spacing.large) {
+                LucideIcon("location.slash", size: IconSize.hero)
                     .foregroundStyle(Color.accentColor)
                     .accessibilityHidden(true)
 
-                VStack(spacing: 8) {
+                VStack(spacing: Spacing.small) {
                     Text("Location Access Is Off")
-                        .font(.headline)
+                        .font(.rowTitle)
+                        .accessibilityAddTraits(.isHeader)
 
                     Text(
                         "Turn on location access in Settings to use GPS Mode, or continue in Manual Mode."
                     )
-                    .font(.subheadline)
+                    .font(.rowSubtitle)
                     .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
                 }
+                .multilineTextAlignment(.center)
+                .wrapsFully()
 
-                VStack(spacing: 8) {
+                VStack(spacing: Spacing.medium) {
                     Button("Open Settings", action: onOpenSettings)
-                        .buttonStyle(.borderedProminent)
-                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.primaryAction)
                         .accessibilityIdentifier("gps-location-permission-settings")
 
                     Button("Manual Mode", action: onUseManualMode)
-                        .buttonStyle(.bordered)
-                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.secondaryAction)
                         .accessibilityIdentifier("gps-location-permission-manual")
                 }
             }
-            .padding(22)
-            .frame(maxWidth: 340)
-            .background(.regularMaterial, in: .rect(cornerRadius: 20))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(Color(uiColor: .separator).opacity(0.3), lineWidth: 0.5)
-            }
+            .padding(Spacing.xxLarge)
+            .frame(maxWidth: ReadableWidth.floatingCard)
+            .mapChromeSurface(.panel)
+            // Floating map chrome is the one place where a shadow is allowed.
             .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
-            .padding(24)
+            .padding(Spacing.xxLarge)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("gps-location-permission-recovery")
         }
@@ -1055,15 +1054,7 @@ private struct MapLocationControlIcon: View {
     let isActive: Bool
 
     var body: some View {
-        LucideIcon(icon, size: 20)
-            .foregroundStyle(isActive ? Color.accentColor : Color.primary)
-            .frame(width: MapChromeLayout.controlSize, height: MapChromeLayout.controlSize)
-            .background(.regularMaterial, in: .circle)
-            .overlay {
-                Circle()
-                    .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
-            }
-            .contentShape(.circle)
+        MapChromeIconLabel(icon: icon, isActive: isActive)
     }
 }
 
@@ -1072,36 +1063,59 @@ private struct MapSelectorBar: View {
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
 
     var body: some View {
-        HStack(spacing: 8) {
-            Menu {
-                // An inline picker lets the system draw and align the
-                // checkmark for Campus and every hall.
-                Picker("Area", selection: venueSelection) {
-                    Text("Campus")
-                        .tag(Int?.none)
-
-                    ForEach(model.halls, id: \.id) { hall in
-                        // The catalog code stays as secondary text so it can
-                        // be matched against printed catalogs and signs.
-                        VStack(alignment: .leading) {
-                            Text(verbatim: BigSightVenue.localizedHallName(for: hall))
-                            Text(verbatim: hall.name)
-                        }
-                        .tag(Int?.some(hall.externalMapId))
-                        .accessibilityLabel(Text(verbatim: BigSightVenue.localizedHallName(for: hall)))
-                    }
-                }
-                .pickerStyle(.inline)
-            } label: {
-                SelectorLabel(
-                    title: selectedHallName,
-                    systemImage: "building.2"
-                )
+        // The hall selector and the tools share a row while the hall name
+        // fits on one line. At large text sizes, the selector takes its own
+        // full-width row and the tools move to the row below, so the hall
+        // name does not truncate.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Spacing.small) {
+                venueMenu
+                Spacer(minLength: 0)
+                tools
             }
-            .accessibilityIdentifier("map-venue-selector")
 
-            Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: Spacing.small) {
+                venueMenu
+                HStack(spacing: Spacing.small) {
+                    Spacer(minLength: 0)
+                    tools
+                }
+            }
+        }
+    }
 
+    private var venueMenu: some View {
+        Menu {
+            // Toggles, not an inline picker: a picker row drops the second
+            // text of its label, and a toggle still shows the checkmark.
+            Toggle(isOn: venueBinding(nil)) {
+                Text("Campus")
+            }
+
+            ForEach(model.halls, id: \.id) { hall in
+                // A menu shows the second text of an item label as its
+                // caption. The catalog code stays as that caption, so it can
+                // be matched against printed catalogs and signs.
+                Toggle(isOn: venueBinding(hall.externalMapId)) {
+                    Text(verbatim: BigSightVenue.localizedHallName(for: hall))
+                    Text(verbatim: hall.name)
+                }
+                .accessibilityLabel(Text(verbatim: BigSightVenue.localizedHallName(for: hall)))
+            }
+        } label: {
+            SelectorLabel(
+                title: selectedHallName,
+                systemImage: "building.2"
+            )
+        }
+        .accessibilityIdentifier("map-venue-selector")
+    }
+
+    /// The same tools in every scope, so the chrome does not reflow when the
+    /// attendee opens a hall. Genre colors exist only inside a hall; on the
+    /// campus the button stays in place and is disabled.
+    private var tools: some View {
+        HStack(spacing: Spacing.small) {
             MapLayerMenu(
                 eventNumber: model.eventNumber,
                 availableLayers: model.availableMapLayers,
@@ -1109,34 +1123,39 @@ private struct MapSelectorBar: View {
             )
 
             Button {
+                model.toggleGenreOverlay()
+            } label: {
+                MapChromeIconLabel(
+                    icon: "paintbrush",
+                    isActive: isGenreOverlayAvailable && model.showsGenreOverlay
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!isGenreOverlayAvailable)
+            // A plain button does not dim when disabled.
+            .opacity(isGenreOverlayAvailable ? 1 : 0.45)
+            .accessibilityLabel(
+                isGenreOverlayAvailable && model.showsGenreOverlay
+                    ? "Hide genre overlay" : "Show genre overlay"
+            )
+            .accessibilityHint(
+                isGenreOverlayAvailable ? Text(verbatim: "") : Text("Open a hall to show genre colors.")
+            )
+            .accessibilityIdentifier("map-genre-button")
+
+            Button {
                 model.setSearchPresented(!model.isSearchPresented)
             } label: {
-                LucideIcon(model.isSearchPresented ? "xmark" : "magnifyingglass")
-                    .font(.callout.weight(.semibold))
-                    .frame(width: 44, height: 44)
-                    .background(.thinMaterial, in: .circle)
+                MapChromeIconLabel(icon: model.isSearchPresented ? "xmark" : "magnifyingglass")
             }
             .buttonStyle(.plain)
             .accessibilityLabel(model.isSearchPresented ? "Close map search" : "Search circles")
             .accessibilityIdentifier("map-search-button")
-
-            if model.scope == .venue {
-                Button {
-                    model.toggleGenreOverlay()
-                } label: {
-                    LucideIcon("square.3.layers.3d")
-                        .font(.callout.weight(.semibold))
-                        .foregroundStyle(model.showsGenreOverlay ? Color.accentColor : .primary)
-                        .frame(width: 44, height: 44)
-                        .background(.thinMaterial, in: .circle)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    model.showsGenreOverlay ? "Hide genre overlay" : "Show genre overlay"
-                )
-                .accessibilityIdentifier("map-genre-button")
-            }
         }
+    }
+
+    private var isGenreOverlayAvailable: Bool {
+        model.scope == .venue
     }
 
     private var selectedHallName: String {
@@ -1146,11 +1165,14 @@ private struct MapSelectorBar: View {
             ?? String(localized: "Venue")
     }
 
-    /// `nil` represents the campus overview; a map ID selects that hall.
-    private var venueSelection: Binding<Int?> {
+    /// The checkmark state of one area in the menu. `nil` represents the
+    /// campus overview; a map ID selects that hall. Turning on an area selects
+    /// it; turning off the current area does nothing.
+    private func venueBinding(_ mapID: Int?) -> Binding<Bool> {
         Binding(
-            get: { model.scope == .venue ? model.selectedMapID : nil },
-            set: { mapID in
+            get: { (model.scope == .venue ? model.selectedMapID : nil) == mapID },
+            set: { isOn in
+                guard isOn else { return }
                 if let mapID {
                     model.select(mapID: mapID)
                 } else {
@@ -1181,18 +1203,18 @@ private struct MapLayerMenu: View {
 
     var body: some View {
         Menu {
-            // A picker gives the active preset a system checkmark. A custom
-            // layer mix selects no preset.
-            Picker("Quick Views", selection: quickViewSelection) {
+            // Toggles give the active preset a system checkmark, and a menu
+            // shows the second text of a toggle label as its caption. A custom
+            // layer mix checks no preset.
+            Section {
                 ForEach(availableQuickViews) { quickView in
-                    VStack(alignment: .leading) {
+                    Toggle(isOn: quickViewBinding(quickView)) {
                         Text(verbatim: quickView.title)
                         Text(verbatim: quickView.subtitle)
                     }
-                    .tag(MapQuickView?.some(quickView))
+                    .accessibilityLabel(Text(verbatim: quickView.title))
                 }
             }
-            .pickerStyle(.inline)
 
             Section("Layers") {
                 ForEach(BigSightMapLayer.allCases) { layer in
@@ -1206,18 +1228,23 @@ private struct MapLayerMenu: View {
                         }
                     } else {
                         // A disabled button, not a toggle: a layer with no
-                        // data must never show a checkmark, and a menu button
-                        // shows its second text as a caption.
+                        // data must never show a checkmark. The title, the
+                        // caption, and the image are direct children of the
+                        // label, which is the form in which a menu keeps the
+                        // second text as a caption.
                         Button {} label: {
-                            Label {
-                                Text(verbatim: layer.title)
-                                Text("No data for C\(eventNumber)")
-                            } icon: {
-                                LucideIcon(layer.systemImage)
-                            }
+                            Text(verbatim: layer.title)
+                            Text("No data for C\(eventNumber)")
+                            Image(LucideIcon.assetName(for: layer.systemImage))
+                                .renderingMode(.template)
                         }
                         .disabled(true)
-                        .accessibilityValue(Text("No data for C\(eventNumber)"))
+                        // A menu item does not export its value, so the
+                        // caption is part of the label.
+                        .accessibilityLabel(
+                            Text(verbatim: layer.title) + Text(verbatim: ", ")
+                                + Text("No data for C\(eventNumber)")
+                        )
                     }
                 }
             }
@@ -1238,11 +1265,7 @@ private struct MapLayerMenu: View {
                 }
             }
         } label: {
-            LucideIcon("line.3.horizontal.decrease.circle")
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(showsEveryLayer ? Color.primary : Color.accentColor)
-                .frame(width: 44, height: 44)
-                .background(.thinMaterial, in: .circle)
+            MapChromeIconLabel(icon: "square.3.layers.3d", isActive: !showsEveryLayer)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Map layers")
@@ -1263,11 +1286,11 @@ private struct MapLayerMenu: View {
         return String(localized: "\(shownLayers.count) of \(availableLayers.count) shown")
     }
 
-    private var quickViewSelection: Binding<MapQuickView?> {
+    private func quickViewBinding(_ quickView: MapQuickView) -> Binding<Bool> {
         Binding(
-            get: { activeQuickView },
-            set: { quickView in
-                guard let quickView else { return }
+            get: { activeQuickView == quickView },
+            set: { isOn in
+                guard isOn else { return }
                 visibleMapLayers = quickView.layers
             }
         )
@@ -1296,32 +1319,33 @@ private struct MapSearchField: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                LucideIcon("magnifyingglass")
+        VStack(spacing: Spacing.small) {
+            HStack(spacing: Spacing.small) {
+                LucideIcon("magnifyingglass", size: IconSize.inline)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
 
-                TextField(
-                    "Circle, creator, or space (e.g. 東A01a)",
-                    text: $text
-                )
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .focused($isFocused)
-                .submitLabel(.search)
-                .accessibilityLabel("Search circles")
-                .accessibilityHint("Search circle names, creators, or space codes on every day")
-                .accessibilityIdentifier("map-search-field")
+                // A short prompt fits on one line in every language at
+                // XXXL; a cut-off example code helped no one.
+                TextField("Circle, creator, or space", text: $text)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .focused($isFocused)
+                    .submitLabel(.search)
+                    .accessibilityLabel("Search circles")
+                    .accessibilityHint("Search circle names, creators, or space codes on every day")
+                    .accessibilityIdentifier("map-search-field")
 
                 if model.isSearching {
                     ProgressView()
                         .controlSize(.small)
-                } else if hasQuery {
+                } else if hasQuery, model.searchResultCount > 0 {
+                    // No count for zero results: the empty message below
+                    // already says so.
                     Text("^[\(model.searchResultCount) circle](inflect: true)")
-                        .font(.caption.monospacedDigit().weight(.semibold))
+                        .font(.badge.monospacedDigit())
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .fixedSize()
+                        .singleLineToken()
                         .accessibilityLabel("\(model.searchResultCount) matching circles")
                         .accessibilityIdentifier("map-search-summary")
                 }
@@ -1331,23 +1355,20 @@ private struct MapSearchField: View {
                         text = ""
                         isFocused = true
                     } label: {
-                        LucideIcon("xmark.circle.fill")
+                        LucideIcon("xmark.circle.fill", size: IconSize.inline)
                             .foregroundStyle(.secondary)
-                            .frame(minWidth: 28, minHeight: 44)
-                            .contentShape(.rect)
+                            .minimumHitArea()
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Clear search")
                     .accessibilityIdentifier("map-search-clear")
                 }
             }
-            .padding(.horizontal, 13)
-            .frame(minHeight: 44)
-            .background(.regularMaterial, in: .rect(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(.white.opacity(0.55), lineWidth: 0.5)
-            }
+            .padding(.leading, Spacing.medium)
+            // The clear button draws its own 44 pt target to the edge.
+            .padding(.trailing, text.isEmpty ? Spacing.medium : 0)
+            .frame(minHeight: HitArea.minimum)
+            .mapChromeSurface(.capsule)
 
             if showsResults, hasQuery, !model.isSearching || model.searchResultCount > 0 {
                 MapSearchResultsList(model: model) { result in
@@ -1363,12 +1384,23 @@ private struct MapSearchField: View {
                 isFocused = false
                 onGoToSpace()
             } label: {
-                LucideLabel("Go to a space by block and number", icon: "mappin.and.ellipse")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 44)
+                Label {
+                    Text("Go to a space by block and number")
+                        .multilineTextAlignment(.leading)
+                        .wrapsFully()
+                } icon: {
+                    LucideIcon("mappin.and.ellipse", size: IconSize.inline)
+                        .accessibilityHidden(true)
+                }
+                .font(.control)
+                .foregroundStyle(.primary)
+                .padding(.horizontal, Spacing.large)
+                .padding(.vertical, Spacing.small)
+                .frame(maxWidth: .infinity, minHeight: HitArea.minimum)
+                .mapChromeSurface(.capsule)
+                .contentShape(.capsule)
             }
-            .buttonStyle(.bordered)
-            .tint(.primary)
+            .buttonStyle(.plain)
             .accessibilityHint("Choose the event day, block letter, and space number")
             .accessibilityIdentifier("map-go-to-space-button")
         }
@@ -1403,10 +1435,11 @@ private struct MapSearchResultsList: View {
             LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                 if let emptyMessage {
                     Text(emptyMessage)
-                        .font(.subheadline)
+                        .font(.rowSubtitle)
                         .foregroundStyle(.secondary)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
+                        .wrapsFully()
+                        .padding(.horizontal, Spacing.large)
+                        .padding(.vertical, Spacing.medium)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityIdentifier("map-search-empty")
                 }
@@ -1419,30 +1452,27 @@ private struct MapSearchResultsList: View {
                             }
                             if result.id != group.results.last?.id {
                                 Divider()
-                                    .padding(.leading, 14)
+                                    .padding(.leading, Spacing.large)
                             }
                         }
                     } header: {
                         Text("Day \(group.day)")
-                            .font(.footnote.weight(.semibold))
+                            .font(.meta.weight(.semibold))
                             .foregroundStyle(.secondary)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, Spacing.large)
+                            .padding(.vertical, Spacing.xSmall)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(.regularMaterial)
                             .accessibilityAddTraits(.isHeader)
                     }
                 }
             }
+            .padding(.vertical, Spacing.xSmall)
         }
         .scrollBounceBehavior(.basedOnSize)
         .scrollDismissesKeyboard(.immediately)
-        .background(.regularMaterial, in: .rect(cornerRadius: 14))
-        .clipShape(.rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(.white.opacity(0.55), lineWidth: 0.5)
-        }
+        .clipShape(.rect(cornerRadius: Radius.panel, style: .continuous))
+        .mapChromeSurface(.panel)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Search results")
         .accessibilityIdentifier("map-search-results")
@@ -1467,50 +1497,72 @@ private struct MapSearchResultRow: View {
     let result: MapScreenModel.SearchResult
     let action: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         Button(action: action) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(verbatim: displayName)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    if !result.penName.isEmpty {
-                        Text(verbatim: result.penName)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    // At accessibility sizes the address moves below the
+                    // names, so the circle name keeps the full row width.
+                    VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                        names
+                        address
+                    }
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.medium) {
+                        names
+                            .layoutPriority(1)
+                        Spacer(minLength: 0)
+                        address
                     }
                 }
-
-                Spacer(minLength: 8)
-
-                Text(verbatim: result.address.formatted(.short))
-                    .font(.subheadline.monospaced().weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .fixedSize()
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, Spacing.large)
+            .padding(.vertical, Spacing.small)
+            .frame(maxWidth: .infinity, minHeight: HitArea.minimum, alignment: .leading)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
+        // The button is already one element. A label on it, with no extra
+        // accessibility container, keeps VoiceOver from finding a second
+        // copy of the row.
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityAddTraits(.isButton)
         .accessibilityHint("Shows this circle on the map")
         .accessibilityIdentifier("map-search-result-\(result.id)")
+    }
+
+    private var names: some View {
+        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+            Text(verbatim: displayName)
+                .font(.rowTitle)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+
+            if !result.penName.isEmpty {
+                // Data, one line: the circle name above identifies the row.
+                Text(verbatim: result.penName)
+                    .font(.rowSubtitle)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var address: some View {
+        Text(verbatim: result.address.displayText(.short))
+            .font(.spaceCode)
+            .foregroundStyle(.secondary)
+            .singleLineToken()
     }
 
     private var displayName: String {
         result.circleName.isEmpty ? String(localized: "No circle assigned") : result.circleName
     }
 
+    /// The same short address as the visible text.
     private var accessibilityLabel: String {
-        [displayName, result.penName, result.address.formatted(.full)]
+        [displayName, result.penName, result.address.formatted(.short)]
             .filter { !$0.isEmpty }
             .joined(separator: ", ")
     }
@@ -1521,17 +1573,22 @@ private struct SelectorLabel: View {
     let systemImage: String
 
     var body: some View {
-        LucideLabel(verbatim: title, icon: systemImage)
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
-            .padding(.horizontal, 13)
-            .frame(height: 44)
-            .background(.thinMaterial, in: .capsule)
-            .overlay {
-                Capsule()
-                    .stroke(.white.opacity(0.5), lineWidth: 0.5)
-            }
-            .contentShape(.capsule)
+        HStack(spacing: Spacing.small) {
+            LucideIcon(systemImage, size: IconSize.inline)
+                .foregroundStyle(Color.accentColor)
+                .accessibilityHidden(true)
+            // Single-line chrome: the bar gives the selector its own row
+            // before the name would truncate.
+            Text(verbatim: title)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+        }
+        .font(.control)
+        .padding(.horizontal, Spacing.medium)
+        .frame(minHeight: HitArea.minimum)
+        .mapChromeSurface(.capsule)
+        .contentShape(.capsule)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -1789,7 +1846,7 @@ private struct InteractiveMapCanvas: View {
             .overlay(alignment: .bottomTrailing) {
                 compassButton(viewportSize: viewportSize)
                     .padding(.trailing, MapChromeLayout.edgeInset)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, Spacing.large)
             }
             .onChange(of: committedViewport, initial: true) { _, viewport in
                 onViewportChange(viewport)
@@ -2044,17 +2101,8 @@ private struct InteractiveMapCanvas: View {
                     .radians(MapCameraMath.northIndicatorRotation(mapRotation: camera.rotation))
                 )
                 .frame(width: 30, height: 30)
-                .frame(width: 44, height: 44)
-                .background(.regularMaterial, in: .circle)
-                .overlay {
-                    Circle()
-                        .stroke(
-                            isGridAligned
-                                ? Color.accentColor.opacity(0.58)
-                                : Color(uiColor: .separator).opacity(0.35),
-                            lineWidth: 0.5
-                        )
-                }
+                .frame(width: MapChromeLayout.controlSize, height: MapChromeLayout.controlSize)
+                .mapChromeSurface(.circle)
                 .accessibilityHidden(true)
         }
         .buttonStyle(.plain)
@@ -2478,7 +2526,7 @@ private struct CircleMapDetailSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: Spacing.large) {
                     if selection.isLoading {
                         ProgressView("Loading circles…")
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -2495,16 +2543,14 @@ private struct CircleMapDetailSheet: View {
                         pinDestinationButton
                     }
                 }
-                .padding()
+                .padding(Spacing.screenGutter)
             }
             .navigationTitle("Circle details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
+                    MapSheetCloseButton {
                         dismiss()
-                    } label: {
-                        LucideLabel("Close", icon: "xmark")
                     }
                     .accessibilityIdentifier("map-circle-sheet-close")
                 }
@@ -2531,38 +2577,44 @@ private struct CircleMapDetailSheet: View {
             copiedAddress = true
             hapticFeedback?.play(.copyConfirmation)
         } label: {
-            HStack(spacing: 14) {
-                LucideIcon(copiedAddress ? "checkmark.circle.fill" : "mappin.and.ellipse")
-                    .font(.title2)
-                    .foregroundStyle(copiedAddress ? .green : .accent)
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.iconToText) {
+                LucideIcon(
+                    copiedAddress ? "checkmark.circle.fill" : "mappin.and.ellipse",
+                    size: IconSize.row
+                )
+                .foregroundStyle(copiedAddress ? Color.green : Color.accentColor)
+                .accessibilityHidden(true)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(selection.selectedAddress.spaceCode)
-                        .font(.title2.monospaced().weight(.bold))
+                // The short address is the one shown everywhere on the map
+                // path. The Japanese address is only the captioned staff
+                // line, because venue staff and signs use it.
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                    Text(verbatim: selection.selectedAddress.displayText(.short))
+                        .font(.spaceCode)
                         .foregroundStyle(.primary)
 
-                    Text(selection.selectedAddress.canonicalText)
-                        .font(.subheadline.weight(.medium))
+                    Text("Japanese address (for staff and signs)")
+                        .font(.meta)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, Spacing.xSmall)
+
+                    Text(verbatim: selection.selectedAddress.canonicalText)
+                        .font(.rowSubtitle)
                         .foregroundStyle(.secondary)
                 }
-
-                Spacer(minLength: 8)
+                .wrapsFully()
+                .layoutPriority(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(copiedAddress ? "Copied" : "Copy")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(copiedAddress ? .green : .accentColor)
+                    .font(.control)
+                    .foregroundStyle(copiedAddress ? Color.green : Color.accentColor)
+                    .singleLineToken()
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
+            .surface(.card)
+            .contentShape(.rect(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(.plain)
-        .background(Color(uiColor: .secondarySystemBackground))
-        .clipShape(.rect(cornerRadius: 14))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color(uiColor: .separator).opacity(0.32), lineWidth: 0.5)
-        }
         .accessibilityLabel("Copy \(selection.selectedAddress.canonicalText)")
         .accessibilityHint("Copies the venue-aware circle address and a ComiNavi link")
         .accessibilityIdentifier("map-circle-address-copy")
@@ -2573,16 +2625,14 @@ private struct CircleMapDetailSheet: View {
             onPinDestination()
         } label: {
             LucideLabel("Pin as Destination", icon: "mappin.and.ellipse")
-                .font(.headline)
-                .frame(maxWidth: .infinity, minHeight: 50)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
         .accessibilityHint("Keeps this space marked on the map until you clear it")
         .accessibilityIdentifier("map-circle-pin-destination")
     }
 
     private var circleSummaries: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Spacing.medium) {
             ForEach(circleGroups.indices, id: \.self) { index in
                 let circles = circleGroups[index]
                 let circle = circles[0]
@@ -2636,9 +2686,9 @@ private struct CircleMapSummaryCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 if !isCombinedAB {
                     Text(circle.subspace == 0 ? "A" : "B")
-                        .font(.headline.monospaced().weight(.bold))
+                        .font(.rowTitle.monospaced())
                         .foregroundStyle(.secondary)
-                        .padding(10)
+                        .padding(Spacing.medium)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
@@ -2649,54 +2699,45 @@ private struct CircleMapSummaryCard: View {
                                 ProgressView()
                                     .controlSize(.small)
                             } else {
-                                LucideIcon("arrow.up.right")
-                                    .font(.caption2.weight(.bold))
+                                LucideIcon("arrow.up.right", size: IconSize.chipAccessory)
                             }
                         }
                         .foregroundStyle(.primary)
+                        // 28 pt: a compact marker on the artwork. The whole
+                        // card is the button, so it needs no own hit area.
                         .frame(width: 28, height: 28)
                         .background(.regularMaterial, in: .circle)
-                        .padding(6)
+                        .padding(Spacing.xSmall)
                         .accessibilityHidden(true)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.top, isCombinedAB ? 10 : 0)
+                    .padding(.horizontal, Spacing.medium)
+                    .padding(.top, isCombinedAB ? Spacing.medium : 0)
 
-                VStack(alignment: .leading, spacing: 7) {
+                VStack(alignment: .leading, spacing: Spacing.xSmall) {
+                    // A dense two-column grid: a circle name may use two lines.
                     Text(displayName)
-                        .font(.subheadline.weight(.bold))
+                        .font(.rowTitle)
                         .foregroundStyle(.primary)
                         .lineLimit(2)
 
-                    Text(locationLabel)
-                        .font(.caption.monospaced().weight(.semibold))
+                    Text(nonBreaking: locationLabel)
+                        .font(.spaceCode)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
 
                     if !circle.penName.isEmpty {
                         Text(circle.penName)
-                            .font(.caption)
+                            .font(.meta)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
-                .padding(10)
+                .padding(Spacing.medium)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .contentShape(.rect)
-            .background(
-                Color(uiColor: .secondarySystemBackground)
-            )
-            .compositingGroup()
-            .clipShape(.rect(cornerRadius: 12))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        Color(uiColor: .separator).opacity(0.3),
-                        lineWidth: 0.5
-                    )
-            }
+            .surface(.card, padding: 0)
+            .contentShape(.rect(cornerRadius: Radius.card, style: .continuous))
         }
         .buttonStyle(.plain)
         .navigationDestination(isPresented: $showsDetail) {
@@ -2767,10 +2808,10 @@ private struct CircleMapSummaryCard: View {
         .aspectRatio(180 / 256, contentMode: .fit)
         .frame(maxWidth: .infinity)
         .background(Color(uiColor: .secondarySystemFill))
-        .clipShape(.rect(cornerRadius: 8))
+        .clipShape(.rect(cornerRadius: artworkRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(uiColor: .separator).opacity(0.25), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: artworkRadius, style: .continuous)
+                .strokeBorder(Color.hairline, lineWidth: 0.5)
         }
         .overlay {
             CircleFavoriteMark(color: favoriteColor)
@@ -2783,6 +2824,11 @@ private struct CircleMapSummaryCard: View {
 
     private var circle: CatalogMapCircle { circles[0] }
     private var isCombinedAB: Bool { circles.count == 2 }
+    /// The artwork sits `Spacing.medium` inside the card, so its corners
+    /// share a center with the card's corners.
+    private var artworkRadius: CGFloat {
+        Radius.concentric(outer: Radius.card, inset: Spacing.medium)
+    }
 }
 
 #if DEBUG
