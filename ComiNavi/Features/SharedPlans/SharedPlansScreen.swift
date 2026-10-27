@@ -606,15 +606,15 @@ private struct SharedPlanSwitcherSheet: View {
                         Button {
                             onCreate(comiketNo)
                         } label: {
-                            Label("Create plan", systemImage: "plus")
+                            LucideLabel("Create a plan", icon: "plus")
                         }
                     }
                     Button(action: onJoin) {
-                        Label("Join with an invite link", systemImage: "person.crop.circle.badge.plus")
+                        LucideLabel("Join with an invite link", icon: "users")
                     }
                 }
             }
-            .navigationTitle("All Plans")
+            .navigationTitle("All plans")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -633,24 +633,24 @@ private struct SharedPlanRecoveryPickerRow: View {
     let onOpenPlan: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             LucideLabel("Recovery copy", icon: "database")
-                .font(.headline)
+                .font(.rowTitle)
             Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are available in this recovery copy.")
-                .font(.caption)
+                .font(.meta)
                 .foregroundStyle(.secondary)
-            HStack {
+                .wrapsFully()
+            AdaptiveButtonRow(spacing: Spacing.small) {
                 ShareLink(item: recovery.exportText) {
                     LucideLabel("Download recovery copy", icon: "share")
                 }
-                Spacer()
+                .buttonStyle(.secondaryAction)
                 if canOpenPlan {
                     Button("Open") { onOpenPlan(recovery.planID) }
+                        .buttonStyle(.secondaryAction)
                 }
             }
-            .buttonStyle(.borderless)
         }
-        .padding(.vertical, 3)
     }
 }
 
@@ -662,35 +662,35 @@ private struct SharedPlanPickerRow: View {
     var showsDisclosure = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            LucideIcon(isArchived ? "archive" : "list-checks", size: 22)
+        HStack(spacing: Spacing.iconToText) {
+            LucideIcon(isArchived ? "archive" : "list-checks", size: IconSize.row)
                 .foregroundStyle(isArchived ? Color.secondary : Color.accentColor)
-                .frame(width: 28)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(plan.name)
-                    .font(.headline)
+                    .font(.rowTitle)
                 Text("C\(plan.comiketNo) · \(plan.circleKeys.count) circles")
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
+            .wrapsFully()
+            .layoutPriority(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
             if hasPendingChanges {
-                LucideIcon("cloud-upload", size: 16)
+                LucideIcon("cloud-upload", size: IconSize.inline)
                     .foregroundStyle(.orange)
                     .accessibilityLabel("Pending changes")
             }
             if isSelected {
-                LucideIcon("check", size: 18)
+                LucideIcon("check", size: IconSize.inline)
                     .foregroundStyle(Color.accentColor)
                     .accessibilityLabel("Current plan")
             } else if isArchived || showsDisclosure {
-                LucideIcon("chevron-right", size: 16)
+                LucideIcon("chevron-right", size: IconSize.inline)
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
         }
-        .padding(.vertical, 3)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -700,11 +700,13 @@ private struct SharedPlanPickerRow: View {
 private struct SharedPlanJoinSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appHapticFeedback) private var hapticFeedback
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// Returns false when the link cannot be stored for confirmation.
     let onSubmitLink: (URL) -> Bool
     @State private var linkText = ""
     @State private var issue: LocalizedStringResource?
     @State private var showsSteps = false
+    @ScaledMetric(relativeTo: .headline) private var stepNumberSize = 28.0
 
     var body: some View {
         NavigationStack {
@@ -736,6 +738,11 @@ private struct SharedPlanJoinSheet: View {
                             submit()
                         }
                     }
+                    // PasteButton draws a white title on its tint. The olive accent
+                    // keeps it legible; lime would put white text on lime.
+                    .tint(Color.accentColor)
+                    .labelStyle(.titleAndIcon)
+                    .buttonBorderShape(.roundedRectangle(radius: Radius.control))
                     .accessibilityIdentifier("shared-plan-join-paste")
                 } header: {
                     Text("Invitation link")
@@ -769,7 +776,7 @@ private struct SharedPlanJoinSheet: View {
                     }
                 }
             }
-            .navigationTitle("Join a Plan")
+            .navigationTitle("Join a plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -783,6 +790,13 @@ private struct SharedPlanJoinSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .onAppear {
+            // A regular-width sheet has room for the steps; open them so the
+            // sheet has no empty lower half.
+            if horizontalSizeClass == .regular {
+                showsSteps = true
+            }
+        }
         .accessibilityIdentifier("shared-plan-join-guide")
     }
 
@@ -805,21 +819,24 @@ private struct SharedPlanJoinSheet: View {
         title: LocalizedStringKey,
         detail: LocalizedStringKey
     ) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: Spacing.medium) {
             Text(number, format: .number)
-                .font(.headline)
-                .foregroundStyle(Color.onAccentFill)
-                .frame(width: 30, height: 30)
-                .background(Color.accentFill, in: .circle)
-            VStack(alignment: .leading, spacing: 4) {
+                .font(.rowTitle)
+                .monospacedDigit()
+                .foregroundStyle(Color.accentColor)
+                .frame(width: stepNumberSize, height: stepNumberSize)
+                .background(Color.accentColor.opacity(0.12), in: .circle)
+            VStack(alignment: .leading, spacing: Spacing.xSmall) {
                 Text(title)
-                    .font(.headline)
+                    .font(.rowTitle)
                 Text(detail)
-                    .font(.callout)
+                    .font(.rowSubtitle)
                     .foregroundStyle(.secondary)
             }
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, Spacing.xSmall)
         .accessibilityElement(children: .combine)
     }
 }
