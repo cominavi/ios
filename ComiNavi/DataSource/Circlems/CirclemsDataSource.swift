@@ -228,6 +228,13 @@ final class CirclemsDataSource {
     private(set) var bookmarkSyncCoordinator: BookmarkSyncCoordinator!
     
     public var comiket: Comiket!
+
+    /// The event number once the catalog has loaded `comiket`, or nil while it
+    /// opens. Views that render before the catalog is ready (Profile, issue
+    /// reports) read this instead of `comiket`, which traps while it is nil.
+    var loadedComiketNumber: Int? {
+        (comiket as Comiket?)?.number
+    }
     public let eventID: Int
     public var comiketId: String
     

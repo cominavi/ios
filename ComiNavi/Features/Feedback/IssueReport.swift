@@ -41,7 +41,7 @@ struct IssueReportContext: Equatable, Sendable {
             operatingSystem: "\(device.systemName) \(device.systemVersion)",
             buildEnvironment: AppEnvironment.current.build.rawValue,
             catalogMode: AppData.catalogLibrary.mode.rawValue,
-            comiketNumber: AppData.catalogLibrary.dataSource?.comiket.number
+            comiketNumber: AppData.catalogLibrary.dataSource?.loadedComiketNumber
         )
     }
 }

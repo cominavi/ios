@@ -337,7 +337,7 @@ struct ProfileScreen: View {
             else { return }
             await linkCirclemsIdentityAndWait(userID)
         }
-        .task(id: catalogLibrary.dataSource?.comiket.number) {
+        .task(id: catalogLibrary.dataSource?.loadedComiketNumber) {
             favoriteSyncState = .idle
             await loadFavoriteRecoveries()
         }
@@ -743,14 +743,16 @@ struct ProfileScreen: View {
     }
 
     private func loadFavoriteRecoveries() async {
-        guard let dataSource = catalogLibrary.dataSource else {
+        guard let dataSource = catalogLibrary.dataSource,
+              let eventNumber = dataSource.loadedComiketNumber
+        else {
             favoriteRecoveries = []
             return
         }
         do {
             favoriteRecoveries = try await dataSource.userPlanStore
                 .quarantinedCanonicalFavoriteMutations(
-                    eventNumber: dataSource.comiket.number
+                    eventNumber: eventNumber
                 )
             favoriteRecoveryIssue = nil
         } catch {
@@ -759,7 +761,9 @@ struct ProfileScreen: View {
     }
 
     private func syncFavoritesToCirclems(_ dataSource: CirclemsDataSource) {
-        guard favoriteSyncState != .syncing else { return }
+        guard favoriteSyncState != .syncing,
+              let eventNumber = dataSource.loadedComiketNumber
+        else { return }
         favoriteSyncState = .syncing
         Task {
             do {
@@ -767,8 +771,8 @@ struct ProfileScreen: View {
                 // canonical revision that includes this device's latest edits.
                 try await dataSource.bookmarkSyncCoordinator?.sync()
                 let result = try await CominaviServiceClient.shared
-                    .syncCirclemsFavorites(eventNumber: dataSource.comiket.number)
-                guard result.eventNumber == dataSource.comiket.number else {
+                    .syncCirclemsFavorites(eventNumber: eventNumber)
+                guard result.eventNumber == eventNumber else {
                     throw CominaviServiceError.invalidResponse
                 }
                 favoriteSyncState = .succeeded
