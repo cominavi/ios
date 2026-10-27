@@ -1805,34 +1805,6 @@
         }
       }
     },
-    "Circle.ms runs the official Comic Market Web Catalog." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.msはコ⁠ミ⁠ッ⁠ク⁠マ⁠ー⁠ケ⁠ッ⁠ト公式W⁠e⁠b⁠カ⁠タ⁠ロ⁠グを運営しています。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.ms는 Comic Market 공식 웹 카탈로그를 운영합니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.ms 运营 Comic Market 官方网络目录"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Circle.ms 營運 Comic Market 官方網路目錄"
-          }
-        }
-      }
-    },
     "Confirmed" : {
       "localizations" : {
         "ja" : {
@@ -2029,34 +2001,6 @@
         }
       }
     },
-    "It opens in a secure browser sheet, and ComiNavi never sees your password." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "安全なブ⁠ラ⁠ウ⁠ザ⁠シ⁠ー⁠トで開くため、ComiNaviがパスワードを見ることはありません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "안전한 브라우저 시트에서 열리므로 ComiNavi는 비밀번호를 볼 수 없습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登录页面会在安全的浏览器面板中打开，ComiNavi 不会看到你的密码"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "登入頁面會在安全的瀏覽器面板中開啟，ComiNavi 不會看到你的密碼"
-          }
-        }
-      }
-    },
     "Join a plan" : {
       "localizations" : {
         "ja" : {
@@ -2225,30 +2169,30 @@
         }
       }
     },
-    "Sign in with your Circle.ms account." : {
+    "Sign in with your Circle.ms account. Circle.ms runs the official Comic Market Web Catalog. It opens in a secure browser sheet, and ComiNavi never sees your password." : {
       "localizations" : {
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Circle.msアカウントでログインします。"
+            "value" : "Circle.msアカウントでログインします。Circle.msはコ⁠ミ⁠ッ⁠ク⁠マ⁠ー⁠ケ⁠ッ⁠ト公式W⁠e⁠b⁠カ⁠タ⁠ロ⁠グを運⁠営⁠し⁠て⁠い⁠ま⁠す。安全なブ⁠ラ⁠ウ⁠ザ⁠シ⁠ー⁠トで開くため、ComiNaviがパスワードを見⁠る⁠こ⁠と⁠は⁠あ⁠り⁠ま⁠せ⁠ん。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Circle.ms 계정으로 로그인합니다."
+            "value" : "Circle.ms 계정으로 로그인합니다. Circle.ms는 Comic Market 공식 웹 카탈로그를 운영합니다. 안전한 브라우저 시트에서 열리므로 ComiNavi는 비밀번호를 볼 수 없습니다."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用你的 Circle.ms 账户登录"
+            "value" : "使用你的 Circle.ms 账户登录。Circle.ms 运营 Comic Market 官方网络目录。登录页面会在安全的浏览器面板中打开，ComiNavi 不会看到你的密码"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用你的 Circle.ms 帳號登入"
+            "value" : "使用你的 Circle.ms 帳號登入。Circle.ms 營運 Comic Market 官方網路目錄。登入頁面會在安全的瀏覽器面板中開啟，ComiNavi 不會看到你的密碼"
           }
         }
       }
@@ -11662,7 +11606,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Circle.msのアカウントをお持ちでない方"
+            "value" : "Circle.msのアカウントをお⁠持⁠ち⁠で⁠な⁠い⁠方"
           }
         },
         "ko" : {

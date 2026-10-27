@@ -919,13 +919,12 @@ struct SignInView: View {
 
     private var circlemsExplanation: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // One sentence per text view, so each line breaks at a sentence
-            // end instead of inside a Japanese word.
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Sign in with your Circle.ms account.")
-                Text("Circle.ms runs the official Comic Market Web Catalog.")
-                Text("It opens in a secure browser sheet, and ComiNavi never sees your password.")
-            }
+            // One paragraph, so the lines fill the column instead of
+            // breaking at every sentence end. The Japanese translation joins
+            // its words with U+2060, so no line breaks inside a word.
+            Text(
+                "Sign in with your Circle.ms account. Circle.ms runs the official Comic Market Web Catalog. It opens in a secure browser sheet, and ComiNavi never sees your password."
+            )
             .font(.meta)
             .foregroundStyle(.secondary)
             .wrapsFully()
