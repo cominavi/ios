@@ -901,7 +901,7 @@ final class UnifiedMapHostView: UIView {
         campusAccessibilityProxy.isHidden = scope != .campus
         venueAccessibilityProxy.isHidden = scope != .venue
         updateVenueAccessibilityElements(renderer: renderer, scope: scope)
-        updateCampusHint(scope: scope)
+        updateCampusHint(scope: scope, isSearchActive: renderer.isSearchModeActive)
     }
 
     /// Exposes each visible hall badge as a button so VoiceOver users can open
@@ -950,13 +950,14 @@ final class UnifiedMapHostView: UIView {
     }
 
     /// Shows "Tap a hall to open its floor map" on the campus overview until
-    /// the attendee opens a hall for the first time.
-    private func updateCampusHint(scope: MapScreenModel.Scope) {
+    /// the attendee opens a hall for the first time. Search results replace
+    /// the hint while search is active.
+    private func updateCampusHint(scope: MapScreenModel.Scope, isSearchActive: Bool) {
         if scope == .venue, !hasSeenCampusHint {
             hasSeenCampusHint = true
             UserDefaults.standard.set(true, forKey: Self.campusHintSeenKey)
         }
-        let isHidden = scope != .campus || hasSeenCampusHint
+        let isHidden = scope != .campus || hasSeenCampusHint || isSearchActive
         if campusHintChip.isHidden != isHidden {
             campusHintChip.isHidden = isHidden
         }
@@ -1408,6 +1409,14 @@ final class UnifiedBigSightScene: SKScene {
     private var locationFocusBottomInset: CGFloat = 0
     private var visibleMapLayers = BigSightMapLayer.defaultVisible
     private var isSearchActive = false
+    /// Halls that contain at least one search match. Their badges stay at
+    /// full opacity in search mode; the other halls dim.
+    private var searchMatchedVenueIDs: Set<Int> = []
+    /// Opacity of the floor plans while search highlights are shown. High
+    /// enough that hall outlines stay readable around the matches.
+    private static let searchBaseMapAlpha: CGFloat = 0.5
+    /// Opacity of a hall badge with no search match.
+    private static let searchUnmatchedVenueAlpha: CGFloat = 0.35
 
     var cameraRotation: CGFloat { mapCamera.zRotation }
     var gridAlignedCameraRotation: CGFloat { campus.gridAlignedCameraRotation }
@@ -1454,7 +1463,12 @@ final class UnifiedBigSightScene: SKScene {
         dynamicRoot.children.compactMap { $0 as? SKShapeNode }.count
     }
     var baseMapAlpha: CGFloat { staticRoot.alpha }
-    var areMapIconsHiddenForSearch: Bool { markerRoot.isHidden }
+    var isSearchModeActive: Bool { isSearchActive }
+    /// Search mode hides the facility icons. Hall badges stay visible so the
+    /// user can still see where each match is.
+    var areMapIconsHiddenForSearch: Bool {
+        isSearchActive && facilityMarkers.allSatisfy(\.node.isHidden)
+    }
     func isFacilityMarkerVisible(id: String) -> Bool {
         facilityMarkers.first(where: { $0.id == id }).map { !$0.node.isHidden } ?? false
     }
@@ -1650,6 +1664,7 @@ final class UnifiedBigSightScene: SKScene {
         self.selectedMapID = scope == .venue ? selectedMapID : nil
         self.visibleMapLayers = visibleMapLayers
         isSearchActive = searchActive
+        searchMatchedVenueIDs = searchActive ? Set(searchMatches.map(\.mapID)) : []
         applyLevelOfDetail()
         artworkCount = circleArtwork.count
         favoriteCount = bookmarks.count
@@ -2497,12 +2512,12 @@ final class UnifiedBigSightScene: SKScene {
         tableRoot.isHidden = zoom < 2.2
         blockLabelRoot.isHidden = zoom < 10 || zoom > 65
         tableLabelRoot.isHidden = zoom < 32
-        staticRoot.alpha = isSearchActive ? 0.18 : 1
-        tableLabelRoot.alpha = isSearchActive ? 0.18 : 1
+        staticRoot.alpha = isSearchActive ? Self.searchBaseMapAlpha : 1
+        tableLabelRoot.alpha = isSearchActive ? Self.searchBaseMapAlpha : 1
         genreRoot.alpha = isSearchActive ? 0.12 : 1
         genreRoot.isHidden = scope != .venue
         dynamicRoot.isHidden = false
-        markerRoot.isHidden = isSearchActive
+        markerRoot.isHidden = false
         for marker in destinationRoot.children where marker.name == "map-destination-marker" {
             marker.setScale(mapCamera.xScale)
             marker.zRotation = levelRotation
@@ -2510,14 +2525,24 @@ final class UnifiedBigSightScene: SKScene {
         for marker in venueMarkers + facilityMarkers {
             marker.node.setScale(mapCamera.xScale)
             marker.node.zRotation = levelRotation
-            let isVisible = marker.layer.map(visibleMapLayers.contains) ?? true
+            let isVenue = marker.venueID != nil
+            let isLayerVisible = marker.layer.map(visibleMapLayers.contains) ?? true
+            // Search hides facility icons only. Hall badges stay, and halls
+            // without a match dim.
+            let isVisible = isLayerVisible && (isVenue || !isSearchActive)
+            var searchAlpha: CGFloat = 1
+            if isSearchActive, let venueID = marker.venueID,
+                !searchMatchedVenueIDs.contains(venueID)
+            {
+                searchAlpha = Self.searchUnmatchedVenueAlpha
+            }
             marker.node.alpha =
                 isVisible
                 ? UnifiedMapLevelOfDetail.opacity(
                     at: zoom,
                     minimumZoom: marker.minimumZoom,
                     maximumZoom: marker.maximumZoom
-                )
+                ) * searchAlpha
                 : 0
             marker.node.isHidden = marker.node.alpha <= 0
             marker.label.alpha = UnifiedMapLevelOfDetail.opacity(
