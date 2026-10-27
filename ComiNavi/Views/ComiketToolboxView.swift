@@ -201,8 +201,9 @@ private struct ToolboxResourcesScreen: View {
 private struct ToolboxReminderSection: View {
     let store: ComiketReminderStore
     let edition: ComiketToolboxEdition
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// Grows with Dynamic Type so the times stay aligned without clipping.
-    @ScaledMetric(relativeTo: .body) private var timeColumnWidth = 50.0
+    @ScaledMetric(relativeTo: .headline) private var timeColumnWidth = 50.0
 
     private var needsSettingsButton: Bool {
         switch store.state {
@@ -217,19 +218,18 @@ private struct ToolboxReminderSection: View {
 
     var body: some View {
         Section {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 9) {
-                    LucideIcon("calendar-clock", size: 20)
-                        .foregroundStyle(.orange)
+            ToolboxIconRow(icon: "calendar-clock", iconStyle: .orange, textStyle: .headline) {
+                VStack(alignment: .leading, spacing: Spacing.xSmall) {
                     Text("\(edition.shortName) event reminders")
-                        .font(.headline)
-                }
+                        .font(.rowTitle)
+                        .wrapsFully()
 
-                Text("Get a Time Sensitive alert 15 minutes before each selected time, on both event days.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text("Get a Time Sensitive alert 15 minutes before each selected time, on both event days.")
+                        .font(.rowSubtitle)
+                        .foregroundStyle(.secondary)
+                        .wrapsFully()
+                }
             }
-            .padding(.vertical, 3)
             .accessibilityElement(children: .combine)
 
             if store.isSchedulable {
@@ -242,14 +242,7 @@ private struct ToolboxReminderSection: View {
                             }
                         )
                     ) {
-                        HStack(alignment: .firstTextBaseline, spacing: 12) {
-                            Text(verbatim: kind.timeLabel)
-                                .font(.body.monospacedDigit().weight(.semibold))
-                                .frame(minWidth: timeColumnWidth, alignment: .leading)
-
-                            Text(kind.title)
-                                .font(.body)
-                        }
+                        reminderLabel(for: kind)
                     }
                     // A milestone whose fire dates have all passed cannot schedule anything.
                     .disabled(!store.hasFutureFireDate(for: kind))
@@ -269,10 +262,11 @@ private struct ToolboxReminderSection: View {
             } else {
                 Text("Reminders for \(edition.shortName) have ended.")
                     .foregroundStyle(.secondary)
+                    .wrapsFully()
                     .accessibilityIdentifier("toolbox-reminders-ended")
             }
         } footer: {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: Spacing.xSmall) {
                 if store.isSchedulable {
                     Text(
                         "Reminders are set on this device only. Delivery follows your iOS notification settings."
@@ -286,25 +280,67 @@ private struct ToolboxReminderSection: View {
         }
     }
 
+    /// The time and the milestone side by side, or stacked at accessibility
+    /// sizes so the title keeps a usable width next to the toggle.
+    @ViewBuilder
+    private func reminderLabel(for kind: ComiketReminderKind) -> some View {
+        let time = Text(verbatim: kind.timeLabel)
+            .font(.rowTitle.monospacedDigit())
+            .singleLineToken()
+        let title = Text(kind.title)
+            .font(.body)
+            .wrapsFully()
+
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                time
+                title
+            }
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.medium) {
+                time
+                    .frame(minWidth: timeColumnWidth, alignment: .leading)
+                title
+                    .layoutPriority(1)
+            }
+        }
+    }
+
     @ViewBuilder
     private var reminderStatus: some View {
         switch store.state {
         case .checking, .notDetermined:
             EmptyView()
         case .denied:
-            Label("Notifications are off for ComiNavi.", systemImage: "bell.slash")
-                .font(.caption)
-                .foregroundStyle(.orange)
+            ToolboxReminderWarning(message: Text("Notifications are off for ComiNavi."))
         case .authorized(let timeSensitiveEnabled):
             if !timeSensitiveEnabled {
-                Label(
-                    "Time Sensitive delivery is off in Settings; alerts may be delayed.",
-                    systemImage: "exclamationmark.triangle.fill"
+                ToolboxReminderWarning(
+                    message: Text("Time Sensitive delivery is off in Settings; alerts may be delayed.")
                 )
-                .font(.caption)
-                .foregroundStyle(.orange)
             }
         }
+    }
+}
+
+/// An orange warning line under the reminder toggles, with a Lucide icon like
+/// the rest of the Toolbox.
+private struct ToolboxReminderWarning: View {
+    let message: Text
+
+    var body: some View {
+        ToolboxIconRow(
+            icon: "exclamationmark.triangle.fill",
+            iconSize: IconSize.caption,
+            iconStyle: .orange,
+            textStyle: .footnote
+        ) {
+            message
+                .font(.meta)
+                .foregroundStyle(.orange)
+                .wrapsFully()
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -331,36 +367,50 @@ private struct ToolboxEditionNotice: View {
     let edition: ComiketToolboxEdition
     @Binding var isExpanded: Bool
 
+    /// 6 pt: off the spacing scale on purpose; a bullet sized to the x-height.
+    private static let bulletSize: CGFloat = 6
+    /// Half the x-height of `rowSubtitle` text, so the bullet centers on the
+    /// lowercase letters of the first line instead of sitting on the baseline.
+    @ScaledMetric(relativeTo: .subheadline) private var bulletLift = 3.5
+
+    /// A date such as "Jul 30, 2026" that never splits across two lines.
+    private var verifiedDate: String {
+        NonBreaking.spaces(edition.verifiedAt.formatted(.dateTime.year().month().day()))
+    }
+
     var body: some View {
         Section {
             DisclosureGroup(isExpanded: $isExpanded) {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: Spacing.medium) {
                     ForEach(edition.notices) { notice in
-                        HStack(alignment: .firstTextBaseline, spacing: 9) {
+                        HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
                             Circle()
                                 .fill(.orange)
-                                .frame(width: 5, height: 5)
+                                .frame(width: Self.bulletSize, height: Self.bulletSize)
+                                .alignmentGuide(.firstTextBaseline) { dimensions in
+                                    dimensions[VerticalAlignment.center] + bulletLift
+                                }
                                 .accessibilityHidden(true)
                             Text(notice.text)
-                                .font(.subheadline)
+                                .font(.rowSubtitle)
                                 .foregroundStyle(.secondary)
+                                .wrapsFully()
                         }
                     }
 
                     Text(
-                        "Checked against official posts on \(edition.verifiedAt, format: .dateTime.year().month().day()). Check live notices again before you travel."
+                        "Checked against official posts on \(verifiedDate). Check live notices again before you travel."
                     )
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
+                    .wrapsFully()
                 }
-                .padding(.vertical, 4)
                 .accessibilityElement(children: .combine)
             } label: {
-                HStack(spacing: 10) {
-                    LucideIcon("circle-alert", size: 20)
-                        .foregroundStyle(.orange)
+                ToolboxIconRow(icon: "circle-alert", iconStyle: .orange, textStyle: .headline) {
                     Text("\(edition.shortName) notices")
-                        .font(.headline)
+                        .font(.rowTitle)
+                        .wrapsFully()
                 }
             }
             .accessibilityIdentifier("toolbox-edition-notice")
