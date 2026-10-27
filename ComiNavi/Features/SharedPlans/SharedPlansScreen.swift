@@ -22,6 +22,7 @@ private enum SharedPlansSheet: Identifiable {
 }
 
 struct SharedPlansScreen: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let store: SharedPlanStore
     @State private var navigationPath: [SharedPlansRoute] = []
     @State private var presentedSheet: SharedPlansSheet?
@@ -31,6 +32,9 @@ struct SharedPlansScreen: View {
     @State private var hasLoadedPrimaryPreference = false
     @State private var presentsInvitationAfterDismissal = false
     @State private var requestsSignInAfterDismissal = false
+    #if DEBUG
+    @State private var hasHandledLaunchRoute = false
+    #endif
     let comiketNo: Int?
     let currentUserID: String?
     let features: SharedPlanPresentationFeatures
@@ -124,9 +128,23 @@ struct SharedPlansScreen: View {
                     onJoin: { queueSheet(.join) }
                 )
             case .join:
-                SharedPlanJoinSheet(onSubmitLink: receiveInvitationLink)
+                SharedPlanJoinSheet(
+                    onSubmitLink: receiveInvitationLink,
+                    isRegularWidth: horizontalSizeClass == .regular
+                )
             }
         }
+        #if DEBUG
+        .onAppear {
+            // UI-test launch route for screenshots: present the Join sheet
+            // once on the first appearance.
+            guard !hasHandledLaunchRoute else { return }
+            hasHandledLaunchRoute = true
+            if SharedPlanJoinSheet.launchRouteRequested, presentedSheet == nil {
+                presentedSheet = .join
+            }
+        }
+        #endif
         .task(id: primaryPreferenceKey) {
             hasLoadedPrimaryPreference = false
             let storedPlanID = primaryPlanPreference.planID(
@@ -705,16 +723,52 @@ private struct SharedPlanPickerRow: View {
     }
 }
 
+/// On iPad, a form sheet as tall as the join form, so a short form does not
+/// leave an empty lower half. A `Form` is a scroll view and has no fitted
+/// height, so the sheet uses the measured height as its only detent. On
+/// iPhone the sheet keeps the medium and large detents.
+private struct SharedPlanJoinSheetSizing: ViewModifier {
+    let isRegularWidth: Bool
+    let measuredHeight: CGFloat
+
+    func body(content: Content) -> some View {
+        if isRegularWidth {
+            content
+                .presentationSizing(.form)
+                .presentationDetents(regularDetents)
+        } else {
+            content.presentationDetents([.medium, .large])
+        }
+    }
+
+    /// Large until the first measurement arrives.
+    private var regularDetents: Set<PresentationDetent> {
+        measuredHeight > 0 ? [.height(measuredHeight)] : [.large]
+    }
+}
+
 private struct SharedPlanJoinSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appHapticFeedback) private var hapticFeedback
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// Returns false when the link cannot be stored for confirmation.
     let onSubmitLink: (URL) -> Bool
+    /// The size class of the presenting screen. Inside an iPad sheet the
+    /// environment reports a compact width, so the presenter passes it.
+    var isRegularWidth = false
     @State private var linkText = ""
     @State private var issue: LocalizedStringResource?
     @State private var showsSteps = false
+    /// The height of the form rows plus the navigation bar, measured from
+    /// the scroll geometry. The iPad form sheet uses it as its detent.
+    @State private var measuredHeight: CGFloat = 0
     @ScaledMetric(relativeTo: .headline) private var stepNumberSize = 28.0
+
+    #if DEBUG
+    /// `-cominavi-ui-testing-open-join` presents this sheet at launch.
+    static var launchRouteRequested: Bool {
+        ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-open-join")
+    }
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -784,6 +838,14 @@ private struct SharedPlanJoinSheet: View {
                     }
                 }
             }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                // Content plus the top inset for the navigation bar: the
+                // height that shows every row. The bottom inset is left out,
+                // because it grows with the keyboard.
+                geometry.contentSize.height + geometry.contentInsets.top
+            } action: { _, height in
+                measuredHeight = height.rounded(.up)
+            }
             .navigationTitle("Join a plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -797,11 +859,15 @@ private struct SharedPlanJoinSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .modifier(
+            SharedPlanJoinSheetSizing(
+                isRegularWidth: isRegularWidth,
+                measuredHeight: measuredHeight
+            )
+        )
         .onAppear {
-            // A regular-width sheet has room for the steps; open them so the
-            // sheet has no empty lower half.
-            if horizontalSizeClass == .regular {
+            // A regular-width sheet has room for the steps; open them.
+            if isRegularWidth {
                 showsSteps = true
             }
         }
@@ -1087,7 +1153,9 @@ struct SharedPlanEmptyUITestSurface: View {
         }
     }
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var presentedSheet: Sheet?
+    @State private var hasHandledLaunchRoute = false
 
     var body: some View {
         NavigationStack {
@@ -1114,7 +1182,17 @@ struct SharedPlanEmptyUITestSurface: View {
                         .accessibilityIdentifier("shared-plan-create-test-surface")
                 }
             case .join:
-                SharedPlanJoinSheet(onSubmitLink: { _ in true })
+                SharedPlanJoinSheet(
+                    onSubmitLink: { _ in true },
+                    isRegularWidth: horizontalSizeClass == .regular
+                )
+            }
+        }
+        .onAppear {
+            guard !hasHandledLaunchRoute else { return }
+            hasHandledLaunchRoute = true
+            if SharedPlanJoinSheet.launchRouteRequested {
+                presentedSheet = .join
             }
         }
     }
