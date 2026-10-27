@@ -536,11 +536,11 @@ struct SharedPlanEditorScreen: View {
             let presentation = SharedPlanEditorReadOnlyPresentation(reason: reason)
             Section {
                 Label {
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: Spacing.xSmall) {
                         Text(presentation.title)
-                            .font(.headline)
+                            .font(.rowTitle)
                         Text(presentation.detail)
-                            .font(.callout)
+                            .font(.rowSubtitle)
                             .foregroundStyle(.secondary)
                     }
                 } icon: {
@@ -557,11 +557,11 @@ struct SharedPlanEditorScreen: View {
     private var recoverySection: some View {
         if let recovery = model.recoveryDocument {
             Section {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Spacing.small) {
                     LucideLabel("Recovery copy", icon: "database")
-                        .font(.headline)
+                        .font(.rowTitle)
                     Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are available in this recovery copy.")
-                        .font(.callout)
+                        .font(.rowSubtitle)
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)
@@ -605,11 +605,11 @@ struct SharedPlanEditorScreen: View {
         if !model.memoDraftRecoveries.isEmpty {
             Section {
                 ForEach(model.memoDraftRecoveries) { recovery in
-                    VStack(alignment: .leading, spacing: 7) {
+                    VStack(alignment: .leading, spacing: Spacing.small) {
                         Text("Circle memo")
-                            .font(.headline)
+                            .font(.rowTitle)
                         Text(recovery.reason)
-                            .font(.caption)
+                            .font(.meta)
                             .foregroundStyle(.secondary)
                         ShareLink(item: recovery.exportText) {
                             LucideLabel("Download memo", icon: "share")
@@ -889,110 +889,75 @@ struct SharedPlanEditorScreen: View {
 struct SharedPlanEmptyCirclesView: View {
     let canEdit: Bool
 
-    @ScaledMetric(relativeTo: .title3) private var iconContainerSize = 72.0
-    @ScaledMetric(relativeTo: .title3) private var iconSize = 30.0
-
     var body: some View {
-        VStack(spacing: 16) {
-            Circle()
-                .fill(Color.accentColor.opacity(0.12))
-                .frame(width: iconContainerSize, height: iconContainerSize)
-                .overlay {
-                    LucideIcon("building-2", size: iconSize)
-                        .foregroundStyle(Color.accentColor)
-                }
-                .accessibilityHidden(true)
+        emptyState
+            .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("shared-plan-empty-circles")
+            .listRowInsets(EdgeInsets(top: Spacing.small, leading: 0, bottom: Spacing.large, trailing: 0))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
 
-            VStack(spacing: 7) {
-                Text("No circles in this plan")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.center)
-
-                if canEdit {
-                    Text("Open a circle from the catalog to add a purchase request to this plan.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Circles and purchase requests will appear here.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .multilineTextAlignment(.center)
-            .fixedSize(horizontal: false, vertical: true)
+    @ViewBuilder
+    private var emptyState: some View {
+        if canEdit {
+            EmptyStateView(
+                "No circles in this plan",
+                icon: "building-2",
+                message: "Open a circle from the catalog to add a purchase request to this plan."
+            )
+        } else {
+            EmptyStateView(
+                "No circles in this plan",
+                icon: "building-2",
+                message: "Circles and purchase requests will appear here."
+            )
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 30)
-        .background(.background, in: .rect(cornerRadius: 24))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24)
-                .strokeBorder(Color.accentColor.opacity(0.16), lineWidth: 1)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("shared-plan-empty-circles")
-        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 16, trailing: 0))
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
     }
 }
 
 struct SharedPlanProgressOverview: View {
     let progress: SharedPlanProgressSummary
 
-    @ScaledMetric(relativeTo: .body) private var barHeight = 12.0
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         if progress.wanted == 0 {
             Label {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     Text("No purchase requests yet")
-                        .font(.headline)
+                        .font(.rowTitle)
                     Text("Add a purchase request to start tracking this plan.")
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
                 }
+                .wrapsFully()
             } icon: {
-                LucideIcon("shopping-cart")
+                LucideIcon("shopping-cart", size: IconSize.row)
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
         } else {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(verbatim: "\(progress.fulfilledPercentage)%")
-                        .font(.system(.title, design: .rounded, weight: .bold))
-                    Text("bought")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("\(progress.outstanding) remaining")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                GeometryReader { geometry in
-                    let width = geometry.size.width
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(.secondary.opacity(0.18))
-                        Capsule()
-                            .fill(.orange)
-                            .frame(width: width * progress.assignedFraction)
-                        Capsule()
-                            .fill(.green)
-                            .frame(width: width * progress.fulfilledFraction)
+            VStack(alignment: .leading, spacing: Spacing.medium) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+                        boughtSummary
+                        Spacer(minLength: Spacing.small)
+                        remainingText
                     }
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
+                    VStack(alignment: .leading, spacing: Spacing.xSmall) {
+                        boughtSummary
+                        remainingText
                     }
                 }
-                .frame(height: barHeight)
-                .accessibilityHidden(true)
 
-                HStack(spacing: 8) {
+                CapsuleProgressBar(segments: [
+                    .init(fraction: progress.assignedFraction, color: .orange),
+                    .init(fraction: progress.fulfilledFraction, color: .green),
+                ])
+
+                metricsLayout {
                     SharedPlanProgressMetric(
                         title: String(localized: "Requested"),
                         value: progress.wanted,
@@ -1017,16 +982,44 @@ struct SharedPlanProgressOverview: View {
             )
         }
     }
+
+    private var boughtSummary: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+            // The hero number of the plan: one step above the type roles.
+            Text(verbatim: "\(progress.fulfilledPercentage)%")
+                .font(.title.bold())
+                .monospacedDigit()
+                .singleLineToken()
+            Text("bought")
+                .font(.rowSubtitle.weight(.medium))
+                .foregroundStyle(.secondary)
+                .singleLineToken()
+        }
+    }
+
+    private var remainingText: some View {
+        Text("\(progress.outstanding) remaining")
+            .font(.rowSubtitle)
+            .foregroundStyle(.secondary)
+            .singleLineToken()
+    }
+
+    /// Three metric columns, or one column at accessibility sizes.
+    private var metricsLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.small))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: Spacing.small))
+    }
 }
 
 struct SharedPlanTotalAmountFooter: View {
     let totalAmount: Int?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
             Text("Total amount")
                 .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
+            Spacer(minLength: Spacing.small)
             if let totalAmount {
                 Text(
                     totalAmount,
@@ -1039,7 +1032,7 @@ struct SharedPlanTotalAmountFooter: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .font(.subheadline.weight(.semibold))
+        .font(.control)
         .textCase(nil)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(SharedPlanEditorAccessibilityID.totalAmount)
@@ -1052,17 +1045,18 @@ private struct SharedPlanProgressMetric: View {
     let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 5) {
+        VStack(alignment: .leading, spacing: Spacing.xSmall) {
+            HStack(spacing: Spacing.xSmall) {
                 Circle()
                     .fill(color)
-                    .frame(width: 7, height: 7)
+                    .frame(width: 6, height: 6)
                 Text(title)
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
+                    .wrapsFully()
             }
             Text(value, format: .number)
-                .font(.headline)
+                .font(.rowTitle)
                 .monospacedDigit()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1079,33 +1073,32 @@ private struct SharedPlanCircleGroupHeader: View {
     let catalogCircle: CirclemsDataSchema.ComiketCircleWC?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
             if let favoriteBookmark, favoriteBookmark.isFavorite {
                 FavoriteColorLabelBadge(
                     color: favoriteBookmark.color,
                     label: favoriteColorLabelStore.customLabels[favoriteBookmark.color]
                 )
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(identity.circleName)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.rowTitle)
+                    .foregroundStyle(.primary)
                 if let penName = identity.penName {
                     Text(penName)
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
                 }
-                LucideLabel(verbatim: identity.dayAndLocation, icon: "map-pin")
-                    .font(.caption)
+                LucideLabel(verbatim: identity.displayDayAndLocation, icon: "map-pin")
+                    .font(.meta)
                     .foregroundStyle(.secondary)
+                    .accessibilityLabel(Text(verbatim: identity.dayAndLocation))
             }
-            Spacer(minLength: 8)
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             if conflictCount > 0 {
-                LucideLabel(
-                    verbatim: String(localized: "\(conflictCount) choices"),
-                    icon: "triangle-alert"
-                )
-                .font(.caption)
-                .foregroundStyle(.orange)
+                StatusBadge(Text("\(conflictCount) choices"), tone: .warning)
             }
             if let catalogDataSource, let catalogCircle {
                 NavigationLink {
@@ -1114,11 +1107,9 @@ private struct SharedPlanCircleGroupHeader: View {
                         dataSource: catalogDataSource
                     )
                 } label: {
-                    Image(systemName: "info.circle")
-                        .font(.body)
+                    LucideIcon("info", size: IconSize.inline)
                         .foregroundStyle(.secondary)
-                        .frame(width: 32, height: 32)
-                        .contentShape(.rect)
+                        .minimumHitArea()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Text("Circle details for \(identity.displayName)"))
@@ -1136,18 +1127,22 @@ struct SharedPlanPurchaseSummaryRow: View {
     let hasConflict: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
                 Text(displayItemName)
-                    .font(.headline)
-                Spacer(minLength: 8)
+                    .font(.rowTitle)
+                    .wrapsFully()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
                 if let unitPrice = need.unitPrice {
                     Text(
                         unitPrice,
                         format: .currency(code: "JPY").precision(.fractionLength(0))
                     )
-                    .font(.caption)
+                    .font(.meta)
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .singleLineToken()
                 }
             }
             SharedPlanPurchaseStageBar(
@@ -1158,7 +1153,6 @@ struct SharedPlanPurchaseSummaryRow: View {
                 accessibilityIdentifier: SharedPlanEditorAccessibilityID.needProgress(need.id)
             )
         }
-        .padding(.vertical, 3)
         .accessibilityElement(children: .combine)
     }
 
@@ -1172,14 +1166,13 @@ private struct SharedPlanEmptyPurchaseSummaryRow: View {
     let identity: SharedPlanCircleIdentityPresentation
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
             Text("No purchase requests yet")
-                .font(.headline)
+                .font(.rowTitle)
             Text(identity.displayName)
-                .font(.caption)
+                .font(.meta)
                 .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 3)
     }
 }
 
@@ -1193,14 +1186,14 @@ private struct SharedPlanConflictRow: View {
 
     var body: some View {
         let presentation = SharedPlanConflictPresentation(conflict: conflict)
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(presentation.title)
-                    .font(.headline)
+                    .font(.rowTitle)
                 Text(presentation.path)
-                    .font(.subheadline.weight(.medium))
+                    .font(.rowSubtitle.weight(.medium))
                 Text(presentation.detail)
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
 
@@ -1237,7 +1230,6 @@ private struct SharedPlanConflictRow: View {
             }
 
         }
-        .padding(.vertical, 5)
         .accessibilityIdentifier(SharedPlanEditorAccessibilityID.conflict(conflict.id))
     }
 
@@ -1255,21 +1247,21 @@ private struct SharedPlanConflictChoiceLabel: View {
     let members: [String: SharedPlanMember]
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.iconToText) {
             LucideIcon("circle")
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(candidate?.value.sharedPlanDisplayText(
                     members: members,
                     currentUserID: currentUserID
                 ) ?? fallbackTitle)
                     .font(.body.weight(.medium))
                 Text(actorLabel)
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
-            LucideIcon("chevron-right", size: 14)
+            Spacer(minLength: Spacing.small)
+            LucideIcon("chevron-right", size: IconSize.caption)
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
@@ -1455,25 +1447,26 @@ private struct SharedPlanCircleEditorScreen: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
+            LazyVStack(alignment: .leading, spacing: Spacing.sectionGap) {
                 if let content {
                     circleOverviewSection
                     needsSection(content)
                     memoSection
                     presenceSection(content)
                 } else {
-                    LucideContentUnavailableView(
+                    EmptyStateView(
                         "Circle content is unavailable",
                         icon: "building-2",
-                        description: Text("This circle may have been removed. Any saved memo can still be downloaded from recovery.")
+                        message: "This circle may have been removed. Any saved memo can still be downloaded from recovery."
                     )
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 64)
+                    .padding(.vertical, Spacing.xxxLarge)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 36)
+            .readableWidth()
+            .padding(.horizontal, Spacing.screenGutter)
+            .padding(.top, Spacing.large)
+            .padding(.bottom, Spacing.xxxLarge)
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .modifier(SharedPlanCirclePurchasesNavigationTitle(identity: identity))
@@ -1570,12 +1563,10 @@ private struct SharedPlanCircleEditorScreen: View {
                     Button(role: .destructive) {
                         confirmsCircleRemoval = true
                     } label: {
-                        SharedPlanActionRowLabel(
-                            title: "Remove circle from plan",
-                            tint: .red
-                        )
+                        Text("Remove circle from plan")
+                            .foregroundStyle(.red)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.secondaryAction)
                     .disabled(model.isPerformingMutation)
                     .confirmationDialog(
                         "Remove this circle from the plan?",
@@ -1613,7 +1604,7 @@ private struct SharedPlanCircleEditorScreen: View {
                     .foregroundStyle(.orange)
                 if model.canEdit {
                     Text("Choose whether this circle should stay in the plan.")
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.orange)
                 }
             }
@@ -1625,7 +1616,9 @@ private struct SharedPlanCircleEditorScreen: View {
             TextEditor(text: memoBinding)
                 .frame(minHeight: 96)
                 .scrollContentBackground(.hidden)
-                .background(.background, in: .rect(cornerRadius: 12))
+                // TextEditor draws its own text inset; 4 pt more keeps the caret
+                // off the tile edge.
+                .surface(.inset, padding: Spacing.xSmall)
                 .disabled(!model.canEdit)
                 .accessibilityLabel("Memo")
                 .accessibilityHint("Saved after a short pause and when you leave.")
@@ -1640,22 +1633,18 @@ private struct SharedPlanCircleEditorScreen: View {
                         ? "circle-check-big"
                         : "calendar-clock"
                 )
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
         }
     }
 
     private func needsSection(_ content: SharedPlanCircleContent) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Spacing.medium) {
             SharedPlanPurchasesHeader()
 
             if content.needs.isEmpty {
-                Text("No purchase requests yet")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(.background, in: .rect(cornerRadius: 16))
-                    .foregroundStyle(.secondary)
+                InlineBanner("No purchase requests yet", icon: "info.circle")
             } else {
                 ForEach(content.needs) { need in
                     SharedPlanNeedEditorRow(
@@ -1698,22 +1687,18 @@ private struct SharedPlanCircleEditorScreen: View {
                 Button {
                     presentedSheet = .createNeed
                 } label: {
-            SharedPlanActionRowLabel(
-                title: "Add purchase request",
-                icon: "plus",
-                tint: .accentColor,
-                titleColor: .primary
-            )
+                    LucideLabel("Add purchase request", icon: "plus")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.secondaryAction)
                 .disabled(currentUserID == nil || model.isPerformingMutation)
                 .accessibilityIdentifier(SharedPlanEditorAccessibilityID.addNeed(circle))
             }
 
             if model.canEdit, currentUserID == nil {
                 Text("Reload your verified profile before creating or assigning a purchase need.")
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
+                    .wrapsFully()
             }
         }
     }
@@ -1731,18 +1716,20 @@ private struct SharedPlanCircleIdentityText: View {
     let identity: SharedPlanCircleIdentityPresentation
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
             Text(identity.circleName)
-                .font(.headline)
+                .font(.rowTitle)
             if let penName = identity.penName {
                 Text(penName)
-                    .font(.subheadline)
+                    .font(.rowSubtitle)
                     .foregroundStyle(.secondary)
             }
-            LucideLabel(verbatim: identity.dayAndLocation, icon: "map-pin")
-                .font(.caption)
+            LucideLabel(verbatim: identity.displayDayAndLocation, icon: "map-pin")
+                .font(.meta)
                 .foregroundStyle(.secondary)
+                .accessibilityLabel(Text(verbatim: identity.dayAndLocation))
         }
+        .wrapsFully()
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
@@ -1751,30 +1738,27 @@ private struct SharedPlanCircleOverviewRow: View {
     let identity: SharedPlanCircleIdentityPresentation
 
     var body: some View {
-        HStack(spacing: 12) {
-            LucideIcon("building-2", size: 20)
+        HStack(spacing: Spacing.iconToText) {
+            LucideIcon("building-2", size: IconSize.row)
                 .foregroundStyle(.accent)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(identity.displayName)
-                    .font(.headline)
-                Text(identity.dayAndLocation)
-                    .font(.caption)
+                    .font(.rowTitle)
+                Text(verbatim: identity.displayDayAndLocation)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
+                    .accessibilityLabel(Text(verbatim: identity.dayAndLocation))
             }
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
 
-            Spacer(minLength: 8)
-
-            LucideIcon("chevron-right", size: 17)
+            LucideIcon("chevron-right", size: IconSize.inline)
                 .foregroundStyle(.tertiary)
         }
-        .padding(14)
         .contentShape(.rect)
-        .background(.background, in: .rect(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
-        }
+        .surface(.card)
     }
 }
 
@@ -1792,11 +1776,11 @@ private struct SharedPlanCirclePurchasesNavigationTitle: ViewModifier {
                 .navigationTitle(String())
                 .toolbar {
                     ToolbarItem(placement: .principal) {
-                        VStack(spacing: 1) {
+                        VStack(spacing: 0) {
                             Text("Circle purchases")
-                                .font(.headline)
+                                .font(.rowTitle)
                             Text(identity.navigationSubtitle)
-                                .font(.caption)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
@@ -1817,68 +1801,14 @@ private struct SharedPlanCirclePanel<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.medium) {
             Text(title)
-                .font(.title3.weight(.bold))
+                .font(.sectionTitle)
+                .accessibilityAddTraits(.isHeader)
             content
         }
-        .padding(16)
-        .background(.background, in: .rect(cornerRadius: 18))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18)
-                .strokeBorder(.separator.opacity(0.35), lineWidth: 1)
-        }
-    }
-}
-
-private struct SharedPlanActionRowLabel: View {
-    let title: LocalizedStringKey
-    let icon: String?
-    let tint: Color
-    let titleColor: Color
-
-    @ScaledMetric(relativeTo: .body) private var iconContainerSize = 42.0
-    @ScaledMetric(relativeTo: .body) private var iconSize = 22.0
-    @ScaledMetric(relativeTo: .body) private var rowHeight = 60.0
-
-    init(
-        title: LocalizedStringKey,
-        icon: String? = nil,
-        tint: Color,
-        titleColor: Color? = nil
-    ) {
-        self.title = title
-        self.icon = icon
-        self.tint = tint
-        self.titleColor = titleColor ?? (icon == nil ? tint : .primary)
-    }
-
-    var body: some View {
-        HStack(spacing: 16) {
-            if let icon {
-                Circle()
-                    .fill(tint)
-                    .frame(width: iconContainerSize, height: iconContainerSize)
-                    .overlay {
-                        LucideIcon(icon, size: iconSize)
-                            .foregroundStyle(.white)
-                    }
-                    .accessibilityHidden(true)
-            }
-
-            Text(title)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(titleColor)
-                .multilineTextAlignment(.leading)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, icon == nil ? 22 : 16)
-        .frame(maxWidth: .infinity, minHeight: rowHeight, alignment: .leading)
-        .background(
-            Color(uiColor: .secondarySystemBackground),
-            in: .capsule
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surface(.card)
     }
 }
 
@@ -1892,7 +1822,7 @@ private struct SharedPlanPurchasesHeader: View {
             ViewThatFits(in: .horizontal) {
                 HStack {
                     title.fixedSize()
-                    Spacer(minLength: 8)
+                    Spacer(minLength: Spacing.small)
                     SharedPlanPurchaseStageLegend().fixedSize()
                 }
                 stackedHeader
@@ -1902,11 +1832,12 @@ private struct SharedPlanPurchasesHeader: View {
 
     private var title: some View {
         Text("Purchases")
-            .font(.title3.weight(.bold))
+            .font(.sectionTitle)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private var stackedHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             title
             SharedPlanPurchaseStageLegend()
         }
@@ -1919,8 +1850,8 @@ private struct SharedPlanPurchaseStageLegend: View {
 
     private var layout: AnyLayout {
         dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-            : AnyLayout(HStackLayout(spacing: 8))
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.xSmall))
+            : AnyLayout(HStackLayout(spacing: Spacing.small))
     }
 
     var body: some View {
@@ -1929,12 +1860,12 @@ private struct SharedPlanPurchaseStageLegend: View {
             stage("Assigned", color: .orange)
             stage("Bought", color: .green)
         }
-        .font(.caption2.weight(.semibold))
+        .font(.badge)
         .accessibilityElement(children: .combine)
     }
 
     private func stage(_ title: LocalizedStringKey, color: Color) -> some View {
-        HStack(spacing: 3) {
+        HStack(spacing: Spacing.xSmall) {
             Circle()
                 .fill(color)
                 .frame(width: 6, height: 6)
@@ -1948,27 +1879,12 @@ private struct SharedPlanPurchaseStageBar: View {
     let progress: SharedPlanPurchaseProgressPresentation
     let accessibilityIdentifier: String
 
-    @ScaledMetric(relativeTo: .caption) private var barHeight = 10.5
-
     var body: some View {
-        VStack(spacing: 3) {
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(.secondary.opacity(0.22))
-                    Capsule()
-                        .fill(.orange)
-                        .frame(width: geometry.size.width * progress.assignedFraction)
-                    Capsule()
-                        .fill(.green)
-                        .frame(width: geometry.size.width * progress.boughtFraction)
-                }
-                .overlay {
-                    Capsule()
-                        .strokeBorder(.primary.opacity(0.08), lineWidth: 1)
-                }
-            }
-            .frame(height: barHeight)
+        VStack(spacing: Spacing.xSmall) {
+            CapsuleProgressBar(segments: [
+                .init(fraction: progress.assignedFraction, color: .orange),
+                .init(fraction: progress.boughtFraction, color: .green),
+            ])
 
             HStack(spacing: 0) {
                 quantityLabel(progress.requested, color: .secondary)
@@ -1986,7 +1902,7 @@ private struct SharedPlanPurchaseStageBar: View {
 
     private func quantityLabel(_ quantity: Int, color: Color) -> some View {
         Text(quantity.formatted())
-            .font(.caption2.weight(.bold))
+            .font(.badge)
             .monospacedDigit()
             .foregroundStyle(color)
             .frame(maxWidth: .infinity)
@@ -2005,97 +1921,82 @@ private struct SharedPlanNeedEditorRow: View {
     let onDelete: () -> Void
 
     @ScaledMetric(relativeTo: .body) private var avatarSize = 60.0
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-
-    private var layout: AnyLayout {
-        dynamicTypeSize.isAccessibilitySize
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
-            : AnyLayout(HStackLayout(spacing: 8))
-    }
 
     var body: some View {
-        layout {
-            VStack(alignment: .leading, spacing: 5) {
-                ZStack(alignment: .topLeading) {
-                    if !dynamicTypeSize.isAccessibilitySize {
-                        Text(verbatim: " \n ")
-                            .font(.headline)
-                            .hidden()
-                            .accessibilityHidden(true)
-                    }
-
+        VStack(alignment: .leading, spacing: Spacing.medium) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     Text(displayItemName)
-                        .font(.headline)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .font(.rowTitle)
+                    if let unitPrice = need.unitPrice {
+                        Text(
+                            unitPrice,
+                            format: .currency(code: "JPY").precision(.fractionLength(0))
+                        )
+                        .font(.meta)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    }
                 }
+                .wrapsFully()
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
 
-                if let unitPrice = need.unitPrice {
-                    Text(
-                        unitPrice,
-                        format: .currency(code: "JPY").precision(.fractionLength(0))
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                } else {
-                    Text(verbatim: "0")
-                        .font(.caption)
-                        .hidden()
-                        .accessibilityHidden(true)
-                }
                 if canEdit {
-                    Button(action: onEditProgress) {
-                        progressBar
-                            .contentShape(.rect)
+                    Menu {
+                        Button("Purchase progress", action: onEditProgress)
+                        Button("Assign a buyer", action: onAddAllocation)
+                            .disabled(activeMembers.isEmpty)
+                        Button("Remove request", role: .destructive, action: onDelete)
+                    } label: {
+                        LucideIcon("ellipsis", size: IconSize.action)
+                            .minimumHitArea()
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Purchase progress")
-                    .accessibilityValue(
-                        "Requested \(progress.requested), assigned \(progress.assigned), bought \(progress.bought)"
-                    )
-                    .accessibilityIdentifier(
-                        SharedPlanEditorAccessibilityID.needProgress(need.id)
-                    )
-                } else {
-                    progressBar
+                    // Center the glyph on the cap height of the first title line.
+                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
+                    .accessibilityLabel("More actions for \(displayItemName)")
                 }
             }
-            .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 102, alignment: .leading)
+
+            if canEdit {
+                Button(action: onEditProgress) {
+                    progressBar
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Purchase progress")
+                .accessibilityValue(
+                    "Requested \(progress.requested), assigned \(progress.assigned), bought \(progress.bought)"
+                )
+                .accessibilityIdentifier(
+                    SharedPlanEditorAccessibilityID.needProgress(need.id)
+                )
+            } else {
+                progressBar
+            }
 
             ScrollView(.horizontal) {
-                HStack(alignment: .center, spacing: 8) {
+                HStack(alignment: .center, spacing: Spacing.small) {
                     ForEach(participants) { participant in
                         participantAvatar(participant)
                     }
                 }
-                .padding(.vertical, 2)
+                // Room for the quantity badges that hang below each avatar.
+                .padding(.vertical, Spacing.xSmall)
             }
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
-            .frame(maxWidth: .infinity, minHeight: avatarSize + 4, alignment: .leading)
-
-            if canEdit {
-                Menu {
-                    Button("Purchase progress", action: onEditProgress)
-                    Button("Assign a buyer", action: onAddAllocation)
-                        .disabled(activeMembers.isEmpty)
-                    Button("Remove request", role: .destructive, action: onDelete)
-                } label: {
-                    LucideIcon("ellipsis", size: 22)
-                        .frame(width: 44, height: 44)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("More actions for \(displayItemName)")
-            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-        .background(rowBackground, in: .rect(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(statusColor.opacity(0.32), lineWidth: 1)
+        .surface(.card, padding: Spacing.medium)
+        .overlay(alignment: .leading) {
+            // The purchase state as a leading bar, so the card keeps the
+            // hairline that every other card uses.
+            Capsule()
+                .fill(statusColor)
+                .frame(width: Spacing.xSmall)
+                .padding(.vertical, Spacing.large)
+                .accessibilityHidden(true)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilitySummary)
@@ -2110,7 +2011,7 @@ private struct SharedPlanNeedEditorRow: View {
         )
             .overlay { Circle().strokeBorder(.background, lineWidth: 3) }
             .overlay(alignment: .bottom) {
-                HStack(spacing: 3) {
+                HStack(spacing: Spacing.xxSmall) {
                     if let requestedQuantity = participant.requestedQuantity {
                         quantityBadge(requestedQuantity, color: .secondary)
                     }
@@ -2144,11 +2045,13 @@ private struct SharedPlanNeedEditorRow: View {
 
     private func quantityBadge(_ quantity: Int, color: Color) -> some View {
         Text("×\(quantity)")
-            .font(.caption2.weight(.bold))
+            .font(.badge)
             .monospacedDigit()
             .foregroundStyle(.white)
+            .singleLineToken()
+            // 6 pt: the same compact capsule inset as StatusBadge.
             .padding(.horizontal, 6)
-            .padding(.vertical, 3)
+            .padding(.vertical, Spacing.xxSmall)
             .background(color, in: .capsule)
     }
 
@@ -2206,15 +2109,6 @@ private struct SharedPlanNeedEditorRow: View {
         }
     }
 
-    private var rowBackground: Color {
-        switch progress.state {
-        case .requested: Color(uiColor: .secondarySystemGroupedBackground)
-        case .partiallyAssigned, .assigned: .orange.opacity(0.08)
-        case .partiallyBought, .bought: .green.opacity(0.08)
-        case .needsReview: .red.opacity(0.08)
-        }
-    }
-
     private var accessibilitySummary: String {
         let participantSummary = participants.map(\.accessibilityLabel).formatted()
         return String(localized: "\(displayItemName). Requested \(progress.requested), assigned \(progress.assigned), bought \(progress.bought). \(participantSummary)")
@@ -2262,7 +2156,7 @@ private struct SharedPlanQuantityControl: View {
 
     var body: some View {
         if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Spacing.small) {
                 Text(title)
                     .font(.body.weight(.medium))
                 control
@@ -2278,7 +2172,7 @@ private struct SharedPlanQuantityControl: View {
                 if !dynamicTypeSize.isAccessibilitySize {
                     Text(title)
                         .font(.body.weight(.medium))
-                    Spacer(minLength: 8)
+                    Spacer(minLength: Spacing.small)
                 }
                 Text(quantity, format: .number)
                     .monospacedDigit()
@@ -2434,7 +2328,7 @@ private struct SharedPlanPurchaseProgressForm: View {
                     )
                 )
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .padding(.vertical, Spacing.small)
             } header: {
                 Text(verbatim: edit.itemName)
             }
@@ -2452,7 +2346,7 @@ private struct SharedPlanPurchaseProgressForm: View {
                     range: 0...SharedPlanAutomergeDocument.maximumQuantity
                 )
             } footer: {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.xSmall) {
                     Text("How many items are needed in total.")
                     Text("How many items were actually bought.")
                 }
@@ -2611,7 +2505,7 @@ private struct SharedPlanBuyerAllocationSheet: View {
                 }
                 Section {
                     Text("Choose who will try to buy these items and how many.")
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -2635,7 +2529,7 @@ private struct SharedPlanBuyerAllocationSheet: View {
     }
 
     private func buyerLabel(for member: SharedPlanMember) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.iconToText) {
             AuthenticatedProfileAvatar(
                 url: member.avatarURL,
                 size: buyerAvatarSize
@@ -2647,7 +2541,6 @@ private struct SharedPlanBuyerAllocationSheet: View {
                 currentUserID: currentUserID
             ))
         }
-        .padding(.vertical, 2)
     }
 
     private func save() {
@@ -2762,7 +2655,7 @@ struct SharedPlanPurchaseUITestSurface: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
+                LazyVStack(alignment: .leading, spacing: Spacing.medium) {
                     SharedPlanPurchasesHeader()
                     ForEach(needs) { need in
                         SharedPlanNeedEditorRow(
@@ -2783,7 +2676,7 @@ struct SharedPlanPurchaseUITestSurface: View {
                         )
                     }
                 }
-                .padding(16)
+                .padding(Spacing.screenGutter)
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .modifier(SharedPlanCirclePurchasesNavigationTitle(identity: identity))

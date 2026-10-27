@@ -412,7 +412,7 @@ struct SharedPlansScreen: View {
 
 /// The tab root when no active plan exists. It explains what a Shared Plan is
 /// and leads with one labeled primary action: Sign in when signed out, Create
-/// otherwise.
+/// otherwise. Join is the secondary action.
 private struct SharedPlanEmptyHome: View {
     let comiketNo: Int?
     let isSignedIn: Bool
@@ -423,132 +423,66 @@ private struct SharedPlanEmptyHome: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if let comiketNo {
-                    Text("Plans for C\(comiketNo)")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 6)
-                }
+            VStack(alignment: .leading, spacing: Spacing.sectionGap) {
+                VStack(alignment: .leading, spacing: Spacing.small) {
+                    Text("Shop the event together")
+                        .font(.sectionTitle)
+                        .accessibilityAddTraits(.isHeader)
 
-                Text("Shop the event together")
-                    .font(.title2.bold())
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Group {
-                    if let comiketNo {
-                        Text("A Shared Plan is a shopping list of circles for C\(comiketNo). Everyone in the plan can add circles, ask for items, and mark what they bought.")
-                    } else {
-                        Text("A Shared Plan is a shopping list of circles that you and your friends edit together. Everyone in the plan can add circles, ask for items, and mark what they bought.")
+                    Group {
+                        if let comiketNo {
+                            Text("A Shared Plan is a shopping list of circles for C\(comiketNo). Everyone in the plan can add circles, ask for items, and mark what they bought.")
+                        } else {
+                            Text("A Shared Plan is a shopping list of circles that you and your friends edit together. Everyone in the plan can add circles, ask for items, and mark what they bought.")
+                        }
                     }
+                    .font(.body)
+                    .foregroundStyle(.secondary)
                 }
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 8)
+                .wrapsFully()
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: Spacing.medium) {
                     if isSignedIn {
-                        SharedPlanHomeActionButton(
-                            title: "Create a plan",
-                            subtitle: "Start a new list, then invite friends.",
-                            icon: "plus",
-                            isProminent: true,
-                            action: onCreate
-                        )
+                        Button(action: onCreate) {
+                            LucideLabel("Create a plan", icon: "plus")
+                        }
+                        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
                         .disabled(createUnavailableReason != nil)
                         .accessibilityIdentifier("shared-plan-create-button")
 
                         if let createUnavailableReason {
-                            Label {
-                                Text(createUnavailableReason)
-                            } icon: {
-                                LucideIcon("info", size: 15)
-                            }
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("shared-plan-create-unavailable-reason")
+                            InlineBanner(Text(createUnavailableReason), icon: "info.circle", tone: .info)
+                                .accessibilityIdentifier("shared-plan-create-unavailable-reason")
                         }
                     } else if let onSignIn {
-                        SharedPlanHomeActionButton(
-                            title: "Sign in",
-                            subtitle: "Sign in to ComiNavi to create or join a plan.",
-                            icon: "circle-user",
-                            isProminent: true,
-                            action: onSignIn
-                        )
+                        Button(action: onSignIn) {
+                            LucideLabel("Sign in", icon: "circle-user")
+                        }
+                        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
                         .accessibilityIdentifier("shared-plan-sign-in-button")
                     } else {
                         Text("Sign in from the Profile tab to create or join a plan.")
-                            .font(.callout)
+                            .font(.rowSubtitle)
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .wrapsFully()
                             .accessibilityIdentifier("shared-plan-sign-in-hint")
                     }
 
-                    SharedPlanHomeActionButton(
-                        title: "Join with an invite link",
-                        subtitle: "Paste a link that a friend sent you.",
-                        icon: "users",
-                        isProminent: false,
-                        action: onJoin
-                    )
+                    Button(action: onJoin) {
+                        LucideLabel("Join with an invite link", icon: "users")
+                    }
+                    .buttonStyle(ActionButtonStyle(role: .secondary, size: .large))
                     .accessibilityIdentifier("shared-plan-join-button")
                 }
-                .padding(.top, 24)
             }
-            // A readable column on iPad, on the same leading edge as the
-            // navigation title instead of centered in empty space.
-            .frame(maxWidth: 540, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            // The same centered readable column as the Profile tab on iPad.
+            .readableWidth(ReadableWidth.form)
+            .padding(.horizontal, Spacing.screenGutter)
+            .padding(.vertical, Spacing.large)
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .accessibilityElement(children: .contain)
-    }
-}
-
-/// A full-width action with a visible subtitle. The prominent style is the
-/// lime fill behind dark text; the other style is a plain grouped surface.
-private struct SharedPlanHomeActionButton: View {
-    let title: LocalizedStringKey
-    let subtitle: LocalizedStringKey
-    let icon: String
-    let isProminent: Bool
-    let action: () -> Void
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: Spacing.iconToText) {
-                LucideIcon(icon, size: IconSize.action)
-                    .foregroundStyle(isProminent ? Color.onAccentFill : Color.accentColor)
-                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
-                    Text(title)
-                        .font(.rowTitle)
-                    Text(subtitle)
-                        .font(.rowSubtitle)
-                        .foregroundStyle(isProminent ? Color.onAccentFill.opacity(0.8) : Color.secondary)
-                }
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .foregroundStyle(isProminent ? Color.onAccentFill : Color.primary)
-            .padding(Spacing.cardPadding)
-            .frame(maxWidth: .infinity, minHeight: 64)
-            .background(
-                isProminent
-                    ? Color.accentFill
-                    : Color(uiColor: .secondarySystemGroupedBackground),
-                in: .rect(cornerRadius: Radius.card, style: .continuous)
-            )
-            .contentShape(.rect(cornerRadius: Radius.card, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .opacity(isEnabled ? 1 : 0.5)
     }
 }
 
@@ -672,15 +606,15 @@ private struct SharedPlanSwitcherSheet: View {
                         Button {
                             onCreate(comiketNo)
                         } label: {
-                            Label("Create plan", systemImage: "plus")
+                            LucideLabel("Create a plan", icon: "plus")
                         }
                     }
                     Button(action: onJoin) {
-                        Label("Join with an invite link", systemImage: "person.crop.circle.badge.plus")
+                        LucideLabel("Join with an invite link", icon: "users")
                     }
                 }
             }
-            .navigationTitle("All Plans")
+            .navigationTitle("All plans")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -699,24 +633,24 @@ private struct SharedPlanRecoveryPickerRow: View {
     let onOpenPlan: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             LucideLabel("Recovery copy", icon: "database")
-                .font(.headline)
+                .font(.rowTitle)
             Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are available in this recovery copy.")
-                .font(.caption)
+                .font(.meta)
                 .foregroundStyle(.secondary)
-            HStack {
+                .wrapsFully()
+            AdaptiveButtonRow(spacing: Spacing.small) {
                 ShareLink(item: recovery.exportText) {
                     LucideLabel("Download recovery copy", icon: "share")
                 }
-                Spacer()
+                .buttonStyle(.secondaryAction)
                 if canOpenPlan {
                     Button("Open") { onOpenPlan(recovery.planID) }
+                        .buttonStyle(.secondaryAction)
                 }
             }
-            .buttonStyle(.borderless)
         }
-        .padding(.vertical, 3)
     }
 }
 
@@ -728,35 +662,35 @@ private struct SharedPlanPickerRow: View {
     var showsDisclosure = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            LucideIcon(isArchived ? "archive" : "list-checks", size: 22)
+        HStack(spacing: Spacing.iconToText) {
+            LucideIcon(isArchived ? "archive" : "list-checks", size: IconSize.row)
                 .foregroundStyle(isArchived ? Color.secondary : Color.accentColor)
-                .frame(width: 28)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(plan.name)
-                    .font(.headline)
+                    .font(.rowTitle)
                 Text("C\(plan.comiketNo) · \(plan.circleKeys.count) circles")
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
+            .wrapsFully()
+            .layoutPriority(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
             if hasPendingChanges {
-                LucideIcon("cloud-upload", size: 16)
+                LucideIcon("cloud-upload", size: IconSize.inline)
                     .foregroundStyle(.orange)
                     .accessibilityLabel("Pending changes")
             }
             if isSelected {
-                LucideIcon("check", size: 18)
+                LucideIcon("check", size: IconSize.inline)
                     .foregroundStyle(Color.accentColor)
                     .accessibilityLabel("Current plan")
             } else if isArchived || showsDisclosure {
-                LucideIcon("chevron-right", size: 16)
+                LucideIcon("chevron-right", size: IconSize.inline)
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
         }
-        .padding(.vertical, 3)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -766,11 +700,13 @@ private struct SharedPlanPickerRow: View {
 private struct SharedPlanJoinSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appHapticFeedback) private var hapticFeedback
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// Returns false when the link cannot be stored for confirmation.
     let onSubmitLink: (URL) -> Bool
     @State private var linkText = ""
     @State private var issue: LocalizedStringResource?
     @State private var showsSteps = false
+    @ScaledMetric(relativeTo: .headline) private var stepNumberSize = 28.0
 
     var body: some View {
         NavigationStack {
@@ -802,6 +738,11 @@ private struct SharedPlanJoinSheet: View {
                             submit()
                         }
                     }
+                    // PasteButton draws a white title on its tint. The olive accent
+                    // keeps it legible; lime would put white text on lime.
+                    .tint(Color.accentColor)
+                    .labelStyle(.titleAndIcon)
+                    .buttonBorderShape(.roundedRectangle(radius: Radius.control))
                     .accessibilityIdentifier("shared-plan-join-paste")
                 } header: {
                     Text("Invitation link")
@@ -835,7 +776,7 @@ private struct SharedPlanJoinSheet: View {
                     }
                 }
             }
-            .navigationTitle("Join a Plan")
+            .navigationTitle("Join a plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -849,6 +790,13 @@ private struct SharedPlanJoinSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .onAppear {
+            // A regular-width sheet has room for the steps; open them so the
+            // sheet has no empty lower half.
+            if horizontalSizeClass == .regular {
+                showsSteps = true
+            }
+        }
         .accessibilityIdentifier("shared-plan-join-guide")
     }
 
@@ -871,21 +819,24 @@ private struct SharedPlanJoinSheet: View {
         title: LocalizedStringKey,
         detail: LocalizedStringKey
     ) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: Spacing.medium) {
             Text(number, format: .number)
-                .font(.headline)
-                .foregroundStyle(Color.onAccentFill)
-                .frame(width: 30, height: 30)
-                .background(Color.accentFill, in: .circle)
-            VStack(alignment: .leading, spacing: 4) {
+                .font(.rowTitle)
+                .monospacedDigit()
+                .foregroundStyle(Color.accentColor)
+                .frame(width: stepNumberSize, height: stepNumberSize)
+                .background(Color.accentColor.opacity(0.12), in: .circle)
+            VStack(alignment: .leading, spacing: Spacing.xSmall) {
                 Text(title)
-                    .font(.headline)
+                    .font(.rowTitle)
                 Text(detail)
-                    .font(.callout)
+                    .font(.rowSubtitle)
                     .foregroundStyle(.secondary)
             }
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, Spacing.xSmall)
         .accessibilityElement(children: .combine)
     }
 }
@@ -1391,29 +1342,31 @@ private struct SharedPlanInformationScreen: View {
                     if !quarantinedChanges.isEmpty {
                         Section("Changes to review") {
                             Text("This is the latest version of the plan. Review your remaining changes.")
-                                .font(.callout)
+                                .font(.rowSubtitle)
                                 .foregroundStyle(.orange)
                             ForEach(quarantinedChanges) { write in
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: Spacing.xSmall) {
                                     Text(quarantinedTitle(write))
-                                        .font(.headline)
+                                        .font(.rowTitle)
                                     if let message = write.quarantineMessage {
                                         Text(message)
-                                            .font(.caption)
+                                            .font(.meta)
                                             .foregroundStyle(.secondary)
                                     }
                                     Button("Discard this change", role: .destructive) {
                                         discard(write)
                                     }
-                                    .font(.callout)
+                                    .font(.control)
                                 }
                             }
                             if features.writesEnabled,
                                quarantinedChanges.allSatisfy({
                                 $0.quarantineReason == .revisionConflict
                             }) {
+                                // Lime fill with dark text; the system prominent
+                                // style would draw white text on the lime tint.
                                 Button("Try again with the latest plan") { retryConflict() }
-                                    .buttonStyle(.borderedProminent)
+                                    .buttonStyle(.primaryAction)
                                 Button("Discard all remaining changes", role: .destructive) {
                                     discardAllConflicts()
                                 }
@@ -1442,14 +1395,14 @@ private struct SharedPlanInformationScreen: View {
                             showsFavoriteImport = true
                         } label: {
                             Label {
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                                     Text("Import Circle.ms favorites")
                                     Text("Review and add only the circles that are not in this plan yet.")
-                                        .font(.caption)
+                                        .font(.meta)
                                         .foregroundStyle(.secondary)
                                 }
                             } icon: {
-                                Image(systemName: "square.and.arrow.down")
+                                LucideIcon("download")
                             }
                         }
                     }
@@ -1463,14 +1416,14 @@ private struct SharedPlanInformationScreen: View {
                                     dataSource: catalogDataSource
                                 )
                             } label: {
-                                Label("Export sharing plan", systemImage: "archivebox")
+                                LucideLabel("Export sharing plan", icon: "archive")
                             }
                             .accessibilityIdentifier("shared-plan-export-button")
                         }
                     }
 
                     if features.writesEnabled, plan.role == .owner {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: Spacing.small) {
                             Button(role: plan.lifecycle == .active ? .destructive : nil) {
                                 if plan.lifecycle == .active {
                                     confirmation = .archive
@@ -1478,12 +1431,13 @@ private struct SharedPlanInformationScreen: View {
                                     toggleArchive(plan)
                                 }
                             } label: {
-                                HStack {
-                                    Text(archiveButtonTitle(for: plan))
-                                    Spacer(minLength: 0)
-                                }
+                                Text(archiveButtonTitle(for: plan))
+                                    .font(.control)
+                                    .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.roundedRectangle(radius: Radius.control))
+                            .controlSize(.large)
                             .tint(plan.lifecycle == .active ? .red : .accentColor)
                             .frame(maxWidth: .infinity)
                             .disabled(!quarantinedChanges.isEmpty)
@@ -1491,10 +1445,16 @@ private struct SharedPlanInformationScreen: View {
                             Text(plan.lifecycle == .active
                                 ? String(localized: "Archived plans remain available but cannot be edited.")
                                 : String(localized: "Reopen this plan to make it editable again."))
-                                .font(.footnote)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
+                                .wrapsFully()
                         }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(
+                            top: Spacing.small,
+                            leading: Spacing.large,
+                            bottom: Spacing.small,
+                            trailing: Spacing.large
+                        ))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     }
@@ -1564,10 +1524,12 @@ private struct SharedPlanInformationScreen: View {
                     tint: .orange
                 ) {
                     Text("Plan not found")
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        .font(.focusedSurfaceTitle)
+                        .wrapsFully()
                     Text("This plan was deleted, or you no longer have access to it.")
                         .foregroundStyle(.secondary)
-                        .padding(.top, 12)
+                        .wrapsFully()
+                        .padding(.top, Spacing.medium)
                 }
             }
         }

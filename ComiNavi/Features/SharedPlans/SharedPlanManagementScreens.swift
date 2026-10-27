@@ -129,7 +129,7 @@ struct SharedPlanManagementScreen: View {
         if !model.quarantinedWrites.isEmpty {
             Section {
                 ForEach(model.quarantinedWrites) { write in
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Spacing.small) {
                         SharedPlanAdministrativeWriteRow(
                             write: write,
                             issue: model.writeIssues[write.id],
@@ -340,28 +340,28 @@ struct SharedPlanNotificationInboxScreen: View {
         }
         .overlay {
             if model.notifications.isEmpty, !model.isRefreshing {
-                FocusedActionSurface(
-                    symbolName: model.issueMessage == nil
-                        ? "antenna.radiowaves.left.and.right"
-                        : "exclamationmark.triangle.fill",
-                    tint: model.issueMessage == nil ? .accentColor : .orange
-                ) {
-                    Text(model.issueMessage == nil ? "No notifications" : "Notifications unavailable")
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    Text(model.issueMessage ?? String(localized: "Circle, purchase, and conflict updates will appear here."))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 12)
-                    if model.issueMessage != nil {
-                        FocusedActionButton {
+                if let issueMessage = model.issueMessage {
+                    EmptyStateView("Notifications unavailable", icon: "triangle-alert") {
+                        Text(issueMessage)
+                            .font(.rowSubtitle)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .wrapsFully()
+                        Button {
                             Task { await model.refresh(using: store) }
                         } label: {
                             LucideLabel("Try Again", icon: "arrow.clockwise")
                         }
-                        .padding(.top, 28)
+                        .buttonStyle(.primaryAction)
                     }
+                } else {
+                    EmptyStateView(
+                        "No notifications",
+                        icon: "radio-tower",
+                        message: "Circle, purchase, and conflict updates will appear here."
+                    )
+                    .allowsHitTesting(false)
                 }
-                .allowsHitTesting(model.issueMessage != nil)
             }
         }
         .navigationTitle("Notifications")
@@ -374,11 +374,11 @@ struct SharedPlanReadOnlyNotice: View {
     var body: some View {
         Section {
             Label {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     Text("Shared Plans are read-only")
-                        .font(.headline)
+                        .font(.rowTitle)
                     Text("You can view plans, members, invitations, notifications, and saved recovery copies. Editing will be available in a later update.")
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
                 }
             } icon: {
@@ -396,26 +396,27 @@ struct SharedPlanMemberRow: View {
     let onAction: (SharedPlanAdministrativeAction) -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Spacing.iconToText) {
             AuthenticatedProfileAvatar(url: member.avatarURL, size: 40)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(member.displayName)
                     .font(.body.weight(.medium))
-                HStack(spacing: 6) {
+                HStack(spacing: Spacing.small) {
                     Text(member.role.localizedTitle)
                     if member.membershipStatus == .removed {
                         Text("Removed")
                             .foregroundStyle(.orange)
                     }
                 }
-                .font(.caption)
+                .font(.meta)
                 .foregroundStyle(.secondary)
             }
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             .accessibilityElement(children: .combine)
-
-            Spacer(minLength: 8)
 
             if canManage, let actions = availableActions, !actions.isEmpty {
                 Menu {
@@ -429,11 +430,11 @@ struct SharedPlanMemberRow: View {
                 } label: {
                     Label("Member actions", systemImage: "ellipsis.circle")
                         .labelStyle(.iconOnly)
+                        .minimumHitArea()
                 }
                 .accessibilityLabel(Text("Actions for \(member.displayName)"))
             }
         }
-        .padding(.vertical, 2)
     }
 
     private var availableActions: [SharedPlanAdministrativeAction]? {
@@ -456,29 +457,32 @@ struct SharedPlanInvitationRow: View {
     let onRevoke: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Spacing.iconToText) {
             Image(systemName: status.systemImage)
                 .foregroundStyle(status.color)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(status.title)
                     .font(.body.weight(.medium))
-                Text(invitation.expiresAt, format: .dateTime.year().month().day().hour().minute())
-                    .font(.caption)
+                // Date and time are each one unit; the line breaks only between them.
+                Text(verbatim: "\(NonBreaking.spaces(invitation.expiresAt.formatted(.dateTime.year().month(.abbreviated).day()))) \(NonBreaking.spaces(invitation.expiresAt.formatted(.dateTime.hour().minute())))")
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
             .accessibilityElement(children: .combine)
-            Spacer(minLength: 8)
             if canManage, invitation.currentUserCanRevoke, status == .active {
                 Button(role: .destructive, action: onRevoke) {
                     Label("Revoke invitation", systemImage: "xmark.circle")
                         .labelStyle(.iconOnly)
+                        .minimumHitArea()
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel("Revoke invitation...")
             }
         }
-        .padding(.vertical, 2)
     }
 
     private var status: Status {
@@ -523,17 +527,17 @@ private struct SharedPlanAdministrativeWriteRow: View {
     let isQuarantined: Bool
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: Spacing.iconToText) {
             Image(systemName: isQuarantined ? "exclamationmark.triangle.fill" : "clock.arrow.circlepath")
                 .foregroundStyle(isQuarantined ? .orange : .secondary)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(write.kind.localizedAdministrativeTitle)
                     .font(.body.weight(.medium))
                 Text(issue ?? (isQuarantined
                     ? String(localized: "This change needs your review before it can be sent.")
                     : String(localized: "Waiting to send.")))
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(issue == nil ? Color.secondary : Color.orange)
             }
             .accessibilityElement(children: .combine)
@@ -546,9 +550,9 @@ struct SharedPlanInlineIssue: View {
     let retry: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             Label(message, systemImage: "exclamationmark.triangle")
-                .font(.callout)
+                .font(.rowSubtitle)
                 .foregroundStyle(.orange)
                 .accessibilityElement(children: .combine)
             Button("Try Again", action: retry)
@@ -606,7 +610,7 @@ struct SharedPlanCreateInvitationSheet: View {
                 }
                 Section {
                     Text("The invite link is reusable until it expires, is revoked, or the plan is archived.")
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -659,6 +663,7 @@ struct SharedPlanCreatedInvitationSheet: View {
     let model: SharedPlanManagementModel
     @State private var copied = false
     @Environment(\.appHapticFeedback) private var hapticFeedback
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         NavigationStack {
@@ -675,82 +680,74 @@ struct SharedPlanCreatedInvitationSheet: View {
         availability: SharedPlanProtectedInvitationAvailability
     ) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Share this link")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 20)
+            VStack(alignment: .leading, spacing: Spacing.sectionGap) {
+                VStack(alignment: .leading, spacing: Spacing.small) {
+                    SectionHeader("Share this link")
 
                     VStack(spacing: 0) {
-                        LabeledContent("Expires") {
-                            Text(invitation.expiresAt, format: .dateTime.year().month().day().hour().minute())
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 16)
+                        expiryRow
+                            .padding(Spacing.cardPadding)
 
                         Divider()
-                            .padding(.leading, 16)
+                            .padding(.leading, Spacing.cardPadding)
 
                         LabeledContent("Invitation status") {
-                            Label(availability.title, systemImage: availability.systemImage)
-                                .foregroundStyle(availability.color)
+                            Label {
+                                Text(availability.title)
+                            } icon: {
+                                LucideIcon(availability.lucideIcon, size: IconSize.inline)
+                            }
+                            .foregroundStyle(availability.color)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 16)
+                        .padding(Spacing.cardPadding)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        Color(uiColor: .secondarySystemGroupedBackground),
-                        in: .rect(cornerRadius: 24)
-                    )
+                    .surface(.card, padding: 0)
 
                     Text(availability.canShare
                         ? String(localized: "Share this link with the person you want to add.")
                         : String(localized: "This invitation link is no longer available."))
-                        .font(.footnote)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 20)
+                        .wrapsFully()
+                        .padding(.horizontal, Spacing.cardPadding)
                 }
 
                 VStack(spacing: 0) {
                     ShareLink(item: invitation.canonicalURL) {
-                        Label("Share invitation link", systemImage: "square.and.arrow.up")
+                        LucideLabel("Share invitation link", icon: "share")
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(Spacing.cardPadding)
+                            .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
                     .disabled(!availability.canShare)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 16)
 
                     Divider()
-                        .padding(.leading, 16)
+                        .padding(.leading, Spacing.cardPadding)
 
                     Button {
                         UIPasteboard.general.url = invitation.canonicalURL
                         copied = true
                         hapticFeedback?.play(.copyConfirmation)
                     } label: {
-                        Label(
+                        LucideLabel(
                             copied ? "Invitation link copied" : "Copy invitation link",
-                            systemImage: copied ? "checkmark" : "doc.on.doc"
+                            icon: copied ? "check" : "copy"
                         )
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(Spacing.cardPadding)
+                        .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
                     .disabled(!availability.canShare)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 16)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    Color(uiColor: .secondarySystemGroupedBackground),
-                    in: .rect(cornerRadius: 24)
-                )
+                .surface(.card, padding: 0)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 20)
+            .readableWidth(ReadableWidth.form)
+            .padding(.horizontal, Spacing.screenGutter)
+            .padding(.vertical, Spacing.xLarge)
         }
         .scrollIndicators(.hidden)
         .background(Color(uiColor: .systemGroupedBackground).ignoresSafeArea())
@@ -759,6 +756,28 @@ struct SharedPlanCreatedInvitationSheet: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { dismiss() }
+            }
+        }
+    }
+
+    /// The expiry date and time. Each part is one unit, so the line breaks
+    /// only between the date and the time. At accessibility sizes the value
+    /// moves under its label.
+    @ViewBuilder
+    private var expiryRow: some View {
+        let date = NonBreaking.spaces(invitation.expiresAt.formatted(.dateTime.year().month(.abbreviated).day()))
+        let time = NonBreaking.spaces(invitation.expiresAt.formatted(.dateTime.hour().minute()))
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                Text("Expires")
+                Text(verbatim: "\(date) \(time)")
+                    .foregroundStyle(.secondary)
+            }
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            LabeledContent("Expires") {
+                Text(verbatim: "\(date) \(time)")
             }
         }
     }
@@ -774,12 +793,12 @@ private extension SharedPlanProtectedInvitationAvailability {
         }
     }
 
-    var systemImage: String {
+    var lucideIcon: String {
         switch self {
-        case .active: "link"
-        case .expired: "clock.badge.xmark"
-        case .revoked: "xmark.circle"
-        case .unavailable: "questionmark.circle"
+        case .active: "circle-check-big"
+        case .expired: "clock"
+        case .revoked: "x"
+        case .unavailable: "circle-alert"
         }
     }
 
@@ -802,72 +821,82 @@ private struct SharedPlanNotificationRow: View {
     let onSeen: () -> Void
     let onRetryRead: () -> Void
     @State private var circleSummary: CatalogNotificationCircle?
+    /// The SF Symbol column. The notification glyphs have no Lucide asset, so
+    /// the column scales with the text instead of a fixed 18 pt.
+    @ScaledMetric(relativeTo: .subheadline) private var iconColumnWidth = 20.0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             Button(action: onOpen) {
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: Spacing.small) {
                     if let presentation {
                         Image(systemName: presentation.systemImage)
                             .foregroundStyle(presentation.isConflict ? .orange : .accent)
-                            .font(.caption)
-                            .frame(width: 18)
+                            .font(.rowSubtitle)
+                            .frame(width: iconColumnWidth)
                             .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Spacing.xSmall) {
                             Text(presentation.title)
-                                .font(.caption.weight(displayItem.isUnread ? .semibold : .regular))
+                                .font(.rowSubtitle.weight(displayItem.isUnread ? .semibold : .regular))
                             circleSummaryLine
                             Text(presentation.detail)
-                                .font(.caption2)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
                             notificationTimestamp
                         }
                         .multilineTextAlignment(.leading)
+                        .wrapsFully()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
                     } else {
                         Image(systemName: "questionmark.circle")
                             .foregroundStyle(.secondary)
-                            .font(.caption)
-                            .frame(width: 18)
+                            .font(.rowSubtitle)
+                            .frame(width: iconColumnWidth)
                             .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Spacing.xSmall) {
                             Text("Plan activity")
-                                .font(.caption.weight(.medium))
+                                .font(.rowSubtitle.weight(.medium))
                             Text("Open the plan to see what changed.")
-                                .font(.caption2)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
                             notificationTimestamp
                         }
+                        .wrapsFully()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
                     }
-                    Spacer(minLength: 4)
-                    VStack(alignment: .trailing, spacing: 10) {
+                    VStack(alignment: .trailing, spacing: Spacing.small) {
                         unreadIndicator
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
+                        LucideIcon("chevron-right", size: IconSize.caption)
                             .foregroundStyle(.tertiary)
                             .accessibilityHidden(true)
                     }
                 }
+                .contentShape(.rect)
             }
             .buttonStyle(.plain)
 
             if isPendingRead {
-                Label("Marking as read", systemImage: "clock.arrow.circlepath")
-                    .font(.caption)
+                LucideLabel("Marking as read", icon: "clock")
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
             if let readIssue {
-                HStack {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
                     Text(readIssue)
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.orange)
-                    Spacer()
+                        .wrapsFully()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .layoutPriority(1)
                     Button("Retry", action: onRetryRead)
-                        .font(.caption)
+                        .font(.control)
                         .buttonStyle(.borderless)
+                        .singleLineToken()
                 }
             }
         }
-        .padding(.vertical, 3)
         .onAppear(perform: onSeen)
         .task(id: circleSummaryTaskID) {
             circleSummary = nil
@@ -900,7 +929,7 @@ private struct SharedPlanNotificationRow: View {
     @ViewBuilder
     private var circleSummaryLine: some View {
         if let circleSummary {
-            HStack(spacing: 6) {
+            HStack(spacing: Spacing.small) {
                 if let imageData = circleSummary.coverImageData,
                    let image = UIImage(data: imageData)
                 {
@@ -909,29 +938,27 @@ private struct SharedPlanNotificationRow: View {
                         .scaledToFill()
                         .frame(width: 28, height: 28)
                         .clipped()
-                        .clipShape(.rect(cornerRadius: 4))
+                        .clipShape(.rect(cornerRadius: Radius.xSmall, style: .continuous))
                         .accessibilityHidden(true)
                 }
                 Text(circleSummary.name)
-                    .font(.caption2.weight(.medium))
+                    .font(.meta.weight(.medium))
                     .lineLimit(2)
             }
             .accessibilityElement(children: .combine)
         }
     }
 
+    /// One text, so the relative and absolute dates wrap as one line. Each
+    /// unit is non-breaking; the line can break only at the separators.
     private var notificationTimestamp: some View {
-        HStack(spacing: 4) {
-            Text(notification.createdAt, format: .relative(presentation: .named))
-            Text(verbatim: "•")
-                .accessibilityHidden(true)
-            Text(
-                notification.createdAt,
-                format: .dateTime.year().month(.abbreviated).day().hour().minute()
-            )
-        }
-        .font(.caption2)
-        .foregroundStyle(.tertiary)
+        let createdAt = notification.createdAt
+        let relative = NonBreaking.spaces(createdAt.formatted(.relative(presentation: .named)))
+        let date = NonBreaking.spaces(createdAt.formatted(.dateTime.month(.abbreviated).day()))
+        let time = NonBreaking.spaces(createdAt.formatted(.dateTime.hour().minute()))
+        return Text(verbatim: "\(relative) · \(date) \(time)")
+            .font(.meta)
+            .foregroundStyle(.secondary)
     }
 
     @ViewBuilder
