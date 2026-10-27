@@ -618,7 +618,12 @@ struct SignInView: View {
     private static let circlemsPortalURL = URL(string: "https://portal.circle.ms/")!
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .title) private var logoTileSize = 80.0
+    /// Half the cap height of `.body`. It moves a row icon up from the text
+    /// baseline to the middle of the first line.
+    @ScaledMetric(relativeTo: .body) private var bodyCapHalfHeight = 6.0
+    @ScaledMetric(relativeTo: .headline) private var googleGlyphSize = IconSize.inline
     @StateObject private var vm = SignInViewModel()
     @State private var logoTapCount = 0
     @State private var isDemoDataUnlocked = false
@@ -656,6 +661,19 @@ struct SignInView: View {
         horizontalSizeClass == .regular
     }
 
+    private var topSpacing: CGFloat {
+        if isRegularWidth || dynamicTypeSize.isAccessibilitySize {
+            return Spacing.xxLarge
+        }
+        return Spacing.xxxLarge
+    }
+
+    /// The logo tile grows with Dynamic Type up to 96 pt. Beyond that it only
+    /// pushes the sign-in button below the fold, so it stops growing.
+    private var brandTileSize: CGFloat {
+        min(logoTileSize, 96)
+    }
+
     var body: some View {
         let reason = resolvedReason
         GeometryReader { proxy in
@@ -663,19 +681,25 @@ struct SignInView: View {
                 VStack(spacing: 0) {
                     // iPhone keeps the actions in thumb reach at the bottom.
                     // iPad centers one readable column instead of stretching it.
-                    Spacer(minLength: isRegularWidth ? 24 : 40)
+                    // At accessibility sizes the content is already taller than
+                    // the screen, so a short top gap keeps the button closer.
+                    Spacer(minLength: topSpacing)
 
                     content(reason: reason)
-                        .frame(maxWidth: isRegularWidth ? 520 : 620, alignment: .leading)
+                        .frame(maxWidth: ReadableWidth.form, alignment: .leading)
                         .background { contentScrim }
+                        .frame(maxWidth: .infinity)
 
                     if isRegularWidth {
-                        Spacer(minLength: 24)
+                        Spacer(minLength: Spacing.xxLarge)
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: max(0, proxy.size.height - 48))
-                .padding(.horizontal, 24)
-                .padding(.vertical, 24)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: max(0, proxy.size.height - Spacing.xxLarge * 2)
+                )
+                .padding(.horizontal, Spacing.screenGutter)
+                .padding(.vertical, Spacing.xxLarge)
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize)
@@ -712,102 +736,95 @@ struct SignInView: View {
     }
 
     private func content(reason: SignInReason) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            brandMark
-
-            hero(reason: reason)
-                .padding(.top, 20)
+        VStack(alignment: .leading, spacing: Spacing.sectionGap) {
+            VStack(alignment: .leading, spacing: Spacing.large) {
+                brandMark
+                hero(reason: reason)
+            }
 
             switch reason {
             case .firstLaunch:
                 valueRows
-                    .padding(.top, 24)
             case .sessionExpired(let message, _):
                 sessionExpiredNotice(
                     message: message
                         ?? CominaviServiceError.notLoggedIn.localizedDescription
                 )
-                .padding(.top, 20)
             }
 
+            actions
+
+            finePrint
+        }
+    }
+
+    /// The sign-in button and everything that belongs to one attempt: its
+    /// progress, the optional demo and Google entries, and the last error.
+    private var actions: some View {
+        VStack(alignment: .leading, spacing: Spacing.medium) {
             loginButton
-                .padding(.top, 28)
 
             authenticationProgress
 
             if isDemoDataUnlocked, let onUseDemoData {
                 Button(action: onUseDemoData) {
                     LucideLabel("Continue with demo data", icon: "externaldrive")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, minHeight: 52)
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
+                .buttonStyle(ActionButtonStyle(role: .secondary, size: .large))
                 .disabled(vm.state == .authenticating)
-                .padding(.top, 12)
                 .accessibilityIdentifier("sign-in-demo-data")
             }
 
             if let googleInvitation {
                 if GoogleSignInConfiguration.load() != nil {
                     googleLoginButton(invitation: googleInvitation)
-                        .padding(.top, 12)
                 }
             } else if googleSpecialEntry {
                 if GoogleSignInConfiguration.load() != nil {
                     googleLoginButton(invitation: nil)
-                        .padding(.top, 12)
                 }
             }
 
             if let authenticationError = vm.authenticationError {
-                HStack(alignment: .top, spacing: 10) {
-                    LucideIcon("exclamationmark.circle.fill", size: 20)
-                        .foregroundStyle(.red)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Couldn't sign in")
-                            .font(.subheadline.weight(.semibold))
-                        Text(authenticationError)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .padding(.top, 12)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("sign-in-authentication-error")
+                authenticationErrorBanner(authenticationError)
             }
+        }
+    }
 
+    private var finePrint: some View {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             circlemsExplanation
-                .padding(.top, 20)
 
             Text("ComiNavi is an unofficial app. It is not affiliated with Comic Market or Circle.ms.")
-                .font(.caption)
+                .font(.meta)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 16)
+                .wrapsFully()
         }
     }
 
     /// A soft background fill behind the text, so the moving booth highlights
     /// of the backdrop never cross the headline or the explanation.
     private var contentScrim: some View {
-        RoundedRectangle(cornerRadius: 32, style: .continuous)
+        RoundedRectangle(cornerRadius: Radius.panel, style: .continuous)
             .fill(Color(uiColor: .systemBackground).opacity(0.9))
-            .padding(-20)
-            .blur(radius: 16)
+            .padding(-Spacing.xLarge)
+            .blur(radius: Spacing.large)
             .accessibilityHidden(true)
     }
 
     private var brandMark: some View {
-        LogoShape()
-            .foregroundStyle(Color.onAccentFill)
-            .padding(logoTileSize * 0.2)
-            .frame(width: logoTileSize, height: logoTileSize)
+        let size = brandTileSize
+        return LogoShape()
+            .fill(Color.onAccentFill)
+            // The path bars are thin at tile size; a hairline stroke gives the
+            // mark the weight of the bold title next to it.
+            .overlay { LogoShape().stroke(Color.onAccentFill, lineWidth: size * 0.012) }
+            .padding(size * 0.16)
+            .frame(width: size, height: size)
             .background(
                 Color.accentFill,
-                in: RoundedRectangle(cornerRadius: logoTileSize * 0.24, style: .continuous)
+                // App-icon proportion: the radius scales with the tile.
+                in: RoundedRectangle(cornerRadius: size * 0.24, style: .continuous)
             )
             .contentShape(.rect)
             .onTapGesture(perform: recordLogoTap)
@@ -824,11 +841,11 @@ struct SignInView: View {
     }
 
     private func hero(reason: SignInReason) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             switch reason {
             case .firstLaunch:
                 Text("Welcome to ComiNavi!")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(Self.heroTitleFont)
                     .foregroundStyle(.primary)
                     .accessibilityAddTraits(.isHeader)
 
@@ -837,7 +854,7 @@ struct SignInView: View {
                     .foregroundStyle(.secondary)
             case .sessionExpired(_, let displayName):
                 Text("Sign in again")
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(Self.heroTitleFont)
                     .foregroundStyle(.primary)
                     .accessibilityAddTraits(.isHeader)
 
@@ -848,11 +865,15 @@ struct SignInView: View {
                 }
             }
         }
-        .fixedSize(horizontal: false, vertical: true)
+        .wrapsFully()
     }
 
+    /// The welcome screen is the one place with a hero title. It keeps the
+    /// rounded large title of the brand instead of `Font.sectionTitle`.
+    private static let heroTitleFont = Font.system(.largeTitle, design: .rounded, weight: .bold)
+
     private var valueRows: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.medium) {
             valueRow("Find any space on the venue map", icon: "map")
             valueRow("Search the circle catalog", icon: "search")
             valueRow("Share purchase plans with friends", icon: "users")
@@ -860,52 +881,61 @@ struct SignInView: View {
     }
 
     private func valueRow(_ title: LocalizedStringKey, icon: String) -> some View {
-        HStack(spacing: 12) {
-            LucideIcon(icon, size: 20)
+        // The icon starts on the column edge and stays on the first line when
+        // the label wraps at large sizes.
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.iconToText) {
+            LucideIcon(icon, size: IconSize.row)
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 28)
+                .alignmentGuide(.firstTextBaseline) { dimensions in
+                    dimensions[VerticalAlignment.center] + bodyCapHalfHeight
+                }
 
             Text(title)
                 .font(.body)
                 .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+                .wrapsFully()
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .accessibilityElement(children: .combine)
+        // One VoiceOver element that reads the label once.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(title))
     }
 
     private func sessionExpiredNotice(message: String) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            LucideIcon("info.circle", size: 20)
-                .foregroundStyle(.secondary)
+        InlineBanner(Text(message), icon: "info.circle", tone: .info)
+            .accessibilityIdentifier("sign-in-session-expired")
+    }
 
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            Color(uiColor: .secondarySystemBackground),
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("sign-in-session-expired")
+    private func authenticationErrorBanner(_ message: String) -> some View {
+        var text = AttributedString(localized: "Couldn't sign in")
+        text.inlinePresentationIntent = .stronglyEmphasized
+        text.foregroundColor = Color.primary
+        text.append(AttributedString("\n" + message))
+        return InlineBanner(Text(text), icon: "exclamationmark.circle", tone: .warning)
+            .accessibilityIdentifier("sign-in-authentication-error")
     }
 
     private var circlemsExplanation: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(
-                "Sign in with your Circle.ms account. Circle.ms runs the official Comic Market Web Catalog. It opens in a secure browser sheet, and ComiNavi never sees your password."
-            )
-            .font(.footnote)
+        VStack(alignment: .leading, spacing: 0) {
+            // One sentence per text view, so each line breaks at a sentence
+            // end instead of inside a Japanese word.
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Sign in with your Circle.ms account.")
+                Text("Circle.ms runs the official Comic Market Web Catalog.")
+                Text("It opens in a secure browser sheet, and ComiNavi never sees your password.")
+            }
+            .font(.meta)
             .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
 
             Link(destination: Self.circlemsPortalURL) {
                 Text("Don't have a Circle.ms account?")
-                    .font(.footnote.weight(.semibold))
+                    .multilineTextAlignment(.leading)
+                    .wrapsFully()
             }
+            .buttonStyle(.tertiaryAction)
             .accessibilityHint("Opens Circle.ms in Safari.")
         }
     }
@@ -915,11 +945,13 @@ struct SignInView: View {
     @ViewBuilder
     private var authenticationProgress: some View {
         if vm.state == .authenticating {
-            HStack(spacing: 12) {
+            HStack(spacing: Spacing.medium) {
                 if let step = vm.step {
                     Text(step.title)
-                        .font(.footnote)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
+                        .wrapsFully()
+                        .layoutPriority(1)
                         .accessibilityIdentifier("sign-in-step")
                 }
 
@@ -927,32 +959,18 @@ struct SignInView: View {
 
                 if canCancelAuthentication {
                     Button("Cancel", action: vm.cancelAuthentication)
-                        .font(.footnote.weight(.semibold))
+                        .buttonStyle(.tertiaryAction)
                         .accessibilityIdentifier("sign-in-cancel")
                 }
             }
-            .padding(.top, 10)
         }
     }
 
-    @ViewBuilder
     private var loginButton: some View {
-        if #available(iOS 26.0, *) {
-            loginButtonContent
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(Color.accentFill)
-        } else {
-            loginButtonContent
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.roundedRectangle(radius: 16))
-                .tint(Color.accentFill)
-        }
-    }
-
-    private var loginButtonContent: some View {
         Button(action: vm.signIn) {
-            HStack(spacing: 10) {
+            // Both states share one center, so the label does not jump when
+            // the attempt starts.
+            HStack(spacing: Spacing.small) {
                 if vm.state == .authenticating {
                     ProgressView()
                         .controlSize(.small)
@@ -962,17 +980,12 @@ struct SignInView: View {
                 } else {
                     Text("Sign in with Circle.ms")
 
-                    Spacer(minLength: 12)
-
-                    LucideIcon("arrow.up.right")
+                    LucideIcon("arrow.up.right", size: IconSize.inline)
                 }
             }
-            .font(.headline)
-            .foregroundStyle(Color.onAccentFill)
-            .frame(maxWidth: .infinity, minHeight: 56)
-            .padding(.horizontal, 8)
             .contentTransition(.opacity)
         }
+        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
         .disabled(vm.state == .authenticating)
         .accessibilityHint("Opens Circle.ms in a secure browser sheet.")
         .accessibilityIdentifier("sign-in-circlems")
@@ -988,20 +1001,16 @@ struct SignInView: View {
                 invitationToken: invitation?.token
             )
         } label: {
-            HStack(spacing: 10) {
-                Text("Sign in with Google")
-                Spacer(minLength: 12)
+            HStack(spacing: Spacing.small) {
                 Image(decorative: "simple-icons-google")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 20, height: 20)
+                    .frame(width: googleGlyphSize, height: googleGlyphSize)
+
+                Text("Sign in with Google")
             }
-            .font(.headline)
-            .frame(maxWidth: .infinity, minHeight: 56)
-            .padding(.horizontal, 8)
         }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.roundedRectangle(radius: 16))
+        .buttonStyle(ActionButtonStyle(role: .secondary, size: .large))
         .disabled(vm.state == .authenticating)
         .accessibilityHint(
             invitation == nil
