@@ -536,11 +536,11 @@ struct SharedPlanEditorScreen: View {
             let presentation = SharedPlanEditorReadOnlyPresentation(reason: reason)
             Section {
                 Label {
-                    VStack(alignment: .leading, spacing: 5) {
+                    VStack(alignment: .leading, spacing: Spacing.xSmall) {
                         Text(presentation.title)
-                            .font(.headline)
+                            .font(.rowTitle)
                         Text(presentation.detail)
-                            .font(.callout)
+                            .font(.rowSubtitle)
                             .foregroundStyle(.secondary)
                     }
                 } icon: {
@@ -557,11 +557,11 @@ struct SharedPlanEditorScreen: View {
     private var recoverySection: some View {
         if let recovery = model.recoveryDocument {
             Section {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Spacing.small) {
                     LucideLabel("Recovery copy", icon: "database")
-                        .font(.headline)
+                        .font(.rowTitle)
                     Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are available in this recovery copy.")
-                        .font(.callout)
+                        .font(.rowSubtitle)
                         .foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)
@@ -605,11 +605,11 @@ struct SharedPlanEditorScreen: View {
         if !model.memoDraftRecoveries.isEmpty {
             Section {
                 ForEach(model.memoDraftRecoveries) { recovery in
-                    VStack(alignment: .leading, spacing: 7) {
+                    VStack(alignment: .leading, spacing: Spacing.small) {
                         Text("Circle memo")
-                            .font(.headline)
+                            .font(.rowTitle)
                         Text(recovery.reason)
-                            .font(.caption)
+                            .font(.meta)
                             .foregroundStyle(.secondary)
                         ShareLink(item: recovery.exportText) {
                             LucideLabel("Download memo", icon: "share")
@@ -1016,10 +1016,10 @@ struct SharedPlanTotalAmountFooter: View {
     let totalAmount: Int?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
             Text("Total amount")
                 .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
+            Spacer(minLength: Spacing.small)
             if let totalAmount {
                 Text(
                     totalAmount,
@@ -1032,7 +1032,7 @@ struct SharedPlanTotalAmountFooter: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .font(.subheadline.weight(.semibold))
+        .font(.control)
         .textCase(nil)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(SharedPlanEditorAccessibilityID.totalAmount)
@@ -1127,18 +1127,22 @@ struct SharedPlanPurchaseSummaryRow: View {
     let hasConflict: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
                 Text(displayItemName)
-                    .font(.headline)
-                Spacer(minLength: 8)
+                    .font(.rowTitle)
+                    .wrapsFully()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .layoutPriority(1)
                 if let unitPrice = need.unitPrice {
                     Text(
                         unitPrice,
                         format: .currency(code: "JPY").precision(.fractionLength(0))
                     )
-                    .font(.caption)
+                    .font(.meta)
+                    .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .singleLineToken()
                 }
             }
             SharedPlanPurchaseStageBar(
@@ -1149,7 +1153,6 @@ struct SharedPlanPurchaseSummaryRow: View {
                 accessibilityIdentifier: SharedPlanEditorAccessibilityID.needProgress(need.id)
             )
         }
-        .padding(.vertical, 3)
         .accessibilityElement(children: .combine)
     }
 
@@ -1163,14 +1166,13 @@ private struct SharedPlanEmptyPurchaseSummaryRow: View {
     let identity: SharedPlanCircleIdentityPresentation
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
             Text("No purchase requests yet")
-                .font(.headline)
+                .font(.rowTitle)
             Text(identity.displayName)
-                .font(.caption)
+                .font(.meta)
                 .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 3)
     }
 }
 
@@ -1184,14 +1186,14 @@ private struct SharedPlanConflictRow: View {
 
     var body: some View {
         let presentation = SharedPlanConflictPresentation(conflict: conflict)
-        VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(presentation.title)
-                    .font(.headline)
+                    .font(.rowTitle)
                 Text(presentation.path)
-                    .font(.subheadline.weight(.medium))
+                    .font(.rowSubtitle.weight(.medium))
                 Text(presentation.detail)
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
 
@@ -1228,7 +1230,6 @@ private struct SharedPlanConflictRow: View {
             }
 
         }
-        .padding(.vertical, 5)
         .accessibilityIdentifier(SharedPlanEditorAccessibilityID.conflict(conflict.id))
     }
 
@@ -1246,21 +1247,21 @@ private struct SharedPlanConflictChoiceLabel: View {
     let members: [String: SharedPlanMember]
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.iconToText) {
             LucideIcon("circle")
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(candidate?.value.sharedPlanDisplayText(
                     members: members,
                     currentUserID: currentUserID
                 ) ?? fallbackTitle)
                     .font(.body.weight(.medium))
                 Text(actorLabel)
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
-            LucideIcon("chevron-right", size: 14)
+            Spacer(minLength: Spacing.small)
+            LucideIcon("chevron-right", size: IconSize.caption)
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
         }
@@ -1775,11 +1776,11 @@ private struct SharedPlanCirclePurchasesNavigationTitle: ViewModifier {
                 .navigationTitle(String())
                 .toolbar {
                     ToolbarItem(placement: .principal) {
-                        VStack(spacing: 1) {
+                        VStack(spacing: 0) {
                             Text("Circle purchases")
-                                .font(.headline)
+                                .font(.rowTitle)
                             Text(identity.navigationSubtitle)
-                                .font(.caption)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
@@ -1901,7 +1902,7 @@ private struct SharedPlanPurchaseStageBar: View {
 
     private func quantityLabel(_ quantity: Int, color: Color) -> some View {
         Text(quantity.formatted())
-            .font(.caption2.weight(.bold))
+            .font(.badge)
             .monospacedDigit()
             .foregroundStyle(color)
             .frame(maxWidth: .infinity)
@@ -2044,7 +2045,7 @@ private struct SharedPlanNeedEditorRow: View {
 
     private func quantityBadge(_ quantity: Int, color: Color) -> some View {
         Text("×\(quantity)")
-            .font(.caption2.weight(.bold))
+            .font(.badge)
             .monospacedDigit()
             .foregroundStyle(.white)
             .singleLineToken()
@@ -2155,7 +2156,7 @@ private struct SharedPlanQuantityControl: View {
 
     var body: some View {
         if dynamicTypeSize.isAccessibilitySize {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: Spacing.small) {
                 Text(title)
                     .font(.body.weight(.medium))
                 control
@@ -2171,7 +2172,7 @@ private struct SharedPlanQuantityControl: View {
                 if !dynamicTypeSize.isAccessibilitySize {
                     Text(title)
                         .font(.body.weight(.medium))
-                    Spacer(minLength: 8)
+                    Spacer(minLength: Spacing.small)
                 }
                 Text(quantity, format: .number)
                     .monospacedDigit()
@@ -2327,7 +2328,7 @@ private struct SharedPlanPurchaseProgressForm: View {
                     )
                 )
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .padding(.vertical, Spacing.small)
             } header: {
                 Text(verbatim: edit.itemName)
             }
@@ -2345,7 +2346,7 @@ private struct SharedPlanPurchaseProgressForm: View {
                     range: 0...SharedPlanAutomergeDocument.maximumQuantity
                 )
             } footer: {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.xSmall) {
                     Text("How many items are needed in total.")
                     Text("How many items were actually bought.")
                 }
@@ -2504,7 +2505,7 @@ private struct SharedPlanBuyerAllocationSheet: View {
                 }
                 Section {
                     Text("Choose who will try to buy these items and how many.")
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -2528,7 +2529,7 @@ private struct SharedPlanBuyerAllocationSheet: View {
     }
 
     private func buyerLabel(for member: SharedPlanMember) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Spacing.iconToText) {
             AuthenticatedProfileAvatar(
                 url: member.avatarURL,
                 size: buyerAvatarSize
@@ -2540,7 +2541,6 @@ private struct SharedPlanBuyerAllocationSheet: View {
                 currentUserID: currentUserID
             ))
         }
-        .padding(.vertical, 2)
     }
 
     private func save() {
@@ -2655,7 +2655,7 @@ struct SharedPlanPurchaseUITestSurface: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
+                LazyVStack(alignment: .leading, spacing: Spacing.medium) {
                     SharedPlanPurchasesHeader()
                     ForEach(needs) { need in
                         SharedPlanNeedEditorRow(
@@ -2676,7 +2676,7 @@ struct SharedPlanPurchaseUITestSurface: View {
                         )
                     }
                 }
-                .padding(16)
+                .padding(Spacing.screenGutter)
             }
             .background(Color(uiColor: .systemGroupedBackground))
             .modifier(SharedPlanCirclePurchasesNavigationTitle(identity: identity))
