@@ -986,16 +986,11 @@ private struct CircleDetailActionRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    favoriteButton
-                    sharedPlanButton
-                }
-
-                VStack(spacing: 10) {
-                    favoriteButton
-                    sharedPlanButton
-                }
+            // Equal widths side by side, or a full-width column when
+            // "Add to shared plan" would wrap in its half.
+            AdaptiveButtonRow {
+                favoriteButton
+                sharedPlanButton
             }
 
             if let caption {
@@ -1016,7 +1011,7 @@ private struct CircleDetailActionRow: View {
                 icon: isFavorite ? "star.fill" : "star"
             )
         }
-        .buttonStyle(CircleDetailActionButtonStyle(isProminent: isFavorite))
+        .buttonStyle(ActionButtonStyle(role: isFavorite ? .primary : .secondary))
         .disabled(isFavoriteUnavailable)
         .accessibilityHint("Adds or removes this circle from your favorites")
         .accessibilityAddTraits(isFavorite ? .isSelected : [])
@@ -1036,7 +1031,7 @@ private struct CircleDetailActionRow: View {
         } label: {
             LucideLabel("Add to shared plan", icon: "cart.fill")
         }
-        .buttonStyle(CircleDetailActionButtonStyle(isProminent: false))
+        .buttonStyle(.secondaryAction)
         .disabled(sharedPlanAvailability == .unavailable)
         .accessibilityHint(Text(sharedPlanHint))
         .accessibilityIdentifier("circle-shared-plan-action")
@@ -1061,38 +1056,6 @@ private struct CircleDetailActionRow: View {
 
 /// A labeled action button. The prominent variant uses the lime fill behind
 /// dark text; the plain variant matches the grouped cards on the page.
-private struct CircleDetailActionButtonStyle: ButtonStyle {
-    let isProminent: Bool
-
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(2)
-            .multilineTextAlignment(.center)
-            .foregroundStyle(isProminent ? Color.onAccentFill : Color.primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(
-                isProminent
-                    ? Color.accentFill
-                    : Color(uiColor: .secondarySystemGroupedBackground),
-                in: .rect(cornerRadius: 12)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        Color(uiColor: .separator).opacity(isProminent ? 0 : 0.24),
-                        lineWidth: 0.5
-                    )
-            }
-            .contentShape(.rect(cornerRadius: 12))
-            .opacity(isEnabled ? (configuration.isPressed ? 0.7 : 1) : 0.45)
-    }
-}
-
 private struct CircleDetailExternalLinksRow: View {
     let links: [CircleExternalLink]
 
