@@ -79,18 +79,18 @@ struct FollowingImportView: View {
         FocusedActionSurface(symbolName: "person.2.crop.square.stack") {
             Text("Sign in required")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .fixedSize(horizontal: false, vertical: true)
+                .wrapsFully()
 
             Text("Sign in to ComiNavi to find the circles that an X account follows in this catalog.")
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 12)
+                .wrapsFully()
+                .padding(.top, Spacing.medium)
 
             if let onSignIn {
                 FocusedActionButton(action: onSignIn) {
                     Text("Sign in")
                 }
-                .padding(.top, 28)
+                .padding(.top, Spacing.xxLarge)
                 .accessibilityIdentifier("following-import-sign-in")
             }
         }
@@ -115,14 +115,15 @@ struct FollowingImportView: View {
         ) {
             Text("X followed circles")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .fixedSize(horizontal: false, vertical: true)
+                .wrapsFully()
 
             Text("Loading imported circles…")
                 .foregroundStyle(.secondary)
-                .padding(.top, 12)
+                .wrapsFully()
+                .padding(.top, Spacing.medium)
 
             CatalogActivityIndicator(accessibilityLabel: "Loading imported circles…")
-                .padding(.top, 30)
+                .padding(.top, Spacing.xxLarge)
         }
         .accessibilityIdentifier("following-import-loading")
     }
@@ -134,7 +135,7 @@ struct FollowingImportView: View {
         ) {
             Text("Import followed circles")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .fixedSize(horizontal: false, vertical: true)
+                .wrapsFully()
 
             Text(
                 model.progressPreview.phase == .finalizing
@@ -142,11 +143,11 @@ struct FollowingImportView: View {
                     : "Scanning up to 5,000 followed accounts…"
             )
             .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 12)
+            .wrapsFully()
+            .padding(.top, Spacing.medium)
 
             FollowingImportProgressPreviewView(progress: model.progressPreview)
-                .padding(.top, 30)
+                .padding(.top, Spacing.xxLarge)
         }
         .accessibilityIdentifier("following-import-progress")
     }
@@ -155,15 +156,15 @@ struct FollowingImportView: View {
         FocusedActionSurface(symbolName: "person.2.crop.square.stack") {
             Text("Find followed circles")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .fixedSize(horizontal: false, vertical: true)
+                .wrapsFully()
 
             Text("Import an X account to find circles it follows in this catalog.")
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 12)
+                .wrapsFully()
+                .padding(.top, Spacing.medium)
 
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: Spacing.medium) {
+                HStack(spacing: Spacing.small) {
                     Text(verbatim: "@")
                         .foregroundStyle(.secondary)
 
@@ -175,11 +176,12 @@ struct FollowingImportView: View {
                         .onSubmit(model.importNow)
                         .accessibilityIdentifier("following-import-username")
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Spacing.large)
+                // 52 pt: the height of the large button below it.
                 .frame(minHeight: 52)
                 .background(
-                    Color(uiColor: .secondarySystemBackground),
-                    in: .rect(cornerRadius: 14)
+                    Color(uiColor: .tertiarySystemFill),
+                    in: .rect(cornerRadius: Radius.control, style: .continuous)
                 )
 
                 FocusedActionButton(action: model.importNow) {
@@ -191,12 +193,14 @@ struct FollowingImportView: View {
                 .disabled(!model.canImport)
                 .accessibilityIdentifier("following-import-start")
             }
-            .padding(.top, 30)
+            .padding(.top, Spacing.xxLarge)
 
             Group {
                 if let availableAt = model.manualImportAvailableAt {
+                    // No-break spaces keep the date and time whole, so a
+                    // line never breaks inside "Oct 27" or "3:46 PM".
                     Text(
-                        "You can import again after \(availableAt.formatted(date: .abbreviated, time: .shortened))."
+                        "You can import again after \(NonBreaking.spaces(availableAt.formatted(date: .abbreviated, time: .shortened)))."
                     )
                 } else {
                     Text(
@@ -204,10 +208,10 @@ struct FollowingImportView: View {
                     )
                 }
             }
-            .font(.caption)
+            .font(.meta)
             .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 18)
+            .wrapsFully()
+            .padding(.top, Spacing.large)
         }
         .accessibilityIdentifier("following-import-form")
     }
@@ -216,17 +220,17 @@ struct FollowingImportView: View {
         FocusedActionSurface(symbolName: "person.slash") {
             Text("No imported circles")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .fixedSize(horizontal: false, vertical: true)
+                .wrapsFully()
 
             Text("Import an X account to find circles it follows in this catalog.")
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 12)
+                .wrapsFully()
+                .padding(.top, Spacing.medium)
 
             FocusedActionButton(action: showImportForm) {
                 LucideLabel("Import", icon: "arrow.down.circle.fill")
             }
-            .padding(.top, 28)
+            .padding(.top, Spacing.xxLarge)
         }
         .accessibilityIdentifier("following-import-empty")
     }
@@ -236,25 +240,21 @@ struct FollowingImportView: View {
             if !model.importedCircles.isEmpty {
                 Section("Favorite imported circles") {
                     ScrollView(.horizontal) {
-                        HStack(spacing: 10) {
+                        HStack(spacing: Spacing.xSmall) {
                             ForEach(BookmarkColor.selectableColors) { color in
                                 Button {
                                     model.selectedColor = color
                                 } label: {
-                                    Circle()
-                                        .fill(color.swiftUIColor)
-                                        .frame(width: 30, height: 30)
+                                    // 30 pt drawn swatch inside a 44 pt target.
+                                    ColorSwatch(color: color.swiftUIColor, size: 30)
                                         .overlay {
                                             if model.selectedColor == color {
-                                                Image(systemName: "checkmark")
-                                                    .font(.caption.bold())
+                                                LucideIcon("checkmark", size: IconSize.caption)
                                                     .foregroundStyle(.white)
                                                     .shadow(radius: 1)
                                             }
                                         }
-                                        .overlay {
-                                            Circle().stroke(.primary.opacity(0.16), lineWidth: 0.5)
-                                        }
+                                        .minimumHitArea()
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel(color.displayName)
@@ -268,37 +268,29 @@ struct FollowingImportView: View {
                                 )
                             }
                         }
-                        .padding(.vertical, 2)
                     }
                     .scrollIndicators(.hidden)
 
                     Button(action: model.favoriteAll) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "star.fill")
+                        HStack(spacing: Spacing.iconToText) {
+                            LucideIcon("star.fill", size: IconSize.row)
                                 .foregroundStyle(Color.accentColor)
-                                .frame(width: 30, height: 30)
-                                .background(Color.accentColor.opacity(0.12), in: .circle)
 
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                                 Text("Favorite all imported circles")
-                                    .font(.body.weight(.semibold))
+                                    .font(.rowTitle)
+                                    .foregroundStyle(.primary)
                                 Text("Use the selected label color for each circle.")
-                                    .font(.caption)
+                                    .font(.meta)
                                     .foregroundStyle(.secondary)
                             }
+                            .wrapsFully()
+                            .layoutPriority(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                            Spacer(minLength: 8)
-
-                            Circle()
-                                .fill(model.selectedColor.swiftUIColor)
-                                .frame(width: 18, height: 18)
-                                .overlay {
-                                    Circle()
-                                        .stroke(Color(uiColor: .separator), lineWidth: 0.5)
-                                }
+                            ColorSwatch(color: model.selectedColor.swiftUIColor, size: IconSize.row)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 4)
+                        .padding(.vertical, Spacing.xSmall)
                     }
                     .disabled(model.activity != .idle)
                     .accessibilityLabel("Favorite all imported circles")
@@ -310,19 +302,21 @@ struct FollowingImportView: View {
                     .accessibilityIdentifier("following-import-favorite-all")
 
                     if let undo = model.lastBulkFavorite {
-                        HStack(spacing: 12) {
+                        HStack(spacing: Spacing.medium) {
                             Label {
                                 Text("Favorited \(undo.circleCount) circles")
+                                    .wrapsFully()
                             } icon: {
-                                Image(systemName: "checkmark.circle.fill")
+                                LucideIcon("checkmark.circle.fill", size: IconSize.inline)
                                     .foregroundStyle(.green)
                             }
-                            .font(.subheadline)
-
-                            Spacer(minLength: 8)
+                            .font(.rowSubtitle)
+                            .layoutPriority(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
                             Button("Undo", action: model.undoFavoriteAll)
-                                .buttonStyle(.borderless)
+                                .buttonStyle(.tertiaryAction)
+                                .singleLineToken()
                                 .disabled(model.activity != .idle)
                                 .accessibilityIdentifier("following-import-undo-favorite-all")
                         }
@@ -334,7 +328,7 @@ struct FollowingImportView: View {
                 ForEach(model.importedCircles) { importedCircle in
                     let favoriteColor = model.favoriteColor(for: importedCircle)
 
-                    HStack(alignment: .top, spacing: 10) {
+                    HStack(alignment: .top, spacing: Spacing.small) {
                         NavigationLink {
                             CircleDetailView(
                                 circles: importedCircle.circles,
@@ -352,12 +346,12 @@ struct FollowingImportView: View {
                         Button {
                             model.favorite(importedCircle)
                         } label: {
-                            Image(systemName: favoriteColor == nil ? "star" : "star.fill")
-                                .font(.title3)
+                            LucideIcon(favoriteColor == nil ? "star" : "star.fill", size: IconSize.action)
                                 .foregroundStyle(Color.accentColor)
-                                .frame(width: 36, height: 44)
+                                .frame(width: HitArea.minimum, height: HitArea.minimum)
                                 .overlay(alignment: .bottomTrailing) {
                                     if let favoriteColor {
+                                        // 9 pt: a dot on the star, smaller than any icon size.
                                         Circle()
                                             .fill(favoriteColor.swiftUIColor)
                                             .frame(width: 9, height: 9)
@@ -385,6 +379,7 @@ struct FollowingImportView: View {
                 }
             }
         }
+        .readableFormWidth()
     }
 
     private func favoriteAccessibilityValue(for color: BookmarkColor?) -> String {
@@ -422,14 +417,14 @@ private struct FollowingImportProgressPreviewView: View {
     let progress: FollowingImportProgressPreview
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: Spacing.xxLarge) {
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: 36) {
+                HStack(alignment: .top, spacing: Spacing.xxLarge) {
                     fetchedMetric
                     matchedMetric
                 }
 
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: Spacing.large) {
                     fetchedMetric
                     matchedMetric
                 }
@@ -474,7 +469,7 @@ private struct FollowingImportMetric: View {
     let label: LocalizedStringKey
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Spacing.xSmall) {
             Text(value, format: .number.grouping(.automatic))
                 .font(.system(.title, design: .rounded, weight: .bold))
                 .monospacedDigit()
@@ -486,8 +481,9 @@ private struct FollowingImportMetric: View {
                 )
 
             Text(label)
-                .font(.subheadline)
+                .font(.rowSubtitle)
                 .foregroundStyle(.secondary)
+                .wrapsFully()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
@@ -502,28 +498,29 @@ private struct FollowingImportedCircleRow: View {
     let favoriteColor: BookmarkColor?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: Spacing.medium) {
             FollowingImportedCircleArtwork(
                 circle: importedCircle.circle,
                 dataSource: dataSource,
                 favoriteColor: favoriteColor
             )
+            // 66 pt: a fixed thumbnail width; the circle cut keeps its 211:300 ratio.
             .frame(width: 66)
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: Spacing.xSmall) {
                 Text(displayName)
-                    .font(.body.weight(.semibold))
+                    .font(.rowTitle)
                     .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .wrapsFully()
 
                 if let placement = placementLabel {
-                    Text(placement)
-                        .font(.caption.monospaced())
+                    Text(verbatim: placement)
+                        .font(.meta.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
 
                 ForEach(importedCircle.sources.prefix(2), id: \.twitterUserID) { source in
-                    HStack(spacing: 6) {
+                    HStack(spacing: Spacing.small) {
                         KFImage(source.profilePictureURL)
                             .placeholder {
                                 Circle().fill(Color(uiColor: .secondarySystemFill))
@@ -534,17 +531,20 @@ private struct FollowingImportedCircleRow: View {
                             .waitForCache()
                             .resizable()
                             .scaledToFill()
-                            .frame(width: 22, height: 22)
+                            // 22 pt: IconSize.action, so the avatar reads as a row glyph.
+                            .frame(width: IconSize.action, height: IconSize.action)
                             .clipShape(.circle)
 
                         VStack(alignment: .leading, spacing: 0) {
                             Text(source.twitterDisplayName)
-                                .font(.caption.weight(.medium))
+                                .font(.meta.weight(.medium))
                                 .lineLimit(1)
+                            // A handle is a value from data: keep both ends.
                             Text("@\(source.twitterUserName)")
-                                .font(.caption2)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
+                                .truncationMode(.middle)
                         }
                     }
                 }
@@ -565,7 +565,9 @@ private struct FollowingImportedCircleRow: View {
             ? "a+b"
             : (importedCircle.circle.spaceNoSub == 1 ? "b" : "a")
         let day = String(localized: "Day \(importedCircle.circle.day ?? 0)")
-        return "\(day) · \(block.name)\(String(format: "%02d", spaceNumber))\(side)"
+        let space = "\(block.name)\(String(format: "%02d", spaceNumber))\(side)"
+        // Each unit stays whole; the line can break only at " · ".
+        return "\(NonBreaking.spaces(day)) · \(NonBreaking.unit(space))"
     }
 
     private var displayName: String {
@@ -597,10 +599,10 @@ private struct FollowingImportedCircleArtwork: View {
             }
         }
         .aspectRatio(211 / 300, contentMode: .fit)
-        .clipShape(.rect(cornerRadius: 8))
+        .clipShape(.rect(cornerRadius: Radius.small, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(uiColor: .separator).opacity(0.35), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .strokeBorder(Color.hairline, lineWidth: 0.5)
         }
         .overlay { CircleFavoriteMark(color: favoriteColor) }
         .task(id: circle.id) {
