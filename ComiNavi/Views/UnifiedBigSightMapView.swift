@@ -105,6 +105,27 @@ struct UnifiedMapPalette {
     let markerStroke: UIColor
 }
 
+extension UnifiedMapPalette {
+    /// The halo behind map text, so roads, footways, and floor artwork never
+    /// cross a label. It matches the floor the labels mostly sit on.
+    var labelHalo: UIColor { floor.withAlphaComponent(0.9) }
+}
+
+extension UnifiedMapAppearance {
+    /// The rim around the colored plate of a hall badge. White in light mode;
+    /// the dark floor color in dark mode, so the badge has the same visual
+    /// weight on both maps.
+    var venueBadgeRim: UIColor {
+        self == .dark ? palette.floor : .white
+    }
+
+    var venueBadgeRimStroke: UIColor {
+        self == .dark
+            ? UIColor.white.withAlphaComponent(0.18)
+            : UIColor.black.withAlphaComponent(0.16)
+    }
+}
+
 /// A single retained-mode surface for both the Big Sight campus and every hall map.
 /// Gestures mutate `SKCameraNode` directly, so dragging does not invalidate SwiftUI.
 struct UnifiedBigSightMapView: UIViewRepresentable {
@@ -1296,6 +1317,32 @@ final class MapCompassButton: UIButton {
 
 enum UnifiedMapMarkerMetrics {
     static let venueIconSize: CGFloat = 32
+    /// Facility titles wrap to two lines at this width instead of running
+    /// off the screen. About 18 characters of 11 pt text per line.
+    static let facilityLabelMaxWidth: CGFloat = 120
+    /// Gap between a marker backing and its title.
+    static let labelClearance: CGFloat = Spacing.xSmall
+    /// Width of the halo stroke behind map text, in points.
+    static let labelHaloWidth: CGFloat = 3
+
+    // Shared by the SpriteKit badge and `BigSightVenueBadge`, so the two
+    // renderers keep one shape.
+    static let venueBadgeCornerRatio: CGFloat = 0.24
+    static let venueBadgePlateInsetRatio: CGFloat = 0.075
+
+    static func venueBadgeCornerRadius(side: CGFloat) -> CGFloat {
+        side * venueBadgeCornerRatio
+    }
+
+    static func venueBadgePlateInset(side: CGFloat) -> CGFloat {
+        side * venueBadgePlateInsetRatio
+    }
+
+    /// Concentric with the outer corner. `Radius.concentric` is not used
+    /// because it clamps to 6 pt, and small badges scale below that.
+    static func venueBadgePlateRadius(side: CGFloat) -> CGFloat {
+        venueBadgeCornerRadius(side: side) - venueBadgePlateInset(side: side)
+    }
 
     static func facilityIconSize(for kind: BigSightFacilityLocation.Kind) -> CGFloat {
         kind == .conferenceTower ? 22 : 18
@@ -1332,6 +1379,9 @@ final class UnifiedBigSightScene: SKScene {
         /// Side of the square or round backing, in screen points.
         let badgeSize: CGFloat
         let venueID: Int?
+        /// Lower values claim screen space first: halls, then gates and
+        /// help points, then food and restrooms, then everything else.
+        let priority: Int
     }
 
     /// The on-screen footprint of a hall badge and its title, in the SKView's
@@ -2127,7 +2177,8 @@ final class UnifiedBigSightScene: SKScene {
                     for: venue.kind.icon,
                     iconSize: UnifiedMapMarkerMetrics.venueIconSize
                 ),
-                venueID: venue.id
+                venueID: venue.id,
+                priority: 0
             ))
         // Hall titles must stay readable where a neighboring badge overlaps
         // them, so they draw above every marker backing.
@@ -2142,7 +2193,8 @@ final class UnifiedBigSightScene: SKScene {
                     at: UnifiedMapProjection.scenePoint(fromCampus: campusPoint),
                     fontSize: 19,
                     color: palette.blockText,
-                    zPosition: 12
+                    zPosition: 12,
+                    halo: true
                 )
                 label.userData = NSMutableDictionary(dictionary: ["mapID": venue.id])
                 blockLabels.append(label)
@@ -2163,7 +2215,8 @@ final class UnifiedBigSightScene: SKScene {
             iconSize: UnifiedMapMarkerMetrics.facilityIconSize(for: facility.kind),
             fontSize: 11,
             titleColor: appearance.palette.primaryText,
-            zPosition: 22
+            zPosition: 22,
+            labelMaxWidth: UnifiedMapMarkerMetrics.facilityLabelMaxWidth
         )
         facilityMarkers.append(
             ScreenSpaceMarker(
@@ -2178,9 +2231,22 @@ final class UnifiedBigSightScene: SKScene {
                     for: facility.kind.icon,
                     iconSize: UnifiedMapMarkerMetrics.facilityIconSize(for: facility.kind)
                 ),
-                venueID: nil
+                venueID: nil,
+                priority: Self.labelPriority(for: facility.kind)
             ))
         markerRoot.addChild(marker.node)
+    }
+
+    private static func labelPriority(for kind: BigSightFacilityLocation.Kind) -> Int {
+        switch kind {
+        case .entryGate, .information, .internationalDesk, .firstAid, .ticketExchange,
+            .waitingArea, .train, .conferenceTower:
+            1
+        case .food, .restroom, .convenienceStore:
+            2
+        default:
+            3
+        }
     }
 
     private func facilityMarkerPresentation(
@@ -2567,57 +2633,122 @@ final class UnifiedBigSightScene: SKScene {
         for child in userRoot.children {
             child.setScale(mapCamera.xScale)
         }
-        layoutVenueMarkerLabels()
+        layoutMarkerLabels()
     }
 
-    /// Places each hall title on the first side of its badge that does not
-    /// overlap another hall badge or an already placed title, and hides the
-    /// title when no side is clear. East 1–3 and East 4–6 sit close enough
-    /// at overview zoom that the default below-badge title otherwise falls
-    /// under the neighboring badge.
-    private func layoutVenueMarkerLabels() {
-        guard view != nil else { return }
-        let visibleMarkers = venueMarkers.filter { !$0.node.isHidden }
-        let badgeRects = visibleMarkers.map(badgeViewRect)
-        var placedLabelRects: [CGRect] = []
-        for (index, marker) in visibleMarkers.enumerated() {
+    /// Screen-space collision pass for every marker and title.
+    ///
+    /// 1. Hall badges claim their rects first.
+    /// 2. Each hall title takes the first clear side of its badge: below,
+    ///    trailing, leading, then above.
+    /// 3. Facility icons follow in priority order. An icon that would cover a
+    ///    hall badge, a hall title, or a higher-priority icon is hidden.
+    /// 4. Facility titles take the first clear side of their icon: below,
+    ///    above, trailing, then leading. A title with no clear side inside the
+    ///    uncovered viewport is hidden, and its icon stays.
+    ///
+    /// The viewport excludes the top and bottom map chrome, so no title runs
+    /// under the compass, the attribution, or off the screen edge.
+    private func layoutMarkerLabels() {
+        guard let view else { return }
+        let insets = effectiveOverviewInsets
+        let viewport = CGRect(
+            x: insets.left,
+            y: insets.top,
+            width: view.bounds.width - insets.left - insets.right,
+            height: view.bounds.height - insets.top - insets.bottom
+        )
+        let venues = venueMarkers.filter { !$0.node.isHidden }
+        var obstacles = venues.map(badgeViewRect)
+
+        for marker in venues {
             guard marker.label.alpha > 0 else { continue }
-            let center = markerViewCenter(marker)
-            let labelSize = marker.label.frame.size
-            let clearance = marker.badgeSize / 2 + 3
-            // Screen-space offsets, y down: below, above, trailing, leading.
-            let candidates = [
-                CGPoint(x: 0, y: clearance + labelSize.height / 2),
-                CGPoint(x: 0, y: -(clearance + labelSize.height / 2)),
-                CGPoint(x: clearance + labelSize.width / 2, y: 0),
-                CGPoint(x: -(clearance + labelSize.width / 2), y: 0),
-            ]
-            var placement: (offset: CGPoint, rect: CGRect)?
-            for offset in candidates {
-                let rect = CGRect(
-                    x: center.x + offset.x - labelSize.width / 2,
-                    y: center.y + offset.y - labelSize.height / 2,
-                    width: labelSize.width,
-                    height: labelSize.height
-                )
-                let hitsBadge = badgeRects.indices.contains { otherIndex in
-                    otherIndex != index && badgeRects[otherIndex].intersects(rect)
-                }
-                if !hitsBadge, !placedLabelRects.contains(where: { $0.intersects(rect) }) {
-                    placement = (offset, rect)
-                    break
-                }
-            }
-            guard let placement else {
-                marker.label.isHidden = true
+            place(
+                marker.label,
+                of: marker,
+                sides: [.below, .trailing, .leading, .above],
+                in: viewport,
+                obstacles: &obstacles
+            )
+        }
+
+        let facilities = facilityMarkers.enumerated()
+            .filter { !$0.element.node.isHidden }
+            .sorted { ($0.element.priority, $0.offset) < ($1.element.priority, $1.offset) }
+            .map(\.element)
+        var placedFacilities: [ScreenSpaceMarker] = []
+        for marker in facilities {
+            let iconRect = badgeViewRect(marker)
+            // Icons may touch, but not overlap by more than a point.
+            let probe = iconRect.insetBy(dx: 1, dy: 1)
+            if obstacles.contains(where: { $0.intersects(probe) }) {
+                marker.node.isHidden = true
                 continue
             }
+            obstacles.append(iconRect)
+            placedFacilities.append(marker)
+        }
+
+        for marker in placedFacilities {
+            guard !marker.label.isHidden, marker.label.alpha > 0,
+                marker.label.text?.isEmpty == false
+            else { continue }
+            place(
+                marker.label,
+                of: marker,
+                sides: [.below, .above, .trailing, .leading],
+                in: viewport,
+                obstacles: &obstacles
+            )
+        }
+    }
+
+    private enum LabelSide {
+        case below, above, trailing, leading
+    }
+
+    /// Moves `label` to the first side of its marker whose rect stays inside
+    /// `viewport` and clear of `obstacles`, then adds that rect to
+    /// `obstacles`. Hides the label when no side is clear.
+    private func place(
+        _ label: SKLabelNode,
+        of marker: ScreenSpaceMarker,
+        sides: [LabelSide],
+        in viewport: CGRect,
+        obstacles: inout [CGRect]
+    ) {
+        let center = markerViewCenter(marker)
+        let size = label.frame.size
+        let clearance = marker.badgeSize / 2 + UnifiedMapMarkerMetrics.labelClearance
+        for side in sides {
+            // Screen-space offset of the label center, y down.
+            let offset: CGPoint =
+                switch side {
+                case .below: CGPoint(x: 0, y: clearance + size.height / 2)
+                case .above: CGPoint(x: 0, y: -(clearance + size.height / 2))
+                case .trailing: CGPoint(x: clearance + size.width / 2, y: 0)
+                case .leading: CGPoint(x: -(clearance + size.width / 2), y: 0)
+                }
+            let rect = CGRect(
+                x: center.x + offset.x - size.width / 2,
+                y: center.y + offset.y - size.height / 2,
+                width: size.width,
+                height: size.height
+            )
+            // Keep a small gap to neighbors, so two titles never read as
+            // one block.
+            let probe = rect.insetBy(dx: -Spacing.xxSmall, dy: -Spacing.xxSmall)
+            guard viewport.contains(rect),
+                !obstacles.contains(where: { $0.intersects(probe) })
+            else { continue }
             // The marker is scaled and rotated to stay screen-upright, so one
             // local unit is one screen point with the y axis pointing up.
-            marker.label.position = CGPoint(x: placement.offset.x, y: -placement.offset.y)
-            marker.label.isHidden = false
-            placedLabelRects.append(placement.rect)
+            label.position = CGPoint(x: offset.x, y: -offset.y)
+            label.isHidden = false
+            obstacles.append(rect)
+            return
         }
+        label.isHidden = true
     }
 
     private func markerViewCenter(_ marker: ScreenSpaceMarker) -> CGPoint {
@@ -3067,7 +3198,9 @@ final class UnifiedBigSightScene: SKScene {
         at position: CGPoint,
         fontSize: CGFloat,
         color: UIColor,
-        zPosition: CGFloat
+        zPosition: CGFloat,
+        halo: Bool = false,
+        maxWidth: CGFloat? = nil
     ) -> SKLabelNode {
         let label = SKLabelNode(fontNamed: ".AppleSystemUIFontRounded-Bold")
         label.text = text
@@ -3077,7 +3210,53 @@ final class UnifiedBigSightScene: SKScene {
         label.verticalAlignmentMode = .center
         label.position = position
         label.zPosition = zPosition
+        if let maxWidth {
+            // Long facility names wrap to two lines instead of running off
+            // the screen. Japanese breaks between characters, which is fine
+            // for map labels.
+            label.numberOfLines = 2
+            label.lineBreakMode = .byWordWrapping
+            label.preferredMaxLayoutWidth = maxWidth
+        }
+        if halo, !text.isEmpty {
+            label.addChild(haloNode(for: label, text: text, fontSize: fontSize))
+        }
         return label
+    }
+
+    /// A copy of the label drawn behind it with a thick stroke in the floor
+    /// color, the same halo the basemap uses for its own labels.
+    private func haloNode(for label: SKLabelNode, text: String, fontSize: CGFloat) -> SKLabelNode {
+        let base = UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        let font =
+            base.fontDescriptor.withDesign(.rounded).map { UIFont(descriptor: $0, size: fontSize) }
+            ?? base
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineBreakMode = label.lineBreakMode
+        let haloColor = appearance.palette.labelHalo
+        let halo = SKLabelNode()
+        halo.name = "map-label-halo"
+        halo.attributedText = NSAttributedString(
+            string: text,
+            attributes: [
+                .font: font,
+                .foregroundColor: haloColor,
+                .strokeColor: haloColor,
+                // A negative width strokes and fills. The value is a
+                // percentage of the point size.
+                .strokeWidth: -(UnifiedMapMarkerMetrics.labelHaloWidth * 100 / fontSize),
+                .paragraphStyle: paragraph,
+            ]
+        )
+        halo.numberOfLines = label.numberOfLines
+        halo.lineBreakMode = label.lineBreakMode
+        halo.preferredMaxLayoutWidth = label.preferredMaxLayoutWidth
+        halo.horizontalAlignmentMode = .center
+        halo.verticalAlignmentMode = .center
+        halo.position = .zero
+        halo.zPosition = -0.05
+        return halo
     }
 
     private func markerNode(
@@ -3087,7 +3266,8 @@ final class UnifiedBigSightScene: SKScene {
         iconSize: CGFloat,
         fontSize: CGFloat,
         titleColor: UIColor,
-        zPosition: CGFloat
+        zPosition: CGFloat,
+        labelMaxWidth: CGFloat? = nil
     ) -> (node: SKNode, label: SKLabelNode) {
         let container = SKNode()
         let iconName = icon.rawValue
@@ -3104,7 +3284,7 @@ final class UnifiedBigSightScene: SKScene {
         case .standard:
             backing = SKShapeNode(
                 rectOf: CGSize(width: backingSize, height: backingSize),
-                cornerRadius: 7
+                cornerRadius: Radius.xSmall
             )
             backing.fillColor = appearance.palette.iconBackground
             backing.strokeColor = appearance.palette.markerStroke
@@ -3122,10 +3302,10 @@ final class UnifiedBigSightScene: SKScene {
         case .venueBilingualBadge:
             backing = SKShapeNode(
                 rectOf: CGSize(width: backingSize, height: backingSize),
-                cornerRadius: 10
+                cornerRadius: UnifiedMapMarkerMetrics.venueBadgeCornerRadius(side: backingSize)
             )
-            backing.fillColor = .white
-            backing.strokeColor = UIColor.black.withAlphaComponent(0.16)
+            backing.fillColor = appearance.venueBadgeRim
+            backing.strokeColor = appearance.venueBadgeRimStroke
             backing.lineWidth = 0.65
         }
         backing.name = "map-marker-backdrop-\(iconName)"
@@ -3133,11 +3313,11 @@ final class UnifiedBigSightScene: SKScene {
         container.addChild(backing)
 
         if let badge = icon.venueBadge {
-            let inset = max(2.25, backingSize * 0.075)
+            let inset = UnifiedMapMarkerMetrics.venueBadgePlateInset(side: backingSize)
             let plateSize = backingSize - inset * 2
             let plate = SKShapeNode(
                 rectOf: CGSize(width: plateSize, height: plateSize),
-                cornerRadius: 7.5
+                cornerRadius: UnifiedMapMarkerMetrics.venueBadgePlateRadius(side: backingSize)
             )
             plate.name = "map-marker-venue-color-\(iconName)"
             plate.fillColor = markerAccentColor(icon)
@@ -3170,10 +3350,17 @@ final class UnifiedBigSightScene: SKScene {
 
         let label = labelNode(
             text: title,
-            at: CGPoint(x: 0, y: -(iconSize / 2 + 10)),
+            at: .zero,
             fontSize: fontSize,
             color: titleColor,
-            zPosition: 2
+            zPosition: 2,
+            halo: true,
+            maxWidth: labelMaxWidth
+        )
+        // Below the backing until the screen-space layout picks a side.
+        label.position = CGPoint(
+            x: 0,
+            y: -(backingSize / 2 + UnifiedMapMarkerMetrics.labelClearance + label.frame.height / 2)
         )
         container.addChild(label)
         return (container, label)
