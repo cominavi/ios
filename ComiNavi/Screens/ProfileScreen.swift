@@ -246,6 +246,10 @@ struct ProfileScreen: View {
                 Text(
                     "Friends can send you a ComiNavi location link. When this setting is on, ComiNavi checks the clipboard for a new link each time you return to the app. To open a link that you copied, tap Paste."
                 )
+                // A grouped footer leaves about 12 pt less space above the
+                // next header than a card does. This is the only footer on
+                // the screen, so the padding makes every section gap equal.
+                .padding(.bottom, Spacing.medium)
             }
 
             Section("Support") {
