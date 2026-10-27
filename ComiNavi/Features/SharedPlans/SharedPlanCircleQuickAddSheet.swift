@@ -103,11 +103,11 @@ struct SharedPlanCircleQuickAddSheet: View {
                     .accessibilityIdentifier("circle-shared-plan-request-plan")
                 }
                 LabeledContent("Circle") {
-                    VStack(alignment: .trailing, spacing: 2) {
+                    VStack(alignment: .trailing, spacing: Spacing.xxSmall) {
                         Text(circleName)
                         if let penName, !penName.isEmpty {
                             Text(penName)
-                                .font(.caption)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
                         }
                     }
