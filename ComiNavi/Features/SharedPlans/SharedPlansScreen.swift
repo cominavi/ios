@@ -197,6 +197,9 @@ struct SharedPlansScreen: View {
                 onJoin: { presentedSheet = .join }
             )
             .navigationTitle("Shared Plans")
+            // Inline on iPad, like Profile, so the title shares the
+            // leading edge of the readable column.
+            .readableColumnTitleDisplayMode()
             .accessibilityIdentifier("shared-plan-empty-home")
             .toolbar { planListToolbar }
         } else {
@@ -209,6 +212,9 @@ struct SharedPlansScreen: View {
                 onJoin: { presentedSheet = .join }
             )
             .navigationTitle("Shared Plans")
+            // Inline on iPad, like Profile, so the title shares the
+            // leading edge of the readable column.
+            .readableColumnTitleDisplayMode()
             .accessibilityIdentifier("shared-plan-list-home")
             .toolbar { planListToolbar }
         }
@@ -1092,6 +1098,9 @@ struct SharedPlanEmptyUITestSurface: View {
                 onJoin: { presentedSheet = .join }
             )
             .navigationTitle("Shared Plans")
+            // Inline on iPad, like Profile, so the title shares the
+            // leading edge of the readable column.
+            .readableColumnTitleDisplayMode()
             .accessibilityIdentifier("shared-plan-empty-home")
         }
         .sheet(item: $presentedSheet) { sheet in
