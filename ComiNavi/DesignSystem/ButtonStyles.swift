@@ -5,6 +5,9 @@ import SwiftUI
 /// - `primary`: the lime fill behind dark text. One per screen or card.
 /// - `secondary`: a grouped surface with a hairline stroke and primary text.
 /// - `tertiary`: accent text with no fill, for "Show on map"-style links.
+/// - `destructive`: red text on a pale red fill, for "Delete plan"-style
+///   actions. Pair it with `Button(role: .destructive)` so VoiceOver and
+///   menus know the intent; the style only draws it.
 ///
 /// The button fills the width that its container offers. Put two or more of
 /// them in an `AdaptiveButtonRow` so the row switches to a column before a
@@ -14,6 +17,7 @@ struct ActionButtonStyle: ButtonStyle {
         case primary
         case secondary
         case tertiary
+        case destructive
     }
 
     enum Size {
@@ -65,6 +69,9 @@ struct ActionButtonStyle: ButtonStyle {
                 .overlay { shape.strokeBorder(Color.hairline, lineWidth: 0.5) }
         case .tertiary:
             Color.clear
+        case .destructive:
+            // 0.12: inside the 0.08–0.14 status-fill range of the Color rules.
+            shape.fill(Color.red.opacity(0.12))
         }
     }
 }
@@ -76,6 +83,9 @@ extension ButtonStyle where Self == ActionButtonStyle {
     static var secondaryAction: ActionButtonStyle { ActionButtonStyle(role: .secondary) }
     /// Accent text, no fill. Example: `.buttonStyle(.tertiaryAction)`.
     static var tertiaryAction: ActionButtonStyle { ActionButtonStyle(role: .tertiary) }
+    /// Red text on a pale red fill. Example:
+    /// `Button("Delete plan", role: .destructive) { … }.buttonStyle(.destructiveAction)`.
+    static var destructiveAction: ActionButtonStyle { ActionButtonStyle(role: .destructive) }
 }
 
 /// A capsule chip for filters, tags, and links. Selected chips use the lime

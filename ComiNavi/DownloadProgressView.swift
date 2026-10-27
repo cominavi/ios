@@ -68,9 +68,10 @@ struct FocusedActionSurface<Content: View>: View {
 }
 
 /// The full-width action of a focused state. It uses the design-system
-/// action buttons; a custom tint (red for a destructive action, secondary
-/// for cancel) colors the title of a secondary button, or fills a primary
-/// one with the system prominent style.
+/// action buttons. A primary destructive action uses the `destructive` style
+/// (red text on a pale red fill). A custom tint (red for a destructive action,
+/// secondary for cancel) colors the title of a secondary button, or fills a
+/// primary one with the system prominent style.
 struct FocusedActionButton<Label: View>: View {
     enum Emphasis {
         case primary
@@ -99,6 +100,9 @@ struct FocusedActionButton<Label: View>: View {
 
     var body: some View {
         switch (emphasis, tint) {
+        case (.primary, _) where role == .destructive:
+            Button(role: role, action: action, label: label)
+                .buttonStyle(ActionButtonStyle(role: .destructive, size: .large))
         case (.primary, .none):
             Button(role: role, action: action, label: label)
                 .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
