@@ -197,8 +197,8 @@ struct SharedPlansScreen: View {
                 onJoin: { presentedSheet = .join }
             )
             .navigationTitle("Shared Plans")
-            // Inline on iPad, like Profile, so the title shares the
-            // leading edge of the readable column.
+            // A large title on iPad too; the column starts on its leading
+            // edge, like Profile.
             .readableColumnTitleDisplayMode()
             .accessibilityIdentifier("shared-plan-empty-home")
             .toolbar { planListToolbar }
@@ -212,8 +212,8 @@ struct SharedPlansScreen: View {
                 onJoin: { presentedSheet = .join }
             )
             .navigationTitle("Shared Plans")
-            // Inline on iPad, like Profile, so the title shares the
-            // leading edge of the readable column.
+            // A large title on iPad too; the column starts on its leading
+            // edge, like Profile.
             .readableColumnTitleDisplayMode()
             .accessibilityIdentifier("shared-plan-list-home")
             .toolbar { planListToolbar }
@@ -482,8 +482,9 @@ private struct SharedPlanEmptyHome: View {
                     .accessibilityIdentifier("shared-plan-join-button")
                 }
             }
-            // The same centered readable column as the Profile tab on iPad.
-            .readableWidth(ReadableWidth.form)
+            // On iPad the column starts under the large title, like the
+            // Profile tab.
+            .readableTitleLeadingWidth(ReadableWidth.form)
             .padding(.horizontal, Spacing.screenGutter)
             .padding(.vertical, Spacing.large)
         }
@@ -539,6 +540,7 @@ private struct SharedPlanListHome: View {
                 .accessibilityIdentifier("shared-plan-join-button")
             }
         }
+        .readableFormWidth(alignment: .titleLeading)
     }
 }
 
@@ -1098,8 +1100,8 @@ struct SharedPlanEmptyUITestSurface: View {
                 onJoin: { presentedSheet = .join }
             )
             .navigationTitle("Shared Plans")
-            // Inline on iPad, like Profile, so the title shares the
-            // leading edge of the readable column.
+            // A large title on iPad too; the column starts on its leading
+            // edge, like Profile.
             .readableColumnTitleDisplayMode()
             .accessibilityIdentifier("shared-plan-empty-home")
         }

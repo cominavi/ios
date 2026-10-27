@@ -287,7 +287,9 @@ struct ProfileScreen: View {
                 }
             }
         }
-        .readableFormWidth()
+        // A tab root: the large title shows on iPad too, and the cards start
+        // on its leading edge.
+        .readableFormWidth(alignment: .titleLeading)
         .navigationTitle("Profile")
         .readableColumnTitleDisplayMode()
         .sheet(item: $presentedSheet) { sheet in
