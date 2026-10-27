@@ -198,7 +198,12 @@ struct SharedPlanProgressSummary: Equatable, Sendable {
 struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
     let circleName: String
     let penName: String?
+    /// The plain day and location, for copy, search, and accessibility.
     let dayAndLocation: String
+    /// The same text for display. The day, the hall name, and the space code
+    /// are each one non-breaking unit, so a narrow column breaks only at the
+    /// separators and never inside `西あ01a` or `Day 1`.
+    let displayDayAndLocation: String
 
     init(
         circleName: String?,
@@ -238,6 +243,13 @@ struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
             return value
         }
         let location = locationParts.isEmpty ? nil : locationParts.joined(separator: " ")
+        let displayLocationParts: [String] = [
+            normalizedHallName.flatMap { $0.isEmpty ? nil : NonBreaking.spaces($0) },
+            space.map(NonBreaking.unit),
+        ].compactMap { $0 }
+        let displayLocation = displayLocationParts.isEmpty
+            ? nil
+            : displayLocationParts.joined(separator: " ")
 
         dayAndLocation = switch (day, location) {
         case let (.some(day), .some(location)):
@@ -249,6 +261,26 @@ struct SharedPlanCircleIdentityPresentation: Equatable, Sendable {
         case (nil, nil):
             String(localized: "Location unavailable")
         }
+
+        displayDayAndLocation = switch (day, displayLocation) {
+        case let (.some(day), .some(displayLocation)):
+            Self.protectingDay(
+                day,
+                in: String(localized: "Day \(day) · \(displayLocation)")
+            )
+        case let (.some(day), nil):
+            NonBreaking.unit(String(localized: "Day \(day)"))
+        case let (nil, .some(displayLocation)):
+            displayLocation
+        case (nil, nil):
+            String(localized: "Location unavailable")
+        }
+    }
+
+    /// Replaces the localized "Day N" inside `text` with a non-breaking copy.
+    private static func protectingDay(_ day: Int, in text: String) -> String {
+        let dayText = String(localized: "Day \(day)")
+        return text.replacingOccurrences(of: dayText, with: NonBreaking.unit(dayText))
     }
 
     var displayName: String {
