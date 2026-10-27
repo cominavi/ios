@@ -27,6 +27,9 @@ struct LucideIcon: View {
             .renderingMode(.template)
             .scaledToFit()
             .frame(width: dimension, height: dimension)
+            // A decorative glyph is not an element at all, so a combined row or
+            // a `LucideLabel` exposes its text once and no empty image node.
+            .accessibilityHidden(accessibilityLabel == nil)
     }
 
     private var icon: Image {
