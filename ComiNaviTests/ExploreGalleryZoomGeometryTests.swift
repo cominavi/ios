@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import ComiNavi
 
@@ -51,6 +52,18 @@ final class ExploreGalleryZoomGeometryTests: XCTestCase {
         XCTAssertEqual(
             ExploreGalleryZoomGeometry.preferredInitialColumnCount(for: 1_366),
             5
+        )
+    }
+
+    func testCompactGalleryUsesShorterArtworkFrame() {
+        XCTAssertEqual(
+            ExploreLayoutMetrics.galleryArtworkAspectRatio(for: .compact),
+            0.8,
+            accuracy: 0.000_1
+        )
+        XCTAssertEqual(
+            ExploreLayoutMetrics.galleryArtworkAspectRatio(for: .regular),
+            ExploreLayoutMetrics.circleArtworkAspectRatio
         )
     }
 

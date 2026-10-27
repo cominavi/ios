@@ -13,6 +13,16 @@ enum ExploreLayoutMetrics {
     static let listArtworkWidth: CGFloat = 76
     static let circleArtworkAspectRatio = ShinagakiArtworkLayout.a4PortraitAspectRatio
 
+    /// The artwork frame of a gallery card. Regular width shows the whole A4
+    /// cut. Compact width uses a 4:5 frame, so two full rows of cards fit
+    /// above the tab bar on iPhone; `FittedArtworkImage` still shows the
+    /// whole cut and fills the narrow side bands with its blurred backdrop.
+    static func galleryArtworkAspectRatio(
+        for sizeClass: UserInterfaceSizeClass?
+    ) -> CGFloat {
+        sizeClass == .regular ? circleArtworkAspectRatio : 4 / 5
+    }
+
     static func artworkPixelSize(
         width: CGFloat,
         displayScale: CGFloat
@@ -65,6 +75,9 @@ struct ExploreView<EventDayHeader: View>: View {
     @State private var showsFilters = false
     @State private var showsGalleryZoomOnboarding = false
     @State private var didApplyAccessibilityLayout = false
+    #if DEBUG
+    @State private var didOpenFirstCircleForUITesting = false
+    #endif
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let eventDayHeader: EventDayHeader
@@ -182,6 +195,9 @@ struct ExploreView<EventDayHeader: View>: View {
             applyAccessibilityLayoutIfNeeded()
             model.select(day: selectedDay)
             await model.load()
+            #if DEBUG
+            openFirstCircleForUITestingIfNeeded()
+            #endif
             presentGalleryZoomOnboardingIfNeeded()
         }
         .onAppear {
@@ -310,7 +326,8 @@ struct ExploreView<EventDayHeader: View>: View {
     private func presentGalleryZoomOnboardingIfNeeded() {
         guard model.layout == .gallery,
               !model.visibleCircles.isEmpty,
-              !showsGalleryZoomOnboarding
+              !showsGalleryZoomOnboarding,
+              selectedCircle == nil
         else { return }
 
         let arguments = ProcessInfo.processInfo.arguments
@@ -330,6 +347,22 @@ struct ExploreView<EventDayHeader: View>: View {
     private func completeGalleryZoomOnboarding() {
         onboardingStore.markCompleted(.exploreGalleryZoom)
     }
+
+    #if DEBUG
+    /// Launch route for screenshot and UI-test runs: opens the first visible
+    /// circle's detail through the normal navigation destination, once per
+    /// launch, so a capture script does not have to tap a card.
+    private func openFirstCircleForUITestingIfNeeded() {
+        guard !didOpenFirstCircleForUITesting,
+              ProcessInfo.processInfo.arguments.contains(
+                  "-cominavi-ui-testing-open-circle-first"
+              ),
+              let firstCircle = model.visibleCircles.first
+        else { return }
+        didOpenFirstCircleForUITesting = true
+        selectedCircle = firstCircle
+    }
+    #endif
 }
 
 /// Static placeholder cards in the same grid shape as the gallery, so the
@@ -349,7 +382,11 @@ struct ExploreLoadingScreen: View {
         ScrollView {
             LazyVGrid(columns: columns, alignment: .leading, spacing: Spacing.xLarge) {
                 ForEach(0..<12, id: \.self) { _ in
-                    ExploreSkeletonCard()
+                    ExploreSkeletonCard(
+                        artworkAspectRatio: ExploreLayoutMetrics.galleryArtworkAspectRatio(
+                            for: horizontalSizeClass
+                        )
+                    )
                 }
             }
             .padding(
@@ -368,14 +405,13 @@ struct ExploreLoadingScreen: View {
 }
 
 private struct ExploreSkeletonCard: View {
+    let artworkAspectRatio: CGFloat
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
             RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
                 .fill(Color(uiColor: .secondarySystemFill))
-                .aspectRatio(
-                    ExploreLayoutMetrics.circleArtworkAspectRatio,
-                    contentMode: .fit
-                )
+                .aspectRatio(artworkAspectRatio, contentMode: .fit)
 
             VStack(alignment: .leading, spacing: Spacing.small) {
                 // 10 pt bars: about one cap height of the card text.
@@ -1099,6 +1135,7 @@ struct ExploreGalleryCard: View {
     let model: ExploreModel
     let favoriteColorLabels: [BookmarkColor: String]
     let artworkPixelSize: ExploreArtworkPixelSize
+    var artworkAspectRatio: CGFloat = ExploreLayoutMetrics.circleArtworkAspectRatio
     var detail: ExploreGalleryCardDetail = .full
     /// VoiceOver paths for the cell's tap and long-press gestures, which live
     /// on the hosting collection view and are invisible to assistive tech.
@@ -1112,7 +1149,8 @@ struct ExploreGalleryCard: View {
             ExploreCircleArtwork(
                 circle: circle,
                 model: model,
-                targetPixelSize: artworkPixelSize
+                targetPixelSize: artworkPixelSize,
+                aspectRatio: artworkAspectRatio
             )
 
             if detail != .artworkOnly {
@@ -1403,6 +1441,7 @@ struct ExploreCircleArtwork: View {
     let circle: ExploreCircle
     let model: ExploreModel
     let targetPixelSize: ExploreArtworkPixelSize
+    var aspectRatio: CGFloat = ExploreLayoutMetrics.circleArtworkAspectRatio
 
     @State private var loadedArtwork: LoadedExploreArtwork?
     @State private var didFinishLoading = false
@@ -1439,10 +1478,7 @@ struct ExploreCircleArtwork: View {
                     }
             }
         }
-        .aspectRatio(
-            ExploreLayoutMetrics.circleArtworkAspectRatio,
-            contentMode: .fit
-        )
+        .aspectRatio(aspectRatio, contentMode: .fit)
         .compositingGroup()
         .clipShape(.rect(cornerRadius: Radius.small, style: .continuous))
         .overlay {
