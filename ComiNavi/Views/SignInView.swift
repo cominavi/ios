@@ -844,19 +844,13 @@ struct SignInView: View {
         VStack(alignment: .leading, spacing: Spacing.small) {
             switch reason {
             case .firstLaunch:
-                Text("Welcome to ComiNavi!")
-                    .font(Self.heroTitleFont)
-                    .foregroundStyle(.primary)
-                    .accessibilityAddTraits(.isHeader)
+                heroTitle("Welcome to ComiNavi!")
 
                 Text("Find circles. Know where they are.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
             case .sessionExpired(_, let displayName):
-                Text("Sign in again")
-                    .font(Self.heroTitleFont)
-                    .foregroundStyle(.primary)
-                    .accessibilityAddTraits(.isHeader)
+                heroTitle("Sign in again")
 
                 if let displayName, !displayName.isEmpty {
                     Text("You were signed in as \(displayName).")
@@ -868,9 +862,32 @@ struct SignInView: View {
         .wrapsFully()
     }
 
+    /// The hero title is short, so a break inside it reads as a mistake
+    /// ("Welcome to / ComiNavi!" on a 330 pt iPhone Duo column). It stays on
+    /// one line at the hero size, then on one line at the next smaller text
+    /// style, and wraps only when neither fits. No `minimumScaleFactor`: both
+    /// sizes are Dynamic Type styles.
+    private func heroTitle(_ title: LocalizedStringKey) -> some View {
+        ViewThatFits(in: .horizontal) {
+            Text(title)
+                .font(Self.heroTitleFont)
+                .lineLimit(1)
+            Text(title)
+                .font(Self.compactHeroTitleFont)
+                .lineLimit(1)
+            Text(title)
+                .font(Self.heroTitleFont)
+                .wrapsFully()
+        }
+        .foregroundStyle(.primary)
+        .accessibilityAddTraits(.isHeader)
+    }
+
     /// The welcome screen is the one place with a hero title. It keeps the
     /// rounded large title of the brand instead of `Font.sectionTitle`.
     private static let heroTitleFont = Font.system(.largeTitle, design: .rounded, weight: .bold)
+    /// The hero title one text style smaller, for a narrow column.
+    private static let compactHeroTitleFont = Font.system(.title, design: .rounded, weight: .bold)
 
     private var valueRows: some View {
         VStack(alignment: .leading, spacing: Spacing.medium) {

@@ -496,6 +496,9 @@ private struct FollowingImportedCircleRow: View {
     let importedCircle: FollowingImportedCircle
     let dataSource: CirclemsDataSource
     let favoriteColor: BookmarkColor?
+    /// The address with its hall, loaded from the map catalog. Until it
+    /// loads, or when the hall is unknown, the row shows the bare code.
+    @State private var resolvedAddress: ComiketSpaceAddress?
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.medium) {
@@ -552,22 +555,65 @@ private struct FollowingImportedCircleRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .contentShape(.rect)
+        .task(id: importedCircle.id) {
+            resolvedAddress = await loadAddress()
+        }
     }
 
+    /// "Day 1 · West あ01a": the shared short space format, as in Explore,
+    /// circle details, and map search.
     private var placementLabel: String? {
-        guard let blockID = importedCircle.circle.blockId,
+        guard let address = resolvedAddress ?? catalogAddress else { return nil }
+        let day = String(localized: "Day \(address.day)")
+        // Each unit stays whole; the line can break only at " · ".
+        return "\(NonBreaking.spaces(day)) · \(NonBreaking.unit(address.formatted(.short)))"
+    }
+
+    /// The address from the catalog row alone. It has no hall, so
+    /// `formatted(.short)` shows the bare code "あ01a".
+    private var catalogAddress: ComiketSpaceAddress? {
+        let circle = importedCircle.circle
+        guard let blockID = circle.blockId,
               let block = dataSource.comiket.blocks.first(where: {
                   $0.externalBlockId == blockID
               }),
-              let spaceNumber = importedCircle.circle.spaceNo
+              let spaceNumber = circle.spaceNo,
+              spaceNumber > 0
         else { return nil }
-        let side = importedCircle.isCombinedAB
-            ? "a+b"
-            : (importedCircle.circle.spaceNoSub == 1 ? "b" : "a")
-        let day = String(localized: "Day \(importedCircle.circle.day ?? 0)")
-        let space = "\(block.name)\(String(format: "%02d", spaceNumber))\(side)"
-        // Each unit stays whole; the line can break only at " · ".
-        return "\(NonBreaking.spaces(day)) · \(NonBreaking.unit(space))"
+        return ComiketSpaceAddress(
+            day: circle.day ?? 0,
+            hallName: "",
+            blockName: block.name,
+            spaceNumber: spaceNumber,
+            subspace: circle.spaceNoSub == 1 ? 1 : 0,
+            isCombinedAB: importedCircle.isCombinedAB
+        )
+    }
+
+    /// Resolves the hall the same way as `CircleDetailView`.
+    private func loadAddress() async -> ComiketSpaceAddress? {
+        let circle = importedCircle.circle
+        let updateIDs = importedCircle.circles.compactMap(\.updateId)
+        guard !updateIDs.isEmpty,
+              let catalog = dataSource.mapCatalog,
+              let locations = try? await catalog.bookmarkLocations(
+                  updateIDs: updateIDs
+              ),
+              let location = locations.first(where: { $0.catalogCircleID == circle.id }),
+              let blockID = circle.blockId,
+              let block = dataSource.comiket.blocks.first(where: { $0.externalBlockId == blockID }),
+              let hall = dataSource.comiket.days
+                  .first(where: { $0.dayIndex == location.day })?
+                  .halls.first(where: { $0.externalMapId == location.mapID })
+        else { return nil }
+        return ComiketSpaceAddress(
+            day: location.day,
+            hallName: hall.name,
+            blockName: block.name,
+            spaceNumber: location.tableID.spaceNumber,
+            subspace: importedCircle.isCombinedAB ? nil : location.subspace,
+            isCombinedAB: importedCircle.isCombinedAB
+        )
     }
 
     private var displayName: String {

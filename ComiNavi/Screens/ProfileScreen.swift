@@ -227,9 +227,9 @@ struct ProfileScreen: View {
                         sharedLocationInbox.receiveClipboardText(value)
                     }
                     .buttonBorderShape(.roundedRectangle(radius: Radius.control))
-                    // PasteButton draws white text. Dark olive keeps it legible
-                    // in light and dark mode; lime behind white text does not.
-                    .tint(Color.accentColor)
+                    // PasteButton draws white text on its tint. See
+                    // `Color.whiteTitleTint`.
+                    .tint(Color.whiteTitleTint)
                     // The large size gives the button a 44 pt hit height.
                     .controlSize(.large)
                     .accessibilityIdentifier("profile-paste-shared-location")
@@ -246,6 +246,10 @@ struct ProfileScreen: View {
                 Text(
                     "Friends can send you a ComiNavi location link. When this setting is on, ComiNavi checks the clipboard for a new link each time you return to the app. To open a link that you copied, tap Paste."
                 )
+                // A grouped footer leaves about 12 pt less space above the
+                // next header than a card does. This is the only footer on
+                // the screen, so the padding makes every section gap equal.
+                .padding(.bottom, Spacing.medium)
             }
 
             Section("Support") {
@@ -287,9 +291,14 @@ struct ProfileScreen: View {
                 }
             }
         }
-        .readableFormWidth()
+        // A tab root: the large title shows on iPad too, and the cards start
+        // on its leading edge.
+        .readableFormWidth(alignment: .titleLeading)
         .navigationTitle("Profile")
         .readableColumnTitleDisplayMode()
+        #if DEBUG
+        .modifier(ProfileLaunchRouteModifier(catalogLibrary: catalogLibrary))
+        #endif
         .sheet(item: $presentedSheet) { sheet in
             switch sheet {
             case .profileEditor:
@@ -1290,3 +1299,38 @@ private struct AccountDeletionScopeRow: View {
 #Preview {
     ProfileScreen()
 }
+
+#if DEBUG
+/// UI-test launch routes for screenshots. `-cominavi-ui-testing-open-toolbox`,
+/// `-cominavi-ui-testing-open-checklist`, and
+/// `-cominavi-ui-testing-open-official-links` push the Toolbox once. The
+/// Toolbox pushes the checklist or the official links itself.
+private struct ProfileLaunchRouteModifier: ViewModifier {
+    private static let toolboxArguments = [
+        "-cominavi-ui-testing-open-toolbox",
+        "-cominavi-ui-testing-open-checklist",
+        "-cominavi-ui-testing-open-official-links",
+    ]
+
+    let catalogLibrary: CatalogLibrary
+    @State private var showsToolbox = false
+    @State private var hasHandledLaunchRoute = false
+
+    func body(content: Content) -> some View {
+        content
+            .navigationDestination(isPresented: $showsToolbox) {
+                ComiketToolboxView(event: catalogLibrary.selectedEvent)
+            }
+            .onAppear {
+                // Only the first appearance: the Profile screen appears again
+                // when the Toolbox is popped.
+                guard !hasHandledLaunchRoute else { return }
+                hasHandledLaunchRoute = true
+                let arguments = ProcessInfo.processInfo.arguments
+                if Self.toolboxArguments.contains(where: { arguments.contains($0) }) {
+                    showsToolbox = true
+                }
+            }
+    }
+}
+#endif
