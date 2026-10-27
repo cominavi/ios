@@ -1327,7 +1327,7 @@ private struct ProfileLaunchRouteModifier: ViewModifier {
                 guard !hasHandledLaunchRoute else { return }
                 hasHandledLaunchRoute = true
                 let arguments = ProcessInfo.processInfo.arguments
-                if Self.toolboxArguments.contains(where: arguments.contains) {
+                if Self.toolboxArguments.contains(where: { arguments.contains($0) }) {
                     showsToolbox = true
                 }
             }
