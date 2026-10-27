@@ -260,6 +260,19 @@ private struct CatalogEventDayCapsule<Title: View>: View {
 }
 
 private extension View {
+    /// Gives a sheet's scroll view the ideal height of its content.
+    ///
+    /// A `ScrollView` has an ideal height near zero, so a sheet sized with
+    /// `.presentationSizing(.form.fitted(horizontal: false, vertical: true))`
+    /// collapsed to its title bar on iPad. With the measured content height as
+    /// the ideal height, the form sheet grows to show every row; the system
+    /// caps it at the screen height, and the rows then scroll. A sheet with
+    /// detents (iPhone) proposes a height, so the ideal height has no effect.
+    func fittingSheetHeight(_ contentHeight: CGFloat?) -> some View {
+        frame(idealHeight: contentHeight)
+            .scrollBounceBehavior(.basedOnSize)
+    }
+
     /// `.surface(.floating)` in a capsule shape, for one-line map chrome.
     @ViewBuilder
     func floatingCapsule() -> some View {
@@ -462,6 +475,8 @@ struct CatalogEventDaySheet: View {
     // 72 and 64 pt: two-line rows with a 12 pt inset; they scale with the text.
     @ScaledMetric(relativeTo: .body) private var eventRowHeight = 72.0
     @ScaledMetric(relativeTo: .body) private var dayRowHeight = 64.0
+    /// The height of the rows, which the iPad form sheet fits itself to.
+    @State private var contentHeight: CGFloat?
 
     var body: some View {
         NavigationStack {
@@ -474,7 +489,13 @@ struct CatalogEventDaySheet: View {
                 }
                 .padding(.horizontal, Spacing.screenGutter)
                 .padding(.vertical, Spacing.xLarge)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    contentHeight = height
+                }
             }
+            .fittingSheetHeight(contentHeight)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Day & Comiket")
             .navigationBarTitleDisplayMode(.inline)
@@ -679,10 +700,15 @@ private struct CatalogEventSelectionView: View {
     @Environment(\.locale) private var locale
     // 72 pt: a two-line row with a 12 pt inset; it scales with the text.
     @ScaledMetric(relativeTo: .body) private var rowHeight = 72.0
+    /// The height of the rows, so the iPad form sheet keeps fitting its
+    /// content after this page is pushed.
+    @State private var contentHeight: CGFloat?
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: Spacing.small) {
+            // A VStack, not a LazyVStack: the sheet measures every row, and a
+            // catalog list has only a few Comikets.
+            VStack(alignment: .leading, spacing: Spacing.small) {
                 CatalogSwitchProgress(catalogLibrary: catalogLibrary)
 
                 ForEach(catalogLibrary.events) { event in
@@ -713,7 +739,13 @@ private struct CatalogEventSelectionView: View {
             }
             .padding(.horizontal, Spacing.screenGutter)
             .padding(.vertical, Spacing.xLarge)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.height
+            } action: { height in
+                contentHeight = height
+            }
         }
+        .fittingSheetHeight(contentHeight)
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Comiket")
         .navigationBarTitleDisplayMode(.inline)

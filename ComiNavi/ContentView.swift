@@ -255,7 +255,10 @@ private struct CatalogEventDaySheetPresentation: ViewModifier {
     func body(content: Content) -> some View {
         if isRegularWidth {
             // A form sheet as tall as its rows, so a short day list does
-            // not leave an empty lower half on iPad.
+            // not leave an empty lower half on iPad. The sheet's scroll views
+            // report their measured content height as their ideal height
+            // (`fittingSheetHeight`); without it the sheet showed only its
+            // title bar.
             content
                 .presentationSizing(.form.fitted(horizontal: false, vertical: true))
         } else if isAccessibilitySize {
