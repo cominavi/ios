@@ -106,7 +106,14 @@ struct ComiketToolboxView: View {
             }
         }
         .readableFormWidth()
+        .hardTopScrollEdge()
         .navigationTitle("Toolbox")
+        #if DEBUG
+        .modifier(ToolboxLaunchRouteModifier(
+            checklistStore: checklistStore,
+            sections: ComiketToolboxCatalog.sections(for: edition)
+        ))
+        #endif
         .searchable(
             text: $searchText,
             placement: searchPlacement,
@@ -635,3 +642,66 @@ private struct ToolboxResourceRow: View {
         ComiketToolboxView()
     }
 }
+
+private extension View {
+    /// The always-visible search drawer is a glass capsule on iOS 26. With
+    /// the soft edge effect, row titles scrolled under it stayed sharp
+    /// enough to collide with the prompt at accessibility sizes. The hard
+    /// edge puts an opaque band behind the bar and the drawer.
+    @ViewBuilder
+    func hardTopScrollEdge() -> some View {
+        if #available(iOS 26.0, *) {
+            scrollEdgeEffectStyle(.hard, for: .top)
+        } else {
+            self
+        }
+    }
+}
+
+#if DEBUG
+/// UI-test launch routes for screenshots. Profile pushes the Toolbox for
+/// `-cominavi-ui-testing-open-checklist` and
+/// `-cominavi-ui-testing-open-official-links`; this modifier then pushes the
+/// child screen once per process, so a pop does not push it again.
+private struct ToolboxLaunchRouteModifier: ViewModifier {
+    enum Child: Hashable {
+        case checklist
+        case officialLinks
+    }
+
+    @MainActor private static var hasHandledLaunchRoute = false
+
+    let checklistStore: ComiketChecklistStore
+    let sections: [ComiketToolboxSection]
+    @State private var child: Child?
+
+    func body(content: Content) -> some View {
+        content
+            .navigationDestination(item: $child) { child in
+                switch child {
+                case .checklist:
+                    ToolboxChecklistScreen(store: checklistStore)
+                case .officialLinks:
+                    ToolboxResourcesScreen(sections: sections)
+                }
+            }
+            .task {
+                guard !Self.hasHandledLaunchRoute else { return }
+                Self.hasHandledLaunchRoute = true
+                let arguments = ProcessInfo.processInfo.arguments
+                let route: Child? = if arguments.contains("-cominavi-ui-testing-open-checklist") {
+                    .checklist
+                } else if arguments.contains("-cominavi-ui-testing-open-official-links") {
+                    .officialLinks
+                } else {
+                    nil
+                }
+                guard let route else { return }
+                // A push inside the push transition of the Toolbox itself is
+                // dropped, so wait for that transition to end.
+                try? await Task.sleep(for: .milliseconds(600))
+                child = route
+            }
+    }
+}
+#endif
