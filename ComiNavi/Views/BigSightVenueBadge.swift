@@ -1,26 +1,39 @@
 import SwiftUI
 
+/// The bilingual hall badge (東 EAST) in SwiftUI. It shares its shape ratios
+/// and rim colors with the SpriteKit badge in `UnifiedBigSightScene`, through
+/// `UnifiedMapMarkerMetrics` and `UnifiedMapAppearance`.
 struct BigSightVenueBadge: View {
     private static let minimumSideForEnglish: CGFloat = 32
 
     let icon: BigSightMapIcon
+
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { proxy in
             let side = min(proxy.size.width, proxy.size.height)
 
             if let badge = icon.venueBadge {
+                let appearance = UnifiedMapAppearance(colorScheme)
+                let outerRadius = UnifiedMapMarkerMetrics.venueBadgeCornerRadius(side: side)
                 ZStack {
-                    RoundedRectangle(cornerRadius: side * 0.24, style: .continuous)
-                        .fill(.white)
+                    RoundedRectangle(cornerRadius: outerRadius, style: .continuous)
+                        .fill(Color(uiColor: appearance.venueBadgeRim))
                         .overlay {
-                            RoundedRectangle(cornerRadius: side * 0.24, style: .continuous)
-                                .stroke(.black.opacity(0.16), lineWidth: max(0.5, side * 0.018))
+                            RoundedRectangle(cornerRadius: outerRadius, style: .continuous)
+                                .strokeBorder(
+                                    Color(uiColor: appearance.venueBadgeRimStroke),
+                                    lineWidth: max(0.5, side * 0.018)
+                                )
                         }
 
-                    RoundedRectangle(cornerRadius: side * 0.18, style: .continuous)
-                        .fill(color(for: badge))
-                        .padding(side * 0.075)
+                    RoundedRectangle(
+                        cornerRadius: UnifiedMapMarkerMetrics.venueBadgePlateRadius(side: side),
+                        style: .continuous
+                    )
+                    .fill(color(for: badge))
+                    .padding(UnifiedMapMarkerMetrics.venueBadgePlateInset(side: side))
 
                     VStack(spacing: -side * 0.035) {
                         Text(badge.japanese)
@@ -33,6 +46,8 @@ struct BigSightVenueBadge: View {
                             Text(badge.english)
                                 .font(.system(size: side * 0.14, weight: .black, design: .rounded))
                                 .tracking(side * 0.006)
+                                // Map badges are fixed-size chrome; the design
+                                // system allows scaling here.
                                 .minimumScaleFactor(0.8)
                         }
                     }
@@ -45,6 +60,9 @@ struct BigSightVenueBadge: View {
             }
         }
         .aspectRatio(1, contentMode: .fit)
+        // The row or button beside the badge already names the hall, so the
+        // glyphs (東, EAST) are decoration for VoiceOver.
+        .accessibilityHidden(true)
     }
 
     private func color(for badge: BigSightMapIcon.VenueBadge) -> Color {
