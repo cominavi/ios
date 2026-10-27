@@ -34,13 +34,16 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
 
     func makeUIView(context: Context) -> UICollectionView {
         let layout = UICollectionViewFlowLayout()
-        layout.minimumInteritemSpacing = 12
-        layout.minimumLineSpacing = 18
+        let horizontalInset = ExploreLayoutMetrics.horizontalContentInset(
+            for: context.environment.horizontalSizeClass
+        )
+        layout.minimumInteritemSpacing = Spacing.medium
+        layout.minimumLineSpacing = Spacing.xLarge
         layout.sectionInset = UIEdgeInsets(
             top: 0,
-            left: ExploreLayoutMetrics.horizontalContentInset,
+            left: horizontalInset,
             bottom: 0,
-            right: ExploreLayoutMetrics.horizontalContentInset
+            right: horizontalInset
         )
 
         let collectionView = ExploreTouchCancellingCollectionView(
@@ -48,8 +51,10 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             collectionViewLayout: layout
         )
         collectionView.backgroundColor = .systemBackground
-        collectionView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 28, right: 0)
-        collectionView.verticalScrollIndicatorInsets = UIEdgeInsets(top: 0, left: 0, bottom: 28, right: 2)
+        collectionView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: Spacing.xxxLarge, right: 0)
+        collectionView.verticalScrollIndicatorInsets = UIEdgeInsets(
+            top: 0, left: 0, bottom: Spacing.xxxLarge, right: Spacing.xxSmall
+        )
         collectionView.contentInsetAdjustmentBehavior = .automatic
         collectionView.alwaysBounceVertical = true
         collectionView.dataSource = context.coordinator
@@ -90,6 +95,12 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
     }
 
     func updateUIView(_ collectionView: UICollectionView, context: Context) {
+        context.coordinator.updateHorizontalInset(
+            ExploreLayoutMetrics.horizontalContentInset(
+                for: context.environment.horizontalSizeClass
+            ),
+            in: collectionView
+        )
         context.coordinator.update(parent: self)
     }
 
@@ -155,6 +166,20 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                     }
                 ),
             ]
+        }
+
+        /// Keeps the grid on the same leading edge as the search field and
+        /// the header rows when the size class changes (iPad split view).
+        func updateHorizontalInset(_ inset: CGFloat, in collectionView: UICollectionView) {
+            guard let flowLayout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout,
+                  flowLayout.sectionInset.left != inset
+            else { return }
+            flowLayout.sectionInset.left = inset
+            flowLayout.sectionInset.right = inset
+            measuredHeaderSize = nil
+            updateCardDetailIfNeeded(in: collectionView)
+            refreshVisibleArtworkIfNeeded(in: collectionView)
+            flowLayout.invalidateLayout()
         }
 
         func update(parent: ExploreGalleryCollection) {
@@ -258,19 +283,20 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             if renderedCardDetail == .artworkOnly {
                 return CGSize(width: width, height: artworkHeight)
             }
+            // Keep these text styles and gaps in step with ExploreGalleryCard.
             let penNameHeight = renderedCardDetail == .full
                 ? UIFont.preferredFont(
-                    forTextStyle: .caption2, compatibleWith: collectionView.traitCollection
-                ).lineHeight + 2
+                    forTextStyle: .footnote, compatibleWith: collectionView.traitCollection
+                ).lineHeight + Spacing.xxSmall
                 : 0
             let titleHeight = UIFont.preferredFont(
                 forTextStyle: .subheadline, compatibleWith: collectionView.traitCollection
             ).lineHeight
             let hasLocation = circleIndex(for: indexPath) != nil
             let locationHeight = hasLocation
-                ? 2 + max(
+                ? Spacing.xxSmall + max(
                     UIFont.preferredFont(
-                        forTextStyle: .caption1,
+                        forTextStyle: .footnote,
                         compatibleWith: collectionView.traitCollection
                     ).lineHeight,
                     FavoriteColorLabelMetrics.height(
@@ -280,7 +306,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
                 : 0
             return CGSize(
                 width: width,
-                height: artworkHeight + 8 + penNameHeight + titleHeight + locationHeight
+                height: artworkHeight + Spacing.small + penNameHeight + titleHeight + locationHeight
             )
         }
 
@@ -293,7 +319,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
             in collectionView: UICollectionView
         ) -> CGFloat {
             let flowLayout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout
-            let spacing = flowLayout?.minimumInteritemSpacing ?? 12
+            let spacing = flowLayout?.minimumInteritemSpacing ?? Spacing.medium
             let sectionInset = flowLayout?.sectionInset ?? .zero
             let horizontalInsets = sectionInset.left + sectionInset.right
             let availableWidth = max(contentWidth(in: collectionView) - horizontalInsets, 1)
@@ -600,7 +626,7 @@ struct ExploreGalleryCollection<Header: View>: UIViewRepresentable {
         ) -> Int {
             guard let collectionView, columns > 0 else { return 0 }
             let flowLayout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout
-            let spacing = flowLayout?.minimumInteritemSpacing ?? 12
+            let spacing = flowLayout?.minimumInteritemSpacing ?? Spacing.medium
             let sectionInset = flowLayout?.sectionInset ?? .zero
             let horizontalInsets = sectionInset.left + sectionInset.right
             let availableWidth = max(contentWidth(in: collectionView) - horizontalInsets, 1)

@@ -32,27 +32,27 @@ struct ExploreTagPage: View {
 
         Group {
             if (model.isLoading && model.allCircles.isEmpty) || model.isResolvingFixedTag {
-                ProgressView("Loading circles…")
+                // The same skeleton as Explore, so both screens share one
+                // loading state.
+                ExploreLoadingScreen()
             } else if model.visibleCircles.isEmpty {
-                LucideContentUnavailableView(
+                EmptyStateView(
                     "No circles found",
                     icon: "tag.slash",
-                    description: Text("No circles on this day use this tag.")
+                    message: "No circles on this day use this tag."
                 )
             } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(model.visibleCircles) { circle in
-                            ExploreTagCircleLink(
+                            ExploreCircleListRow(
                                 circle: circle,
                                 model: model,
                                 favoriteColorLabels: favoriteColorLabelStore.customLabels,
+                                accessibilityIdentifier: "explore-tag-circle-\(circle.id)",
                                 onSelect: { selectedCircle = circle },
                                 onLongPress: { openLightbox(circle) }
                             )
-
-                            Divider()
-                                .padding(.leading, 104)
                         }
                     }
                 }
@@ -86,7 +86,11 @@ struct ExploreTagPage: View {
                     ExploreSortPicker(selection: $model.sort)
                         .pickerStyle(.inline)
                 } label: {
-                    LucideLabel("Sort", icon: model.sort.systemImage)
+                    Label {
+                        Text("Sort")
+                    } icon: {
+                        LucideIcon(model.sort.systemImage, size: IconSize.action)
+                    }
                 }
                 .accessibilityLabel(Text("Sort, \(Text(model.sort.title))"))
                 .accessibilityIdentifier("circle-tag-sort")
@@ -124,54 +128,6 @@ struct ExploreTagPage: View {
     }
 }
 
-private struct ExploreTagCircleLink: View {
-    let circle: ExploreCircle
-    let model: ExploreModel
-    let favoriteColorLabels: [BookmarkColor: String]
-    let onSelect: () -> Void
-    let onLongPress: () -> Void
-
-    init(
-        circle: ExploreCircle,
-        model: ExploreModel,
-        favoriteColorLabels: [BookmarkColor: String] = [:],
-        onSelect: @escaping () -> Void,
-        onLongPress: @escaping () -> Void
-    ) {
-        self.circle = circle
-        self.model = model
-        self.favoriteColorLabels = favoriteColorLabels
-        self.onSelect = onSelect
-        self.onLongPress = onLongPress
-    }
-
-    var body: some View {
-        Button(action: onSelect) {
-            HStack(spacing: 12) {
-                ExploreCircleRow(
-                    circle: circle,
-                    model: model,
-                    favoriteColorLabels: favoriteColorLabels
-                )
-
-                LucideIcon("chevron.forward")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
-            .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
-            .padding(.vertical, 8)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .highPriorityGesture(
-            LongPressGesture(minimumDuration: 0.45)
-                .onEnded { _ in onLongPress() }
-        )
-        .accessibilityIdentifier("explore-tag-circle-\(circle.id)")
-    }
-}
-
 #if DEBUG
     struct ExploreTagLongPressUITestSurface: View {
         let circle: ExploreCircle
@@ -185,15 +141,14 @@ private struct ExploreTagCircleLink: View {
 
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    ExploreTagCircleLink(
+                    ExploreCircleListRow(
                         circle: circle,
                         model: model,
+                        favoriteColorLabels: [:],
+                        accessibilityIdentifier: "explore-tag-circle-\(circle.id)",
                         onSelect: { onSelect(circle) },
                         onLongPress: { openLightbox() }
                     )
-
-                    Divider()
-                        .padding(.leading, 104)
                 }
             }
             .accessibilityIdentifier("explore-tag-test-surface")

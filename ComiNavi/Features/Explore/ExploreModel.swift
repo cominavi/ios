@@ -243,7 +243,16 @@ struct ExploreCircle: Identifiable {
     /// The short space address, "West あ01a", in the same format as map
     /// search. Without a known hall it falls back to the bare code "あ01a".
     var spaceLabel: String {
-        guard let number = circle.spaceNo, number > 0 else { return blockName }
+        spaceAddress?.formatted(.short) ?? blockName
+    }
+
+    /// The bare space code, "あ01a", for cards too narrow for the hall.
+    var spaceCode: String {
+        spaceAddress?.spaceCode ?? blockName
+    }
+
+    private var spaceAddress: ComiketSpaceAddress? {
+        guard let number = circle.spaceNo, number > 0 else { return nil }
         return ComiketSpaceAddress(
             day: day,
             hallName: hallName ?? "",
@@ -252,7 +261,6 @@ struct ExploreCircle: Identifiable {
             subspace: circle.spaceNoSub == 1 ? 1 : 0,
             isCombinedAB: isCombinedAB
         )
-        .formatted(.short)
     }
 
     var preferredCoverURLs: [URL] {

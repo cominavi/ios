@@ -2,7 +2,14 @@ import Observation
 import SwiftUI
 
 enum ExploreLayoutMetrics {
-    static let horizontalContentInset: CGFloat = 16
+    /// The leading and trailing inset of every Explore block: header rows,
+    /// tag lanes, the gallery grid, and list rows. Compact width uses 16 pt
+    /// to match the system search drawer; regular width uses the 20 pt
+    /// screen gutter to match the iPad search field.
+    static func horizontalContentInset(for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
+        sizeClass == .regular ? Spacing.screenGutter : Spacing.large
+    }
+
     static let listArtworkWidth: CGFloat = 76
     static let circleArtworkAspectRatio = ShinagakiArtworkLayout.a4PortraitAspectRatio
 
@@ -57,6 +64,9 @@ struct ExploreView<EventDayHeader: View>: View {
     @State private var selectedCircle: ExploreCircle?
     @State private var showsFilters = false
     @State private var showsGalleryZoomOnboarding = false
+    @State private var didApplyAccessibilityLayout = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private let eventDayHeader: EventDayHeader
     private let onboardingStore: FeatureOnboardingStore
     private let favoriteColorLabelStore: FavoriteColorLabelStore
@@ -137,7 +147,13 @@ struct ExploreView<EventDayHeader: View>: View {
                         ExploreSortPicker(selection: $model.sort)
                             .pickerStyle(.inline)
                     } label: {
-                        LucideLabel("View options", icon: "slider.horizontal.3")
+                        // The current layout glyph, so this menu does not read
+                        // as a second filter next to the funnel.
+                        Label {
+                            Text("View options")
+                        } icon: {
+                            LucideIcon(model.layout.systemImage, size: IconSize.action)
+                        }
                     }
                     .accessibilityLabel(
                         Text("View options, \(model.layout.title), \(Text(model.sort.title))")
@@ -163,6 +179,7 @@ struct ExploreView<EventDayHeader: View>: View {
             }
         }
         .task {
+            applyAccessibilityLayoutIfNeeded()
             model.select(day: selectedDay)
             await model.load()
             presentGalleryZoomOnboardingIfNeeded()
@@ -202,7 +219,7 @@ struct ExploreView<EventDayHeader: View>: View {
                 headerLayoutVersion: galleryHeaderLayoutVersion,
                 onSelect: { selectedCircle = $0 }
             ) {
-                scrollingHeader(horizontalPadding: ExploreLayoutMetrics.horizontalContentInset)
+                scrollingHeader(horizontalPadding: horizontalInset)
             }
             .ignoresSafeArea(.container, edges: .bottom)
         case .list:
@@ -212,7 +229,7 @@ struct ExploreView<EventDayHeader: View>: View {
                 favoriteColorLabels: favoriteColorLabelStore.customLabels,
                 onSelect: { selectedCircle = $0 }
             ) {
-                scrollingHeader(horizontalPadding: ExploreLayoutMetrics.horizontalContentInset)
+                scrollingHeader(horizontalPadding: horizontalInset)
             }
             .ignoresSafeArea(.container, edges: .bottom)
         }
@@ -237,8 +254,16 @@ struct ExploreView<EventDayHeader: View>: View {
         model.activeFilters.count
     }
 
+    private var horizontalInset: CGFloat {
+        ExploreLayoutMetrics.horizontalContentInset(for: horizontalSizeClass)
+    }
+
     private var galleryHeaderLayoutVersion: Int {
-        let hasFilterChipRow = activeFilterCount > 0
+        let hasFilterChipRow = ExploreResultsHeader.isVisible(
+            visibleCount: model.visibleCircles.count,
+            totalCount: model.selectedDayCircleCount,
+            activeFilters: model.activeFilters
+        )
         let showsDiscoveryMatchMenu = model.selectedDiscoveryTermIDs.count > 1
         let showsDiscoveryCloud = ExploreDiscoveryCloud.hasContent(model)
         return (hasFilterChipRow ? 1 : 0)
@@ -251,23 +276,35 @@ struct ExploreView<EventDayHeader: View>: View {
     private var emptyResults: some View {
         ScrollView {
             VStack(spacing: 0) {
-                scrollingHeader(horizontalPadding: ExploreLayoutMetrics.horizontalContentInset)
+                scrollingHeader(horizontalPadding: horizontalInset)
 
-                ContentUnavailableView {
-                    LucideLabel("No circles found", icon: "sparkle.magnifyingglass")
-                } description: {
-                    Text("No circles match your search and filters.")
-                } actions: {
+                EmptyStateView(
+                    "No circles found",
+                    icon: "sparkle.magnifyingglass",
+                    message: "No circles match your search and filters."
+                ) {
                     if activeFilterCount > 0 {
                         Button("Clear filters") {
                             model.clearFilters()
                         }
+                        .buttonStyle(.primaryAction)
                     }
                 }
-                .padding(.vertical, 24)
+                .padding(.vertical, Spacing.xxLarge)
             }
         }
         .scrollDismissesKeyboard(.interactively)
+    }
+
+    /// At accessibility sizes one gallery card fills the screen and its name
+    /// falls under the tab bar. Start in the list there, once, so a later
+    /// choice in View options stays.
+    private func applyAccessibilityLayoutIfNeeded() {
+        guard !didApplyAccessibilityLayout else { return }
+        didApplyAccessibilityLayout = true
+        if dynamicTypeSize.isAccessibilitySize {
+            model.layout = .list
+        }
     }
 
     private func presentGalleryZoomOnboardingIfNeeded() {
@@ -297,25 +334,29 @@ struct ExploreView<EventDayHeader: View>: View {
 
 /// Static placeholder cards in the same grid shape as the gallery, so the
 /// first load reads as "circles are on the way" instead of a separate screen.
-private struct ExploreLoadingScreen: View {
+/// Explore and the tag pages share it.
+struct ExploreLoadingScreen: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var columns: [GridItem] {
         Array(
-            repeating: GridItem(.flexible(), spacing: 12, alignment: .top),
+            repeating: GridItem(.flexible(), spacing: Spacing.medium, alignment: .top),
             count: horizontalSizeClass == .compact ? 2 : 4
         )
     }
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 18) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: Spacing.xLarge) {
                 ForEach(0..<12, id: \.self) { _ in
                     ExploreSkeletonCard()
                 }
             }
-            .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
-            .padding(.top, 12)
+            .padding(
+                .horizontal,
+                ExploreLayoutMetrics.horizontalContentInset(for: horizontalSizeClass)
+            )
+            .padding(.top, Spacing.medium)
         }
         .scrollDisabled(true)
         .allowsHitTesting(false)
@@ -328,20 +369,21 @@ private struct ExploreLoadingScreen: View {
 
 private struct ExploreSkeletonCard: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: 10)
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
                 .fill(Color(uiColor: .secondarySystemFill))
                 .aspectRatio(
                     ExploreLayoutMetrics.circleArtworkAspectRatio,
                     contentMode: .fit
                 )
 
-            VStack(alignment: .leading, spacing: 6) {
-                RoundedRectangle(cornerRadius: 4)
+            VStack(alignment: .leading, spacing: Spacing.small) {
+                // 10 pt bars: about one cap height of the card text.
+                RoundedRectangle(cornerRadius: Radius.xSmall, style: .continuous)
                     .fill(Color(uiColor: .quaternaryLabel))
                     .frame(height: 10)
-                    .padding(.trailing, 24)
-                RoundedRectangle(cornerRadius: 4)
+                    .padding(.trailing, Spacing.xxLarge)
+                RoundedRectangle(cornerRadius: Radius.xSmall, style: .continuous)
                     .fill(Color(uiColor: .quaternaryLabel))
                     .frame(width: 48, height: 10)
             }
@@ -371,20 +413,8 @@ private struct ExploreDiscoveryCloud: View {
         @Bindable var model = model
 
         if Self.hasContent(model) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Popular tags")
-                            .font(.headline)
-                            .accessibilityAddTraits(.isHeader)
-                        Text("Most-used tags for this day")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer(minLength: 8)
-
+            VStack(alignment: .leading, spacing: Spacing.small) {
+                SectionHeader("Popular tags", subtitle: "Most-used tags for this day") {
                     if model.selectedDiscoveryTermIDs.count > 1 {
                         Menu {
                             Picker("Match tags", selection: $model.discoveryMatchMode) {
@@ -395,10 +425,12 @@ private struct ExploreDiscoveryCloud: View {
                         } label: {
                             LucideLabel(
                                 resource: model.discoveryMatchMode.shortTitle,
-                                icon: "slider.horizontal.3"
+                                icon: "tag"
                             )
                                 .labelStyle(.titleAndIcon)
-                                .font(.subheadline.weight(.semibold))
+                                .font(.control)
+                                .singleLineToken()
+                                .frame(minHeight: HitArea.minimum)
                         }
                         .accessibilityLabel("Tag matching")
                         .accessibilityValue(Text(model.discoveryMatchMode.title))
@@ -414,7 +446,7 @@ private struct ExploreDiscoveryCloud: View {
                     )
                 } else {
                     ScrollView(.horizontal) {
-                        HorizontalStaggeredLayout(laneCount: laneCount, spacing: 8) {
+                        HorizontalStaggeredLayout(laneCount: laneCount, spacing: Spacing.small, laneSpacing: ExploreDiscoveryMetrics.laneSpacing) {
                             ForEach(model.discoveryTerms) { term in
                                 ExploreDiscoveryTermButton(
                                     term: term,
@@ -429,8 +461,8 @@ private struct ExploreDiscoveryCloud: View {
                     .frame(minHeight: ExploreDiscoveryMetrics.height(laneCount: laneCount))
                 }
             }
-            .padding(.top, 6)
-            .padding(.bottom, 10)
+            .padding(.top, Spacing.small)
+            .padding(.bottom, Spacing.small)
             .background(Color(uiColor: .systemBackground))
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("explore-discovery-cloud")
@@ -439,8 +471,10 @@ private struct ExploreDiscoveryCloud: View {
 }
 
 private enum ExploreDiscoveryMetrics {
-    static let chipHeight: CGFloat = 44
-    static let laneSpacing: CGFloat = 8
+    /// The `.chip` style's full height: a 32 pt capsule padded to a 44 pt
+    /// hit area. Lanes need no extra gap, so the capsules stay 12 pt apart.
+    static let chipHeight: CGFloat = HitArea.minimum
+    static let laneSpacing: CGFloat = 0
 
     static func height(laneCount: Int) -> CGFloat {
         let lanes = CGFloat(max(laneCount, 1))
@@ -472,7 +506,7 @@ private struct ExploreDiscoverySkeleton: View {
 
     var body: some View {
         ScrollView(.horizontal) {
-            HorizontalStaggeredLayout(laneCount: laneCount, spacing: 8) {
+            HorizontalStaggeredLayout(laneCount: laneCount, spacing: Spacing.small, laneSpacing: ExploreDiscoveryMetrics.laneSpacing) {
                 ForEach(Self.items) { item in
                     ExploreDiscoverySkeletonChip(width: item.width)
                 }
@@ -493,29 +527,23 @@ private struct ExploreDiscoverySkeletonChip: View {
     let width: CGFloat
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
+        // Drawn like the `.chip` style: a 32 pt capsule inside a 44 pt slot.
+        HStack(spacing: Spacing.small) {
+            RoundedRectangle(cornerRadius: Radius.xSmall, style: .continuous)
                 .fill(Color(uiColor: .quaternaryLabel))
-                .frame(width: 16, height: 16)
-
-            RoundedRectangle(cornerRadius: 4)
-                .fill(Color(uiColor: .quaternaryLabel))
-                .frame(width: width - 56, height: 10)
+                .frame(width: width - Spacing.medium * 2, height: 10)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Spacing.medium)
         .frame(width: width, alignment: .leading)
-        .frame(minHeight: 44, alignment: .leading)
+        .frame(height: 32)
         .background(
-            Color(uiColor: .secondarySystemBackground),
+            Color(uiColor: .secondarySystemGroupedBackground),
             in: .capsule
         )
         .overlay {
-            Capsule()
-                .stroke(
-                    Color(uiColor: .separator).opacity(0.14),
-                    lineWidth: 0.5
-                )
+            Capsule().strokeBorder(Color.hairline, lineWidth: 0.5)
         }
+        .frame(height: ExploreDiscoveryMetrics.chipHeight)
     }
 }
 
@@ -536,7 +564,10 @@ private struct HorizontalStaggeredLayout: Layout {
     }
 
     let laneCount: Int
+    /// The gap between chips in one lane.
     let spacing: CGFloat
+    /// The gap between lanes.
+    var laneSpacing: CGFloat = 0
 
     func sizeThatFits(
         proposal: ProposedViewSize,
@@ -589,9 +620,9 @@ private struct HorizontalStaggeredLayout: Layout {
         var laneOffsets: [CGFloat] = []
         var height: CGFloat = 0
         for laneHeight in laneHeights {
-            laneOffsets.append(height == 0 ? 0 : height + spacing)
+            laneOffsets.append(height == 0 ? 0 : height + laneSpacing)
             if laneHeight > 0 {
-                height = (height == 0 ? 0 : height + spacing) + laneHeight
+                height = (height == 0 ? 0 : height + laneSpacing) + laneHeight
             }
         }
         return Arrangement(
@@ -608,38 +639,20 @@ private struct ExploreDiscoveryTermButton: View {
     let action: () -> Void
 
     var body: some View {
+        // One chip style for every tag. The model already orders the lane by
+        // use, so prominence does not need mixed text sizes in one lane.
         Button(action: action) {
-            LucideLabel(verbatim: term.title, icon: term.kind.systemImage)
-                .font(font)
-                .lineLimit(1)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .foregroundStyle(isSelected ? Color.onAccentFill : Color.primary)
-                .background(
-                    isSelected ? Color.accentFill : Color(uiColor: .secondarySystemBackground),
-                    in: .capsule
-                )
-                .overlay {
-                    if !isSelected {
-                        Capsule()
-                            .stroke(Color(uiColor: .separator).opacity(0.28), lineWidth: 0.5)
-                    }
-                }
+            HStack(spacing: Spacing.xSmall) {
+                LucideIcon(term.kind.systemImage, size: IconSize.caption)
+                Text(verbatim: term.title)
+            }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chip(selected: isSelected))
         .accessibilityLabel(term.title)
         .accessibilityValue("\(term.count) circles")
         .accessibilityHint(isSelected ? "Double tap to remove this tag" : "Double tap to filter by this tag")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityIdentifier("explore-discovery-term-\(term.id)")
-    }
-
-    private var font: Font {
-        switch term.prominence {
-        case 2: .headline
-        case 1: .subheadline.weight(.semibold)
-        default: .subheadline
-        }
     }
 }
 
@@ -651,20 +664,36 @@ private struct ExploreResultsHeader: View {
     let onRemove: (ExploreActiveFilterKind) -> Void
     let onClearAll: () -> Void
 
+    /// The row shows only when something narrows the results. The full
+    /// day count alone ("11,348 circles") pushed the second row of cards
+    /// under the tab bar on iPhone and told the attendee nothing new.
+    static func isVisible(
+        visibleCount: Int,
+        totalCount: Int,
+        activeFilters: [ExploreActiveFilter]
+    ) -> Bool {
+        !activeFilters.isEmpty || visibleCount != totalCount
+    }
+
     var body: some View {
+        if Self.isVisible(
+            visibleCount: visibleCount,
+            totalCount: totalCount,
+            activeFilters: activeFilters
+        ) {
+            row
+        }
+    }
+
+    private var row: some View {
         ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-                Group {
-                    if visibleCount == totalCount {
-                        Text("\(totalCount) circles")
-                    } else {
-                        Text("\(visibleCount) of \(totalCount) circles")
-                    }
-                }
-                .font(.subheadline.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.secondary)
-                .fixedSize()
-                .padding(.trailing, activeFilters.isEmpty ? 0 : 4)
+            HStack(spacing: Spacing.small) {
+                Text("\(visibleCount) of \(totalCount) circles")
+                    .font(.meta.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .singleLineToken()
+                    .padding(.trailing, activeFilters.isEmpty ? 0 : Spacing.xSmall)
+                    .accessibilityIdentifier("explore-results-count")
 
                 ForEach(activeFilters) { filter in
                     FilterChip(
@@ -676,18 +705,14 @@ private struct ExploreResultsHeader: View {
 
                 if activeFilters.count > 1 {
                     Button("Clear all", action: onClearAll)
-                        .font(.subheadline.weight(.semibold))
-                        .frame(minHeight: 44)
+                        .buttonStyle(.tertiaryAction)
                         .accessibilityIdentifier("explore-clear-all-filters")
                 }
             }
-            // Without chips the row holds only the count, so it needs no
-            // 44-point touch height and gives the space to the results.
-            .frame(minHeight: activeFilters.isEmpty ? 24 : 44)
+            .frame(minHeight: HitArea.minimum)
             .padding(.horizontal, horizontalPadding)
         }
         .scrollIndicators(.hidden)
-        .padding(.vertical, activeFilters.isEmpty ? 2 : 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(uiColor: .systemBackground))
     }
@@ -700,20 +725,13 @@ private struct FilterChip: View {
 
     var body: some View {
         Button(action: onRemove) {
-            HStack(spacing: 6) {
-                LucideIcon(systemImage)
+            HStack(spacing: Spacing.xSmall) {
+                LucideIcon(systemImage, size: IconSize.caption)
                 Text(title)
-                    .lineLimit(1)
-                LucideIcon("xmark", size: 12)
-                    .foregroundStyle(.secondary)
+                LucideIcon("xmark", size: IconSize.chipAccessory)
             }
-            .font(.subheadline.weight(.semibold))
-            .padding(.horizontal, 12)
-            .frame(minHeight: 44)
-            .background(Color.accentColor.opacity(0.12), in: .capsule)
-            .contentShape(.capsule)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.chip(selected: true))
         .accessibilityLabel("Remove \(title) filter")
     }
 }
@@ -724,11 +742,12 @@ struct ExploreFilterButtonLabel: View {
     let activeFilterCount: Int
 
     var body: some View {
-        HStack(spacing: 5) {
-            LucideIcon("line.3.horizontal.decrease")
+        HStack(spacing: Spacing.xSmall) {
+            LucideIcon("line.3.horizontal.decrease", size: IconSize.action)
             if activeFilterCount > 0 {
                 Text(activeFilterCount, format: .number)
-                    .font(.caption.monospacedDigit().weight(.bold))
+                    .font(.badge.monospacedDigit())
+                    .singleLineToken()
             }
         }
     }
@@ -1087,7 +1106,9 @@ struct ExploreGalleryCard: View {
     var onViewArtwork: (() -> Void)?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        // The text styles and gaps here set the cell height in
+        // ExploreGalleryCollection; change both together.
+        VStack(alignment: .leading, spacing: Spacing.small) {
             ExploreCircleArtwork(
                 circle: circle,
                 model: model,
@@ -1095,28 +1116,26 @@ struct ExploreGalleryCard: View {
             )
 
             if detail != .artworkOnly {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                     // Narrow cards drop the pen name first; the space code is
                     // what an attendee needs to walk to the circle.
                     if detail == .full {
                         Text(circle.penName ?? " ")
-                            .font(.caption2)
+                            .font(.meta)
                             .foregroundStyle(.secondary)
                             .lineLimit(1, reservesSpace: true)
                             .opacity(circle.penName == nil ? 0 : 1)
                     }
 
+                    // One line by design: the grid cell has a fixed height.
                     Text(circle.displayName)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                         .truncationMode(.tail)
 
-                    HStack(spacing: 6) {
-                        Text(circle.spaceLabel)
-                            .font(.caption.monospaced().weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                    HStack(spacing: Spacing.xSmall) {
+                        ExploreSpaceLabel(circle: circle)
                             .layoutPriority(1)
 
                         Spacer(minLength: 0)
@@ -1197,34 +1216,14 @@ private struct ExploreList<Header: View>: View {
                 header
 
                 ForEach(circles) { circle in
-                    Button {
-                        onSelect(circle)
-                    } label: {
-                        HStack(spacing: 12) {
-                            ExploreCircleRow(
-                                circle: circle,
-                                model: model,
-                                favoriteColorLabels: favoriteColorLabels
-                            )
-
-                            LucideIcon("chevron.forward")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                                .accessibilityHidden(true)
-                        }
-                        .padding(.horizontal, ExploreLayoutMetrics.horizontalContentInset)
-                        .padding(.vertical, 8)
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(CircleListRowButtonStyle())
-                    .highPriorityGesture(
-                        LongPressGesture(minimumDuration: 0.45)
-                            .onEnded { _ in openLightbox(circle) }
+                    ExploreCircleListRow(
+                        circle: circle,
+                        model: model,
+                        favoriteColorLabels: favoriteColorLabels,
+                        accessibilityIdentifier: "explore-list-circle-\(circle.id)",
+                        onSelect: { onSelect(circle) },
+                        onLongPress: { openLightbox(circle) }
                     )
-                    .accessibilityIdentifier("explore-list-circle-\(circle.id)")
-
-                    Divider()
-                        .padding(.leading, ExploreLayoutMetrics.horizontalContentInset + artworkWidth + 12)
                 }
             }
         }
@@ -1240,13 +1239,66 @@ private struct ExploreList<Header: View>: View {
         }
     }
 
-    @ScaledMetric(relativeTo: .body)
-    private var artworkWidth = ExploreLayoutMetrics.listArtworkWidth
-
     private func openLightbox(_ circle: ExploreCircle) {
         lightboxController.present(circle: circle) {
             await model.fullCoverImage(for: circle)
         }
+    }
+}
+
+/// One tappable circle row with its divider, shared by the Explore list and
+/// the tag pages, so both lists have one press style and one divider inset.
+struct ExploreCircleListRow: View {
+    let circle: ExploreCircle
+    let model: ExploreModel
+    let favoriteColorLabels: [BookmarkColor: String]
+    let accessibilityIdentifier: String
+    let onSelect: () -> Void
+    let onLongPress: () -> Void
+
+    @ScaledMetric(relativeTo: .body)
+    private var artworkWidth = ExploreLayoutMetrics.listArtworkWidth
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: Spacing.medium) {
+                ExploreCircleRow(
+                    circle: circle,
+                    model: model,
+                    favoriteColorLabels: favoriteColorLabels
+                )
+
+                LucideIcon("chevron.forward", size: IconSize.caption)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, horizontalInset)
+            .padding(.vertical, Spacing.small)
+            .contentShape(.rect)
+        }
+        .buttonStyle(CircleListRowButtonStyle())
+        .highPriorityGesture(
+            LongPressGesture(minimumDuration: 0.45)
+                .onEnded { _ in onLongPress() }
+        )
+        .accessibilityIdentifier(accessibilityIdentifier)
+
+        Divider()
+            .padding(.leading, dividerInset)
+    }
+
+    private var horizontalInset: CGFloat {
+        ExploreLayoutMetrics.horizontalContentInset(for: horizontalSizeClass)
+    }
+
+    /// The divider starts under the text column. At accessibility sizes the
+    /// artwork sits above the text, so the divider starts at the gutter.
+    private var dividerInset: CGFloat {
+        dynamicTypeSize.isAccessibilitySize
+            ? horizontalInset
+            : horizontalInset + artworkWidth + Spacing.medium
     }
 }
 
@@ -1258,9 +1310,18 @@ struct ExploreCircleRow: View {
     @ScaledMetric(relativeTo: .body)
     private var artworkWidth = ExploreLayoutMetrics.listArtworkWidth
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    /// Side by side normally; at accessibility sizes the artwork goes above
+    /// the text, so the name keeps the full row width.
+    private var rowLayout: AnyLayout {
+        dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.small))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: Spacing.medium))
+    }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        rowLayout {
             ExploreCircleArtwork(
                 circle: circle,
                 model: model,
@@ -1272,25 +1333,21 @@ struct ExploreCircleRow: View {
             )
                 .frame(width: artworkWidth)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: Spacing.xSmall) {
                 if let penName = circle.penName {
                     Text(penName)
-                        .font(.caption2)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
 
                 Text(circle.displayName)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.rowTitle)
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    .wrapsFully()
 
-                HStack(spacing: 6) {
-                    Text(circle.spaceLabel)
-                        .font(.caption.monospaced().weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                HStack(spacing: Spacing.xSmall) {
+                    ExploreSpaceLabel(circle: circle)
                         .layoutPriority(1)
 
                     Spacer(minLength: 0)
@@ -1304,14 +1361,15 @@ struct ExploreCircleRow: View {
                 }
                 .frame(minHeight: FavoriteColorLabelMetrics.baseHeight)
 
+                // A preview of longer data: two lines, then an ellipsis.
                 if !circle.tags.isEmpty {
                     Text(circle.tags.prefix(3).map { "#\($0)" }.joined(separator: "  "))
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(Color.accentColor)
                         .lineLimit(2)
                 } else if let description = circle.description {
                     Text(description)
-                        .font(.caption)
+                        .font(.meta)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
@@ -1319,6 +1377,25 @@ struct ExploreCircleRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// The short space address ("West あ01a") as one unit that never breaks.
+/// A narrow gallery card drops the hall and keeps the code ("あ01a").
+/// Proportional kana with monospaced digits: `.monospaced()` put the kana in
+/// a fallback CJK face and opened a gap before the digits.
+struct ExploreSpaceLabel: View {
+    let circle: ExploreCircle
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            Text(nonBreaking: circle.spaceLabel)
+                .lineLimit(1)
+            Text(nonBreaking: circle.spaceCode)
+                .lineLimit(1)
+        }
+        .font(.meta.monospacedDigit().weight(.semibold))
+        .foregroundStyle(.secondary)
     }
 }
 
@@ -1356,8 +1433,7 @@ struct ExploreCircleArtwork: View {
                         // The plain fill is the loading state; only a failed
                         // load gets a glyph.
                         if didFinishLoading {
-                            LucideIcon("photo.badge.exclamationmark")
-                                .font(.title2)
+                            LucideIcon("photo.badge.exclamationmark", size: IconSize.action)
                                 .foregroundStyle(.tertiary)
                         }
                     }
@@ -1368,11 +1444,17 @@ struct ExploreCircleArtwork: View {
             contentMode: .fit
         )
         .compositingGroup()
-        .clipShape(.rect(cornerRadius: 10))
+        .clipShape(.rect(cornerRadius: Radius.small, style: .continuous))
+        .overlay {
+            // Every tile gets the hairline edge, so a white circle cut keeps
+            // its outline on the black background in dark mode.
+            RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
+                .strokeBorder(Color.hairline, lineWidth: 0.5)
+        }
         .overlay {
             switch borderStyle {
             case .favorite(let color):
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: Radius.small, style: .continuous)
                     .strokeBorder(color.swiftUIColor, lineWidth: 2)
             case .none:
                 EmptyView()
@@ -1380,12 +1462,11 @@ struct ExploreCircleArtwork: View {
         }
         .overlay(alignment: .topTrailing) {
             if isShowingShinagaki {
-                LucideIcon("doc.richtext.fill")
-                    .font(.caption2.weight(.bold))
+                LucideIcon("doc.richtext.fill", size: IconSize.caption)
                     .foregroundStyle(Color.onAccentFill)
-                    .frame(width: 24, height: 24)
+                    .padding(Spacing.xSmall)
                     .background(Color.accentFill, in: .circle)
-                    .padding(6)
+                    .padding(Spacing.small)
                     .accessibilityHidden(true)
             }
         }
