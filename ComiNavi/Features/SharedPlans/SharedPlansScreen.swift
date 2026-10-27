@@ -412,7 +412,7 @@ struct SharedPlansScreen: View {
 
 /// The tab root when no active plan exists. It explains what a Shared Plan is
 /// and leads with one labeled primary action: Sign in when signed out, Create
-/// otherwise.
+/// otherwise. Join is the secondary action.
 private struct SharedPlanEmptyHome: View {
     let comiketNo: Int?
     let isSignedIn: Bool
@@ -423,132 +423,66 @@ private struct SharedPlanEmptyHome: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                if let comiketNo {
-                    Text("Plans for C\(comiketNo)")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.bottom, 6)
-                }
+            VStack(alignment: .leading, spacing: Spacing.sectionGap) {
+                VStack(alignment: .leading, spacing: Spacing.small) {
+                    Text("Shop the event together")
+                        .font(.sectionTitle)
+                        .accessibilityAddTraits(.isHeader)
 
-                Text("Shop the event together")
-                    .font(.title2.bold())
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Group {
-                    if let comiketNo {
-                        Text("A Shared Plan is a shopping list of circles for C\(comiketNo). Everyone in the plan can add circles, ask for items, and mark what they bought.")
-                    } else {
-                        Text("A Shared Plan is a shopping list of circles that you and your friends edit together. Everyone in the plan can add circles, ask for items, and mark what they bought.")
+                    Group {
+                        if let comiketNo {
+                            Text("A Shared Plan is a shopping list of circles for C\(comiketNo). Everyone in the plan can add circles, ask for items, and mark what they bought.")
+                        } else {
+                            Text("A Shared Plan is a shopping list of circles that you and your friends edit together. Everyone in the plan can add circles, ask for items, and mark what they bought.")
+                        }
                     }
+                    .font(.body)
+                    .foregroundStyle(.secondary)
                 }
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 8)
+                .wrapsFully()
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: Spacing.medium) {
                     if isSignedIn {
-                        SharedPlanHomeActionButton(
-                            title: "Create a plan",
-                            subtitle: "Start a new list, then invite friends.",
-                            icon: "plus",
-                            isProminent: true,
-                            action: onCreate
-                        )
+                        Button(action: onCreate) {
+                            LucideLabel("Create a plan", icon: "plus")
+                        }
+                        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
                         .disabled(createUnavailableReason != nil)
                         .accessibilityIdentifier("shared-plan-create-button")
 
                         if let createUnavailableReason {
-                            Label {
-                                Text(createUnavailableReason)
-                            } icon: {
-                                LucideIcon("info", size: 15)
-                            }
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("shared-plan-create-unavailable-reason")
+                            InlineBanner(Text(createUnavailableReason), icon: "info.circle", tone: .info)
+                                .accessibilityIdentifier("shared-plan-create-unavailable-reason")
                         }
                     } else if let onSignIn {
-                        SharedPlanHomeActionButton(
-                            title: "Sign in",
-                            subtitle: "Sign in to ComiNavi to create or join a plan.",
-                            icon: "circle-user",
-                            isProminent: true,
-                            action: onSignIn
-                        )
+                        Button(action: onSignIn) {
+                            LucideLabel("Sign in", icon: "circle-user")
+                        }
+                        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
                         .accessibilityIdentifier("shared-plan-sign-in-button")
                     } else {
                         Text("Sign in from the Profile tab to create or join a plan.")
-                            .font(.callout)
+                            .font(.rowSubtitle)
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .wrapsFully()
                             .accessibilityIdentifier("shared-plan-sign-in-hint")
                     }
 
-                    SharedPlanHomeActionButton(
-                        title: "Join with an invite link",
-                        subtitle: "Paste a link that a friend sent you.",
-                        icon: "users",
-                        isProminent: false,
-                        action: onJoin
-                    )
+                    Button(action: onJoin) {
+                        LucideLabel("Join with an invite link", icon: "users")
+                    }
+                    .buttonStyle(ActionButtonStyle(role: .secondary, size: .large))
                     .accessibilityIdentifier("shared-plan-join-button")
                 }
-                .padding(.top, 24)
             }
-            // A readable column on iPad, on the same leading edge as the
-            // navigation title instead of centered in empty space.
-            .frame(maxWidth: 540, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            // The same centered readable column as the Profile tab on iPad.
+            .readableWidth(ReadableWidth.form)
+            .padding(.horizontal, Spacing.screenGutter)
+            .padding(.vertical, Spacing.large)
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .accessibilityElement(children: .contain)
-    }
-}
-
-/// A full-width action with a visible subtitle. The prominent style is the
-/// lime fill behind dark text; the other style is a plain grouped surface.
-private struct SharedPlanHomeActionButton: View {
-    let title: LocalizedStringKey
-    let subtitle: LocalizedStringKey
-    let icon: String
-    let isProminent: Bool
-    let action: () -> Void
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: Spacing.iconToText) {
-                LucideIcon(icon, size: IconSize.action)
-                    .foregroundStyle(isProminent ? Color.onAccentFill : Color.accentColor)
-                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
-                    Text(title)
-                        .font(.rowTitle)
-                    Text(subtitle)
-                        .font(.rowSubtitle)
-                        .foregroundStyle(isProminent ? Color.onAccentFill.opacity(0.8) : Color.secondary)
-                }
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .foregroundStyle(isProminent ? Color.onAccentFill : Color.primary)
-            .padding(Spacing.cardPadding)
-            .frame(maxWidth: .infinity, minHeight: 64)
-            .background(
-                isProminent
-                    ? Color.accentFill
-                    : Color(uiColor: .secondarySystemGroupedBackground),
-                in: .rect(cornerRadius: Radius.card, style: .continuous)
-            )
-            .contentShape(.rect(cornerRadius: Radius.card, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .opacity(isEnabled ? 1 : 0.5)
     }
 }
 
