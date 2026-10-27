@@ -330,7 +330,7 @@ private struct VenueSelectionScreen: View {
             .padding(.bottom, Spacing.xxxLarge)
             .readableWidth()
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(purpose.flowTitle)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -456,7 +456,7 @@ private struct CharacterSelectionScreen: View {
             .padding(.bottom, Spacing.xxxLarge)
             .frame(maxWidth: .infinity)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(venue.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -812,7 +812,7 @@ private struct NumberSelectionScreen: View {
             .accessibilityHint(completionHint)
             .accessibilityIdentifier(purpose.actionIdentifier)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Block \(character)")
         .navigationBarTitleDisplayMode(.inline)
     }

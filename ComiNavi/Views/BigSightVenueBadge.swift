@@ -54,7 +54,11 @@ struct BigSightVenueBadge: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .padding(side * 0.12)
+                    // The modifier on the GeometryReader alone did not hide
+                    // the glyph texts inside a button label.
+                    .accessibilityHidden(true)
                 }
+                .accessibilityHidden(true)
                 .frame(width: side, height: side)
                 .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
             }

@@ -179,18 +179,21 @@ struct InlineBanner: View {
     }
 
     var body: some View {
-        // `Label` centers the icon on the first line of a wrapped message.
-        Label {
+        // An HStack, not a `Label`: the label style gave the title less than
+        // the card width, so the message wrapped early and left an empty
+        // right side. The icon sits on the first line of the message.
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.iconToText) {
+            LucideIcon(icon, size: IconSize.inline)
+                .foregroundStyle(tone == .warning ? Color.orange : Color.secondary)
             message
                 .font(.rowSubtitle)
                 .foregroundStyle(.secondary)
                 .wrapsFully()
                 .frame(maxWidth: .infinity, alignment: .leading)
-        } icon: {
-            LucideIcon(icon, size: IconSize.inline)
-                .foregroundStyle(tone == .warning ? Color.orange : Color.secondary)
+                .layoutPriority(1)
         }
         .font(.rowSubtitle)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .surface(.card)
         .accessibilityElement(children: .combine)
     }
