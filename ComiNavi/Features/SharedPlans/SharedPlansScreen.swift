@@ -871,7 +871,7 @@ struct SharedPlanListUITestSurface: View {
     private let plans = [
         SharedPlan(
             id: Self.planID,
-            name: "Shopping list",
+            name: String(localized: "Shopping list"),
             comiketNo: 108,
             ownership: .owned,
             role: .owner,
@@ -883,7 +883,7 @@ struct SharedPlanListUITestSurface: View {
         ),
         SharedPlan(
             id: Self.secondPlanID,
-            name: "Travel team",
+            name: String(localized: "Travel team"),
             comiketNo: 108,
             ownership: .joined,
             role: .editor,
