@@ -476,7 +476,7 @@ private struct ToolboxQuickAccess: View {
             Link(destination: ComiketToolboxCatalog.venueMapsURL) {
                 ToolboxActionRow(
                     title: "Transit to Tokyo Big Sight",
-                    detail: "Open current public-transit directions in Maps.",
+                    detail: "Public-transit directions in Maps.",
                     icon: "navigation",
                     accessory: .externalLink
                 )
@@ -498,7 +498,7 @@ private struct ToolboxQuickAccess: View {
             } label: {
                 ToolboxActionRow(
                     title: copiedVenue ? "Venue copied" : "Copy venue and map link",
-                    detail: "Copies the address and an Apple Maps link.",
+                    detail: "Copies the address and a Maps link.",
                     icon: copiedVenue ? "check" : "copy",
                     accessory: .none
                 )
@@ -522,29 +522,40 @@ private struct ToolboxActionRow: View {
     let accessory: Accessory
 
     var body: some View {
-        HStack(spacing: 13) {
-            LucideIcon(icon, size: 20)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 28)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
+        ToolboxIconRow(icon: icon, textStyle: .headline) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                ToolboxRowTitle(title: Text(title), opensExternally: accessory == .externalLink)
                 Text(detail)
-                    .font(.caption)
+                    .font(.rowSubtitle)
                     .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 8)
-
-            if accessory == .externalLink {
-                LucideIcon("external-link", size: 14)
-                    .foregroundStyle(.tertiary)
+                    .wrapsFully()
             }
         }
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A row title with an optional external-link glyph on its first line. The
+/// glyph sits after the title instead of in a trailing column, so the subtitle
+/// below can use the full width of the row.
+private struct ToolboxRowTitle: View {
+    let title: Text
+    let opensExternally: Bool
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.xSmall) {
+            title
+                .font(.rowTitle)
+                .foregroundStyle(.primary)
+                .wrapsFully()
+                .layoutPriority(1)
+
+            if opensExternally {
+                LucideIcon("external-link", size: IconSize.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 }
 
@@ -562,27 +573,23 @@ private struct ToolboxChecklistSection: View {
                 Button {
                     store.setCompleted(!isCompleted, for: item)
                 } label: {
-                    HStack(alignment: .top, spacing: 12) {
-                        LucideIcon(item.icon, size: 18)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 24, height: 24)
-
-                        VStack(alignment: .leading, spacing: 2) {
+                    // The check circle leads, like Reminders, and is the only icon, so
+                    // titles and details keep the full row width before they wrap.
+                    ToolboxIconRow(
+                        icon: isCompleted ? "checkmark.circle.fill" : "circle",
+                        iconStyle: isCompleted ? Color.accentColor : Color.secondary,
+                        textStyle: .body
+                    ) {
+                        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                             Text(item.title)
                                 .font(.body)
+                                .foregroundStyle(.primary)
+                                .wrapsFully()
                             Text(item.detail)
-                                .font(.caption)
+                                .font(.rowSubtitle)
                                 .foregroundStyle(.secondary)
+                                .wrapsFully()
                         }
-
-                        Spacer(minLength: 12)
-
-                        LucideIcon(
-                            isCompleted ? "checkmark.circle.fill" : "circle",
-                            size: 22
-                        )
-                        .foregroundStyle(isCompleted ? Color.accentColor : Color.secondary)
-                        .accessibilityHidden(true)
                     }
                     .contentShape(.rect)
                 }
@@ -615,32 +622,22 @@ private struct ToolboxResourceRow: View {
     let resource: ComiketToolboxResource
 
     var body: some View {
-        HStack(alignment: .top, spacing: 13) {
-            LucideIcon(resource.icon, size: 19)
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 28, height: 28)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(resource.title)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.primary)
+        ToolboxIconRow(icon: resource.icon, textStyle: .headline) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                ToolboxRowTitle(title: Text(resource.title), opensExternally: true)
 
                 Text(resource.summary)
-                    .font(.caption)
+                    .font(.rowSubtitle)
                     .foregroundStyle(.secondary)
+                    .wrapsFully()
 
                 Text(resource.authority.label)
-                    .font(.caption2.weight(.medium))
+                    .font(.meta)
                     .foregroundStyle(.secondary)
+                    .wrapsFully()
+                    .padding(.top, Spacing.xxSmall)
             }
-
-            Spacer(minLength: 6)
-
-            LucideIcon("external-link", size: 14)
-                .foregroundStyle(.tertiary)
-                .padding(.top, 3)
         }
-        .padding(.vertical, 3)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens in browser")
