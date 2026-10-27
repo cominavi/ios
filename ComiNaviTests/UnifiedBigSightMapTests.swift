@@ -111,7 +111,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
             )
         }
 
-        func update(searchActive: Bool) {
+        @MainActor func update(searchActive: Bool) {
             renderer.update(
                 campus: campus,
                 scope: .campus,
