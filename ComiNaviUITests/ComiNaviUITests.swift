@@ -431,7 +431,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-ui-testing-shinagaki-lightbox")
         app.launch()
 
-        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let lightbox = app.scrollViews["shinagaki-lightbox"]
         let firstPage = app.images["Test Shinagaki page 1"]
         let secondPage = app.images["Test Shinagaki page 2"]
         let shareButton = app.buttons["shinagaki-lightbox-share"]
@@ -495,7 +495,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertEqual(secondPreview.label, "Image 2 of 2: UI test Shinagaki")
         secondPreview.tap()
 
-        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let lightbox = app.scrollViews["shinagaki-lightbox"]
         let pageIndicator = app.descendants(matching: .any)[
             "shinagaki-lightbox-page-indicator"
         ]
@@ -513,7 +513,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-ui-testing-shinagaki-lightbox")
         app.launch()
 
-        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let lightbox = app.scrollViews["shinagaki-lightbox"]
         let secondPage = app.images["Test Shinagaki page 2"]
         XCTAssertTrue(lightbox.waitForExistence(timeout: 5))
         lightbox.swipeLeft()
@@ -1401,7 +1401,7 @@ final class ComiNaviUITests: XCTestCase {
             XCTAssertTrue(target.isHittable)
             target.press(forDuration: 0.7)
 
-            let lightboxes = app.collectionViews.matching(
+            let lightboxes = app.scrollViews.matching(
                 identifier: "shinagaki-lightbox"
             )
             let lightbox = lightboxes.firstMatch
@@ -1504,7 +1504,7 @@ final class ComiNaviUITests: XCTestCase {
 
         firstCircle.press(forDuration: 0.7)
 
-        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let lightbox = app.scrollViews["shinagaki-lightbox"]
         XCTAssertTrue(lightbox.waitForExistence(timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["circle-detail-screen"].exists)
 

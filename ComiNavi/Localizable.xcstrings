@@ -2085,34 +2085,6 @@
         }
       }
     },
-    "Open a hall to show genre colors." : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ホールを開くとジャンルの色分けを表示できます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "홀을 열면 장르 색상을 표시할 수 있습니다."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "打开展馆即可显示类型颜色"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "開啟展館即可顯示類型顏色"
-          }
-        }
-      }
-    },
     "Public-transit directions in Maps." : {
       "localizations" : {
         "ja" : {
@@ -2137,6 +2109,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在地圖中開啟公共交通路線"
+          }
+        }
+      }
+    },
+    "Shopping list" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "買い物リスト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "쇼핑 목록"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "购物清单"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "購物清單"
           }
         }
       }
@@ -2277,6 +2277,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這些是根據公開資訊自動推算的結果。請先確認原始貼文和攤位配置，再據此判斷"
+          }
+        }
+      }
+    },
+    "Travel team" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遠征チーム"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원정 팀"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "远征小队"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遠征小隊"
           }
         }
       }
@@ -9569,7 +9597,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "会場住所と地図リンクをコピー"
+            "value" : "住所と地図リンクをコピー"
           }
         },
         "ko" : {
@@ -14471,34 +14499,6 @@
         }
       }
     },
-    "Favorites" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "お気に入り"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "즐겨찾기"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "收藏"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "收藏"
-          }
-        }
-      }
-    },
     "Favorites aren't available for this circle." : {
       "localizations" : {
         "ja" : {
@@ -15385,7 +15385,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "入退場口・飲食・案内"
+            "value" : "入場・飲食・案内"
           }
         },
         "ko" : {
@@ -15413,7 +15413,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "入退場口・飲食・案内・コスプレ"
+            "value" : "入場・飲食・案内・コスプレ"
           }
         },
         "ko" : {

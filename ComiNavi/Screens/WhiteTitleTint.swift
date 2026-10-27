@@ -9,10 +9,7 @@ extension Color {
     /// and white text on lime is not legible. This color keeps the
     /// light-mode olive (and its high-contrast variant) in both appearances.
     static let whiteTitleTint = Color(uiColor: UIColor { traits in
-        let lightTraits = UITraitCollection(traitsFrom: [
-            traits,
-            UITraitCollection(userInterfaceStyle: .light),
-        ])
+        let lightTraits = traits.modifyingTraits { $0.userInterfaceStyle = .light }
         return (UIColor(named: "AccentColor") ?? .systemGreen)
             .resolvedColor(with: lightTraits)
     })

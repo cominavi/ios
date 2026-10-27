@@ -95,7 +95,7 @@ final class ComiNaviAdaptiveLayoutTests: XCTestCase {
         defer { XCUIDevice.shared.orientation = .portrait }
         let first = app.images["Test Shinagaki page 1"]
         XCTAssertTrue(first.waitForExistence(timeout: 10))
-        app.collectionViews["shinagaki-lightbox"].swipeLeft()
+        app.scrollViews["shinagaki-lightbox"].swipeLeft()
         let second = app.images["Test Shinagaki page 2"]
         XCTAssertTrue(second.waitForExistence(timeout: 5))
         for orientation: UIDeviceOrientation in [.landscapeLeft, .portrait, .landscapeRight] {
