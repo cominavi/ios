@@ -441,8 +441,10 @@ private struct ToolboxNoEditionNote: View {
 }
 
 /// A hub row: a leading icon, a title that wraps, and an optional trailing
-/// accessory such as a count. The accessory stays on the first line and never
-/// wraps, so the row keeps one layout at every text size.
+/// accessory such as a count. The accessory sits next to the title while the
+/// title fits on one line beside it. When it does not (long translations,
+/// accessibility sizes), the accessory moves under the title as a `Font.meta`
+/// line, so the title gets the full width and never breaks inside a word.
 private struct ToolboxHubRow<Accessory: View>: View {
     let title: LocalizedStringResource
     let icon: String
@@ -450,12 +452,23 @@ private struct ToolboxHubRow<Accessory: View>: View {
 
     var body: some View {
         IconRow(icon: icon, textStyle: .body) {
-            HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
-                Text(title)
-                    .wrapsFully()
-                    .layoutPriority(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                accessory
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
+                    Text(title)
+                        .wrapsFully()
+                        .layoutPriority(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    accessory
+                }
+
+                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                    Text(title)
+                        .wrapsFully()
+                    accessory
+                        .font(.meta)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
