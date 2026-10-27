@@ -734,6 +734,7 @@ private struct MapControlPanel: View {
     let onGoToSpace: () -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.small) {
@@ -748,20 +749,22 @@ private struct MapControlPanel: View {
         )
     }
 
-    /// One row when the day selector, with every status, and the map tools
-    /// fit side by side (iPhone landscape); two rows otherwise (iPhone
+    /// One row in iPhone landscape, where the day selector, with every
+    /// status, and the map tools fit side by side; two rows otherwise (iPhone
     /// portrait, iPad). The tools are the same in every scope and the day
     /// selector never drops a status, so opening a hall does not reflow the
     /// chrome or change what the day selector shows.
+    ///
+    /// The choice comes from the size classes, not from `ViewThatFits`. On
+    /// iOS 27 a `ViewThatFits` around this bar, which holds menus and its own
+    /// row-or-column choice, measured its variants without end and kept the
+    /// main thread busy on launch.
     @ViewBuilder
     private var selectors: some View {
-        if horizontalSizeClass == .regular {
-            stackedSelectors
+        if horizontalSizeClass == .compact, verticalSizeClass == .compact {
+            singleRowSelectors
         } else {
-            ViewThatFits(in: .horizontal) {
-                singleRowSelectors
-                stackedSelectors
-            }
+            stackedSelectors
         }
     }
 
@@ -1062,24 +1065,28 @@ private struct MapSelectorBar: View {
     let model: MapScreenModel
     @Binding var visibleMapLayers: Set<BigSightMapLayer>
 
-    var body: some View {
-        // The hall selector and the tools share a row while the hall name
-        // fits on one line. At large text sizes, the selector takes its own
-        // full-width row and the tools move to the row below, so the hall
-        // name does not truncate.
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: Spacing.small) {
-                venueMenu
-                Spacer(minLength: 0)
-                tools
-            }
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    var body: some View {
+        // The hall selector and the tools share a row up to XXXL; hall names
+        // are short ("West 1–2", "東7ホール"), so they fit beside three 44 pt
+        // tools. At accessibility sizes, the selector takes its own
+        // full-width row and the tools move to the row below, so the hall
+        // name does not truncate. This is a fixed choice, not a
+        // `ViewThatFits`: see `MapControlPanel.selectors`.
+        if dynamicTypeSize.isAccessibilitySize {
             VStack(alignment: .leading, spacing: Spacing.small) {
                 venueMenu
                 HStack(spacing: Spacing.small) {
                     Spacer(minLength: 0)
                     tools
                 }
+            }
+        } else {
+            HStack(spacing: Spacing.small) {
+                venueMenu
+                Spacer(minLength: 0)
+                tools
             }
         }
     }
@@ -1131,9 +1138,9 @@ private struct MapSelectorBar: View {
                 )
             }
             .buttonStyle(.plain)
+            // MapChromeIconLabel dims only the glyph when disabled, so the
+            // button keeps its surface beside the other tools.
             .disabled(!isGenreOverlayAvailable)
-            // A plain button does not dim when disabled.
-            .opacity(isGenreOverlayAvailable ? 1 : 0.45)
             .accessibilityLabel(
                 isGenreOverlayAvailable && model.showsGenreOverlay
                     ? "Hide genre overlay" : "Show genre overlay"

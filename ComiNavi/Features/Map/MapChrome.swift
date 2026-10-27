@@ -54,15 +54,24 @@ struct MapChromeIconLabel: View {
     let icon: String
     var isActive = false
 
+    @Environment(\.isEnabled) private var isEnabled
+
     var body: some View {
         LucideIcon(icon, size: IconSize.inline)
             // The circle keeps a fixed 44 pt size over the map, so the glyph
             // stops growing at XXXL and keeps its inset at accessibility sizes.
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-            .foregroundStyle(isActive ? Color.accentColor : Color.primary)
+            // A disabled control dims its glyph and keeps its full surface,
+            // so it still reads as a button in the tool row.
+            .foregroundStyle(glyphStyle)
             .frame(width: HitArea.minimum, height: HitArea.minimum)
             .mapChromeSurface(.circle)
             .contentShape(.circle)
+    }
+
+    private var glyphStyle: AnyShapeStyle {
+        if !isEnabled { return AnyShapeStyle(.tertiary) }
+        return isActive ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary)
     }
 }
 
