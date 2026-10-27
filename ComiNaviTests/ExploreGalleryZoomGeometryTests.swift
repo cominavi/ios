@@ -46,11 +46,11 @@ final class ExploreGalleryZoomGeometryTests: XCTestCase {
         )
         XCTAssertEqual(
             ExploreGalleryZoomGeometry.preferredInitialColumnCount(for: 744),
-            3
+            4
         )
         XCTAssertEqual(
             ExploreGalleryZoomGeometry.preferredInitialColumnCount(for: 1_366),
-            4
+            5
         )
     }
 

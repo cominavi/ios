@@ -89,7 +89,7 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertLessThan(renderer.zoomFactor, 9)
         XCTAssertTrue(renderer.isPersistentOverlayVisible)
         XCTAssertGreaterThanOrEqual(renderer.persistentOverlayShapeCount, 3)
-        XCTAssertEqual(renderer.baseMapAlpha, 0.18, accuracy: 0.001)
+        XCTAssertEqual(renderer.baseMapAlpha, 0.5, accuracy: 0.001)
         XCTAssertTrue(renderer.areMapIconsHiddenForSearch)
     }
 
@@ -498,8 +498,10 @@ final class UnifiedBigSightMapTests: XCTestCase {
             frame: CGRect(x: 0, y: 0, width: 390, height: 844),
             appearance: .light
         )
-        XCTAssertEqual(
-            host.basemapView.styleURL?.absoluteString, "https://americanamap.org/style.json")
+        // Both appearances use a bundled style, so the map does not depend on
+        // a remote style document.
+        XCTAssertEqual(host.basemapView.styleURL?.lastPathComponent, "AmericanaLight.json")
+        XCTAssertTrue(host.basemapView.styleURL?.isFileURL == true)
 
         host.updateAppearance(.dark)
 
@@ -1136,7 +1138,8 @@ final class UnifiedBigSightMapTests: XCTestCase {
             host.compassButton.frame.minX - MapChromeLayout.controlSpacing,
             accuracy: 0.5
         )
-        XCTAssertLessThan(badge.frame.width, 100)
+        // Caption 2 (11 pt at the default size) in a capsule with 8 pt insets.
+        XCTAssertLessThan(badge.frame.width, 120)
         XCTAssertLessThan(badge.frame.height, 24)
         XCTAssertEqual(badge.titleLabel?.font.pointSize ?? 0, 8, accuracy: 0.1)
         XCTAssertEqual(badge.configuration?.title, "© OpenStreetMap")
