@@ -1118,9 +1118,10 @@ private struct MapSelectorBar: View {
         .accessibilityIdentifier("map-venue-selector")
     }
 
-    /// The same tools in every scope, so the chrome does not reflow when the
-    /// attendee opens a hall. Genre colors exist only inside a hall; on the
-    /// campus the button stays in place and is disabled.
+    /// Layers and search in every scope. The genre overlay exists only
+    /// inside a hall, so its button shows only there. A disabled glass
+    /// circle on the campus read as a faint gap in the row. The HStack keeps
+    /// one `Spacing.small` gap between the buttons that show.
     private var tools: some View {
         HStack(spacing: Spacing.small) {
             MapLayerMenu(
@@ -1129,26 +1130,18 @@ private struct MapSelectorBar: View {
                 visibleMapLayers: $visibleMapLayers
             )
 
-            Button {
-                model.toggleGenreOverlay()
-            } label: {
-                MapChromeIconLabel(
-                    icon: "paintbrush",
-                    isActive: isGenreOverlayAvailable && model.showsGenreOverlay
+            if isGenreOverlayAvailable {
+                Button {
+                    model.toggleGenreOverlay()
+                } label: {
+                    MapChromeIconLabel(icon: "paintbrush", isActive: model.showsGenreOverlay)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    model.showsGenreOverlay ? "Hide genre overlay" : "Show genre overlay"
                 )
+                .accessibilityIdentifier("map-genre-button")
             }
-            .buttonStyle(.plain)
-            // MapChromeIconLabel dims only the glyph when disabled, so the
-            // button keeps its surface beside the other tools.
-            .disabled(!isGenreOverlayAvailable)
-            .accessibilityLabel(
-                isGenreOverlayAvailable && model.showsGenreOverlay
-                    ? "Hide genre overlay" : "Show genre overlay"
-            )
-            .accessibilityHint(
-                isGenreOverlayAvailable ? Text(verbatim: "") : Text("Open a hall to show genre colors.")
-            )
-            .accessibilityIdentifier("map-genre-button")
 
             Button {
                 model.setSearchPresented(!model.isSearchPresented)
