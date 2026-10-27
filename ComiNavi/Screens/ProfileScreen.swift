@@ -227,9 +227,9 @@ struct ProfileScreen: View {
                         sharedLocationInbox.receiveClipboardText(value)
                     }
                     .buttonBorderShape(.roundedRectangle(radius: Radius.control))
-                    // PasteButton draws white text. Dark olive keeps it legible
-                    // in light and dark mode; lime behind white text does not.
-                    .tint(Color.accentColor)
+                    // PasteButton draws white text on its tint. See
+                    // `Color.whiteTitleTint`.
+                    .tint(Color.whiteTitleTint)
                     // The large size gives the button a 44 pt hit height.
                     .controlSize(.large)
                     .accessibilityIdentifier("profile-paste-shared-location")

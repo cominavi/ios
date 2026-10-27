@@ -746,9 +746,9 @@ private struct SharedPlanJoinSheet: View {
                             submit()
                         }
                     }
-                    // PasteButton draws a white title on its tint. The olive accent
-                    // keeps it legible; lime would put white text on lime.
-                    .tint(Color.accentColor)
+                    // PasteButton draws a white title on its tint. See
+                    // `Color.whiteTitleTint`.
+                    .tint(Color.whiteTitleTint)
                     .labelStyle(.titleAndIcon)
                     .buttonBorderShape(.roundedRectangle(radius: Radius.control))
                     .accessibilityIdentifier("shared-plan-join-paste")
