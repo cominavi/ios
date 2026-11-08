@@ -107,10 +107,7 @@ pnpm exec wrangler d1 execute COMINAVI_DB --local --file seed/c108-realtime.sql 
 ```
 
 The App Review demo catalog is served from the local `cominavi-catalog-downloads`
-R2 bucket by the server route `GET/HEAD /api/v2/review-demo/catalogs/c104/v2/:database`.
-As of 2026-11-09 that route is not on the server's `main` branch yet
-("Serve public App Review demo catalog"); without it the demo download returns
-404 locally. Recreate its two artifacts byte for byte from the files bundled in
+R2 bucket by the server route `GET/HEAD /api/v2/review-demo/catalogs/c104/v2/:database`. Recreate its two artifacts byte for byte from the files bundled in
 this repository (`-n` keeps the gzip output deterministic, so the sizes and
 digests match the app's expectations):
 
