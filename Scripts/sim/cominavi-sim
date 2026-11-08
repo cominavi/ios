@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# Drive the ComiNavi Debug build on an iOS Simulator with simctl + AXe.
+# See docs/simulator-automation.md for the playbook and the iPhone Duo notes.
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/../.." && pwd)"
+
+# Default: the iOS 27.1 iPhone Duo used by the 2026-09 Duo audit.
+udid="${COMINAVI_SIM_UDID:-20F70A8B-0A22-4DC4-BA74-7004FF713400}"
+derived_data="${COMINAVI_SIM_DERIVED_DATA:-${repo_root}/build/SimDerivedData}"
+bundle_id="llc.mikunet.cominavi.debug"
+app_path="${derived_data}/Build/Products/Debug-iphonesimulator/ComiNavi.app"
+# The Duo exposes several framebuffers; display 1 ("LCD", 466x678 pt) is the
+# one that renders. AXe screenshots capture a different, black display.
+display="${COMINAVI_SIM_DISPLAY:-1}"
+shots_dir="${COMINAVI_SIM_SHOTS:-${repo_root}/build/sim-shots}"
+
+axe_bin="${AXE:-$(command -v axe || echo /opt/homebrew/bin/axe)}"
+
+usage() {
+  cat <<'EOF'
+Usage: Scripts/sim/cominavi-sim <command> [args]
+
+  build                    Debug simulator build into build/SimDerivedData
+  boot                     Boot the simulator and wait until it is ready
+  install                  Install the built ComiNavi.app
+  launch [app args...]     Terminate and relaunch (e.g. launch -cominavi-demo-data)
+  terminate                Terminate the app
+  ui [--all]               Flattened accessibility tree (labelled/interactive by default)
+  ui-json                  Raw `axe describe-ui` JSON
+  wait <regex> [seconds]   Poll `ui` until a line matches (default 15 s)
+  tap-label <label> [type] Tap element by accessibility label (waits up to 10 s)
+  tap-id <identifier>      Tap element by accessibility identifier (waits up to 10 s)
+  tap <x> <y>              Tap at point coordinates of the rendering display
+  type <text>              Type US-keyboard text into the focused field
+  swipe <x1> <y1> <x2> <y2> [duration]
+  home                     Press the home button
+  shot <name>              Screenshot display $COMINAVI_SIM_DISPLAY to build/sim-shots/<name>.png
+  appearance <light|dark>  Switch appearance
+  displays                 List the simulator's screens
+  smoke                    build, boot, install, launch with demo data, screenshot
+
+Environment: COMINAVI_SIM_UDID, COMINAVI_SIM_DISPLAY, COMINAVI_SIM_DERIVED_DATA,
+COMINAVI_SIM_SHOTS, AXE.
+EOF
+}
+
+cmd="${1:-}"
+[[ -n "${cmd}" ]] || { usage; exit 64; }
+shift
+
+case "${cmd}" in
+  build)
+    xcodebuild \
+      -project "${repo_root}/ComiNavi.xcodeproj" \
+      -scheme ComiNavi \
+      -configuration Debug \
+      -destination "platform=iOS Simulator,id=${udid}" \
+      -derivedDataPath "${derived_data}" \
+      -skipPackagePluginValidation \
+      -skipMacroValidation \
+      CODE_SIGN_IDENTITY=- \
+      build
+    ;;
+  boot)
+    # `bootstatus -b` boots a shut-down device and waits; it is a no-op when already booted.
+    xcrun simctl bootstatus "${udid}" -b >/dev/null
+    # SpringBoard needs a moment after bootstatus before AXe can attach.
+    for _ in $(seq 1 30); do
+      if "${axe_bin}" describe-ui --udid "${udid}" >/dev/null 2>&1; then exit 0; fi
+      sleep 2
+    done
+    echo "AXe could not attach to ${udid}" >&2
+    exit 1
+    ;;
+  install)
+    [[ -d "${app_path}" ]] || { echo "Missing ${app_path}; run build first" >&2; exit 1; }
+    xcrun simctl install "${udid}" "${app_path}"
+    ;;
+  launch)
+    xcrun simctl terminate "${udid}" "${bundle_id}" 2>/dev/null || true
+    xcrun simctl launch "${udid}" "${bundle_id}" "$@"
+    ;;
+  terminate)
+    xcrun simctl terminate "${udid}" "${bundle_id}"
+    ;;
+  ui)
+    "${axe_bin}" describe-ui --udid "${udid}" | python3 -I "${script_dir}/ax-flatten.py" "$@"
+    ;;
+  ui-json)
+    "${axe_bin}" describe-ui --udid "${udid}"
+    ;;
+  wait)
+    # Poll the flattened tree until a line matches the extended regex.
+    pattern="${1:?wait needs a regex}"
+    timeout="${2:-15}"
+    deadline=$((SECONDS + timeout))
+    while (( SECONDS < deadline )); do
+      if match="$("$0" ui 2>/dev/null | grep -E -m1 -- "${pattern}")"; then
+        echo "${match}"
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "Timed out after ${timeout}s waiting for /${pattern}/" >&2
+    exit 1
+    ;;
+  tap-label)
+    if [[ -n "${2:-}" ]]; then
+      "${axe_bin}" tap --label "$1" --element-type "$2" --wait-timeout 10 --tap-style physical --udid "${udid}"
+    else
+      "${axe_bin}" tap --label "$1" --wait-timeout 10 --tap-style physical --udid "${udid}"
+    fi
+    ;;
+  tap-id)
+    "${axe_bin}" tap --id "$1" --wait-timeout 10 --tap-style physical --udid "${udid}"
+    ;;
+  tap)
+    "${axe_bin}" tap -x "$1" -y "$2" --tap-style physical --udid "${udid}"
+    ;;
+  type)
+    "${axe_bin}" type "$1" --udid "${udid}"
+    ;;
+  swipe)
+    "${axe_bin}" swipe --start-x "$1" --start-y "$2" --end-x "$3" --end-y "$4" \
+      --duration "${5:-0.4}" --udid "${udid}"
+    ;;
+  home)
+    "${axe_bin}" button home --udid "${udid}"
+    ;;
+  shot)
+    mkdir -p "${shots_dir}"
+    out="${shots_dir}/${1:?shot needs a name}.png"
+    xcrun simctl io "${udid}" screenshot --display="${display}" "${out}" >/dev/null 2>&1
+    echo "${out}"
+    ;;
+  appearance)
+    xcrun simctl ui "${udid}" appearance "$1"
+    ;;
+  displays)
+    xcrun simctl io "${udid}" enumerate | grep -E "Screen ID|Name:|Pixel Size|Preferred UI Scale|Power state"
+    ;;
+  smoke)
+    "$0" build
+    "$0" boot
+    "$0" install
+    "$0" launch -cominavi-demo-data
+    sleep 8
+    "$0" shot smoke-launch
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage
+    exit 64
+    ;;
+esac

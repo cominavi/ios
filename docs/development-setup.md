@@ -111,6 +111,11 @@ xcodebuild \
 Substitute an available simulator name; the example is not a required device.
 The sign-in and initial app surfaces can run without production access.
 
+To drive a booted simulator from the command line (install, launch with demo
+data, read the accessibility tree, tap, type, screenshot), use
+`Scripts/sim/cominavi-sim`; see [Simulator automation with AXe](simulator-automation.md),
+including the iPhone Duo limits.
+
 ## Schemes and signing
 
 | Scheme | Use | Service environment | Signing and credentials |
