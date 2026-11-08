@@ -120,9 +120,9 @@ including iPhone Duo input and hinge control through idb.
 
 | Scheme | Use | Service environment | Signing and credentials |
 | --- | --- | --- | --- |
-| `ComiNavi` | Normal development and unit/UI tests | Production Circle.ms and ComiNavi endpoints, with debug analytics delivery disabled | None for Simulator; MikuNet development-team access for a device |
-| `ComiNavi-Staging` | Staging behavior and symbol-upload checks | Circle.ms testing configuration | MikuNet team access for a device; Sentry authentication is recommended |
-| `ComiNavi-TestFlight` | Release archive and App Store Connect distribution | Production | MikuNet team, App Store Connect key, Fastlane, and Sentry authentication |
+| `ComiNavi` | Normal development and unit/UI tests | Production Circle.ms. ComiNavi service `https://cominavi.net` by default, switchable to a local server (see [Local ComiNavi service](local-service.md)). Debug analytics delivery disabled | None for Simulator; MikuNet development-team access for a device |
+| `ComiNavi-Staging` | Staging behavior and symbol-upload checks | Circle.ms testing configuration. ComiNavi service `https://cominavi.net` by default, switchable like Debug | MikuNet team access for a device; Sentry authentication is recommended |
+| `ComiNavi-TestFlight` | Release archive and App Store Connect distribution | Production only. The service origin is fixed at compile time | MikuNet team, App Store Connect key, Fastlane, and Sentry authentication |
 
 All targets use automatic signing and currently name team `F25GFFJL49`. To run
 on a physical device, ask a team administrator to add the developer's Apple ID
