@@ -1,3 +1,5 @@
+#if DEBUG
+// The feature is compiled only into Debug builds.
 @testable import ComiNavi
 import XCTest
 
@@ -200,3 +202,4 @@ private final class RecordingSessionStore: @unchecked Sendable,
         return true
     }
 }
+#endif
