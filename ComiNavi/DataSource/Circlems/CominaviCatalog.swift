@@ -916,7 +916,7 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
                 if receipt.stamp(for: candidate.fileName, sha256: catalog.artifact.sha256)
                     != verifiedFile
                 {
-                    try? recordVerifiedFile(verifiedFile, in: receipt, directory: directory)
+                    try? recordVerifiedFile(verifiedFile, directory: directory)
                 }
                 return CominaviInstalledCatalog(
                     catalog: catalog,
@@ -952,11 +952,22 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         return current
     }
 
+    /// Merges one stamp into the receipt on disk. It re-reads the receipt
+    /// because another install may have saved a newer one while validation
+    /// was suspended, and it never changes which versions are listed.
     private func recordVerifiedFile(
         _ verifiedFile: VerifiedFile,
-        in receipt: InstalledReceipt,
         directory: URL
     ) throws {
+        guard let receipt = loadInstalledReceipt(in: directory) else { return }
+        let listedVersions = [
+            InstalledVersion(fileName: receipt.fileName, catalog: receipt.catalog),
+            receipt.fallback,
+        ].compactMap { $0 }
+        guard listedVersions.contains(where: {
+            $0.fileName == verifiedFile.fileName
+                && $0.catalog.artifact.sha256 == verifiedFile.sha256
+        }) else { return }
         let listedFiles = Set([receipt.fileName, receipt.fallback?.fileName].compactMap { $0 })
         var verified = (receipt.verified ?? []).filter {
             $0.fileName != verifiedFile.fileName && listedFiles.contains($0.fileName)
