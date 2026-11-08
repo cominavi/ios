@@ -1761,6 +1761,18 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
             )
         case .unauthorized(let response):
             throw generatedServiceError(try response.body.json, status: 401)
+        // Keep the status for overload and server failures so the realtime
+        // store can retry them; everything else stays a non-retryable error.
+        case .tooManyRequests(let response):
+            throw generatedServiceError(try response.body.json, status: 429)
+        case .internalServerError(let response):
+            throw generatedServiceError(try response.body.json, status: 500)
+        case .badGateway(let response):
+            throw generatedServiceError(try response.body.json, status: 502)
+        case .serviceUnavailable(let response):
+            throw generatedServiceError(try response.body.json, status: 503)
+        case .undocumented(let statusCode, _) where statusCode >= 500:
+            throw undocumentedGeneratedServiceError(status: statusCode)
         default:
             throw CominaviServiceError.invalidResponse
         }

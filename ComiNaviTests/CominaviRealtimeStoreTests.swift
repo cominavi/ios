@@ -883,7 +883,7 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         XCTAssertEqual(currentRevision, emptyOverlay.revision)
     }
 
-    func testPaginationAdvancesTagRevisionAndPublishesNoPartialState() async throws {
+    func testPaginationCommitsEachPageAndAdvancesTagRevision() async throws {
         let overlay = makeOverlay(
             terms: [
                 CominaviCircleTagTerm(
@@ -931,12 +931,15 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         )
         let revisions = await client.requestedTagRevisions()
         let savesBeforeCompletion = await cache.saveCount()
-        XCTAssertNil(whileFetching)
+        // The first page is a consistent prefix of the log, so it is published
+        // and written to disk before the second page arrives.
+        XCTAssertEqual(whileFetching?.tagLabels, ["初音ミク"])
+        XCTAssertEqual(whileFetching?.withdrawalClaims.count, 1)
         XCTAssertEqual(revisions, [
             CominaviCircleTagOverlay.absentRevision,
             overlay.revision,
         ])
-        XCTAssertEqual(savesBeforeCompletion, 0)
+        XCTAssertEqual(savesBeforeCompletion, 1)
 
         await client.resolveSecondPage(CominaviRealtimeUpdatePage(
             updates: [try update(
@@ -958,7 +961,117 @@ final class CominaviRealtimeStoreTests: XCTestCase {
         let savesAfterCompletion = await cache.saveCount()
         XCTAssertEqual(completed?.tagLabels, ["初音ミク"])
         XCTAssertEqual(completed?.withdrawalClaims.count, 1)
-        XCTAssertEqual(savesAfterCompletion, 1)
+        XCTAssertEqual(savesAfterCompletion, 2)
+    }
+
+    func testTransientFailuresAreRetriedAndCommittedPagesSurviveWhenRetriesRunOut() async throws {
+        let cache = InMemoryRealtimeCacheStore()
+        let client = ScriptedRealtimeFetchingStub(results: [
+            .success(CominaviRealtimeUpdatePage(updates: [try update(
+                cursor: 1,
+                stateKind: "attendance",
+                stateValue: "absent",
+                occurredAt: "2026-08-15T03:00:00Z"
+            )], hasMore: true)),
+            .failure(URLError(.timedOut)),
+            .success(CominaviRealtimeUpdatePage(updates: [try update(
+                cursor: 2,
+                stateKind: "shinagaki",
+                stateValue: "menu",
+                occurredAt: "2026-08-15T03:01:00Z",
+                mediaURL: "https://pbs.twimg.com/media/menu.jpg"
+            )], hasMore: true)),
+            .failure(CominaviServiceError.server(code: "busy", message: "busy", status: 503)),
+            .failure(URLError(.networkConnectionLost)),
+            .failure(URLError(.notConnectedToInternet)),
+        ])
+        let store = CominaviRealtimeStore(
+            client: client,
+            cacheStore: cache,
+            retryDelays: [.zero, .zero],
+            persistInterval: .zero
+        )
+
+        do {
+            try await store.refresh(eventNumber: 108, minimumInterval: 0)
+            XCTFail("The third page never arrives")
+        } catch let error as URLError {
+            XCTAssertEqual(error.code, .notConnectedToInternet)
+        }
+
+        let cursors = await client.requestedCursors()
+        XCTAssertEqual(cursors, [0, 1, 1, 2, 2, 2])
+        let partial = await store.enrichment(eventNumber: 108, publicCircleID: 23_000_001)
+        XCTAssertEqual(partial?.withdrawalClaims.count, 1)
+        XCTAssertEqual(partial?.posts.map(\.id), ["menu"])
+        let saves = await cache.saveCount()
+        XCTAssertEqual(saves, 2)
+
+        // A new process starts from the committed disk state and only asks for
+        // what is still missing.
+        let resumedClient = RealtimeFetchingStub(pages: [
+            CominaviRealtimeUpdatePage(updates: [try update(
+                cursor: 3,
+                stateKind: "presence",
+                stateValue: "closed",
+                occurredAt: "2026-08-15T03:02:00Z"
+            )], hasMore: false),
+        ])
+        let resumedStore = CominaviRealtimeStore(client: resumedClient, cacheStore: cache)
+        try await resumedStore.refresh(eventNumber: 108, minimumInterval: 0)
+        await resumedStore.waitForRevalidation(eventNumber: 108)
+        let resumedCursors = await resumedClient.requestedCursors()
+        XCTAssertEqual(resumedCursors, [2])
+    }
+
+    func testOnlyNetworkAndServerOverloadFailuresAreTransient() {
+        XCTAssertTrue(CominaviRealtimeStore.isTransient(URLError(.timedOut)))
+        XCTAssertTrue(CominaviRealtimeStore.isTransient(URLError(.notConnectedToInternet)))
+        XCTAssertTrue(CominaviRealtimeStore.isTransient(
+            CominaviServiceError.server(code: "x", message: "x", status: 503)
+        ))
+        XCTAssertTrue(CominaviRealtimeStore.isTransient(
+            CominaviServiceError.server(code: "x", message: "x", status: 429)
+        ))
+        XCTAssertFalse(CominaviRealtimeStore.isTransient(URLError(.cancelled)))
+        XCTAssertFalse(CominaviRealtimeStore.isTransient(CancellationError()))
+        XCTAssertFalse(CominaviRealtimeStore.isTransient(CominaviServiceError.invalidResponse))
+        XCTAssertFalse(CominaviRealtimeStore.isTransient(
+            CominaviServiceError.server(code: "x", message: "x", status: 401)
+        ))
+        XCTAssertFalse(CominaviRealtimeStore.isTransient(
+            CominaviServiceError.server(code: "x", message: "x", status: 404)
+        ))
+    }
+
+    func testWritesAreThrottledDuringCatchUpButTheLastPageIsAlwaysWritten() async throws {
+        let cache = InMemoryRealtimeCacheStore()
+        let pages = try (1...4).map { cursor in
+            CominaviRealtimeUpdatePage(updates: [try update(
+                cursor: cursor,
+                stateKind: "shinagaki",
+                stateValue: "menu-\(cursor)",
+                occurredAt: "2026-08-15T03:0\(cursor):00Z"
+            )], hasMore: cursor < 4)
+        }
+        let store = CominaviRealtimeStore(
+            client: RealtimeFetchingStub(pages: pages),
+            cacheStore: cache,
+            persistInterval: .seconds(3_600)
+        )
+
+        try await store.refresh(eventNumber: 108, minimumInterval: 0)
+
+        // The first page and the last page are written; the two in between
+        // are only published in memory.
+        let saves = await cache.saveCount()
+        XCTAssertEqual(saves, 2)
+        let cachedData = await cache.load(eventNumber: 108)
+        let data = try XCTUnwrap(cachedData)
+        let snapshot = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        XCTAssertEqual(snapshot["lastCursor"] as? Int, 4)
     }
 
     func testPaginationRejectsHasMoreWithoutCursorProgress() async throws {
@@ -1619,6 +1732,31 @@ private actor PausedSecondPageRealtimeFetchingStub: CominaviRealtimeFetching {
 
     func requestedTagRevisions() -> [String?] {
         tagRevisions
+    }
+}
+
+private actor ScriptedRealtimeFetchingStub: CominaviRealtimeFetching {
+    private var results: [Result<CominaviRealtimeUpdatePage, any Error>]
+    private var cursors: [Int] = []
+
+    init(results: [Result<CominaviRealtimeUpdatePage, any Error>]) {
+        self.results = results
+    }
+
+    func realtimeUpdates(
+        eventNumber: Int,
+        afterCursor: Int,
+        publicationRevision: String,
+        tagRevision: String?
+    ) async throws -> CominaviRealtimeUpdatePage {
+        XCTAssertEqual(eventNumber, 108)
+        cursors.append(afterCursor)
+        guard !results.isEmpty else { throw CominaviServiceError.invalidResponse }
+        return try results.removeFirst().get()
+    }
+
+    func requestedCursors() -> [Int] {
+        cursors
     }
 }
 
