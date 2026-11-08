@@ -98,6 +98,10 @@ struct EntryView: View {
                 guard !deletionPending else { return }
                 let logoutPending = await retryPendingLogoutIfNeeded()
                 guard !logoutPending else { return }
+                #if DEBUG
+                    // `-cominavi-test-session <label>`: staging/local only.
+                    await CominaviTestSession.installIfRequested()
+                #endif
                 await recoverCompletedCirclemsFlowIfPossible()
                 await recoverCompletedGoogleFlowIfPossible()
                 await recoverCompletedAppleFlowIfPossible()
