@@ -523,14 +523,21 @@ final class AppleSignInAuthorizationProvider: NSObject,
 
 /// Uses Apple's required native control while allowing the app to acquire the
 /// short-lived ComiNavi entry grant before presenting the Apple sheet.
+///
+/// The button style is fixed when UIKit creates the control, so callers that
+/// follow the color scheme recreate it with `.id(colorScheme)`.
 struct AppleSignInControl: UIViewRepresentable {
+    var style: ASAuthorizationAppleIDButton.Style = .black
+    var cornerRadius: CGFloat = 12
+    var accessibilityIdentifier: String?
     let action: @MainActor () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(action: action) }
 
     func makeUIView(context: Context) -> ASAuthorizationAppleIDButton {
-        let button = ASAuthorizationAppleIDButton(type: .signIn, style: .black)
-        button.cornerRadius = 12
+        let button = ASAuthorizationAppleIDButton(type: .signIn, style: style)
+        button.cornerRadius = cornerRadius
+        button.accessibilityIdentifier = accessibilityIdentifier
         button.addTarget(
             context.coordinator,
             action: #selector(Coordinator.activate),
@@ -539,11 +546,15 @@ struct AppleSignInControl: UIViewRepresentable {
         return button
     }
 
-    func updateUIView(_ uiView: ASAuthorizationAppleIDButton, context: Context) {}
+    func updateUIView(_ uiView: ASAuthorizationAppleIDButton, context: Context) {
+        context.coordinator.action = action
+        uiView.cornerRadius = cornerRadius
+        uiView.accessibilityIdentifier = accessibilityIdentifier
+    }
 
     @MainActor
     final class Coordinator: NSObject {
-        let action: @MainActor () -> Void
+        var action: @MainActor () -> Void
 
         init(action: @escaping @MainActor () -> Void) { self.action = action }
 

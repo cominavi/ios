@@ -29108,6 +29108,34 @@
         }
       }
     },
+    "Sign in with Apple from the special entry" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "特別なログインリンクからAppleでログインします"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "특별한 로그인 링크에서 Apple로 로그인합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过特殊入口使用 Apple 登录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "透過特殊入口使用 Apple 登入"
+          }
+        }
+      }
+    },
     "Sign in with Apple is unavailable right now." : {
       "localizations" : {
         "ja" : {
@@ -34436,6 +34464,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用 GPS 模式"
+          }
+        }
+      }
+    },
+    "Use the invitation to sign in with Apple" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "招待を使ってAppleでログインします"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "초대를 사용하여 Apple에 로그인합니다"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用邀请通过 Apple 登录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用邀請透過 Apple 登入"
           }
         }
       }
