@@ -96,20 +96,18 @@ final class DirectoryManager: Sendable {
 
     var environmentCachesDirectory: URL {
         let url =
-            cachesDirectory
-            .appendingPathComponent("environments", isDirectory: true)
-            .appendingPathComponent(AppEnvironment.current.build.rawValue, isDirectory: true)
-            .appendingPathComponent(AppEnvironment.current.circlems.rawValue, isDirectory: true)
+            AppEnvironment.current.storageDirectoryComponents.reduce(
+                cachesDirectory.appendingPathComponent("environments", isDirectory: true)
+            ) { $0.appendingPathComponent($1, isDirectory: true) }
         createDirectoryIfNeeded(at: url)
         return url
     }
 
     var environmentApplicationSupportDirectory: URL {
         let url =
-            applicationSupportDirectory
-            .appendingPathComponent("environments", isDirectory: true)
-            .appendingPathComponent(AppEnvironment.current.build.rawValue, isDirectory: true)
-            .appendingPathComponent(AppEnvironment.current.circlems.rawValue, isDirectory: true)
+            AppEnvironment.current.storageDirectoryComponents.reduce(
+                applicationSupportDirectory.appendingPathComponent("environments", isDirectory: true)
+            ) { $0.appendingPathComponent($1, isDirectory: true) }
         createDirectoryIfNeeded(at: url)
         return url
     }

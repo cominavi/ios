@@ -289,6 +289,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
     typealias LogoutRequestIDProvider = @Sendable () -> UUID
 
     static let shared = CominaviServiceClient(
+        baseURL: AppEnvironment.current.serviceOrigin,
         sessionStore: KeychainCominaviAuthenticationSessionStore(
             account: AppEnvironment.current.storageNamespace
         ),

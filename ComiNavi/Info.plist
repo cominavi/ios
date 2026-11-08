@@ -13,7 +13,7 @@
 	<key>ComiNaviOAuthRedirectURL</key>
 	<string>$(COMINAVI_OAUTH_REDIRECT_URL)</string>
 	<key>ComiNaviServiceBaseURL</key>
-	<string>https://cominavi.net</string>
+	<string>$(COMINAVI_SERVICE_BASE_URL)</string>
 	<key>GIDClientID</key>
 	<string>$(COMINAVI_GOOGLE_CLIENT_ID)</string>
 	<key>CFBundleURLTypes</key>
