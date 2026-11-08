@@ -99,6 +99,40 @@ final class MapScreenModel {
         }
     }
 
+    struct SearchResult: Identifiable, Equatable {
+        let id: String
+        let day: Int
+        let mapID: Int
+        let table: CatalogMapTable
+        let subspace: Int
+        /// `nil` when a space code names a table with no assigned circle.
+        let circleID: Int?
+        let circleName: String
+        let penName: String
+        let isSpaceCodeMatch: Bool
+        let address: ComiketSpaceAddress
+
+        var searchMatch: CatalogMapSearchMatch? {
+            circleID.map {
+                CatalogMapSearchMatch(
+                    id: $0,
+                    mapID: mapID,
+                    tableID: table.id,
+                    subspace: subspace,
+                    circleName: circleName,
+                    penName: penName
+                )
+            }
+        }
+    }
+
+    struct SearchResultGroup: Identifiable, Equatable {
+        var id: Int { day }
+
+        let day: Int
+        let results: [SearchResult]
+    }
+
     let days: [UFDSchema.Day]
     var selectedDay: Int
     var selectedMapID: Int
@@ -112,6 +146,9 @@ final class MapScreenModel {
     private(set) var searchQuery = ""
     private(set) var searchMatches: [CatalogMapSearchMatch] = []
     private(set) var isSearching = false
+    /// Search results for every event day, current day first. Days without
+    /// results are omitted.
+    private(set) var searchResultGroups: [SearchResultGroup] = []
     private(set) var showsGenreOverlay = false
     private(set) var genrePlacements: [CatalogMapGenrePlacement] = []
     private(set) var bookmarks: [Int: MapBookmark] = [:]
@@ -144,6 +181,17 @@ final class MapScreenModel {
 
     var halls: [UFDSchema.DayHall] {
         days.first(where: { $0.dayIndex == selectedDay })?.halls ?? []
+    }
+
+    /// Map layers that have facilities for this event and day. Before the
+    /// campus loads every layer is assumed to be available.
+    var availableMapLayers: Set<BigSightMapLayer> {
+        guard let campusScene else { return BigSightMapLayer.defaultVisible }
+        return BigSightMapLayer.available(in: campusScene.facilities)
+    }
+
+    var searchResultCount: Int {
+        searchResultGroups.reduce(0) { $0 + $1.results.count }
     }
 
     var favoriteBookmarks: [Int: MapBookmark] {
@@ -348,9 +396,11 @@ final class MapScreenModel {
         }
     }
 
-    func whereAmIVenues() async throws -> [WhereAmIVenueOption] {
-        let day = selectedDay
-        let halls = halls
+    /// Venue options for `day`, or for the selected day when `nil`. Only the
+    /// selected day's campus replaces the map's campus scene.
+    func whereAmIVenues(day requestedDay: Int? = nil) async throws -> [WhereAmIVenueOption] {
+        let day = requestedDay ?? selectedDay
+        let halls = days.first(where: { $0.dayIndex == day })?.halls ?? []
         var scenes: [Int: CatalogMapScene] = [:]
         var firstError: Error?
 
@@ -384,13 +434,16 @@ final class MapScreenModel {
         else {
             throw MapScreenError.missingCampusVenues
         }
-        guard selectedDay == day else { throw CancellationError() }
-        campusScene = campus
+        if selectedDay == day {
+            campusScene = campus
+        } else if requestedDay == nil {
+            throw CancellationError()
+        }
         let hallsByMapID = Dictionary(uniqueKeysWithValues: halls.map { ($0.externalMapId, $0) })
         return campus.venues.map { placement in
-            let hallName = hallsByMapID[placement.id]?.name ?? placement.kind.displayName
-            return WhereAmIVenueOption(
-                displayName: WhereAmIResolver.venueDisplayName(for: hallName),
+            WhereAmIVenueOption(
+                displayName: hallsByMapID[placement.id].map(BigSightVenue.localizedHallName(for:))
+                    ?? placement.kind.displayName,
                 placement: placement
             )
         }
@@ -467,11 +520,10 @@ final class MapScreenModel {
             return nil
         }
 
-        let hallName =
-            halls.first(where: { $0.externalMapId == targetMapID })?.name
-            ?? placement.kind.displayName
         let venue = WhereAmIVenueOption(
-            displayName: WhereAmIResolver.venueDisplayName(for: hallName),
+            displayName: halls.first(where: { $0.externalMapId == targetMapID })
+                .map(BigSightVenue.localizedHallName(for:))
+                ?? placement.kind.displayName,
             placement: placement
         )
         let user = WhereAmIResolver.locatedUser(
@@ -597,6 +649,9 @@ final class MapScreenModel {
         }
     }
 
+    /// The catalog (Japanese) hall name for an address. It feeds the
+    /// canonical Japanese text that staff read, so the last resort stays
+    /// "会場"; the UI shows it through `ComiketSpaceAddress.localizedHallName`.
     private var fallbackHallName: String {
         if let venue = campusScene?.venues.first(where: { $0.id == selectedMapID }) {
             return WhereAmIResolver.canonicalVenueName(for: venue.kind)
@@ -604,13 +659,13 @@ final class MapScreenModel {
         return halls.first(where: { $0.externalMapId == selectedMapID })?.name ?? "会場"
     }
 
+    /// Closing search keeps the query, so reopening it restores the results.
     func setSearchPresented(_ isPresented: Bool) {
         isSearchPresented = isPresented
-        if !isPresented {
-            updateSearchQuery("")
-        }
     }
 
+    /// Searches every event day, current day first. A query that reads as a
+    /// space code ("東A01a") resolves to that table before the text matches.
     func updateSearchQuery(_ query: String) {
         searchQuery = query
         searchTask?.cancel()
@@ -619,33 +674,234 @@ final class MapScreenModel {
         guard !normalizedQuery.isEmpty, phase == .ready else {
             isSearching = false
             searchMatches = []
+            searchResultGroups = []
             return
         }
 
         isSearching = true
-        let day = selectedDay
+        let currentDay = selectedDay
+        let searchDays =
+            [currentDay] + days.map(\.dayIndex).filter { $0 != currentDay }.sorted()
+        let spaceCode = ComiketSpaceCodeQuery.parse(normalizedQuery)
         searchTask = Task { [weak self, catalog] in
             do {
                 try await Task.sleep(for: .milliseconds(80))
-                let matches = try await catalog.search(day: day, query: normalizedQuery)
-                try Task.checkCancellation()
-                guard let self,
-                    self.selectedDay == day,
+                guard let self else { return }
+                var groups: [SearchResultGroup] = []
+                for day in searchDays {
+                    var results: [SearchResult] = []
+                    if let spaceCode, spaceCode.day == nil || spaceCode.day == day {
+                        results += await self.spaceCodeResults(for: spaceCode, day: day)
+                    }
+                    let matches = try await catalog.search(day: day, query: normalizedQuery)
+                    let resolvedIDs = Set(results.map(\.id))
+                    results += await self.searchResults(for: matches, day: day)
+                        .filter { !resolvedIDs.contains($0.id) }
+                    try Task.checkCancellation()
+                    if !results.isEmpty {
+                        groups.append(SearchResultGroup(day: day, results: results))
+                    }
+                }
+                guard self.selectedDay == currentDay,
                     self.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
                         == normalizedQuery
                 else {
                     return
                 }
-                self.searchMatches = matches
+                self.searchResultGroups = groups
+                self.searchMatches =
+                    groups.first(where: { $0.day == currentDay })?.results
+                    .compactMap(\.searchMatch) ?? []
                 self.isSearching = false
             } catch is CancellationError {
                 return
             } catch {
                 guard let self else { return }
                 self.searchMatches = []
+                self.searchResultGroups = []
                 self.isSearching = false
             }
         }
+    }
+
+    /// Opens a search result, switching day and hall first when needed.
+    func select(_ result: SearchResult) {
+        open(
+            table: result.table,
+            mapID: result.mapID,
+            day: result.day,
+            preferredSubspace: result.subspace
+        )
+    }
+
+    /// Shows the circle sheet for a table on any day and hall. The day and
+    /// hall switch first so the sheet and the map agree.
+    func open(table: CatalogMapTable, mapID: Int, day: Int, preferredSubspace: Int) {
+        if day != selectedDay {
+            select(day: day)
+        }
+        if scope != .venue || selectedMapID != mapID {
+            select(mapID: mapID)
+        }
+        select(table: table, preferredSubspace: preferredSubspace)
+    }
+
+    /// Pins the space in the open circle sheet as the walking destination.
+    func pinSelectionAsDestination() {
+        guard let selection else { return }
+        let table = selection.table
+        let placement =
+            campusScene?.venues.first { venue in
+                venue.scene.id.day == selectedDay && venue.scene.tableByID[table.id] == table
+            } ?? standalonePlacement(mapID: selectedMapID, table: table)
+        guard let placement else { return }
+        let venue = WhereAmIVenueOption(
+            displayName: halls.first(where: { $0.externalMapId == placement.id })
+                .map(BigSightVenue.localizedHallName(for:))
+                ?? placement.kind.displayName,
+            placement: placement
+        )
+        show(
+            WhereAmIResolver.destination(
+                at: table,
+                in: venue,
+                subspace: selection.selectedAddress.subspace
+            ))
+    }
+
+    private func spaceCodeResults(
+        for code: ComiketSpaceCodeQuery,
+        day: Int
+    ) async -> [SearchResult] {
+        let dayHalls = days.first(where: { $0.dayIndex == day })?.halls ?? []
+        var exactTables: [(mapID: Int, table: CatalogMapTable)] = []
+        var caselessTables: [(mapID: Int, table: CatalogMapTable)] = []
+        for hall in dayHalls {
+            if let direction = code.direction,
+                BigSightVenue.direction(matching: "\(hall.name) \(hall.mapName)") != direction
+            {
+                continue
+            }
+            guard let scene = try? await loadScene(day: day, mapID: hall.externalMapId) else {
+                continue
+            }
+            for table in scene.tables where table.id.spaceNumber == code.spaceNumber {
+                if code.matches(blockName: table.blockName) {
+                    exactTables.append((hall.externalMapId, table))
+                } else if code.matches(blockName: table.blockName, ignoringCase: true) {
+                    caselessTables.append((hall.externalMapId, table))
+                }
+            }
+        }
+
+        var results: [SearchResult] = []
+        for (mapID, table) in exactTables.isEmpty ? caselessTables : exactTables {
+            let circles = (try? await catalog.circles(day: day, tableID: table.id)) ?? []
+            let matching = circles.filter { code.subspace == nil || $0.subspace == code.subspace }
+            if matching.isEmpty {
+                // An unassigned table is still a place the attendee can walk to.
+                results.append(
+                    searchResult(
+                        day: day,
+                        mapID: mapID,
+                        table: table,
+                        subspace: code.subspace ?? 0,
+                        circleID: nil,
+                        circleName: "",
+                        penName: "",
+                        isSpaceCodeMatch: true
+                    ))
+            }
+            for circle in matching {
+                results.append(
+                    searchResult(
+                        day: day,
+                        mapID: mapID,
+                        table: table,
+                        subspace: circle.subspace,
+                        circleID: circle.id,
+                        circleName: circle.circleName,
+                        penName: circle.penName,
+                        isSpaceCodeMatch: true
+                    ))
+            }
+        }
+        return results
+    }
+
+    private func searchResults(
+        for matches: [CatalogMapSearchMatch],
+        day: Int
+    ) async -> [SearchResult] {
+        var scenes: [Int: CatalogMapScene] = [:]
+        for mapID in Set(matches.map(\.mapID)) {
+            scenes[mapID] = try? await loadScene(day: day, mapID: mapID)
+        }
+        return matches.compactMap { match in
+            guard let table = scenes[match.mapID]?.tableByID[match.tableID] else { return nil }
+            return searchResult(
+                day: day,
+                mapID: match.mapID,
+                table: table,
+                subspace: match.subspace,
+                circleID: match.id,
+                circleName: match.circleName,
+                penName: match.penName,
+                isSpaceCodeMatch: false
+            )
+        }
+    }
+
+    private func searchResult(
+        day: Int,
+        mapID: Int,
+        table: CatalogMapTable,
+        subspace: Int,
+        circleID: Int?,
+        circleName: String,
+        penName: String,
+        isSpaceCodeMatch: Bool
+    ) -> SearchResult {
+        SearchResult(
+            id: circleID.map { "\(day)-circle-\($0)" }
+                ?? "\(day)-table-\(table.id.blockID)-\(table.id.spaceNumber)-\(subspace)",
+            day: day,
+            mapID: mapID,
+            table: table,
+            subspace: subspace,
+            circleID: circleID,
+            circleName: circleName,
+            penName: penName,
+            isSpaceCodeMatch: isSpaceCodeMatch,
+            address: ComiketSpaceAddress(
+                day: day,
+                hallName: table.hallName ?? catalogHallName(day: day, mapID: mapID),
+                blockName: table.blockName,
+                spaceNumber: table.id.spaceNumber,
+                subspace: subspace
+            )
+        )
+    }
+
+    /// The Japanese hall name for an address on any day, used when the
+    /// catalog table carries no area name of its own.
+    private func catalogHallName(day: Int, mapID: Int) -> String {
+        let hall = days.first(where: { $0.dayIndex == day })?.halls
+            .first(where: { $0.externalMapId == mapID })
+        if let hall, let kind = BigSightVenue.kind(matching: "\(hall.name) \(hall.mapName)") {
+            return WhereAmIResolver.canonicalVenueName(for: kind)
+        }
+        return hall?.name ?? "会場"
+    }
+
+    private func loadScene(day: Int, mapID: Int) async throws -> CatalogMapScene {
+        let sceneID = CatalogMapScene.ID(day: day, mapID: mapID)
+        if let cached = sceneCache[sceneID] {
+            return cached
+        }
+        let loaded = try await catalog.scene(day: day, mapID: mapID)
+        sceneCache[loaded.id] = loaded
+        return loaded
     }
 
     func toggleGenreOverlay() {

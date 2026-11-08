@@ -25,41 +25,46 @@ struct ProfileEditorScreen: View {
 
     var body: some View {
         Form {
-            Section("プロフィール画像") {
+            Section("Profile picture") {
                 Button {
                     isShowingAvatarPicker = true
                 } label: {
-                    VStack(spacing: 10) {
+                    VStack(spacing: Spacing.medium) {
                         editorAvatar
                             .overlay(alignment: .bottomTrailing) {
+                                // SF Symbol: the bundled Lucide set has no camera.
                                 Image(systemName: "camera.fill")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(7)
-                                    .background(Color.accentColor, in: .circle)
+                                    .font(.badge)
+                                    .foregroundStyle(Color.onAccentFill)
+                                    .padding(Spacing.small)
+                                    .background(Color.accentFill, in: .circle)
+                                    .overlay {
+                                        Circle().strokeBorder(Color.hairline, lineWidth: 0.5)
+                                    }
                             }
 
-                        Text("アバターを変更")
-                            .font(.subheadline)
+                        Text("Change Picture")
+                            .font(.control)
+                            .foregroundStyle(Color.accentColor)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, Spacing.small)
                 }
                 .buttonStyle(.plain)
                 .disabled(isSavingChanges || profileStore.isSaving)
-                .accessibilityLabel("アバターを変更")
-                .accessibilityHint("写真を選択して正方形に切り抜きます")
+                .accessibilityLabel("Change Picture")
+                .accessibilityHint("Choose a photo and crop it to a square")
                 .accessibilityIdentifier("profile-change-avatar")
 
                 if canRemoveAvatar {
-                    Button("アバターを削除", role: .destructive, action: stageAvatarRemoval)
+                    Button("Remove Picture", role: .destructive, action: stageAvatarRemoval)
                         .disabled(isSavingChanges)
                         .accessibilityIdentifier("profile-remove-avatar")
                 }
             }
 
-            Section("プロフィール") {
-                TextField("表示名", text: $displayName)
+            Section("Profile") {
+                TextField("Display name", text: $displayName)
                     .textContentType(.name)
                     .submitLabel(.done)
                     .onSubmit {
@@ -73,20 +78,20 @@ struct ProfileEditorScreen: View {
             if let issueMessage {
                 Section {
                     Text(issueMessage)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(.red)
                 }
             }
         }
-        .navigationTitle("プロフィールを編集")
+        .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("キャンセル", action: dismiss.callAsFunction)
+                Button("Cancel", action: dismiss.callAsFunction)
                     .disabled(isSavingChanges)
             }
 
             ToolbarItem(placement: .confirmationAction) {
-                Button("保存", action: saveChanges)
+                Button("Save", action: saveChanges)
                     .disabled(!canSaveChanges)
                     .accessibilityIdentifier("profile-save")
             }
@@ -99,13 +104,17 @@ struct ProfileEditorScreen: View {
         .interactiveDismissDisabled(isSavingChanges)
     }
 
+    /// The editor shows the picture larger than the Profile header, so the
+    /// crop is easy to check.
+    private static let avatarSize: CGFloat = 104
+
     @ViewBuilder
     private var editorAvatar: some View {
         switch avatarChange {
         case .unchanged:
             AuthenticatedProfileAvatar(
                 url: profileStore.profile?.avatarURL,
-                size: 104,
+                size: Self.avatarSize,
                 revision: profileStore.profile?.revision
             )
         case .selected(let image):
@@ -113,15 +122,15 @@ struct ProfileEditorScreen: View {
                 .resizable()
                 .renderingMode(.original)
                 .scaledToFill()
-                .frame(width: 104, height: 104)
+                .frame(width: Self.avatarSize, height: Self.avatarSize)
                 .clipShape(.circle)
-                .accessibilityLabel("プロフィール画像")
+                .accessibilityLabel("Profile picture")
         case .removed:
-            Image(systemName: "person.crop.circle.fill")
-                .resizable()
-                .foregroundStyle(.secondary)
-                .frame(width: 104, height: 104)
-                .accessibilityLabel("プロフィール画像なし")
+            // The same empty glyph as the Profile header.
+            AuthenticatedProfileAvatar.placeholder
+                .frame(width: Self.avatarSize, height: Self.avatarSize)
+                .accessibilityElement()
+                .accessibilityLabel("No profile picture")
         }
     }
 

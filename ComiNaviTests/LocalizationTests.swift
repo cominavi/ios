@@ -17,7 +17,6 @@ final class LocalizationTests: XCTestCase {
             "Event",
             "Favorite circles",
             "Favorite map",
-            "Favorites",
             "Label",
             "Labels are shown in the PDF legend and circle list.",
             "Map pages",
@@ -61,7 +60,7 @@ final class LocalizationTests: XCTestCase {
 
         XCTAssertEqual(japaneseBundle.localizedString(forKey: "Map", value: nil, table: nil), "地図")
         XCTAssertEqual(japaneseBundle.localizedString(forKey: "Explore", value: nil, table: nil), "探す")
-        XCTAssertEqual(japaneseBundle.localizedString(forKey: "Where Am I", value: nil, table: nil), "現在地を設定")
+        XCTAssertEqual(japaneseBundle.localizedString(forKey: "Where am I?", value: nil, table: nil), "現在地を設定")
         XCTAssertEqual(japaneseBundle.localizedString(forKey: "East 1–3", value: nil, table: nil), "東1–3ホール")
         XCTAssertEqual(
             japaneseBundle.localizedString(
@@ -69,15 +68,15 @@ final class LocalizationTests: XCTestCase {
                 value: nil,
                 table: nil
             ),
-            "コミナビへようこそ！"
+            "ComiNaviへようこそ！"
         )
         XCTAssertEqual(
-            japaneseBundle.localizedString(forKey: "Shinagaki", value: nil, table: nil),
+            japaneseBundle.localizedString(forKey: "Item list", value: nil, table: nil),
             "お品書き"
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
-                forKey: "Latest shinagaki",
+                forKey: "Latest item lists",
                 value: nil,
                 table: nil
             ),
@@ -125,11 +124,11 @@ final class LocalizationTests: XCTestCase {
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
-                forKey: "Choose a primary plan",
+                forKey: "All plans",
                 value: nil,
                 table: nil
             ),
-            "メインプランを選択"
+            "すべてのプラン"
         )
         XCTAssertEqual(
             japaneseBundle.localizedString(
@@ -227,18 +226,18 @@ final class LocalizationTests: XCTestCase {
             "zh-Hans": [
                 "Map": "地图",
                 "Explore": "探索",
-                "Where Am I": "设置当前位置",
+                "Where am I?": "设置当前位置",
                 "Welcome to ComiNavi!": "欢迎来到 ComiNavi！",
                 "Find circles. Know where they are.": "找到社团，确认位置",
-                "Login via circle.ms": "使用 Circle.ms 登录",
+                "Sign in with Circle.ms": "使用 Circle.ms 登录",
                 "East 1–3": "东1–3馆",
-                "Shinagaki": "商品一览",
+                "Item list": "商品一览",
                 "Members and invitations": "成员与邀请",
                 "Shared Plans": "共享计划",
                 "Circle": "社团",
                 "Catalog": "目录",
-                "Choose a primary plan": "选择主要计划",
-                "How to join a plan": "如何加入计划",
+                "All plans": "所有计划",
+                "Join with an invite link": "通过邀请链接加入",
                 "Join": "加入",
                 "Plan information": "计划信息",
                 "Add member": "添加成员",
@@ -248,18 +247,18 @@ final class LocalizationTests: XCTestCase {
             "zh-Hant": [
                 "Map": "地圖",
                 "Explore": "探索",
-                "Where Am I": "設定目前位置",
+                "Where am I?": "設定目前位置",
                 "Welcome to ComiNavi!": "歡迎來到 ComiNavi！",
                 "Find circles. Know where they are.": "尋找社團，確認位置",
-                "Login via circle.ms": "使用 Circle.ms 登入",
+                "Sign in with Circle.ms": "使用 Circle.ms 登入",
                 "East 1–3": "東1–3館",
-                "Shinagaki": "商品一覽",
+                "Item list": "商品一覽",
                 "Members and invitations": "成員與邀請",
                 "Shared Plans": "共享計畫",
                 "Circle": "社團",
                 "Catalog": "目錄",
-                "Choose a primary plan": "選擇主要計畫",
-                "How to join a plan": "如何加入計畫",
+                "All plans": "所有計畫",
+                "Join with an invite link": "透過邀請連結加入",
                 "Join": "加入",
                 "Plan information": "計畫資訊",
                 "Add member": "新增成員",
@@ -269,18 +268,18 @@ final class LocalizationTests: XCTestCase {
             "ko": [
                 "Map": "지도",
                 "Explore": "탐색",
-                "Where Am I": "현재 위치 설정",
+                "Where am I?": "현재 위치 설정",
                 "Welcome to ComiNavi!": "ComiNavi에 오신 것을 환영합니다!",
                 "Find circles. Know where they are.": "서클을 찾고 위치를 확인하세요.",
-                "Login via circle.ms": "Circle.ms로 로그인",
+                "Sign in with Circle.ms": "Circle.ms로 로그인",
                 "East 1–3": "동 1–3홀",
-                "Shinagaki": "판매 목록",
+                "Item list": "판매 목록",
                 "Members and invitations": "멤버 및 초대",
                 "Shared Plans": "공유 플랜",
                 "Circle": "서클",
                 "Catalog": "카탈로그",
-                "Choose a primary plan": "기본 플랜 선택",
-                "How to join a plan": "플랜 참여 방법",
+                "All plans": "모든 플랜",
+                "Join with an invite link": "초대 링크로 참여",
                 "Join": "참여",
                 "Plan information": "플랜 정보",
                 "Add member": "멤버 추가",
@@ -349,15 +348,17 @@ final class LocalizationTests: XCTestCase {
         }
     }
 
-    func testJapaneseIsTheProjectDevelopmentLanguage() throws {
+    func testEnglishIsTheProjectDevelopmentLanguage() throws {
         let projectURL = sourceCatalogURL
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appending(path: "ComiNavi.xcodeproj/project.pbxproj")
         let project = try String(contentsOf: projectURL, encoding: .utf8)
 
-        XCTAssertTrue(project.contains("developmentRegion = ja;"))
-        XCTAssertFalse(project.contains("developmentRegion = en;"))
+        XCTAssertTrue(project.contains("developmentRegion = en;"))
+        XCTAssertFalse(project.contains("developmentRegion = ja;"))
+        XCTAssertTrue(project.contains("\n\t\t\t\ten,"))
+        XCTAssertTrue(project.contains("\n\t\t\t\tja,"))
         XCTAssertTrue(project.contains("\n\t\t\t\tko,"))
         XCTAssertTrue(project.contains("\n\t\t\t\t\"zh-Hans\","))
         XCTAssertTrue(project.contains("\n\t\t\t\t\"zh-Hant\","))
@@ -409,7 +410,7 @@ final class LocalizationTests: XCTestCase {
             "Daily Yamazaki",
             "Ministop",
             "Seven Bank",
-            "Pixiv",
+            "pixiv",
             "Google",
         ]
         let expectedTerms = [

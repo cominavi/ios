@@ -6,21 +6,23 @@ import SwiftUI
 import UIKit
 
 enum MapChromeLayout {
-    static let edgeInset: CGFloat = 16
-    static let controlSize: CGFloat = 44
-    static let controlSpacing: CGFloat = 8
-    static let locationControlCount: CGFloat = 2
+    static let edgeInset: CGFloat = Spacing.large
+    static let controlSize: CGFloat = HitArea.minimum
+    static let controlSpacing: CGFloat = Spacing.small
 
-    static var locationControlsWidth: CGFloat {
-        controlSize * locationControlCount + controlSpacing * (locationControlCount - 1)
+    /// Width of the SwiftUI location controls at the trailing end of the
+    /// bottom row. MapView shows "Where am I?" alone, or with the destination
+    /// pin when a destination exists.
+    static func locationControlsWidth(count: Int) -> CGFloat {
+        let count = CGFloat(max(count, 0))
+        return controlSize * count + controlSpacing * max(count - 1, 0)
     }
 
-    static var adjacentChromeTrailingInset: CGFloat {
-        edgeInset + locationControlsWidth + controlSpacing
-    }
-
-    static func attributionTrailingInset(showsCompass: Bool) -> CGFloat {
-        adjacentChromeTrailingInset + (showsCompass ? controlSize + controlSpacing : 0)
+    /// Trailing inset of the compass, which sits just before the location
+    /// controls with one `controlSpacing` gap.
+    static func adjacentChromeTrailingInset(locationControlCount: Int) -> CGFloat {
+        edgeInset + locationControlsWidth(count: locationControlCount)
+            + (locationControlCount > 0 ? controlSpacing : 0)
     }
 }
 
@@ -103,6 +105,27 @@ struct UnifiedMapPalette {
     let markerStroke: UIColor
 }
 
+extension UnifiedMapPalette {
+    /// The halo behind map text, so roads, footways, and floor artwork never
+    /// cross a label. It matches the floor the labels mostly sit on.
+    var labelHalo: UIColor { floor.withAlphaComponent(0.9) }
+}
+
+extension UnifiedMapAppearance {
+    /// The rim around the colored plate of a hall badge. White in light mode;
+    /// the dark floor color in dark mode, so the badge has the same visual
+    /// weight on both maps.
+    var venueBadgeRim: UIColor {
+        self == .dark ? palette.floor : .white
+    }
+
+    var venueBadgeRimStroke: UIColor {
+        self == .dark
+            ? UIColor.white.withAlphaComponent(0.18)
+            : UIColor.black.withAlphaComponent(0.16)
+    }
+}
+
 /// A single retained-mode surface for both the Big Sight campus and every hall map.
 /// Gestures mutate `SKCameraNode` directly, so dragging does not invalidate SwiftUI.
 struct UnifiedBigSightMapView: UIViewRepresentable {
@@ -128,6 +151,14 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     let onSelectTable: (CatalogMapTable, Int) -> Void
     let onSelectLocatedUser: () -> Void
     let onLocate: (Int, CGPoint, CatalogMapTable, Int) -> Void
+    /// Measured map chrome, so camera fits frame content in the uncovered
+    /// area. When `nil`, the renderer estimates the chrome from the safe area.
+    var overviewChromeInsets: MapViewportInsets? = nil
+    /// Screen rects of SwiftUI chrome over the map, in this view's
+    /// coordinates. Facility icons and titles stay out of them.
+    var chromeObstacles: [CGRect] = []
+    /// Frames a campus target once per request `id`.
+    var cameraFitRequest: MapCameraFitRequest? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
@@ -191,8 +222,14 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             locatedUser: locatedUser,
             destination: destination,
             visibleMapLayers: visibleMapLayers,
-            locationFocusBottomInset: locationFocusBottomInset
+            locationFocusBottomInset: locationFocusBottomInset,
+            overviewInsets: overviewChromeInsets,
+            chromeObstacles: chromeObstacles,
+            cameraFitRequest: cameraFitRequest
         )
+        // MapLocationControls shows the destination pin beside "Where am I?"
+        // only while a destination exists.
+        host.updateLocationControlCount(destination == nil ? 1 : 2)
         host.updateBasemap(camera: renderer.basemapCamera)
         host.updateAccessibility(renderer: renderer, scope: scope)
     }
@@ -264,6 +301,11 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
                 rotation: renderer.cameraRotation,
                 gridAlignedRotation: renderer.gridAlignedCameraRotation
             )
+            host.onActivateVenue = { [weak self, weak renderer] mapID in
+                guard let self else { return }
+                renderer?.requestVenue(mapID)
+                self.onSelectVenue(mapID)
+            }
         }
 
         func updateCallbacks(
@@ -387,9 +429,23 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     }
 }
 
+/// Load state of the MapLibre street basemap underneath the venue overlay.
+/// The venue overlay never depends on it, so `.unavailable` only explains
+/// the missing street context.
+enum UnifiedBasemapState: Equatable {
+    case loading
+    case ready
+    case unavailable
+}
+
 @MainActor
 final class UnifiedMapHostView: UIView {
+    /// Fallback only. Both appearances bundle their style so the map never
+    /// needs the network before it can draw the venue context.
     private static let openStreetMapStyleURL = URL(string: "https://americanamap.org/style.json")!
+    /// Tiles that have not rendered by then are treated as unreachable. The
+    /// state still returns to `.ready` if MapLibre completes a render later.
+    private static let basemapLoadTimeout: TimeInterval = 10
     private static let ambientCacheConfiguration: Void = {
         let cacheSize = UInt(150 * 1_024 * 1_024)
         let logger = Logger(
@@ -408,13 +464,34 @@ final class UnifiedMapHostView: UIView {
     let basemapView: MLNMapView
     let mapView = SKView(frame: .zero)
     let compassButton = MapCompassButton(type: .system)
-    private let dataAttributionButton = UIButton(type: .system)
+    private let dataAttributionButton = MapAttributionButton(type: .system)
     private let campusAccessibilityProxy = UIView(frame: .zero)
     private let venueAccessibilityProxy = UIView(frame: .zero)
     private var requestedBasemapCamera: UnifiedBasemapCamera?
     private var lastBasemapCamera: UnifiedBasemapCamera?
     private var appearance: UnifiedMapAppearance
     private var compassState = CompassState.north
+    private let basemapStatusChip = MapStatusChip(
+        text: String(localized: "Street map unavailable offline. The venue map still works.")
+    )
+    private let campusHintChip = MapStatusChip(
+        text: String(localized: "Tap a hall to open its floor map")
+    )
+    private let statusChipStack = UIStackView()
+    private let venueAccessibilityContainer = UIView(frame: .zero)
+    private var venueAccessibilityElements: [Int: MapVenueAccessibilityElement] = [:]
+    private var basemapTimeoutWorkItem: DispatchWorkItem?
+    /// Opens a hall from its VoiceOver button, matching a tap on the badge.
+    var onActivateVenue: ((Int) -> Void)?
+    private static let campusHintSeenKey = "map.campusHallHint.seen"
+    /// Cached because accessibility refreshes on every camera frame.
+    private var hasSeenCampusHint = UserDefaults.standard.bool(
+        forKey: UnifiedMapHostView.campusHintSeenKey
+    )
+    private(set) var basemapState = UnifiedBasemapState.loading
+    /// Number of SwiftUI location buttons trailing the compass.
+    private(set) var locationControlCount = 1
+    private var compassTrailingConstraint: NSLayoutConstraint!
 
     private enum CompassState: Equatable {
         case north
@@ -437,6 +514,11 @@ final class UnifiedMapHostView: UIView {
         basemapView.logoView.isHidden = true
         basemapView.attributionButton.isHidden = true
         basemapView.compassView.isHidden = true
+        basemapView.delegate = self
+        // MapLibre exposes its own zoom slider, compass, and attribution
+        // elements even when they are visually hidden. The SpriteKit canvas
+        // already describes the map, so the basemap stays silent.
+        basemapView.accessibilityElementsHidden = true
         addSubview(basemapView)
 
         mapView.translatesAutoresizingMaskIntoConstraints = false
@@ -446,6 +528,14 @@ final class UnifiedMapHostView: UIView {
         mapView.isAccessibilityElement = true
         mapView.accessibilityIdentifier = "unified-map-canvas"
         addSubview(mapView)
+
+        // Holds one button element per visible hall badge, read right after
+        // the canvas itself.
+        venueAccessibilityContainer.translatesAutoresizingMaskIntoConstraints = false
+        venueAccessibilityContainer.backgroundColor = .clear
+        venueAccessibilityContainer.isUserInteractionEnabled = false
+        venueAccessibilityContainer.isAccessibilityElement = false
+        addSubview(venueAccessibilityContainer)
 
         for proxy in [campusAccessibilityProxy, venueAccessibilityProxy] {
             proxy.translatesAutoresizingMaskIntoConstraints = false
@@ -459,14 +549,17 @@ final class UnifiedMapHostView: UIView {
                 proxy.bottomAnchor.constraint(equalTo: bottomAnchor),
             ])
         }
-        campusAccessibilityProxy.isAccessibilityElement = true
+        // The proxies keep their scope-specific identifiers for automation,
+        // but VoiceOver reads only `mapView` so the canvas is announced once.
+        campusAccessibilityProxy.isAccessibilityElement = false
         campusAccessibilityProxy.accessibilityIdentifier = "campus-map-canvas"
-        venueAccessibilityProxy.isAccessibilityElement = true
+        venueAccessibilityProxy.isAccessibilityElement = false
         venueAccessibilityProxy.accessibilityIdentifier = "interactive-map-canvas"
 
-        var configuration = UIButton.Configuration.filled()
+        // The compass draws its own material circle, so it matches the
+        // SwiftUI location buttons beside it.
+        var configuration = UIButton.Configuration.plain()
         configuration.baseForegroundColor = .label
-        configuration.baseBackgroundColor = UIColor.systemBackground.withAlphaComponent(0.9)
         configuration.cornerStyle = .capsule
         compassButton.configuration = configuration
         compassButton.accessibilityLabel = String(localized: "Align map to venue grid")
@@ -481,19 +574,27 @@ final class UnifiedMapHostView: UIView {
             UIConfigurationTextAttributesTransformer {
                 incoming in
                 var outgoing = incoming
-                outgoing.font = .systemFont(ofSize: 8, weight: .regular)
+                // Caption 2 follows Dynamic Type. The 13 pt cap keeps the
+                // credit one compact line beside the bottom controls at
+                // accessibility sizes, so it does not cover the map.
+                outgoing.font = UIFontMetrics(forTextStyle: .caption2).scaledFont(
+                    for: .systemFont(ofSize: 11, weight: .regular),
+                    maximumPointSize: 13
+                )
                 return outgoing
             }
         attributionConfiguration.contentInsets = NSDirectionalEdgeInsets(
-            top: 1,
-            leading: 3,
-            bottom: 1,
-            trailing: 3
+            top: Spacing.xSmall,
+            leading: Spacing.small,
+            bottom: Spacing.xSmall,
+            trailing: Spacing.small
         )
         dataAttributionButton.configuration = attributionConfiguration
         dataAttributionButton.contentHorizontalAlignment = .trailing
         dataAttributionButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.72)
-        dataAttributionButton.layer.cornerRadius = 4
+        // A pill, like the other floating map chrome. The button sets the
+        // capsule radius from its height in `layoutSubviews`.
+        dataAttributionButton.layer.cornerCurve = .continuous
         dataAttributionButton.accessibilityLabel = String(localized: "Map data attribution")
         dataAttributionButton.accessibilityValue =
             "OpenStreetMap, OpenStreetMap US, OpenMapTiles, and MapLibre"
@@ -517,9 +618,24 @@ final class UnifiedMapHostView: UIView {
         dataAttributionButton.showsMenuAsPrimaryAction = true
         addSubview(dataAttributionButton)
 
-        let dataAttributionTrailingConstraint = dataAttributionButton.trailingAnchor.constraint(
+        campusHintChip.accessibilityIdentifier = "map-campus-hint"
+        campusHintChip.isHidden = true
+        basemapStatusChip.accessibilityIdentifier = "map-basemap-status"
+        basemapStatusChip.isHidden = true
+        statusChipStack.axis = .vertical
+        statusChipStack.alignment = .leading
+        statusChipStack.spacing = MapChromeLayout.controlSpacing
+        statusChipStack.isUserInteractionEnabled = false
+        statusChipStack.translatesAutoresizingMaskIntoConstraints = false
+        statusChipStack.addArrangedSubview(campusHintChip)
+        statusChipStack.addArrangedSubview(basemapStatusChip)
+        addSubview(statusChipStack)
+
+        compassTrailingConstraint = compassButton.trailingAnchor.constraint(
             equalTo: safeAreaLayoutGuide.trailingAnchor,
-            constant: -MapChromeLayout.attributionTrailingInset(showsCompass: true)
+            constant: -MapChromeLayout.adjacentChromeTrailingInset(
+                locationControlCount: locationControlCount
+            )
         )
 
         NSLayoutConstraint.activate([
@@ -533,24 +649,45 @@ final class UnifiedMapHostView: UIView {
             mapView.bottomAnchor.constraint(equalTo: bottomAnchor),
             compassButton.widthAnchor.constraint(equalToConstant: MapChromeLayout.controlSize),
             compassButton.heightAnchor.constraint(equalToConstant: MapChromeLayout.controlSize),
-            compassButton.trailingAnchor.constraint(
-                equalTo: safeAreaLayoutGuide.trailingAnchor,
-                constant: -MapChromeLayout.adjacentChromeTrailingInset
-            ),
+            compassTrailingConstraint,
             compassButton.bottomAnchor.constraint(
                 equalTo: safeAreaLayoutGuide.bottomAnchor,
                 constant: -MapChromeLayout.edgeInset
             ),
             dataAttributionButton.leadingAnchor.constraint(
                 greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor,
-                constant: 10
+                constant: MapChromeLayout.edgeInset
             ),
-            dataAttributionTrailingConstraint,
-            dataAttributionButton.bottomAnchor.constraint(
+            // The credit follows the compass, so the bottom row keeps one
+            // gap size and one center line.
+            dataAttributionButton.trailingAnchor.constraint(
+                equalTo: compassButton.leadingAnchor,
+                constant: -MapChromeLayout.controlSpacing
+            ),
+            dataAttributionButton.centerYAnchor.constraint(
+                equalTo: compassButton.centerYAnchor
+            ),
+            venueAccessibilityContainer.leadingAnchor.constraint(equalTo: leadingAnchor),
+            venueAccessibilityContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
+            venueAccessibilityContainer.topAnchor.constraint(equalTo: topAnchor),
+            venueAccessibilityContainer.bottomAnchor.constraint(equalTo: bottomAnchor),
+            statusChipStack.leadingAnchor.constraint(
+                equalTo: safeAreaLayoutGuide.leadingAnchor,
+                constant: MapChromeLayout.edgeInset
+            ),
+            statusChipStack.trailingAnchor.constraint(
+                lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor,
+                constant: -MapChromeLayout.edgeInset
+            ),
+            // Sit above the bottom control row so the chips never cover the
+            // compass, location buttons, or attribution.
+            statusChipStack.bottomAnchor.constraint(
                 equalTo: safeAreaLayoutGuide.bottomAnchor,
-                constant: -10
+                constant: -(MapChromeLayout.edgeInset + MapChromeLayout.controlSize
+                    + MapChromeLayout.controlSpacing)
             ),
         ])
+        beginBasemapLoad()
 
         let center = NotificationCenter.default
         center.addObserver(
@@ -583,6 +720,7 @@ final class UnifiedMapHostView: UIView {
             mapView.preferredFramesPerSecond = screen.maximumFramesPerSecond
         }
         synchronizeBasemapFromScene()
+        updateReservedChrome()
 
         // SpriteKit applies `.resizeFill` after the SKView receives its final
         // bounds. Re-read the fitted camera on the next main-loop turn so the
@@ -592,14 +730,56 @@ final class UnifiedMapHostView: UIView {
         }
     }
 
+    /// Tells the renderer which screen rects the UIKit chrome covers: the
+    /// bottom row of attribution and compass, and any visible status chip.
+    /// The SKView fills this view, so the frames need no conversion.
+    private func updateReservedChrome() {
+        guard let renderer = mapView.scene as? UnifiedBigSightScene else { return }
+        var rects = [dataAttributionButton.frame.union(compassButton.frame)]
+        if statusChipStack.arrangedSubviews.contains(where: { !$0.isHidden }) {
+            rects.append(statusChipStack.frame)
+        }
+        renderer.hostChromeRects = rects.filter { !$0.isEmpty }
+    }
+
     func updateAppearance(_ appearance: UnifiedMapAppearance) {
         guard self.appearance != appearance else { return }
         self.appearance = appearance
         backgroundColor = appearance.palette.mapBackground
         applyChromeAppearance()
         basemapView.styleURL = Self.styleURL(for: appearance)
+        beginBasemapLoad()
         lastBasemapCamera = nil
         applyRequestedBasemapCamera()
+    }
+
+    private func beginBasemapLoad() {
+        basemapTimeoutWorkItem?.cancel()
+        // Keep showing `.unavailable` across a style swap while offline; a
+        // successful render clears it.
+        if basemapState != .unavailable { setBasemapState(.loading) }
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self, self.basemapState == .loading else { return }
+            self.setBasemapState(.unavailable)
+        }
+        basemapTimeoutWorkItem = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.basemapLoadTimeout, execute: timeout)
+    }
+
+    fileprivate func setBasemapState(_ state: UnifiedBasemapState) {
+        if state != .loading {
+            basemapTimeoutWorkItem?.cancel()
+            basemapTimeoutWorkItem = nil
+        }
+        guard state != basemapState else { return }
+        basemapState = state
+        let isHidden = state != .unavailable
+        guard basemapStatusChip.isHidden != isHidden else { return }
+        basemapStatusChip.isHidden = isHidden
+        setNeedsLayout()
+        if !isHidden {
+            UIAccessibility.post(notification: .announcement, argument: basemapStatusChip.text)
+        }
     }
 
     @objc private func didEnterBackground() {
@@ -629,6 +809,16 @@ final class UnifiedMapHostView: UIView {
         compassButton.updateIndicator(
             rotation: MapCameraMath.northIndicatorRotation(mapRotation: rotation)
         )
+    }
+
+    /// Moves the compass next to the visible location buttons, so the gap
+    /// between every bottom control stays `MapChromeLayout.controlSpacing`.
+    func updateLocationControlCount(_ count: Int) {
+        guard count != locationControlCount else { return }
+        locationControlCount = count
+        compassTrailingConstraint.constant =
+            -MapChromeLayout.adjacentChromeTrailingInset(locationControlCount: count)
+        setNeedsLayout()
     }
 
     func updateBasemap(camera: UnifiedBasemapCamera) {
@@ -672,7 +862,6 @@ final class UnifiedMapHostView: UIView {
         let palette = appearance.palette
         var compassConfiguration = compassButton.configuration
         compassConfiguration?.baseForegroundColor = palette.primaryText
-        compassConfiguration?.baseBackgroundColor = palette.chromeBackground
         compassButton.configuration = compassConfiguration
         compassButton.updateIndicatorColor(
             palette.primaryText,
@@ -693,25 +882,27 @@ final class UnifiedMapHostView: UIView {
     }
 
     private static func styleURL(for appearance: UnifiedMapAppearance) -> URL {
-        guard appearance == .dark else { return openStreetMapStyleURL }
+        let name = appearance == .dark ? "AmericanaDark" : "AmericanaLight"
         if let direct = Bundle.main.url(
-            forResource: "AmericanaDark",
+            forResource: name,
             withExtension: "json",
             subdirectory: "MapStyles"
-        ) ?? Bundle.main.url(forResource: "AmericanaDark", withExtension: "json") {
+        ) ?? Bundle.main.url(forResource: name, withExtension: "json") {
             return direct
         }
-        guard let resourceURL = Bundle.main.resourceURL,
+        let fileName = "\(name).json"
+        if let resourceURL = Bundle.main.resourceURL,
             let enumerator = FileManager.default.enumerator(
                 at: resourceURL,
                 includingPropertiesForKeys: [.isRegularFileKey],
                 options: [.skipsHiddenFiles]
             )
-        else { return openStreetMapStyleURL }
-        for case let url as URL in enumerator where url.lastPathComponent == "AmericanaDark.json" {
-            return url
+        {
+            for case let url as URL in enumerator where url.lastPathComponent == fileName {
+                return url
+            }
         }
-        assertionFailure("Missing bundled AmericanaDark.json map style")
+        assertionFailure("Missing bundled \(fileName) map style")
         return openStreetMapStyleURL
     }
 
@@ -744,12 +935,75 @@ final class UnifiedMapHostView: UIView {
                 "Drag to move, pinch to zoom, rotate with two fingers, or tap a venue or table."
         )
         mapView.accessibilityValue = renderer.accessibilitySummary
+        // The proxies only mark the scope for UI automation. They carry no
+        // label, so assistive technology meets one map canvas, not two.
         campusAccessibilityProxy.isHidden = scope != .campus
         venueAccessibilityProxy.isHidden = scope != .venue
-        let activeProxy = scope == .campus ? campusAccessibilityProxy : venueAccessibilityProxy
-        activeProxy.accessibilityLabel = mapView.accessibilityLabel
-        activeProxy.accessibilityHint = mapView.accessibilityHint
-        activeProxy.accessibilityValue = mapView.accessibilityValue
+        updateVenueAccessibilityElements(renderer: renderer, scope: scope)
+        updateCampusHint(scope: scope, isSearchActive: renderer.isSearchModeActive)
+    }
+
+    /// Exposes each visible hall badge as a button so VoiceOver users can open
+    /// a hall from the campus overview without the venue menu.
+    private func updateVenueAccessibilityElements(
+        renderer: UnifiedBigSightScene,
+        scope: MapScreenModel.Scope
+    ) {
+        let targets = scope == .campus ? renderer.venueBadgeTargets() : []
+        let minimumSide = MapChromeLayout.controlSize
+        var elements: [MapVenueAccessibilityElement] = []
+        for target in targets {
+            let element =
+                venueAccessibilityElements[target.venueID]
+                ?? MapVenueAccessibilityElement(accessibilityContainer: venueAccessibilityContainer)
+            venueAccessibilityElements[target.venueID] = element
+            element.accessibilityLabel = target.title
+            element.accessibilityValue = target.matchCount.map {
+                String(localized: "\($0) matching circles")
+            }
+            element.accessibilityHint = String(localized: "Opens the floor map for this hall.")
+            element.accessibilityTraits = .button
+            element.accessibilityIdentifier = "map-venue-badge-\(target.venueID)"
+            element.accessibilityFrameInContainerSpace = target.frame.insetBy(
+                dx: min(0, (target.frame.width - minimumSide) / 2),
+                dy: min(0, (target.frame.height - minimumSide) / 2)
+            )
+            let venueID = target.venueID
+            element.onActivate = { [weak self] in
+                self?.onActivateVenue?(venueID)
+            }
+            elements.append(element)
+        }
+        // Read badges top to bottom, then leading to trailing.
+        elements.sort { lhs, rhs in
+            let left = lhs.accessibilityFrameInContainerSpace
+            let right = rhs.accessibilityFrameInContainerSpace
+            if abs(left.midY - right.midY) > minimumSide / 2 {
+                return left.midY < right.midY
+            }
+            return left.midX < right.midX
+        }
+        let currentIDs = (venueAccessibilityContainer.accessibilityElements ?? [])
+            .map { ($0 as? MapVenueAccessibilityElement)?.accessibilityIdentifier }
+        venueAccessibilityContainer.accessibilityElements = elements
+        if currentIDs != elements.map(\.accessibilityIdentifier) {
+            UIAccessibility.post(notification: .layoutChanged, argument: nil)
+        }
+    }
+
+    /// Shows "Tap a hall to open its floor map" on the campus overview until
+    /// the attendee opens a hall for the first time. Search results replace
+    /// the hint while search is active.
+    private func updateCampusHint(scope: MapScreenModel.Scope, isSearchActive: Bool) {
+        if scope == .venue, !hasSeenCampusHint {
+            hasSeenCampusHint = true
+            UserDefaults.standard.set(true, forKey: Self.campusHintSeenKey)
+        }
+        let isHidden = scope != .campus || hasSeenCampusHint || isSearchActive
+        if campusHintChip.isHidden != isHidden {
+            campusHintChip.isHidden = isHidden
+            setNeedsLayout()
+        }
     }
 
     private func attributionAction(title: String, url: String) -> UIAction {
@@ -757,6 +1011,159 @@ final class UnifiedMapHostView: UIView {
             guard let url = URL(string: url) else { return }
             UIApplication.shared.open(url)
         }
+    }
+}
+
+/// The map data credit stays visually compact, but accepts touches across a
+/// full 44-point target around its label.
+final class MapAttributionButton: UIButton {
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        layer.cornerRadius = bounds.height / 2
+    }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        let minimumSide = MapChromeLayout.controlSize
+        let target = bounds.insetBy(
+            dx: min(0, (bounds.width - minimumSide) / 2),
+            dy: min(0, (bounds.height - minimumSide) / 2)
+        )
+        return target.contains(point)
+    }
+
+    /// Reports the same 44-point target to assistive technology, so the
+    /// VoiceOver cursor and Switch Control match the touch area.
+    override var accessibilityFrame: CGRect {
+        get {
+            let frame = super.accessibilityFrame
+            let minimumSide = MapChromeLayout.controlSize
+            return frame.insetBy(
+                dx: min(0, (frame.width - minimumSide) / 2),
+                dy: min(0, (frame.height - minimumSide) / 2)
+            )
+        }
+        set { super.accessibilityFrame = newValue }
+    }
+}
+
+/// A hall badge drawn by SpriteKit, exposed to VoiceOver as a button.
+final class MapVenueAccessibilityElement: UIAccessibilityElement {
+    var onActivate: (() -> Void)?
+
+    override func accessibilityActivate() -> Bool {
+        guard let onActivate else { return false }
+        onActivate()
+        return true
+    }
+}
+
+extension UnifiedMapHostView: MLNMapViewDelegate {
+    nonisolated func mapViewDidFinishLoadingMap(_ mapView: MLNMapView) {
+        Task { @MainActor [weak self] in
+            self?.setBasemapState(.ready)
+        }
+    }
+
+    nonisolated func mapViewDidFinishRenderingMap(
+        _ mapView: MLNMapView,
+        fullyRendered: Bool
+    ) {
+        // Partial renders happen while tiles stream in; only a full render
+        // proves the street tiles are reachable.
+        guard fullyRendered else { return }
+        Task { @MainActor [weak self] in
+            self?.setBasemapState(.ready)
+        }
+    }
+
+    nonisolated func mapViewDidFailLoadingMap(_ mapView: MLNMapView, withError error: Error) {
+        Task { @MainActor [weak self] in
+            self?.setBasemapState(.unavailable)
+        }
+    }
+}
+
+/// A compact material chip for passive map status text. It never intercepts
+/// touches, so the map stays fully interactive underneath it.
+///
+/// It is floating map chrome: a capsule while the text fits on one line, and
+/// a `Radius.panel` rounded rectangle when the text wraps.
+final class MapStatusChip: UIView {
+    private let effectView = UIVisualEffectView(
+        effect: UIBlurEffect(style: .systemMaterial)
+    )
+    private let label = UILabel()
+
+    var text: String {
+        get { label.text ?? "" }
+        set {
+            label.text = newValue
+            accessibilityLabel = newValue
+            setNeedsLayout()
+        }
+    }
+
+    init(text: String) {
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
+        isAccessibilityElement = true
+        accessibilityTraits = .staticText
+
+        effectView.translatesAutoresizingMaskIntoConstraints = false
+        effectView.layer.cornerCurve = .continuous
+        effectView.layer.borderWidth = 0.5
+        effectView.clipsToBounds = true
+        addSubview(effectView)
+
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .preferredFont(forTextStyle: .footnote)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .label
+        // A status sentence wraps fully; it never truncates.
+        label.numberOfLines = 0
+        effectView.contentView.addSubview(label)
+
+        NSLayoutConstraint.activate([
+            effectView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            effectView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            effectView.topAnchor.constraint(equalTo: topAnchor),
+            effectView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            label.leadingAnchor.constraint(
+                equalTo: effectView.contentView.leadingAnchor, constant: Spacing.medium),
+            label.trailingAnchor.constraint(
+                equalTo: effectView.contentView.trailingAnchor, constant: -Spacing.medium),
+            label.topAnchor.constraint(
+                equalTo: effectView.contentView.topAnchor, constant: Spacing.small),
+            label.bottomAnchor.constraint(
+                equalTo: effectView.contentView.bottomAnchor, constant: -Spacing.small),
+        ])
+        self.text = text
+        updateBorderColor()
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
+            (chip: MapStatusChip, _: UITraitCollection) in
+            chip.updateBorderColor()
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // Measured from the chip's own height, which is final here; the
+        // label inside the effect view may not have its frame yet.
+        let isSingleLine = bounds.height < label.font.lineHeight * 1.5 + Spacing.small * 2
+        effectView.layer.cornerRadius =
+            isSingleLine ? bounds.height / 2 : min(Radius.panel, bounds.height / 2)
+    }
+
+    private func updateBorderColor() {
+        // `Color.hairline` in UIKit form: separator at 24 % opacity.
+        effectView.layer.borderColor =
+            UIColor.separator.withAlphaComponent(0.24)
+            .resolvedColor(with: traitCollection).cgColor
     }
 }
 
@@ -836,6 +1243,9 @@ enum UnifiedMapLevelOfDetail {
 
 @MainActor
 final class MapCompassButton: UIButton {
+    /// The same material as the SwiftUI location buttons (`.regularMaterial`),
+    /// so the bottom control row reads as one set of floating chrome.
+    private let materialView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
     private let indicatorView = UIView(frame: .zero)
     private let northNeedleLayer = CAShapeLayer()
     private let southNeedleLayer = CAShapeLayer()
@@ -845,12 +1255,15 @@ final class MapCompassButton: UIButton {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
+        materialView.isUserInteractionEnabled = false
+        materialView.clipsToBounds = true
+        insertSubview(materialView, at: 0)
         indicatorView.isUserInteractionEnabled = false
         indicatorView.layer.addSublayer(southNeedleLayer)
         indicatorView.layer.addSublayer(northNeedleLayer)
         indicatorView.layer.addSublayer(centerCapLayer)
         addSubview(indicatorView)
-        layer.cornerRadius = 22
+        layer.cornerRadius = MapChromeLayout.controlSize / 2
         layer.borderWidth = 0.5
     }
 
@@ -872,15 +1285,19 @@ final class MapCompassButton: UIButton {
             isGridAligned ? accentColor : color.withAlphaComponent(0.72)
         ).cgColor
         centerCapLayer.fillColor = UIColor.systemBackground.cgColor
+        // `Color.hairline` in UIKit form: separator at 24 % opacity.
         layer.borderColor = (
             isGridAligned
                 ? accentColor.withAlphaComponent(0.58)
-                : UIColor.separator.withAlphaComponent(0.35)
+                : UIColor.separator.withAlphaComponent(0.24)
         ).cgColor
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        materialView.frame = bounds
+        materialView.layer.cornerRadius = bounds.height / 2
+        sendSubviewToBack(materialView)
         bringSubviewToFront(indicatorView)
         indicatorView.bounds = CGRect(x: 0, y: 0, width: 30, height: 30)
         indicatorView.center = CGPoint(x: bounds.midX, y: bounds.midY)
@@ -924,6 +1341,33 @@ final class MapCompassButton: UIButton {
 
 enum UnifiedMapMarkerMetrics {
     static let venueIconSize: CGFloat = 32
+    /// Facility titles wrap to two lines at this width instead of running
+    /// off the screen. About 18 characters of 11 pt text per line.
+    static let facilityLabelMaxWidth: CGFloat = 120
+    /// Gap between a marker backing and its title.
+    static let labelClearance: CGFloat = Spacing.xSmall
+    /// Distance by which the halo extends past the outline of map text,
+    /// in points.
+    static let labelHaloWidth: CGFloat = 1.5
+
+    // Shared by the SpriteKit badge and `BigSightVenueBadge`, so the two
+    // renderers keep one shape.
+    static let venueBadgeCornerRatio: CGFloat = 0.24
+    static let venueBadgePlateInsetRatio: CGFloat = 0.075
+
+    static func venueBadgeCornerRadius(side: CGFloat) -> CGFloat {
+        side * venueBadgeCornerRatio
+    }
+
+    static func venueBadgePlateInset(side: CGFloat) -> CGFloat {
+        side * venueBadgePlateInsetRatio
+    }
+
+    /// Concentric with the outer corner. `Radius.concentric` is not used
+    /// because it clamps to 6 pt, and small badges scale below that.
+    static func venueBadgePlateRadius(side: CGFloat) -> CGFloat {
+        venueBadgeCornerRadius(side: side) - venueBadgePlateInset(side: side)
+    }
 
     static func facilityIconSize(for kind: BigSightFacilityLocation.Kind) -> CGFloat {
         kind == .conferenceTower ? 22 : 18
@@ -931,6 +1375,62 @@ enum UnifiedMapMarkerMetrics {
 
     static func backingSize(for icon: BigSightMapIcon, iconSize: CGFloat) -> CGFloat {
         iconSize + (icon.venueBadge == nil ? 6 : 10)
+    }
+
+    /// The rounded bold face of every map title.
+    static func titleFont(size: CGFloat) -> UIFont {
+        let base = UIFont.systemFont(ofSize: size, weight: .bold)
+        return base.fontDescriptor.withDesign(.rounded)
+            .map { UIFont(descriptor: $0, size: size) } ?? base
+    }
+
+    static func titleWidth(_ text: String, fontSize: CGFloat) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: titleFont(size: fontSize)]).width)
+    }
+
+    /// A facility title laid out for at most two lines of `maxWidth`.
+    ///
+    /// A title that fits stays on one line. A longer title breaks at the word
+    /// boundary that gives the two most equal lines, so "エントランスプラザ喫煙所"
+    /// becomes "エントランスプラザ / 喫煙所", never "エントランスプラ / ザ喫煙所".
+    /// The returned text holds the break as "\n", and `width` is the wrap
+    /// width that keeps both lines whole. `nil` means that no word boundary
+    /// gives two lines that fit: the map then shows the icon without a title.
+    static func facilityTitle(
+        _ text: String,
+        fontSize: CGFloat,
+        maxWidth: CGFloat
+    ) -> (text: String, width: CGFloat)? {
+        guard !text.isEmpty else { return (text, maxWidth) }
+        if titleWidth(text, fontSize: fontSize) <= maxWidth {
+            return (text, maxWidth)
+        }
+        // ICU word boundaries also split Japanese and Chinese into words.
+        var wordStarts: [String.Index] = []
+        text.enumerateSubstrings(
+            in: text.startIndex..<text.endIndex,
+            options: [.byWords, .substringNotRequired]
+        ) { _, range, _, _ in
+            if range.lowerBound > text.startIndex {
+                wordStarts.append(range.lowerBound)
+            }
+        }
+        var best: (text: String, width: CGFloat)?
+        for index in wordStarts {
+            let first = text[..<index].trimmingCharacters(in: .whitespaces)
+            let second = text[index...].trimmingCharacters(in: .whitespaces)
+            guard !first.isEmpty, !second.isEmpty else { continue }
+            let width = max(
+                titleWidth(first, fontSize: fontSize),
+                titleWidth(second, fontSize: fontSize)
+            )
+            guard width <= maxWidth else { continue }
+            if best.map({ width < $0.width }) ?? true {
+                best = ("\(first)\n\(second)", width)
+            }
+        }
+        // One point of slack, so rounding never wraps a line a second time.
+        return best.map { ($0.text, $0.width + 1) }
     }
 }
 
@@ -957,7 +1457,26 @@ final class UnifiedBigSightScene: SKScene {
         let minimumZoom: CGFloat
         let labelMinimumZoom: CGFloat
         let maximumZoom: CGFloat
+        /// Side of the square or round backing, in screen points.
+        let badgeSize: CGFloat
+        let venueID: Int?
+        /// Lower values claim screen space first: halls, then gates and
+        /// help points, then food and restrooms, then everything else.
+        let priority: Int
     }
+
+    /// The on-screen footprint of a hall badge and its title, in the SKView's
+    /// coordinate space.
+    struct VenueBadgeTarget: Equatable {
+        let venueID: Int
+        let title: String
+        let frame: CGRect
+        /// Search matches in this hall, or `nil` outside search mode.
+        var matchCount: Int? = nil
+    }
+
+    private static let venueTitlePlateName = "map-venue-title-plate"
+    private static let venueMatchCountName = "map-venue-match-count"
 
     private static let darkArtworkShader = SKShader(
         source: """
@@ -999,6 +1518,20 @@ final class UnifiedBigSightScene: SKScene {
     private var minimumCameraScale: CGFloat = 1
     private var maximumCameraScale: CGFloat = 0.01
     private var hasFittedInitialCamera = false
+    /// True while the camera still shows the fitted campus overview. A size
+    /// change then fits the overview again; after any pan, zoom, rotation,
+    /// or focus, the user's camera stays where it is.
+    private var isShowingOverviewFit = false
+    /// The hall that the camera was fitted to, until a gesture moves it. A
+    /// size change fits that hall again, the same as the overview. A focus
+    /// that is asked for before the first layout (a launch route, a restored
+    /// hall) waits here, because the scale needs the viewport size.
+    private var venueFitMapID: Int?
+    private var overviewInsets: MapViewportInsets?
+    private var lastCameraFitRequestID: UUID?
+    /// The overview never opens closer than this, so it stays clear of the
+    /// 2.4x threshold at which the campus drills into a hall.
+    private static let maximumOverviewZoomFactor: CGFloat = 2
     private var lastCameraPosition = CGPoint(x: CGFloat.infinity, y: CGFloat.infinity)
     private var lastCameraScale: CGFloat = .infinity
     private var lastCameraRotation: CGFloat = .infinity
@@ -1017,6 +1550,28 @@ final class UnifiedBigSightScene: SKScene {
     private var locationFocusBottomInset: CGFloat = 0
     private var visibleMapLayers = BigSightMapLayer.defaultVisible
     private var isSearchActive = false
+    /// Halls that contain at least one search match. Their badges stay at
+    /// full opacity in search mode; the other halls dim.
+    private var searchMatchedVenueIDs: Set<Int> = []
+    /// Matches per hall on the current day, shown as a count on each badge
+    /// in search mode.
+    private(set) var searchMatchCountsByVenue: [Int: Int] = [:]
+    /// Screen rects (SKView points) of SwiftUI chrome that MapView measures:
+    /// the selector panel and the bottom-trailing control column.
+    private var overlayChromeRects: [CGRect] = []
+    /// Screen rects of the host's UIKit chrome: the attribution chip, the
+    /// compass, and the status chips. The host sets them on layout.
+    var hostChromeRects: [CGRect] = [] {
+        didSet {
+            guard hostChromeRects != oldValue else { return }
+            applyLevelOfDetail()
+        }
+    }
+    /// Opacity of the floor plans while search highlights are shown. High
+    /// enough that hall outlines stay readable around the matches.
+    private static let searchBaseMapAlpha: CGFloat = 0.5
+    /// Opacity of a hall badge with no search match.
+    private static let searchUnmatchedVenueAlpha: CGFloat = 0.35
 
     var cameraRotation: CGFloat { mapCamera.zRotation }
     var gridAlignedCameraRotation: CGFloat { campus.gridAlignedCameraRotation }
@@ -1063,7 +1618,12 @@ final class UnifiedBigSightScene: SKScene {
         dynamicRoot.children.compactMap { $0 as? SKShapeNode }.count
     }
     var baseMapAlpha: CGFloat { staticRoot.alpha }
-    var areMapIconsHiddenForSearch: Bool { markerRoot.isHidden }
+    var isSearchModeActive: Bool { isSearchActive }
+    /// Search mode hides the facility icons. Hall badges stay visible so the
+    /// user can still see where each match is.
+    var areMapIconsHiddenForSearch: Bool {
+        isSearchActive && facilityMarkers.allSatisfy(\.node.isHidden)
+    }
     func isFacilityMarkerVisible(id: String) -> Bool {
         facilityMarkers.first(where: { $0.id == id }).map { !$0.node.isHidden } ?? false
     }
@@ -1115,8 +1675,6 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     var accessibilitySummary: String {
-        let bearing = Double(normalizedRotation(mapCamera.zRotation) * 180 / .pi)
-            .formatted(.number.precision(.fractionLength(1)))
         let zoom = Double(zoomFactor).formatted(.number.precision(.fractionLength(1)))
         var summary: String
         if scope == .campus {
@@ -1137,17 +1695,20 @@ final class UnifiedBigSightScene: SKScene {
             summary = String(localized: "\(summary), destination \(destinationSummary)")
         }
         #if DEBUG
-            var debugSummary = String(
-                localized:
+            // Raw camera numbers mean nothing to a VoiceOver user. UI tests
+            // opt in to them explicitly to observe camera changes.
+            if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-map-diagnostics") {
+                let bearing = Double(normalizedRotation(mapCamera.zRotation) * 180 / .pi)
+                    .formatted(.number.precision(.fractionLength(1)))
+                var debugSummary =
                     "\(summary), camera offset \(mapCamera.position.x) \(mapCamera.position.y), bearing \(bearing) degrees"
-            )
-            if let locatedUserHeading {
-                debugSummary += ", user heading \(Int(locatedUserHeading.rounded())) degrees"
+                if let locatedUserHeading {
+                    debugSummary += ", user heading \(Int(locatedUserHeading.rounded())) degrees"
+                }
+                return debugSummary
             }
-            return debugSummary
-        #else
-            return summary
         #endif
+        return summary
     }
 
     init(campus: BigSightCampusScene, appearance: UnifiedMapAppearance = .light) {
@@ -1178,6 +1739,7 @@ final class UnifiedBigSightScene: SKScene {
         self.appearance = appearance
         lastDynamicFingerprint = nil
         buildStaticScene()
+        updateVenueMatchCountBadges()
     }
 
     @available(*, unavailable)
@@ -1224,13 +1786,24 @@ final class UnifiedBigSightScene: SKScene {
         locatedUser: LocatedMapUser?,
         destination: MapDestination? = nil,
         visibleMapLayers: Set<BigSightMapLayer> = BigSightMapLayer.defaultVisible,
-        locationFocusBottomInset: CGFloat = 0
+        locationFocusBottomInset: CGFloat = 0,
+        overviewInsets: MapViewportInsets? = nil,
+        chromeObstacles: [CGRect] = [],
+        cameraFitRequest: MapCameraFitRequest? = nil
     ) {
+        overlayChromeRects = chromeObstacles
+        if overviewInsets != self.overviewInsets {
+            self.overviewInsets = overviewInsets
+            if hasFittedInitialCamera, isShowingOverviewFit, self.scope == .campus {
+                focusCampus(animated: false)
+            }
+        }
         if self.campus.id != campus.id {
             self.campus = campus
             lastDynamicFingerprint = nil
             lastRenderedLocatedUser = nil
             buildStaticScene()
+            updateVenueMatchCountBadges()
             hasFittedInitialCamera = false
             fitCameraIfNeeded(force: true)
         }
@@ -1250,6 +1823,14 @@ final class UnifiedBigSightScene: SKScene {
         self.selectedMapID = scope == .venue ? selectedMapID : nil
         self.visibleMapLayers = visibleMapLayers
         isSearchActive = searchActive
+        searchMatchedVenueIDs = searchActive ? Set(searchMatches.map(\.mapID)) : []
+        let matchCounts =
+            searchActive
+            ? Dictionary(grouping: searchMatches, by: \.mapID).mapValues(\.count) : [:]
+        if matchCounts != searchMatchCountsByVenue {
+            searchMatchCountsByVenue = matchCounts
+            updateVenueMatchCountBadges()
+        }
         applyLevelOfDetail()
         artworkCount = circleArtwork.count
         favoriteCount = bookmarks.count
@@ -1306,9 +1887,15 @@ final class UnifiedBigSightScene: SKScene {
         } else if shouldFocusLocatedUser, let locatedUser {
             focus(on: locatedUser, animated: true)
         }
+        if let cameraFitRequest, cameraFitRequest.id != lastCameraFitRequestID {
+            lastCameraFitRequestID = cameraFitRequest.id
+            fitCamera(to: cameraFitRequest.target, searchMatches: searchMatches)
+        }
     }
 
     func beginGesture() {
+        isShowingOverviewFit = false
+        venueFitMapID = nil
         mapCamera.removeAllActions()
     }
 
@@ -1388,6 +1975,8 @@ final class UnifiedBigSightScene: SKScene {
             gridAlignedRotation: gridAlignedCameraRotation
         )
         mapCamera.removeAction(forKey: "compass-rotation")
+        isShowingOverviewFit = false
+        venueFitMapID = nil
 
         if reduceMotion {
             mapCamera.zRotation = targetRotation
@@ -1536,7 +2125,12 @@ final class UnifiedBigSightScene: SKScene {
         blockLabels = []
         staticRoot.addChild(campusDetailRoot)
         staticRoot.addChild(pedestrianRoot)
-        staticRoot.addChild(markerRoot)
+        // Markers sit outside `staticRoot`, whose alpha dims the floor plans
+        // in search mode. Hall badges keep their own search opacity, so a
+        // hall with matches stays at full strength.
+        if markerRoot.parent == nil {
+            addChild(markerRoot)
+        }
         staticRoot.addChild(venueRoot)
         staticRoot.addChild(tableRoot)
         staticRoot.addChild(blockLabelRoot)
@@ -1701,8 +2295,17 @@ final class UnifiedBigSightScene: SKScene {
                 layer: nil,
                 minimumZoom: 0,
                 labelMinimumZoom: 0,
-                maximumZoom: 12
+                maximumZoom: 12,
+                badgeSize: UnifiedMapMarkerMetrics.backingSize(
+                    for: venue.kind.icon,
+                    iconSize: UnifiedMapMarkerMetrics.venueIconSize
+                ),
+                venueID: venue.id,
+                priority: 0
             ))
+        // Hall titles must stay readable where a neighboring badge overlaps
+        // them, so they draw above every marker backing.
+        venueMarker.label.zPosition = 30
         markerRoot.addChild(venueMarker.node)
 
         if venue.scene.artwork == nil {
@@ -1713,7 +2316,8 @@ final class UnifiedBigSightScene: SKScene {
                     at: UnifiedMapProjection.scenePoint(fromCampus: campusPoint),
                     fontSize: 19,
                     color: palette.blockText,
-                    zPosition: 12
+                    zPosition: 12,
+                    halo: true
                 )
                 label.userData = NSMutableDictionary(dictionary: ["mapID": venue.id])
                 blockLabels.append(label)
@@ -1734,7 +2338,8 @@ final class UnifiedBigSightScene: SKScene {
             iconSize: UnifiedMapMarkerMetrics.facilityIconSize(for: facility.kind),
             fontSize: 11,
             titleColor: appearance.palette.primaryText,
-            zPosition: 22
+            zPosition: 22,
+            labelMaxWidth: UnifiedMapMarkerMetrics.facilityLabelMaxWidth
         )
         facilityMarkers.append(
             ScreenSpaceMarker(
@@ -1744,9 +2349,27 @@ final class UnifiedBigSightScene: SKScene {
                 layer: facility.layer,
                 minimumZoom: facility.minimumZoom,
                 labelMinimumZoom: presentation.labelMinimumZoom,
-                maximumZoom: isInsideVenue ? facility.maximumZoom : .infinity
+                maximumZoom: isInsideVenue ? facility.maximumZoom : .infinity,
+                badgeSize: UnifiedMapMarkerMetrics.backingSize(
+                    for: facility.kind.icon,
+                    iconSize: UnifiedMapMarkerMetrics.facilityIconSize(for: facility.kind)
+                ),
+                venueID: nil,
+                priority: Self.labelPriority(for: facility.kind)
             ))
         markerRoot.addChild(marker.node)
+    }
+
+    private static func labelPriority(for kind: BigSightFacilityLocation.Kind) -> Int {
+        switch kind {
+        case .entryGate, .information, .internationalDesk, .firstAid, .ticketExchange,
+            .waitingArea, .train, .conferenceTower:
+            1
+        case .food, .restroom, .convenienceStore:
+            2
+        default:
+            3
+        }
     }
 
     private func facilityMarkerPresentation(
@@ -1790,14 +2413,32 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func fitCameraIfNeeded(force: Bool) {
-        guard size.width > 1, size.height > 1, force || !hasFittedInitialCamera else { return }
+        guard size.width > 1, size.height > 1 else { return }
         let bounds = UnifiedMapProjection.sceneBounds(fromCampus: campus.bounds)
+        // The zoom-out limit always follows the current viewport, even when
+        // the user's camera is kept.
         minimumCameraScale = max(
             bounds.width / (size.width * 0.86), bounds.height / (size.height * 0.76))
         maximumCameraScale = max(minimumCameraScale / 180, 0.006)
-        mapCamera.position = CGPoint(x: bounds.midX, y: bounds.midY)
-        mapCamera.setScale(minimumCameraScale)
+        let refitsOverview = isShowingOverviewFit && scope == .campus
+        let refitsVenue = venueFitMapID != nil && scope == .venue
+        guard force || !hasFittedInitialCamera || refitsOverview || refitsVenue else {
+            clampCamera()
+            applyLevelOfDetail()
+            return
+        }
+        if scope == .venue, let mapID = venueFitMapID ?? selectedMapID {
+            focusVenue(mapID: mapID, animated: false)
+            hasFittedInitialCamera = true
+            applyLevelOfDetail()
+            return
+        }
+        let fit = campusOverviewFit()
+        mapCamera.position = fit.position
+        mapCamera.setScale(fit.scale)
         mapCamera.zRotation = 0
+        isShowingOverviewFit = true
+        venueFitMapID = nil
         #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-rotated-camera") {
                 mapCamera.zRotation = .pi / 4
@@ -1808,17 +2449,123 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func focusCampus(animated: Bool) {
-        let bounds = UnifiedMapProjection.sceneBounds(fromCampus: campus.bounds)
+        let fit = campusOverviewFit()
         animateCamera(
-            position: CGPoint(x: bounds.midX, y: bounds.midY),
-            scale: minimumCameraScale,
+            position: fit.position,
+            scale: fit.scale,
             rotation: 0,
             animated: animated
+        )
+        isShowingOverviewFit = true
+    }
+
+    /// Chrome that covers the map edges. MapView can report measured insets;
+    /// until it does, estimate the event banner and hall selector at the top
+    /// and the control row at the bottom.
+    private var effectiveOverviewInsets: MapViewportInsets {
+        if let overviewInsets { return overviewInsets }
+        let safeArea = view?.safeAreaInsets ?? .zero
+        return MapViewportInsets(
+            top: safeArea.top + 96,
+            left: safeArea.left + MapChromeLayout.edgeInset,
+            bottom: safeArea.bottom + MapChromeLayout.edgeInset + MapChromeLayout.controlSize
+                + MapChromeLayout.controlSpacing,
+            right: safeArea.right + MapChromeLayout.edgeInset
+        )
+    }
+
+    /// The halls and the stations attendees walk from, in scene coordinates.
+    /// `campus.bounds` also holds every facility and footway, which leaves
+    /// the halls small on a large screen such as iPad.
+    private var campusOverviewSceneRect: CGRect {
+        var rect = campus.venues.reduce(CGRect.null) { $0.union($1.bounds) }
+        for facility in campus.facilities where facility.kind == .train {
+            rect = rect.union(CGRect(origin: facility.center, size: CGSize(width: 1, height: 1)))
+        }
+        return UnifiedMapProjection.sceneBounds(fromCampus: rect.isNull ? campus.bounds : rect)
+    }
+
+    private func campusOverviewFit() -> MapCameraFit {
+        let rect = campusOverviewSceneRect
+        let closestScale = minimumCameraScale / Self.maximumOverviewZoomFactor
+        return MapCameraMath.spriteKitCameraFit(
+            sceneRect: rect,
+            viewportSize: size,
+            insets: effectiveOverviewInsets,
+            padding: MapCameraMath.locationMarkerViewportPadding,
+            scaleRange: min(closestScale, minimumCameraScale)...minimumCameraScale
+        )
+            ?? MapCameraFit(
+                position: CGPoint(x: rect.midX, y: rect.midY),
+                scale: minimumCameraScale
+            )
+    }
+
+    private func fitCamera(
+        to target: MapCameraFitRequest.Target,
+        searchMatches: [CatalogMapSearchMatch]
+    ) {
+        switch target {
+        case .campusOverview:
+            focusCampus(animated: true)
+        case .layer(let layer):
+            let rect = campus.facilities
+                .filter { $0.layer == layer }
+                .reduce(CGRect.null) {
+                    $0.union(CGRect(origin: $1.center, size: CGSize(width: 1, height: 1)))
+                }
+            fitCamera(toCampusRect: rect, rotation: mapCamera.zRotation)
+        case .searchMatches:
+            let venuesByMapID = Dictionary(uniqueKeysWithValues: campus.venues.map { ($0.id, $0) })
+            var rect = CGRect.null
+            var matchedVenues: [Int: BigSightVenuePlacement] = [:]
+            for match in searchMatches {
+                guard let venue = venuesByMapID[match.mapID],
+                    let table = venue.scene.tableByID[match.tableID]
+                else { continue }
+                let local = subspaceRect(table: table, subspace: match.subspace, scene: venue.scene)
+                rect = rect.union(local.applying(venue.transform))
+                matchedVenues[venue.id] = venue
+            }
+            // Matches in one hall read best in that hall's own orientation.
+            let rotation =
+                matchedVenues.count == 1
+                ? -(matchedVenues.values.first?.rotation ?? 0)
+                : mapCamera.zRotation
+            fitCamera(toCampusRect: rect, rotation: rotation)
+        }
+    }
+
+    private func fitCamera(toCampusRect rect: CGRect, rotation: CGFloat) {
+        guard !rect.isNull else { return }
+        let closestScale = max(maximumCameraScale, minimumCameraScale / 45)
+        guard
+            let fit = MapCameraMath.spriteKitCameraFit(
+                sceneRect: UnifiedMapProjection.sceneBounds(fromCampus: rect),
+                viewportSize: size,
+                insets: effectiveOverviewInsets,
+                padding: MapCameraMath.locationMarkerViewportPadding,
+                cameraRotation: rotation,
+                scaleRange: min(closestScale, minimumCameraScale)...minimumCameraScale
+            )
+        else { return }
+        animateCamera(
+            position: fit.position,
+            scale: fit.scale,
+            rotation: rotation,
+            animated: true,
+            updatesSemanticScope: true
         )
     }
 
     private func focusVenue(mapID: Int, animated: Bool) {
         guard let venue = campus.venues.first(where: { $0.id == mapID }) else { return }
+        // Without a viewport the scale falls back to the campus limit, and
+        // the camera only turned to the hall. The first layout focuses it.
+        guard size.width > 1, size.height > 1 else {
+            venueFitMapID = mapID
+            return
+        }
         let bounds = UnifiedMapProjection.sceneBounds(fromCampus: venue.bounds)
         let targetScale = max(
             maximumCameraScale,
@@ -1833,6 +2580,7 @@ final class UnifiedBigSightScene: SKScene {
             rotation: -venue.rotation,
             animated: animated
         )
+        venueFitMapID = mapID
     }
 
     private func focus(on user: LocatedMapUser, animated: Bool) {
@@ -1900,15 +2648,22 @@ final class UnifiedBigSightScene: SKScene {
         )
     }
 
-    private func animateCamera(position: CGPoint, scale: CGFloat, rotation: CGFloat, animated: Bool)
-    {
+    private func animateCamera(
+        position: CGPoint,
+        scale: CGFloat,
+        rotation: CGFloat,
+        animated: Bool,
+        updatesSemanticScope: Bool = false
+    ) {
         mapCamera.removeAllActions()
+        isShowingOverviewFit = false
+        venueFitMapID = nil
         let duration = animated && !reduceMotion ? 0.42 : 0
         guard duration > 0 else {
             mapCamera.position = position
             mapCamera.setScale(scale)
             mapCamera.zRotation = rotation
-            endGesture(updateSemanticScope: false)
+            endGesture(updateSemanticScope: updatesSemanticScope)
             return
         }
         let group = SKAction.group([
@@ -1918,7 +2673,7 @@ final class UnifiedBigSightScene: SKScene {
         ])
         group.timingMode = .easeInEaseOut
         mapCamera.run(group) { [weak self] in
-            self?.endGesture(updateSemanticScope: false)
+            self?.endGesture(updateSemanticScope: updatesSemanticScope)
         }
     }
 
@@ -1962,12 +2717,12 @@ final class UnifiedBigSightScene: SKScene {
         tableRoot.isHidden = zoom < 2.2
         blockLabelRoot.isHidden = zoom < 10 || zoom > 65
         tableLabelRoot.isHidden = zoom < 32
-        staticRoot.alpha = isSearchActive ? 0.18 : 1
-        tableLabelRoot.alpha = isSearchActive ? 0.18 : 1
+        staticRoot.alpha = isSearchActive ? Self.searchBaseMapAlpha : 1
+        tableLabelRoot.alpha = isSearchActive ? Self.searchBaseMapAlpha : 1
         genreRoot.alpha = isSearchActive ? 0.12 : 1
         genreRoot.isHidden = scope != .venue
         dynamicRoot.isHidden = false
-        markerRoot.isHidden = isSearchActive
+        markerRoot.isHidden = false
         for marker in destinationRoot.children where marker.name == "map-destination-marker" {
             marker.setScale(mapCamera.xScale)
             marker.zRotation = levelRotation
@@ -1975,14 +2730,24 @@ final class UnifiedBigSightScene: SKScene {
         for marker in venueMarkers + facilityMarkers {
             marker.node.setScale(mapCamera.xScale)
             marker.node.zRotation = levelRotation
-            let isVisible = marker.layer.map(visibleMapLayers.contains) ?? true
+            let isVenue = marker.venueID != nil
+            let isLayerVisible = marker.layer.map(visibleMapLayers.contains) ?? true
+            // Search hides facility icons only. Hall badges stay, and halls
+            // without a match dim.
+            let isVisible = isLayerVisible && (isVenue || !isSearchActive)
+            var searchAlpha: CGFloat = 1
+            if isSearchActive, let venueID = marker.venueID,
+                !searchMatchedVenueIDs.contains(venueID)
+            {
+                searchAlpha = Self.searchUnmatchedVenueAlpha
+            }
             marker.node.alpha =
                 isVisible
                 ? UnifiedMapLevelOfDetail.opacity(
                     at: zoom,
                     minimumZoom: marker.minimumZoom,
                     maximumZoom: marker.maximumZoom
-                )
+                ) * searchAlpha
                 : 0
             marker.node.isHidden = marker.node.alpha <= 0
             marker.label.alpha = UnifiedMapLevelOfDetail.opacity(
@@ -1991,6 +2756,14 @@ final class UnifiedBigSightScene: SKScene {
                 maximumZoom: marker.maximumZoom
             )
             marker.label.isHidden = marker.label.alpha <= 0
+            if let venueID = marker.venueID {
+                // Inside the open hall the title sits on the floor plan, so a
+                // plate keeps the table glyphs from running through it.
+                marker.label.childNode(withName: Self.venueTitlePlateName)?.isHidden =
+                    !(scope == .venue && venueID == selectedMapID)
+                marker.node.childNode(withName: Self.venueMatchCountName)?.isHidden =
+                    !isSearchActive || (searchMatchCountsByVenue[venueID] ?? 0) == 0
+            }
         }
         for label in blockLabels {
             label.setScale(mapCamera.xScale)
@@ -2006,6 +2779,198 @@ final class UnifiedBigSightScene: SKScene {
         }
         for child in userRoot.children {
             child.setScale(mapCamera.xScale)
+        }
+        layoutMarkerLabels()
+    }
+
+    /// Screen-space collision pass for every marker and title.
+    ///
+    /// 1. Hall badges claim their rects first.
+    /// 2. Each hall title takes the first clear side of its badge: below,
+    ///    trailing, leading, then above.
+    /// 3. Facility icons follow in priority order. An icon that would cover a
+    ///    hall badge, a hall title, or a higher-priority icon is hidden.
+    /// 4. Facility titles take the first clear side of their icon: below,
+    ///    above, trailing, then leading. A title with no clear side inside the
+    ///    uncovered viewport is hidden, and its icon stays.
+    ///
+    /// The viewport excludes the top and bottom map chrome, so no title runs
+    /// under the compass, the attribution, or off the screen edge. The
+    /// measured chrome rects are obstacles too, so an icon under a control is
+    /// hidden instead of drawn beneath it.
+    private func layoutMarkerLabels() {
+        guard let view else { return }
+        let insets = effectiveOverviewInsets
+        // Titles keep the 8 pt gap from the screen edges too, so no title
+        // touches the edge of the display.
+        let viewport = CGRect(
+            x: insets.left,
+            y: insets.top,
+            width: view.bounds.width - insets.left - insets.right,
+            height: view.bounds.height - insets.top - insets.bottom
+        ).insetBy(dx: Spacing.small, dy: 0)
+        let venues = venueMarkers.filter { !$0.node.isHidden }
+        var obstacles = venues.map(badgeViewRect)
+
+        let badgeRects = obstacles
+        // Map chrome claims its rects before any title or facility icon, so
+        // the attribution chip, the compass, and the control columns never
+        // cover a restroom or a bus stop.
+        obstacles += (overlayChromeRects + hostChromeRects).filter { !$0.isEmpty }
+        for marker in venues {
+            guard marker.label.alpha > 0 else { continue }
+            let ownBadge = badgeViewRect(marker)
+            place(
+                marker.label,
+                of: marker,
+                sides: [.below, .trailing, .leading, .above],
+                in: viewport,
+                obstacles: &obstacles,
+                // A hall title must sit closer to its own badge than to any
+                // other badge, or "East 7" reads as the name of East 4–6.
+                otherBadges: badgeRects.filter { $0 != ownBadge }
+            )
+        }
+
+        let facilities = facilityMarkers.enumerated()
+            .filter { !$0.element.node.isHidden }
+            .sorted { ($0.element.priority, $0.offset) < ($1.element.priority, $1.offset) }
+            .map(\.element)
+        var placedFacilities: [ScreenSpaceMarker] = []
+        for marker in facilities {
+            let iconRect = badgeViewRect(marker)
+            // Icons may touch, but not overlap by more than a point.
+            let probe = iconRect.insetBy(dx: 1, dy: 1)
+            if obstacles.contains(where: { $0.intersects(probe) }) {
+                marker.node.isHidden = true
+                continue
+            }
+            obstacles.append(iconRect)
+            placedFacilities.append(marker)
+        }
+
+        for marker in placedFacilities {
+            guard !marker.label.isHidden, marker.label.alpha > 0,
+                marker.label.text?.isEmpty == false
+            else { continue }
+            place(
+                marker.label,
+                of: marker,
+                sides: [.below, .above, .trailing, .leading],
+                in: viewport,
+                obstacles: &obstacles
+            )
+        }
+    }
+
+    private enum LabelSide {
+        case below, above, trailing, leading
+    }
+
+    /// Moves `label` to the first side of its marker whose rect stays inside
+    /// `viewport` and clear of `obstacles`, then adds that rect to
+    /// `obstacles`. Hides the label when no side is clear.
+    ///
+    /// The own badge only needs to stay clear of the label; every other
+    /// obstacle keeps an 8 pt gap, so two titles never stack into one block
+    /// and a title never touches a neighbor badge. With `otherBadges`, a side
+    /// is also rejected when the label would sit nearer to one of those
+    /// badges than to its own.
+    private func place(
+        _ label: SKLabelNode,
+        of marker: ScreenSpaceMarker,
+        sides: [LabelSide],
+        in viewport: CGRect,
+        obstacles: inout [CGRect],
+        otherBadges: [CGRect] = []
+    ) {
+        let ownBadge = badgeViewRect(marker)
+        let center = markerViewCenter(marker)
+        let size = label.frame.size
+        let clearance = marker.badgeSize / 2 + UnifiedMapMarkerMetrics.labelClearance
+        for side in sides {
+            // Screen-space offset of the label center, y down.
+            let offset: CGPoint =
+                switch side {
+                case .below: CGPoint(x: 0, y: clearance + size.height / 2)
+                case .above: CGPoint(x: 0, y: -(clearance + size.height / 2))
+                case .trailing: CGPoint(x: clearance + size.width / 2, y: 0)
+                case .leading: CGPoint(x: -(clearance + size.width / 2), y: 0)
+                }
+            let rect = CGRect(
+                x: center.x + offset.x - size.width / 2,
+                y: center.y + offset.y - size.height / 2,
+                width: size.width,
+                height: size.height
+            )
+            let probe = rect.insetBy(dx: -Spacing.small, dy: -Spacing.small)
+            let ownDistance = Self.distance(between: rect, and: ownBadge)
+            guard viewport.contains(rect),
+                !obstacles.contains(where: { obstacle in
+                    obstacle == ownBadge ? obstacle.intersects(rect) : obstacle.intersects(probe)
+                }),
+                !otherBadges.contains(where: {
+                    Self.distance(between: rect, and: $0) <= ownDistance + Spacing.xSmall
+                })
+            else { continue }
+            // The marker is scaled and rotated to stay screen-upright, so one
+            // local unit is one screen point with the y axis pointing up.
+            label.position = CGPoint(x: offset.x, y: -offset.y)
+            label.isHidden = false
+            obstacles.append(rect)
+            return
+        }
+        label.isHidden = true
+    }
+
+    /// The shortest gap between two rects; zero when they touch or overlap.
+    private static func distance(between a: CGRect, and b: CGRect) -> CGFloat {
+        let dx = max(0, max(a.minX - b.maxX, b.minX - a.maxX))
+        let dy = max(0, max(a.minY - b.maxY, b.minY - a.maxY))
+        return hypot(dx, dy)
+    }
+
+    private func markerViewCenter(_ marker: ScreenSpaceMarker) -> CGPoint {
+        convertPoint(toView: marker.node.convert(.zero, to: self))
+    }
+
+    private func badgeViewRect(_ marker: ScreenSpaceMarker) -> CGRect {
+        let center = markerViewCenter(marker)
+        return CGRect(
+            x: center.x - marker.badgeSize / 2,
+            y: center.y - marker.badgeSize / 2,
+            width: marker.badgeSize,
+            height: marker.badgeSize
+        )
+    }
+
+    /// Hall badges that are currently drawn, with frames that cover the badge
+    /// and its visible title. The host exposes each one as a VoiceOver button.
+    func venueBadgeTargets() -> [VenueBadgeTarget] {
+        guard view != nil else { return [] }
+        return venueMarkers.compactMap { marker in
+            guard let venueID = marker.venueID,
+                !marker.node.isHidden,
+                marker.node.alpha > 0.05
+            else { return nil }
+            var frame = badgeViewRect(marker)
+            if !marker.label.isHidden {
+                let center = markerViewCenter(marker)
+                let size = marker.label.frame.size
+                frame = frame.union(
+                    CGRect(
+                        x: center.x + marker.label.position.x - size.width / 2,
+                        y: center.y - marker.label.position.y - size.height / 2,
+                        width: size.width,
+                        height: size.height
+                    ))
+            }
+            return VenueBadgeTarget(
+                venueID: venueID,
+                title: marker.label.text ?? "",
+                frame: frame,
+                matchCount: isSearchActive ? searchMatchCountsByVenue[venueID] ?? 0 : nil
+            )
         }
     }
 
@@ -2413,7 +3378,9 @@ final class UnifiedBigSightScene: SKScene {
         at position: CGPoint,
         fontSize: CGFloat,
         color: UIColor,
-        zPosition: CGFloat
+        zPosition: CGFloat,
+        halo: Bool = false,
+        maxWidth: CGFloat? = nil
     ) -> SKLabelNode {
         let label = SKLabelNode(fontNamed: ".AppleSystemUIFontRounded-Bold")
         label.text = text
@@ -2423,7 +3390,64 @@ final class UnifiedBigSightScene: SKScene {
         label.verticalAlignmentMode = .center
         label.position = position
         label.zPosition = zPosition
+        if let maxWidth {
+            // Long facility names take two lines, broken only between words.
+            // A name that cannot fit loses its title; the icon stays.
+            label.numberOfLines = 2
+            label.lineBreakMode = .byWordWrapping
+            if let title = UnifiedMapMarkerMetrics.facilityTitle(
+                text,
+                fontSize: fontSize,
+                maxWidth: maxWidth
+            ) {
+                label.text = title.text
+                label.preferredMaxLayoutWidth = title.width
+            } else {
+                label.text = ""
+            }
+        }
+        if halo, let shownText = label.text, !shownText.isEmpty {
+            label.addChild(haloNode(for: label, text: shownText, fontSize: fontSize))
+        }
         return label
+    }
+
+    /// The halo behind a map label: copies of the label in the floor color,
+    /// offset in eight directions by the halo width, so roads and floor
+    /// artwork never cut through the text.
+    ///
+    /// The copies use the same font, wrap width, and alignment as the label,
+    /// so they line up glyph for glyph. A stroked `attributedText` copy did
+    /// not: SpriteKit draws attributed text with other metrics and clips the
+    /// stroke at the glyph bounds, so the halo drew as a smear beside the
+    /// text.
+    private func haloNode(for label: SKLabelNode, text: String, fontSize: CGFloat) -> SKNode {
+        let haloColor = appearance.palette.labelHalo
+        let radius = UnifiedMapMarkerMetrics.labelHaloWidth
+        let container = SKNode()
+        container.name = "map-label-halo"
+        container.zPosition = -0.05
+        let diagonal = radius * 0.7071
+        let offsets: [CGPoint] = [
+            CGPoint(x: radius, y: 0), CGPoint(x: -radius, y: 0),
+            CGPoint(x: 0, y: radius), CGPoint(x: 0, y: -radius),
+            CGPoint(x: diagonal, y: diagonal), CGPoint(x: -diagonal, y: diagonal),
+            CGPoint(x: diagonal, y: -diagonal), CGPoint(x: -diagonal, y: -diagonal),
+        ]
+        for offset in offsets {
+            let copy = SKLabelNode(fontNamed: label.fontName)
+            copy.text = text
+            copy.fontSize = fontSize
+            copy.fontColor = haloColor
+            copy.numberOfLines = label.numberOfLines
+            copy.lineBreakMode = label.lineBreakMode
+            copy.preferredMaxLayoutWidth = label.preferredMaxLayoutWidth
+            copy.horizontalAlignmentMode = label.horizontalAlignmentMode
+            copy.verticalAlignmentMode = label.verticalAlignmentMode
+            copy.position = offset
+            container.addChild(copy)
+        }
+        return container
     }
 
     private func markerNode(
@@ -2433,7 +3457,8 @@ final class UnifiedBigSightScene: SKScene {
         iconSize: CGFloat,
         fontSize: CGFloat,
         titleColor: UIColor,
-        zPosition: CGFloat
+        zPosition: CGFloat,
+        labelMaxWidth: CGFloat? = nil
     ) -> (node: SKNode, label: SKLabelNode) {
         let container = SKNode()
         let iconName = icon.rawValue
@@ -2450,7 +3475,7 @@ final class UnifiedBigSightScene: SKScene {
         case .standard:
             backing = SKShapeNode(
                 rectOf: CGSize(width: backingSize, height: backingSize),
-                cornerRadius: 7
+                cornerRadius: Radius.xSmall
             )
             backing.fillColor = appearance.palette.iconBackground
             backing.strokeColor = appearance.palette.markerStroke
@@ -2468,10 +3493,10 @@ final class UnifiedBigSightScene: SKScene {
         case .venueBilingualBadge:
             backing = SKShapeNode(
                 rectOf: CGSize(width: backingSize, height: backingSize),
-                cornerRadius: 10
+                cornerRadius: UnifiedMapMarkerMetrics.venueBadgeCornerRadius(side: backingSize)
             )
-            backing.fillColor = .white
-            backing.strokeColor = UIColor.black.withAlphaComponent(0.16)
+            backing.fillColor = appearance.venueBadgeRim
+            backing.strokeColor = appearance.venueBadgeRimStroke
             backing.lineWidth = 0.65
         }
         backing.name = "map-marker-backdrop-\(iconName)"
@@ -2479,11 +3504,11 @@ final class UnifiedBigSightScene: SKScene {
         container.addChild(backing)
 
         if let badge = icon.venueBadge {
-            let inset = max(2.25, backingSize * 0.075)
+            let inset = UnifiedMapMarkerMetrics.venueBadgePlateInset(side: backingSize)
             let plateSize = backingSize - inset * 2
             let plate = SKShapeNode(
                 rectOf: CGSize(width: plateSize, height: plateSize),
-                cornerRadius: 7.5
+                cornerRadius: UnifiedMapMarkerMetrics.venueBadgePlateRadius(side: backingSize)
             )
             plate.name = "map-marker-venue-color-\(iconName)"
             plate.fillColor = markerAccentColor(icon)
@@ -2516,13 +3541,87 @@ final class UnifiedBigSightScene: SKScene {
 
         let label = labelNode(
             text: title,
-            at: CGPoint(x: 0, y: -(iconSize / 2 + 10)),
+            at: .zero,
             fontSize: fontSize,
             color: titleColor,
-            zPosition: 2
+            zPosition: 2,
+            halo: true,
+            maxWidth: labelMaxWidth
         )
+        // Below the backing until the screen-space layout picks a side.
+        label.position = CGPoint(
+            x: 0,
+            y: -(backingSize / 2 + UnifiedMapMarkerMetrics.labelClearance + label.frame.height / 2)
+        )
+        if icon.venueBadge != nil, !title.isEmpty {
+            label.addChild(venueTitlePlate(for: label))
+        }
         container.addChild(label)
         return (container, label)
+    }
+
+    /// A capsule behind a hall title, shown only while that hall is open.
+    /// It moves with the title wherever the collision pass places it.
+    private func venueTitlePlate(for label: SKLabelNode) -> SKShapeNode {
+        let textSize = label.frame.size
+        let size = CGSize(
+            width: textSize.width + Spacing.small * 2,
+            height: textSize.height + Spacing.xSmall
+        )
+        let plate = SKShapeNode(
+            rectOf: size,
+            cornerRadius: size.height / 2
+        )
+        plate.name = Self.venueTitlePlateName
+        plate.fillColor = appearance.palette.chromeBackground
+        plate.strokeColor = appearance.palette.markerStroke
+        plate.lineWidth = 0.5
+        // Below the halo copies (-0.05) and the text.
+        plate.zPosition = -0.1
+        plate.isHidden = true
+        return plate
+    }
+
+    /// Adds or refreshes the match count on every hall badge. The count is a
+    /// lime capsule with dark text, like `StatusBadge(tone: .accent)`, at the
+    /// top-trailing corner of the badge.
+    private func updateVenueMatchCountBadges() {
+        let fontSize: CGFloat = 11
+        for marker in venueMarkers {
+            guard let venueID = marker.venueID else { continue }
+            marker.node.childNode(withName: Self.venueMatchCountName)?.removeFromParent()
+            guard let count = searchMatchCountsByVenue[venueID], count > 0 else { continue }
+
+            let text = count.formatted()
+            let label = SKLabelNode(fontNamed: ".AppleSystemUIFontRounded-Bold")
+            label.text = text
+            label.fontSize = fontSize
+            label.fontColor = UIColor(named: "OnAccentFill") ?? .black
+            label.horizontalAlignmentMode = .center
+            label.verticalAlignmentMode = .center
+            label.zPosition = 0.1
+
+            let width = max(
+                UnifiedMapMarkerMetrics.titleWidth(text, fontSize: fontSize) + Spacing.small,
+                fontSize + Spacing.xSmall
+            )
+            let height = fontSize + Spacing.xSmall
+            let capsule = SKShapeNode(
+                rectOf: CGSize(width: width, height: height),
+                cornerRadius: height / 2
+            )
+            capsule.name = Self.venueMatchCountName
+            capsule.fillColor = UIColor(named: "AccentFill") ?? .systemYellow
+            capsule.strokeColor = appearance.palette.markerStroke
+            capsule.lineWidth = 0.5
+            // Above the plate and glyphs of the badge, below its title.
+            capsule.zPosition = 1.5
+            let corner = marker.badgeSize / 2 - Spacing.xxSmall
+            capsule.position = CGPoint(x: corner, y: corner)
+            capsule.isHidden = !isSearchActive
+            capsule.addChild(label)
+            marker.node.addChild(capsule)
+        }
     }
 
     private func markerIconColor(_ icon: BigSightMapIcon) -> UIColor {

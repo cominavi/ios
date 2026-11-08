@@ -78,7 +78,7 @@ enum FavoriteColorLabelBadgeSize {
 
     fileprivate var font: Font {
         switch self {
-        case .compact: .caption2.weight(.semibold)
+        case .compact: .badge
         case .control: .caption.weight(.semibold)
         }
     }
@@ -123,10 +123,13 @@ struct FavoriteColorLabelBadge: View {
             Text(verbatim: label)
                 .font(size.font)
                 .foregroundStyle(color.favoriteLabelForegroundStyle)
+                // A user-entered label: one line at full size, truncated at
+                // the tail beyond 140 pt so a long label cannot crowd out the
+                // row it sits in. It never scales down.
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .truncationMode(.tail)
                 .padding(.horizontal, horizontalPadding)
-                .frame(maxWidth: 140, minHeight: height, maxHeight: height)
+                .frame(maxWidth: 140, minHeight: height)
                 .background(color.swiftUIColor, in: .capsule)
                 .overlay {
                     Capsule()

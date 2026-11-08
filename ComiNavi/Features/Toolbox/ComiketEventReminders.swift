@@ -74,16 +74,13 @@ struct ComiketReminderRequest: Equatable, Sendable {
 }
 
 enum ComiketEventReminderCatalog {
-    static let eventNumber = 108
+    /// The edition whose admission schedule the reminders follow.
+    static let edition = ComiketToolboxEdition.c108
+    static let eventNumber = edition.eventNumber
     static let leadTime: TimeInterval = 15 * 60
-    static let officialScheduleURL = URL(
-        string: "https://www.comiket.co.jp/info-a/TAFO/C108TAFO/ticket.html"
-    )!
+    static let officialScheduleURL = edition.reminderScheduleURL
 
-    private static let eventDays = [
-        (day: 1, year: 2026, month: 8, date: 15),
-        (day: 2, year: 2026, month: 8, date: 16),
-    ]
+    private static var eventDays: [ComiketToolboxEventDay] { edition.days }
 
     static var tokyoCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -127,6 +124,17 @@ enum ComiketEventReminderCatalog {
             }
         }
         .sorted { $0.fireDate < $1.fireDate }
+    }
+
+    /// Whether `kind` still has at least one reminder left to fire on any event day.
+    static func hasFutureFireDate(for kind: ComiketReminderKind, now: Date = Date()) -> Bool {
+        !requests(for: [kind], now: now).isEmpty
+    }
+
+    /// Whether any reminder can still be scheduled. After the last milestone the
+    /// toggles would save a choice that never fires, so the UI retires them.
+    static func isSchedulable(now: Date = Date()) -> Bool {
+        ComiketReminderKind.allCases.contains { hasFutureFireDate(for: $0, now: now) }
     }
 
     static func requestIdentifier(day: Int, kind: ComiketReminderKind) -> String {
@@ -257,6 +265,14 @@ final class ComiketReminderStore {
         enabledKinds.contains(kind)
     }
 
+    var isSchedulable: Bool {
+        ComiketEventReminderCatalog.isSchedulable(now: now())
+    }
+
+    func hasFutureFireDate(for kind: ComiketReminderKind) -> Bool {
+        ComiketEventReminderCatalog.hasFutureFireDate(for: kind, now: now())
+    }
+
     func refresh() async {
         state = state(for: await scheduler.authorization())
         guard case .authorized = state else { return }
@@ -307,7 +323,10 @@ final class ComiketReminderStore {
     private func finishSelection(_ mutation: ReminderSelectionMutation) async {
         do {
             var authorization = await scheduler.authorization()
-            if mutation.enabled, authorization == .notDetermined {
+            // Never ask for notification permission for a milestone that already passed.
+            if mutation.enabled, authorization == .notDetermined,
+                hasFutureFireDate(for: mutation.kind)
+            {
                 _ = try await scheduler.requestAuthorization()
                 authorization = await scheduler.authorization()
             }

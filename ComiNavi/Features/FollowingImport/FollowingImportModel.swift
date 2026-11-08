@@ -19,6 +19,16 @@ struct FollowingImportProgressPreview: Equatable, Sendable {
     }
 }
 
+/// The state needed to reverse one "Favorite all" action. Bookmarks that
+/// existed before keep their earlier color and memo; bookmarks that the
+/// action created are removed again through the normal pending-delete sync.
+struct FollowingBulkFavoriteUndo: Equatable, Identifiable {
+    let id = UUID()
+    let circleCount: Int
+    fileprivate let previousBookmarks: [MapBookmark]
+    fileprivate let addedBookmarks: [MapBookmark]
+}
+
 @MainActor
 @Observable
 final class FollowingImportModel {
@@ -35,6 +45,9 @@ final class FollowingImportModel {
     private(set) var activity: Activity = .loading
     private(set) var errorMessage: String?
     private(set) var progressPreview = FollowingImportProgressPreview()
+    /// Set after "Favorite all" succeeds, so the view can confirm the count
+    /// and offer Undo until the next favorite or import action.
+    private(set) var lastBulkFavorite: FollowingBulkFavoriteUndo?
     var twitterUserName = ""
     var selectedColor: BookmarkColor = .orange
 
@@ -90,6 +103,7 @@ final class FollowingImportModel {
         )
         activity = .importing
         errorMessage = nil
+        lastBulkFavorite = nil
         progressPreview = FollowingImportProgressPreview()
         previewMatchedCircleIDs.removeAll(keepingCapacity: true)
         activityTask = Task { [weak self] in
@@ -200,12 +214,27 @@ final class FollowingImportModel {
             circles: [importedCircle],
             intent: favoriteColor(for: importedCircle) == nil
                 ? .favoriteAdded
-                : .favoriteRemoved
+                : .favoriteRemoved,
+            recordsUndo: false
         )
     }
 
     func favoriteAll() {
-        favorite(circles: importedCircles, intent: .favoritesImported)
+        favorite(
+            circles: importedCircles,
+            intent: .favoritesImported,
+            recordsUndo: true
+        )
+    }
+
+    func undoFavoriteAll() {
+        guard activity == .idle, let undo = lastBulkFavorite else { return }
+        lastBulkFavorite = nil
+        activity = .favoriting
+        errorMessage = nil
+        activityTask = Task { [weak self] in
+            await self?.restore(undo)
+        }
     }
 
     func favoriteColor(for importedCircle: FollowingImportedCircle) -> BookmarkColor? {
@@ -228,9 +257,11 @@ final class FollowingImportModel {
 
     private func favorite(
         circles imported: [FollowingImportedCircle],
-        intent: AppTrack.UserIntent
+        intent: AppTrack.UserIntent,
+        recordsUndo: Bool
     ) {
         guard activity == .idle, !imported.isEmpty else { return }
+        lastBulkFavorite = nil
         AppTrack.userIntent(
             intent,
             data: [
@@ -252,7 +283,8 @@ final class FollowingImportModel {
             await self?.persistFavorites(
                 imported,
                 color: color,
-                restoring: previousFavoriteColors
+                restoring: previousFavoriteColors,
+                recordsUndo: recordsUndo
             )
         }
     }
@@ -260,7 +292,8 @@ final class FollowingImportModel {
     private func persistFavorites(
         _ imported: [FollowingImportedCircle],
         color: BookmarkColor,
-        restoring previousFavoriteColors: [Int: BookmarkColor]
+        restoring previousFavoriteColors: [Int: BookmarkColor],
+        recordsUndo: Bool
     ) async {
         defer { activity = .idle }
 
@@ -278,6 +311,8 @@ final class FollowingImportModel {
             )
             let now = Date()
             var bookmarks: [MapBookmark] = []
+            var previousBookmarks: [MapBookmark] = []
+            var addedBookmarks: [MapBookmark] = []
             for circle in memberCircles {
                 guard let publicCircleID = publicIDsByCatalogID[circle.id],
                     let updateID = circle.updateId,
@@ -288,26 +323,28 @@ final class FollowingImportModel {
                     eventNumber: dataSource.comiket.number,
                     publicCircleID: publicCircleID
                 ) {
+                    previousBookmarks.append(existing)
                     existing.color = color
                     existing.modifiedAt = now
                     existing.syncState = .pendingUpsert
                     bookmarks.append(existing)
                 } else {
-                    bookmarks.append(
-                        MapBookmark(
-                            eventNumber: dataSource.comiket.number,
-                            publicCircleID: publicCircleID,
-                            catalogCircleID: circle.id,
-                            updateID: updateID,
-                            day: location.day,
-                            mapID: location.mapID,
-                            tableID: location.tableID,
-                            subspace: location.subspace,
-                            color: color,
-                            memo: "",
-                            modifiedAt: now,
-                            syncState: .pendingUpsert
-                        ))
+                    let added = MapBookmark(
+                        eventNumber: dataSource.comiket.number,
+                        publicCircleID: publicCircleID,
+                        catalogCircleID: circle.id,
+                        updateID: updateID,
+                        day: location.day,
+                        mapID: location.mapID,
+                        tableID: location.tableID,
+                        subspace: location.subspace,
+                        color: color,
+                        memo: "",
+                        modifiedAt: now,
+                        syncState: .pendingUpsert
+                    )
+                    addedBookmarks.append(added)
+                    bookmarks.append(added)
                 }
             }
             guard !bookmarks.isEmpty else {
@@ -318,18 +355,64 @@ final class FollowingImportModel {
             for bookmark in bookmarks {
                 favoriteColorsByPublicID[bookmark.publicCircleID] = bookmark.color
             }
-            if let coordinator = dataSource.bookmarkSyncCoordinator {
-                Task { [weak self] in
-                    do {
-                        try await coordinator.sync()
-                    } catch {
-                        self?.errorMessage = error.localizedDescription
-                    }
-                }
+            if recordsUndo {
+                lastBulkFavorite = FollowingBulkFavoriteUndo(
+                    circleCount: Set(bookmarks.map(\.publicCircleID)).count,
+                    previousBookmarks: previousBookmarks,
+                    addedBookmarks: addedBookmarks
+                )
             }
+            scheduleBookmarkSync()
         } catch {
             favoriteColorsByPublicID = previousFavoriteColors
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func restore(_ undo: FollowingBulkFavoriteUndo) async {
+        defer { activity = .idle }
+
+        let now = Date()
+        let restored = undo.previousBookmarks.map { bookmark in
+            var bookmark = bookmark
+            bookmark.modifiedAt = now
+            // A record that was already waiting for deletion stays that way;
+            // every other earlier record is sent again with its old values.
+            if bookmark.syncState != .pendingDelete {
+                bookmark.syncState = .pendingUpsert
+            }
+            return bookmark
+        }
+        let removed = undo.addedBookmarks.map { bookmark in
+            var bookmark = bookmark
+            bookmark.modifiedAt = now
+            bookmark.syncState = .pendingDelete
+            return bookmark
+        }
+
+        do {
+            try await dataSource.userPlanStore.upsert(restored + removed)
+            for bookmark in removed {
+                favoriteColorsByPublicID[bookmark.publicCircleID] = nil
+            }
+            for bookmark in restored {
+                favoriteColorsByPublicID[bookmark.publicCircleID] =
+                    bookmark.isFavorite ? bookmark.color : nil
+            }
+            scheduleBookmarkSync()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func scheduleBookmarkSync() {
+        guard let coordinator = dataSource.bookmarkSyncCoordinator else { return }
+        Task { [weak self] in
+            do {
+                try await coordinator.sync()
+            } catch {
+                self?.errorMessage = error.localizedDescription
+            }
         }
     }
 

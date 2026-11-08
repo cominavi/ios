@@ -165,9 +165,9 @@ final class CominaviProfileStore {
 
     var pendingMutationDescription: String? {
         switch pendingMutation?.kind {
-        case .displayName: String(localized: "表示名の変更を送信待ちです。")
-        case .avatarUpload: String(localized: "アバターの変更を送信待ちです。")
-        case .avatarDelete: String(localized: "アバターの削除を送信待ちです。")
+        case .displayName: String(localized: "Your display name change is waiting to be sent.")
+        case .avatarUpload: String(localized: "Your profile picture change is waiting to be sent.")
+        case .avatarDelete: String(localized: "Your profile picture removal is waiting to be sent.")
         case nil: nil
         }
     }
@@ -231,14 +231,9 @@ final class CominaviProfileStore {
                 issueMessage = error.localizedDescription
             }
         } catch CominaviServiceError.notLoggedIn {
-            isIdentityVerified = false
-            requiresReauthentication = true
-            issueMessage = CominaviServiceError.notLoggedIn.localizedDescription
+            expireSession(CominaviServiceError.notLoggedIn)
         } catch CominaviServiceError.authenticationStorageUnavailable {
-            isIdentityVerified = false
-            requiresReauthentication = true
-            issueMessage = CominaviServiceError.authenticationStorageUnavailable
-                .localizedDescription
+            expireSession(CominaviServiceError.authenticationStorageUnavailable)
         } catch {
             if profile == nil { isIdentityVerified = false }
             if profile == nil { issueMessage = error.localizedDescription }
@@ -360,6 +355,17 @@ final class CominaviProfileStore {
         issueMessage = nil
         defaults.removeObject(forKey: storageKey)
         if let previousUserID { try? clearPendingMutation(userID: previousUserID) }
+    }
+
+    /// Records a definitive authentication failure from `load()`. Only a
+    /// session that existed on this device can expire: a person who never
+    /// signed in, or who signed out, sees the first-launch sign-in screen
+    /// without a re-authentication notice.
+    private func expireSession(_ error: CominaviServiceError) {
+        let hadSession = profile != nil || requiresReauthentication
+        isIdentityVerified = false
+        requiresReauthentication = hadSession
+        issueMessage = hadSession ? error.localizedDescription : nil
     }
 
     func invalidateIdentityVerification(issueMessage: String? = nil) {

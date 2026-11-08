@@ -13,6 +13,9 @@ final class CircleUserPlanModel {
 
     private(set) var bookmark: MapBookmark?
     private(set) var saveState: SaveState = .idle
+    /// True once loading finds no public Circle.ms ID for any member circle.
+    /// Bookmarks are keyed by that ID, so the circle cannot be saved.
+    private(set) var isFavoriteUnavailable = false
     var memo = ""
 
     private var favoriteOverride: Bool?
@@ -63,6 +66,7 @@ final class CircleUserPlanModel {
 
     func load(publicCircleIDsByCatalogID: [Int: Int]) async {
         self.publicCircleIDsByCatalogID = publicCircleIDsByCatalogID
+        isFavoriteUnavailable = publicCircleIDsByCatalogID.isEmpty
         guard !publicCircleIDsByCatalogID.isEmpty else {
             bookmark = nil
             groupBookmarks = []
@@ -131,6 +135,12 @@ final class CircleUserPlanModel {
                 memo: previousMemo
             )
         } else {
+            guard !isFavoriteUnavailable else {
+                saveState = .failed(
+                    CircleUserPlanError.favoritesUnavailable.localizedDescription
+                )
+                return
+            }
             AppTrack.userIntent(
                 .favoriteAdded,
                 data: favoriteIntentData(color: .orange)
@@ -312,8 +322,14 @@ final class CircleUserPlanModel {
 
 private enum CircleUserPlanError: LocalizedError {
     case locationUnavailable
+    case favoritesUnavailable
 
     var errorDescription: String? {
-        String(localized: "This circle's map location is unavailable.")
+        switch self {
+        case .locationUnavailable:
+            String(localized: "Couldn't find this circle on the map, so it can't be saved.")
+        case .favoritesUnavailable:
+            String(localized: "Favorites aren't available for this circle.")
+        }
     }
 }

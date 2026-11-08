@@ -332,6 +332,9 @@ enum SharedPlanExportLoader {
         components.calendar = calendar
         components.timeZone = calendar.timeZone
         guard let date = components.date else { return String(day.dayIndex) }
+        // The export mirrors the Japanese Circle.ms catalog format (day, hall
+        // and space columns such as 日・東1・ア12ab), so the weekday stays in
+        // Japanese regardless of the app language.
         let symbols = ["日", "月", "火", "水", "木", "金", "土"]
         return symbols[calendar.component(.weekday, from: date) - 1]
     }

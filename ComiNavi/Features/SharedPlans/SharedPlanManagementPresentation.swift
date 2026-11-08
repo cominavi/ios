@@ -57,6 +57,21 @@ struct SharedPlanPrimaryPlanPreference {
         else { return nil }
         return storedPlanID
     }
+
+    /// The plan that the Shared Plans tab opens. A stored choice wins. With no
+    /// stored choice, a single active plan opens directly, so that a person
+    /// who joined one plan on a new device never has to pick from a list of
+    /// one. With several plans and no choice, the tab shows its plan list.
+    static func resolvedPlanID(
+        _ storedPlanID: String?,
+        among plans: [SharedPlan]
+    ) -> String? {
+        if let validPlanID = validPlanID(storedPlanID, among: plans) {
+            return validPlanID
+        }
+        let activePlans = plans.filter { $0.lifecycle == .active }
+        return activePlans.count == 1 ? activePlans[0].id : nil
+    }
 }
 
 @MainActor

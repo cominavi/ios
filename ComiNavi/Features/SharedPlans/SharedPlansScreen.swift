@@ -8,20 +8,21 @@ private enum SharedPlansRoute: Hashable {
 private enum SharedPlansSheet: Identifiable {
     case create(comiketNo: Int)
     case notifications
-    case planSwitcher(required: Bool)
-    case joinGuide
+    case allPlans
+    case join
 
     var id: String {
         switch self {
         case .create(let comiketNo): "create-\(comiketNo)"
         case .notifications: "notifications"
-        case .planSwitcher(let required): "plan-switcher-\(required)"
-        case .joinGuide: "join-guide"
+        case .allPlans: "all-plans"
+        case .join: "join"
         }
     }
 }
 
 struct SharedPlansScreen: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     let store: SharedPlanStore
     @State private var navigationPath: [SharedPlansRoute] = []
     @State private var presentedSheet: SharedPlansSheet?
@@ -29,11 +30,20 @@ struct SharedPlansScreen: View {
     @State private var queuedRoute: SharedPlansRoute?
     @State private var primaryPlanID: String?
     @State private var hasLoadedPrimaryPreference = false
+    @State private var presentsInvitationAfterDismissal = false
+    @State private var requestsSignInAfterDismissal = false
+    #if DEBUG
+    @State private var hasHandledLaunchRoute = false
+    #endif
     let comiketNo: Int?
     let currentUserID: String?
     let features: SharedPlanPresentationFeatures
     let favoriteImportService: any CirclemsFavoriteImportServicing
     let catalogDataSource: CirclemsDataSource?
+    let invitationInbox: SharedPlanInvitationInbox
+    /// Opens ComiNavi sign-in. The shell supplies it. Without it, signed-out
+    /// surfaces tell the person to sign in from the Profile tab.
+    let onRequestSignIn: (() -> Void)?
     private let primaryPlanPreference: SharedPlanPrimaryPlanPreference
 
     init(
@@ -43,7 +53,9 @@ struct SharedPlansScreen: View {
         features: SharedPlanPresentationFeatures = .production,
         favoriteImportService: any CirclemsFavoriteImportServicing = CominaviServiceClient.shared,
         catalogDataSource: CirclemsDataSource? = AppData.catalogLibrary.dataSource,
-        primaryPlanDefaults: UserDefaults = .standard
+        invitationInbox: SharedPlanInvitationInbox = AppData.sharedPlanInvitationInbox,
+        primaryPlanDefaults: UserDefaults = .standard,
+        onRequestSignIn: (() -> Void)? = nil
     ) {
         self.store = store
         self.comiketNo = comiketNo
@@ -51,6 +63,8 @@ struct SharedPlansScreen: View {
         self.features = features
         self.favoriteImportService = favoriteImportService
         self.catalogDataSource = catalogDataSource
+        self.invitationInbox = invitationInbox
+        self.onRequestSignIn = onRequestSignIn
         primaryPlanPreference = SharedPlanPrimaryPlanPreference(defaults: primaryPlanDefaults)
     }
 
@@ -87,7 +101,8 @@ struct SharedPlansScreen: View {
                 SharedPlanCreateSheet(
                     store: store,
                     comiketNo: comiketNo,
-                    onCreated: selectPrimaryPlan
+                    onCreated: selectPrimaryPlan,
+                    onSignIn: onRequestSignIn.map { _ in requestSignInAfterDismissal }
                 )
             case .notifications:
                 SharedPlanNotificationInboxSheet(
@@ -97,26 +112,39 @@ struct SharedPlansScreen: View {
                     catalogDataSource: catalogDataSource,
                     onOpenCirclePlan: queueOpeningCirclePlan
                 )
-            case .planSwitcher(let required):
+            case .allPlans:
                 SharedPlanSwitcherSheet(
                     activePlans: activePlans,
                     archivedPlans: archivedPlans,
                     recoveryDocuments: store.recoveryDocuments,
                     visiblePlanIDs: Set(store.plans.map(\.id)),
                     primaryPlanID: primaryPlanID,
-                    required: required,
                     pendingPlanIDs: pendingPlanIDs,
                     canCreate: canCreatePlan,
                     comiketNo: comiketNo,
                     onSelectPrimary: selectPrimaryPlan,
                     onOpenArchived: queueOpeningPlan,
                     onCreate: { queueSheet(.create(comiketNo: $0)) },
-                    onJoin: { queueSheet(.joinGuide) }
+                    onJoin: { queueSheet(.join) }
                 )
-            case .joinGuide:
-                SharedPlanJoinGuideSheet()
+            case .join:
+                SharedPlanJoinSheet(
+                    onSubmitLink: receiveInvitationLink,
+                    isRegularWidth: horizontalSizeClass == .regular
+                )
             }
         }
+        #if DEBUG
+        .onAppear {
+            // UI-test launch route for screenshots: present the Join sheet
+            // once on the first appearance.
+            guard !hasHandledLaunchRoute else { return }
+            hasHandledLaunchRoute = true
+            if SharedPlanJoinSheet.launchRouteRequested, presentedSheet == nil {
+                presentedSheet = .join
+            }
+        }
+        #endif
         .task(id: primaryPreferenceKey) {
             hasLoadedPrimaryPreference = false
             let storedPlanID = primaryPlanPreference.planID(
@@ -166,9 +194,9 @@ struct SharedPlansScreen: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        presentedSheet = .planSwitcher(required: false)
+                        presentedSheet = .allPlans
                     } label: {
-                        Label("Switch primary plan", systemImage: "rectangle.2.swap")
+                        Label("All plans", systemImage: "rectangle.2.swap")
                     }
                     .accessibilityIdentifier("shared-plan-switcher-button")
                 }
@@ -179,28 +207,55 @@ struct SharedPlansScreen: View {
             }
         } else if activePlans.isEmpty {
             SharedPlanEmptyHome(
-                canCreate: canCreatePlan,
-                onAdd: presentCreateSheet,
-                onJoin: { presentedSheet = .joinGuide }
+                comiketNo: comiketNo,
+                isSignedIn: currentUserID != nil,
+                createUnavailableReason: createUnavailableReason,
+                onSignIn: onRequestSignIn,
+                onCreate: presentCreateSheet,
+                onJoin: { presentedSheet = .join }
             )
             .navigationTitle("Shared Plans")
+            // A large title on iPad too; the column starts on its leading
+            // edge, like Profile.
+            .readableColumnTitleDisplayMode()
             .accessibilityIdentifier("shared-plan-empty-home")
-            .toolbar {
-                if !archivedPlans.isEmpty {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            presentedSheet = .planSwitcher(required: false)
-                        } label: {
-                            Label("View archived plans", systemImage: "archive")
-                        }
-                        .accessibilityIdentifier("shared-plan-switcher-button")
-                    }
-                }
-            }
+            .toolbar { planListToolbar }
         } else {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle("Shared Plans")
+            SharedPlanListHome(
+                plans: activePlans,
+                pendingPlanIDs: pendingPlanIDs,
+                canCreate: canCreatePlan,
+                onSelect: selectPrimaryPlan,
+                onCreate: presentCreateSheet,
+                onJoin: { presentedSheet = .join }
+            )
+            .navigationTitle("Shared Plans")
+            // A large title on iPad too; the column starts on its leading
+            // edge, like Profile.
+            .readableColumnTitleDisplayMode()
+            .accessibilityIdentifier("shared-plan-list-home")
+            .toolbar { planListToolbar }
+        }
+    }
+
+    /// Toolbar for the tab root when no plan is open. Archived plans and
+    /// recovery copies stay reachable even when no active plan exists.
+    @ToolbarContentBuilder
+    private var planListToolbar: some ToolbarContent {
+        if !archivedPlans.isEmpty || !store.recoveryDocuments.isEmpty {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    presentedSheet = .allPlans
+                } label: {
+                    Label("All plans", systemImage: "rectangle.2.swap")
+                }
+                .accessibilityIdentifier("shared-plan-switcher-button")
+            }
+        }
+        if currentUserID != nil {
+            ToolbarItem(placement: .primaryAction) {
+                notificationButton
+            }
         }
     }
 
@@ -234,8 +289,25 @@ struct SharedPlansScreen: View {
     }
 
     private var canCreatePlan: Bool {
-        guard features.writesEnabled, let comiketNo else { return false }
-        return store.createAvailability(comiketNo: comiketNo).canCreate
+        createUnavailableReason == nil
+    }
+
+    /// Why Create is disabled, shown under the button instead of a dimmed
+    /// control with no explanation.
+    private var createUnavailableReason: LocalizedStringResource? {
+        guard currentUserID != nil else {
+            return "Sign in to create a plan."
+        }
+        guard let comiketNo else {
+            return "Open a Comiket catalog to create a plan for that event."
+        }
+        guard features.writesEnabled else {
+            return "Shared Plans are read-only right now. Try again later."
+        }
+        guard store.createAvailability(comiketNo: comiketNo).canCreate else {
+            return "You have \(SharedPlanCreateAvailability.maximumOwnedActivePlans) active plans for C\(comiketNo), which is the limit. Archive a plan to create another."
+        }
+        return nil
     }
 
     private var pendingPlanIDs: Set<String> {
@@ -244,23 +316,20 @@ struct SharedPlansScreen: View {
 
     private func reconcilePrimaryPlan() {
         guard store.isLoaded, hasLoadedPrimaryPreference else { return }
-        let validPlanID = SharedPlanPrimaryPlanPreference.validPlanID(
+        // Several plans with no stored choice show the inline plan list in
+        // the tab root instead of a required picker.
+        let resolvedPlanID = SharedPlanPrimaryPlanPreference.resolvedPlanID(
             primaryPlanID,
             among: activePlans
         )
-        if validPlanID != primaryPlanID {
-            primaryPlanID = validPlanID
-            primaryPlanPreference.setPlanID(
-                validPlanID,
-                userID: currentUserID,
-                comiketNo: comiketNo
-            )
-            navigationPath.removeAll()
-        }
-        guard validPlanID == nil, !activePlans.isEmpty else { return }
-        if presentedSheet == nil {
-            presentedSheet = .planSwitcher(required: true)
-        }
+        guard resolvedPlanID != primaryPlanID else { return }
+        primaryPlanID = resolvedPlanID
+        primaryPlanPreference.setPlanID(
+            resolvedPlanID,
+            userID: currentUserID,
+            comiketNo: comiketNo
+        )
+        navigationPath.removeAll()
     }
 
     private func selectPrimaryPlan(_ planID: String) {
@@ -292,7 +361,31 @@ struct SharedPlansScreen: View {
         presentedSheet = nil
     }
 
+    /// Stores a pasted invitation in the shared inbox. The root view presents
+    /// the confirmation sheet only after the join sheet has fully dismissed,
+    /// because two sheets cannot animate at the same time.
+    private func receiveInvitationLink(_ url: URL) -> Bool {
+        guard invitationInbox.receive(url: url) else { return false }
+        presentsInvitationAfterDismissal = true
+        return true
+    }
+
+    private func requestSignInAfterDismissal() {
+        requestsSignInAfterDismissal = true
+        presentedSheet = nil
+    }
+
     private func completeQueuedSheetTransition() {
+        if requestsSignInAfterDismissal {
+            requestsSignInAfterDismissal = false
+            onRequestSignIn?()
+            return
+        }
+        if presentsInvitationAfterDismissal {
+            presentsInvitationAfterDismissal = false
+            invitationInbox.requestPresentation()
+            return
+        }
         if let queuedSheet {
             self.queuedSheet = nil
             presentedSheet = queuedSheet
@@ -341,114 +434,131 @@ struct SharedPlansScreen: View {
     }
 }
 
+/// The tab root when no active plan exists. It explains what a Shared Plan is
+/// and leads with one labeled primary action: Sign in when signed out, Create
+/// otherwise. Join is the secondary action.
 private struct SharedPlanEmptyHome: View {
-    let canCreate: Bool
-    let onAdd: () -> Void
+    let comiketNo: Int?
+    let isSignedIn: Bool
+    let createUnavailableReason: LocalizedStringResource?
+    let onSignIn: (() -> Void)?
+    let onCreate: () -> Void
     let onJoin: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            actionButton(
-                title: "Add",
-                icon: "plus",
-                hint: "Creates a new Shared Plan.",
-                style: .add,
-                action: onAdd
-            )
-            .disabled(!canCreate)
-            .saturation(canCreate ? 1 : 0.15)
-            .opacity(canCreate ? 1 : 0.45)
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.sectionGap) {
+                VStack(alignment: .leading, spacing: Spacing.small) {
+                    Text("Shop the event together")
+                        .font(.sectionTitle)
+                        .accessibilityAddTraits(.isHeader)
 
-            actionButton(
-                title: "Join",
-                icon: "person.crop.circle.badge.plus",
-                hint: "Shows how to join a Shared Plan.",
-                style: .join,
-                action: onJoin
-            )
-        }
-        .frame(maxWidth: 360)
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(uiColor: .systemGroupedBackground))
-    }
-
-    private func actionButton(
-        title: LocalizedStringKey,
-        icon: String,
-        hint: LocalizedStringKey,
-        style: ActionStyle,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            ZStack(alignment: .topTrailing) {
-                Circle()
-                    .fill(style.foreground.opacity(0.10))
-                    .frame(width: 104, height: 104)
-                    .offset(x: 34, y: -38)
-
-                VStack(spacing: 14) {
-                    LucideIcon(icon, size: 30)
-                        .frame(width: 58, height: 58)
-                        .background(style.foreground.opacity(0.14), in: .circle)
-
-                    Text(title)
-                        .font(.headline)
+                    Group {
+                        if let comiketNo {
+                            Text("A Shared Plan is a shopping list of circles for C\(comiketNo). Everyone in the plan can add circles, ask for items, and mark what they bought.")
+                        } else {
+                            Text("A Shared Plan is a shopping list of circles that you and your friends edit together. Everyone in the plan can add circles, ask for items, and mark what they bought.")
+                        }
+                    }
+                    .font(.body)
+                    .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .wrapsFully()
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: Spacing.medium) {
+                    if isSignedIn {
+                        Button(action: onCreate) {
+                            LucideLabel("Create a plan", icon: "plus")
+                        }
+                        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
+                        .disabled(createUnavailableReason != nil)
+                        .accessibilityIdentifier("shared-plan-create-button")
+
+                        if let createUnavailableReason {
+                            InlineBanner(Text(createUnavailableReason), icon: "info.circle", tone: .info)
+                                .accessibilityIdentifier("shared-plan-create-unavailable-reason")
+                        }
+                    } else if let onSignIn {
+                        Button(action: onSignIn) {
+                            LucideLabel("Sign in", icon: "circle-user")
+                        }
+                        .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
+                        .accessibilityIdentifier("shared-plan-sign-in-button")
+                    } else {
+                        Text("Sign in from the Profile tab to create or join a plan.")
+                            .font(.rowSubtitle)
+                            .foregroundStyle(.secondary)
+                            .wrapsFully()
+                            .accessibilityIdentifier("shared-plan-sign-in-hint")
+                    }
+
+                    Button(action: onJoin) {
+                        LucideLabel("Join with an invite link", icon: "users")
+                    }
+                    .buttonStyle(ActionButtonStyle(role: .secondary, size: .large))
+                    .accessibilityIdentifier("shared-plan-join-button")
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .aspectRatio(1, contentMode: .fit)
-            .foregroundStyle(style.foreground)
-            .background(style.background)
-            .clipShape(.rect(cornerRadius: 24))
-            .shadow(color: style.shadow.opacity(0.28), radius: 14, x: 0, y: 8)
-            .contentShape(.rect(cornerRadius: 24))
+            // On iPad the column starts under the large title, like the
+            // Profile tab.
+            .readableTitleLeadingWidth(ReadableWidth.form)
+            .padding(.horizontal, Spacing.screenGutter)
+            .padding(.vertical, Spacing.large)
         }
-        .buttonStyle(.plain)
-        .accessibilityHint(hint)
+        .background(Color(uiColor: .systemGroupedBackground))
+        .accessibilityElement(children: .contain)
     }
+}
 
-    private enum ActionStyle {
-        case add
-        case join
+/// The tab root when several plans exist and none has been opened on this
+/// device yet. Choosing a plan opens it and remembers the choice.
+private struct SharedPlanListHome: View {
+    let plans: [SharedPlan]
+    let pendingPlanIDs: Set<String>
+    let canCreate: Bool
+    let onSelect: (String) -> Void
+    let onCreate: () -> Void
+    let onJoin: () -> Void
 
-        var background: LinearGradient {
-            switch self {
-            case .add:
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.72, green: 0.90, blue: 0.20),
-                        Color.accentColor,
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            case .join:
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.06, green: 0.52, blue: 0.68),
-                        Color(red: 0.02, green: 0.32, blue: 0.47),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+    var body: some View {
+        List {
+            Section {
+                ForEach(plans) { plan in
+                    Button {
+                        onSelect(plan.id)
+                    } label: {
+                        SharedPlanPickerRow(
+                            plan: plan,
+                            hasPendingChanges: pendingPlanIDs.contains(plan.id),
+                            isSelected: false,
+                            isArchived: false,
+                            showsDisclosure: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("shared-plan-picker-\(plan.id)")
+                }
+            } header: {
+                Text("Your plans")
+            } footer: {
+                Text("Choose a plan to open. You can switch plans later from All plans.")
+            }
+
+            Section {
+                if canCreate {
+                    Button(action: onCreate) {
+                        LucideLabel("Create a plan", icon: "plus")
+                    }
+                    .accessibilityIdentifier("shared-plan-create-button")
+                }
+                Button(action: onJoin) {
+                    LucideLabel("Join with an invite link", icon: "users")
+                }
+                .accessibilityIdentifier("shared-plan-join-button")
             }
         }
-
-        var foreground: Color {
-            switch self {
-            case .add: Color(red: 0.08, green: 0.17, blue: 0.01)
-            case .join: .white
-            }
-        }
-
-        var shadow: Color {
-            switch self {
-            case .add: Color(red: 0.35, green: 0.48, blue: 0.03)
-            case .join: Color(red: 0.01, green: 0.25, blue: 0.38)
-            }
-        }
+        .readableFormWidth(alignment: .titleLeading)
     }
 }
 
@@ -459,7 +569,6 @@ private struct SharedPlanSwitcherSheet: View {
     let recoveryDocuments: [SharedPlanRecoveryDocument]
     let visiblePlanIDs: Set<String>
     let primaryPlanID: String?
-    let required: Bool
     let pendingPlanIDs: Set<String>
     let canCreate: Bool
     let comiketNo: Int?
@@ -488,7 +597,7 @@ private struct SharedPlanSwitcherSheet: View {
                     }
                 }
 
-                if !required, !archivedPlans.isEmpty {
+                if !archivedPlans.isEmpty {
                     Section("Archived") {
                         ForEach(archivedPlans) { plan in
                             Button {
@@ -506,7 +615,7 @@ private struct SharedPlanSwitcherSheet: View {
                     }
                 }
 
-                if !required, !recoveryDocuments.isEmpty {
+                if !recoveryDocuments.isEmpty {
                     Section("Recovery") {
                         ForEach(recoveryDocuments) { recovery in
                             SharedPlanRecoveryPickerRow(
@@ -523,25 +632,22 @@ private struct SharedPlanSwitcherSheet: View {
                         Button {
                             onCreate(comiketNo)
                         } label: {
-                            Label("Create plan", systemImage: "plus")
+                            LucideLabel("Create a plan", icon: "plus")
                         }
                     }
                     Button(action: onJoin) {
-                        Label("How to join a plan", systemImage: "person.crop.circle.badge.plus")
+                        LucideLabel("Join with an invite link", icon: "users")
                     }
                 }
             }
-            .navigationTitle(required ? "Choose a primary plan" : "Switch plan")
+            .navigationTitle("All plans")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if !required {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") { dismiss() }
-                    }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
                 }
             }
         }
-        .interactiveDismissDisabled(required)
         .presentationDetents([.medium, .large])
         .accessibilityIdentifier("shared-plan-switcher-sheet")
     }
@@ -553,24 +659,24 @@ private struct SharedPlanRecoveryPickerRow: View {
     let onOpenPlan: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
             LucideLabel("Recovery copy", icon: "database")
-                .font(.headline)
+                .font(.rowTitle)
             Text("\(recovery.pendingOperationCount) item changes and \(recovery.metadataIntentCount) plan updates are available in this recovery copy.")
-                .font(.caption)
+                .font(.meta)
                 .foregroundStyle(.secondary)
-            HStack {
+                .wrapsFully()
+            AdaptiveButtonRow(spacing: Spacing.small) {
                 ShareLink(item: recovery.exportText) {
                     LucideLabel("Download recovery copy", icon: "share")
                 }
-                Spacer()
+                .buttonStyle(.secondaryAction)
                 if canOpenPlan {
                     Button("Open") { onOpenPlan(recovery.planID) }
+                        .buttonStyle(.secondaryAction)
                 }
             }
-            .buttonStyle(.borderless)
         }
-        .padding(.vertical, 3)
     }
 }
 
@@ -579,79 +685,207 @@ private struct SharedPlanPickerRow: View {
     let hasPendingChanges: Bool
     let isSelected: Bool
     let isArchived: Bool
+    var showsDisclosure = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            LucideIcon(isArchived ? "archive" : "list-checks", size: 22)
+        HStack(spacing: Spacing.iconToText) {
+            LucideIcon(isArchived ? "archive" : "list-checks", size: IconSize.row)
                 .foregroundStyle(isArchived ? Color.secondary : Color.accentColor)
-                .frame(width: 28)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                 Text(plan.name)
-                    .font(.headline)
+                    .font(.rowTitle)
                 Text("C\(plan.comiketNo) · \(plan.circleKeys.count) circles")
-                    .font(.caption)
+                    .font(.meta)
                     .foregroundStyle(.secondary)
             }
-            Spacer(minLength: 8)
+            .wrapsFully()
+            .layoutPriority(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
             if hasPendingChanges {
-                LucideIcon("cloud-upload", size: 16)
+                LucideIcon("cloud-upload", size: IconSize.inline)
                     .foregroundStyle(.orange)
                     .accessibilityLabel("Pending changes")
             }
             if isSelected {
-                LucideIcon("check", size: 18)
+                LucideIcon("check", size: IconSize.inline)
                     .foregroundStyle(Color.accentColor)
-                    .accessibilityLabel("Primary plan")
-            } else if isArchived {
-                LucideIcon("chevron-right", size: 16)
+                    .accessibilityLabel("Current plan")
+            } else if isArchived || showsDisclosure {
+                LucideIcon("chevron-right", size: IconSize.inline)
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
         }
-        .padding(.vertical, 3)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
-private struct SharedPlanJoinGuideSheet: View {
+/// On iPad, a form sheet as tall as the join form, so a short form does not
+/// leave an empty lower half. A `Form` is a scroll view and has no fitted
+/// height, so the sheet uses the measured height as its only detent. On
+/// iPhone the sheet keeps the medium and large detents.
+private struct SharedPlanJoinSheetSizing: ViewModifier {
+    let isRegularWidth: Bool
+    let measuredHeight: CGFloat
+
+    func body(content: Content) -> some View {
+        if isRegularWidth {
+            content
+                .presentationSizing(.form)
+                .presentationDetents(regularDetents)
+        } else {
+            content.presentationDetents([.medium, .large])
+        }
+    }
+
+    /// Large until the first measurement arrives.
+    private var regularDetents: Set<PresentationDetent> {
+        measuredHeight > 0 ? [.height(measuredHeight)] : [.large]
+    }
+}
+
+private struct SharedPlanJoinSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appHapticFeedback) private var hapticFeedback
+    /// Returns false when the link cannot be stored for confirmation.
+    let onSubmitLink: (URL) -> Bool
+    /// The size class of the presenting screen. Inside an iPad sheet the
+    /// environment reports a compact width, so the presenter passes it.
+    var isRegularWidth = false
+    @State private var linkText = ""
+    @State private var issue: LocalizedStringResource?
+    @State private var showsSteps = false
+    /// The height of the form rows plus the navigation bar, measured from
+    /// the scroll geometry. The iPad form sheet uses it as its detent.
+    @State private var measuredHeight: CGFloat = 0
+    @ScaledMetric(relativeTo: .headline) private var stepNumberSize = 28.0
+
+    #if DEBUG
+    /// `-cominavi-ui-testing-open-join` presents this sheet at launch.
+    static var launchRouteRequested: Bool {
+        ProcessInfo.processInfo.arguments.contains("-cominavi-ui-testing-open-join")
+    }
+    #endif
 
     var body: some View {
         NavigationStack {
-            List {
+            Form {
                 Section {
-                    guideStep(
-                        number: 1,
-                        title: "Get an invitation link",
-                        detail: "Ask the plan owner to create and share an invitation from Plan information, then Add member."
+                    TextField(
+                        "Invitation link",
+                        text: Binding(
+                            get: { linkText },
+                            set: {
+                                linkText = $0
+                                issue = nil
+                            }
+                        ),
+                        prompt: Text(verbatim: "https://cominavi.net/join/…")
                     )
-                    guideStep(
-                        number: 2,
-                        title: "Open the link on this iPhone",
-                        detail: "The invitation opens in ComiNavi so you can confirm the plan before joining."
-                    )
-                    guideStep(
-                        number: 3,
-                        title: "Confirm your account",
-                        detail: "Sign in as the person who should join, then accept the invitation."
-                    )
+                    .keyboardType(.URL)
+                    .textContentType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.join)
+                    .onSubmit(submit)
+                    .accessibilityIdentifier("shared-plan-join-link-field")
+
+                    PasteButton(payloadType: String.self) { strings in
+                        guard let text = strings.first else { return }
+                        Task { @MainActor in
+                            linkText = text
+                            submit()
+                        }
+                    }
+                    // PasteButton draws a white title on its tint. See
+                    // `Color.whiteTitleTint`.
+                    .tint(Color.whiteTitleTint)
+                    .labelStyle(.titleAndIcon)
+                    .buttonBorderShape(.roundedRectangle(radius: Radius.control))
+                    .accessibilityIdentifier("shared-plan-join-paste")
+                } header: {
+                    Text("Invitation link")
                 } footer: {
-                    Text("Joining starts from an invitation link; there is no code to enter on this screen.")
+                    if let issue {
+                        Text(issue)
+                            .foregroundStyle(.red)
+                            .accessibilityIdentifier("shared-plan-join-issue")
+                    } else {
+                        Text("Paste the link that a plan member sent you. ComiNavi shows the plan before you join.")
+                    }
+                }
+
+                Section {
+                    DisclosureGroup("How invitations work", isExpanded: $showsSteps) {
+                        guideStep(
+                            number: 1,
+                            title: "Get an invitation link",
+                            detail: "Ask the plan owner to create and share an invitation from Plan information, then Add member."
+                        )
+                        guideStep(
+                            number: 2,
+                            title: "Open the link on this device",
+                            detail: "Tap the link, or paste it on this screen. The invitation opens in ComiNavi so you can confirm the plan before joining."
+                        )
+                        guideStep(
+                            number: 3,
+                            title: "Confirm your account",
+                            detail: "Sign in as the person who should join, then accept the invitation."
+                        )
+                    }
                 }
             }
-            .navigationTitle("How to join a plan")
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                // Content plus the top inset for the navigation bar: the
+                // height that shows every row. The bottom inset is left out,
+                // because it grows with the keyboard.
+                geometry.contentSize.height + geometry.contentInsets.top
+            } action: { _, height in
+                measuredHeight = height.rounded(.up)
+            }
+            .navigationTitle("Join a plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Join", action: submit)
+                        .disabled(linkText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("shared-plan-join-submit")
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .modifier(
+            SharedPlanJoinSheetSizing(
+                isRegularWidth: isRegularWidth,
+                measuredHeight: measuredHeight
+            )
+        )
+        .onAppear {
+            // A regular-width sheet has room for the steps; open them.
+            if isRegularWidth {
+                showsSteps = true
+            }
+        }
         .accessibilityIdentifier("shared-plan-join-guide")
+    }
+
+    private func submit() {
+        guard let url = SharedPlanInvitationLink.url(fromPastedText: linkText) else {
+            issue = "This is not a ComiNavi invitation link. Check the link and try again."
+            hapticFeedback?.play(.error)
+            return
+        }
+        guard onSubmitLink(url) else {
+            issue = "ComiNavi could not open this invitation. Try again."
+            hapticFeedback?.play(.error)
+            return
+        }
+        dismiss()
     }
 
     private func guideStep(
@@ -659,21 +893,24 @@ private struct SharedPlanJoinGuideSheet: View {
         title: LocalizedStringKey,
         detail: LocalizedStringKey
     ) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: Spacing.medium) {
             Text(number, format: .number)
-                .font(.headline)
-                .foregroundStyle(.white)
-                .frame(width: 30, height: 30)
-                .background(Color.accentColor, in: .circle)
-            VStack(alignment: .leading, spacing: 4) {
+                .font(.rowTitle)
+                .monospacedDigit()
+                .foregroundStyle(Color.accentColor)
+                .frame(width: stepNumberSize, height: stepNumberSize)
+                .background(Color.accentColor.opacity(0.12), in: .circle)
+            VStack(alignment: .leading, spacing: Spacing.xSmall) {
                 Text(title)
-                    .font(.headline)
+                    .font(.rowTitle)
                 Text(detail)
-                    .font(.callout)
+                    .font(.rowSubtitle)
                     .foregroundStyle(.secondary)
             }
+            .wrapsFully()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, Spacing.xSmall)
         .accessibilityElement(children: .combine)
     }
 }
@@ -700,7 +937,7 @@ struct SharedPlanListUITestSurface: View {
     private let plans = [
         SharedPlan(
             id: Self.planID,
-            name: "買い物リスト",
+            name: String(localized: "Shopping list"),
             comiketNo: 108,
             ownership: .owned,
             role: .owner,
@@ -712,7 +949,7 @@ struct SharedPlanListUITestSurface: View {
         ),
         SharedPlan(
             id: Self.secondPlanID,
-            name: "Travel team",
+            name: String(localized: "Travel team"),
             comiketNo: 108,
             ownership: .joined,
             role: .editor,
@@ -786,7 +1023,6 @@ struct SharedPlanListUITestSurface: View {
                 recoveryDocuments: [],
                 visiblePlanIDs: Set(plans.map(\.id)),
                 primaryPlanID: primaryPlanID,
-                required: false,
                 pendingPlanIDs: [],
                 canCreate: true,
                 comiketNo: 108,
@@ -851,7 +1087,7 @@ struct SharedPlanListUITestSurface: View {
                 Button {
                     showsSwitcher = true
                 } label: {
-                    Label("Switch primary plan", systemImage: "rectangle.2.swap")
+                    Label("All plans", systemImage: "rectangle.2.swap")
                 }
                 .accessibilityIdentifier("shared-plan-switcher-button")
             }
@@ -917,16 +1153,24 @@ struct SharedPlanEmptyUITestSurface: View {
         }
     }
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var presentedSheet: Sheet?
+    @State private var hasHandledLaunchRoute = false
 
     var body: some View {
         NavigationStack {
             SharedPlanEmptyHome(
-                canCreate: true,
-                onAdd: { presentedSheet = .create },
+                comiketNo: 108,
+                isSignedIn: true,
+                createUnavailableReason: nil,
+                onSignIn: nil,
+                onCreate: { presentedSheet = .create },
                 onJoin: { presentedSheet = .join }
             )
             .navigationTitle("Shared Plans")
+            // A large title on iPad too; the column starts on its leading
+            // edge, like Profile.
+            .readableColumnTitleDisplayMode()
             .accessibilityIdentifier("shared-plan-empty-home")
         }
         .sheet(item: $presentedSheet) { sheet in
@@ -938,7 +1182,17 @@ struct SharedPlanEmptyUITestSurface: View {
                         .accessibilityIdentifier("shared-plan-create-test-surface")
                 }
             case .join:
-                SharedPlanJoinGuideSheet()
+                SharedPlanJoinSheet(
+                    onSubmitLink: { _ in true },
+                    isRegularWidth: horizontalSizeClass == .regular
+                )
+            }
+        }
+        .onAppear {
+            guard !hasHandledLaunchRoute else { return }
+            hasHandledLaunchRoute = true
+            if SharedPlanJoinSheet.launchRouteRequested {
+                presentedSheet = .join
             }
         }
     }
@@ -980,44 +1234,60 @@ private struct SharedPlanCreateSheet: View {
     @Environment(\.appHapticFeedback) private var hapticFeedback
     let store: SharedPlanStore
     let onCreated: (String) -> Void
+    let onSignIn: (() -> Void)?
     @State private var name = ""
     @State private var isSaving = false
     @State private var issue: String?
+    @State private var requiresSignIn = false
     let comiketNo: Int
 
     init(
         store: SharedPlanStore,
         comiketNo: Int,
-        onCreated: @escaping (String) -> Void = { _ in }
+        onCreated: @escaping (String) -> Void = { _ in },
+        onSignIn: (() -> Void)? = nil
     ) {
         self.store = store
         self.comiketNo = comiketNo
         self.onCreated = onCreated
+        self.onSignIn = onSignIn
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("プラン") {
-                    TextField("プラン名", text: $name)
+                Section("Plan") {
+                    TextField("Plan name", text: $name)
                         .textInputAutocapitalization(.never)
-                    LabeledContent("コミケ", value: "C\(comiketNo)")
+                    LabeledContent("Comiket", value: "C\(comiketNo)")
                 }
-                if let issue {
+                if requiresSignIn {
+                    Section {
+                        Label {
+                            Text("Sign in to ComiNavi to create a plan.")
+                        } icon: {
+                            LucideIcon("circle-user")
+                        }
+                        if let onSignIn {
+                            Button("Sign in", action: onSignIn)
+                                .accessibilityIdentifier("shared-plan-create-sign-in")
+                        }
+                    }
+                } else if let issue {
                     Section {
                         Text(issue)
                             .foregroundStyle(.orange)
                     }
                 }
             }
-            .navigationTitle("共有プランを作成")
+            .navigationTitle("Create Shared Plan")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") { dismiss() }
+                    Button("Cancel", role: .cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("作成") { create() }
+                    Button("Create") { create() }
                         .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
                 }
             }
@@ -1037,6 +1307,7 @@ private struct SharedPlanCreateSheet: View {
                 dismiss()
             } catch {
                 issue = error.localizedDescription
+                requiresSignIn = (error as? SharedPlanError) == .profileRequired
                 if store.pendingRESTWrites.contains(where: {
                     $0.kind == .create && $0.name == name && $0.comiketNo == comiketNo
                 }) {
@@ -1158,45 +1429,47 @@ private struct SharedPlanInformationScreen: View {
                     }
 
                     if !quarantinedChanges.isEmpty {
-                        Section("確認が必要な変更") {
-                            Text("最新のプランを表示しています。残っている変更を確認してください。")
-                                .font(.callout)
+                        Section("Changes to review") {
+                            Text("This is the latest version of the plan. Review your remaining changes.")
+                                .font(.rowSubtitle)
                                 .foregroundStyle(.orange)
                             ForEach(quarantinedChanges) { write in
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: Spacing.xSmall) {
                                     Text(quarantinedTitle(write))
-                                        .font(.headline)
+                                        .font(.rowTitle)
                                     if let message = write.quarantineMessage {
                                         Text(message)
-                                            .font(.caption)
+                                            .font(.meta)
                                             .foregroundStyle(.secondary)
                                     }
-                                    Button("この変更を破棄", role: .destructive) {
+                                    Button("Discard this change", role: .destructive) {
                                         discard(write)
                                     }
-                                    .font(.callout)
+                                    .font(.control)
                                 }
                             }
                             if features.writesEnabled,
                                quarantinedChanges.allSatisfy({
                                 $0.quarantineReason == .revisionConflict
                             }) {
-                                Button("最新状態でもう一度試す") { retryConflict() }
-                                    .buttonStyle(.borderedProminent)
-                                Button("残っている変更をすべて破棄", role: .destructive) {
+                                // Lime fill with dark text; the system prominent
+                                // style would draw white text on the lime tint.
+                                Button("Try again with the latest plan") { retryConflict() }
+                                    .buttonStyle(.primaryAction)
+                                Button("Discard all remaining changes", role: .destructive) {
                                     discardAllConflicts()
                                 }
                             }
                         }
                     }
 
-                    Section("プラン名") {
+                    Section("Plan name") {
                         if features.writesEnabled {
-                            TextField("プラン名", text: $editedName)
+                            TextField("Plan name", text: $editedName)
                                 .disabled(plan.role != .owner || !quarantinedChanges.isEmpty)
                                 .onSubmit { saveName() }
                             if plan.role == .owner, editedName != plan.name {
-                                Button("名前を保存") { saveName() }
+                                Button("Save name") { saveName() }
                             }
                         } else {
                             Text(plan.name)
@@ -1211,14 +1484,14 @@ private struct SharedPlanInformationScreen: View {
                             showsFavoriteImport = true
                         } label: {
                             Label {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Circle.msのお気に入りを読み込む")
-                                    Text("プランにまだないサークルだけを確認して追加します。")
-                                        .font(.caption)
+                                VStack(alignment: .leading, spacing: Spacing.xxSmall) {
+                                    Text("Import Circle.ms favorites")
+                                    Text("Review and add only the circles that are not in this plan yet.")
+                                        .font(.meta)
                                         .foregroundStyle(.secondary)
                                 }
                             } icon: {
-                                Image(systemName: "square.and.arrow.down")
+                                LucideIcon("download")
                             }
                         }
                     }
@@ -1232,14 +1505,14 @@ private struct SharedPlanInformationScreen: View {
                                     dataSource: catalogDataSource
                                 )
                             } label: {
-                                Label("Export sharing plan", systemImage: "archivebox")
+                                LucideLabel("Export sharing plan", icon: "archive")
                             }
                             .accessibilityIdentifier("shared-plan-export-button")
                         }
                     }
 
                     if features.writesEnabled, plan.role == .owner {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: Spacing.small) {
                             Button(role: plan.lifecycle == .active ? .destructive : nil) {
                                 if plan.lifecycle == .active {
                                     confirmation = .archive
@@ -1247,12 +1520,13 @@ private struct SharedPlanInformationScreen: View {
                                     toggleArchive(plan)
                                 }
                             } label: {
-                                HStack {
-                                    Text(archiveButtonTitle(for: plan))
-                                    Spacer(minLength: 0)
-                                }
+                                Text(archiveButtonTitle(for: plan))
+                                    .font(.control)
+                                    .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.roundedRectangle(radius: Radius.control))
+                            .controlSize(.large)
                             .tint(plan.lifecycle == .active ? .red : .accentColor)
                             .frame(maxWidth: .infinity)
                             .disabled(!quarantinedChanges.isEmpty)
@@ -1260,10 +1534,16 @@ private struct SharedPlanInformationScreen: View {
                             Text(plan.lifecycle == .active
                                 ? String(localized: "Archived plans remain available but cannot be edited.")
                                 : String(localized: "Reopen this plan to make it editable again."))
-                                .font(.footnote)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
+                                .wrapsFully()
                         }
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(
+                            top: Spacing.small,
+                            leading: Spacing.large,
+                            bottom: Spacing.small,
+                            trailing: Spacing.large
+                        ))
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                     }
@@ -1332,11 +1612,13 @@ private struct SharedPlanInformationScreen: View {
                     symbolName: "exclamationmark.triangle.fill",
                     tint: .orange
                 ) {
-                    Text("プランが見つかりません")
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    Text("このプランは削除されたか、アクセスできなくなった可能性があります。")
+                    Text("Plan not found")
+                        .font(.focusedSurfaceTitle)
+                        .wrapsFully()
+                    Text("This plan was deleted, or you no longer have access to it.")
                         .foregroundStyle(.secondary)
-                        .padding(.top, 12)
+                        .wrapsFully()
+                        .padding(.top, Spacing.medium)
                 }
             }
         }
@@ -1492,16 +1774,16 @@ private struct SharedPlanInformationScreen: View {
 
     private func quarantinedTitle(_ write: SharedPlanRESTWrite) -> String {
         switch write.kind {
-        case .rename: "名前の変更「\(write.name ?? "")」"
-        case .archive: "アーカイブ"
-        case .reopen: "再開"
-        case .create: "プランの作成"
-        case .acceptInvitation: "招待への参加"
-        case .revokeMember: "メンバーの参加解除"
-        case .reinstateMember: "メンバーの再参加"
-        case .transferOwnership: "オーナーの変更"
-        case .createInvitation: "招待の作成"
-        case .revokeInvitation: "招待の取り消し"
+        case .rename: String(localized: "Rename to “\(write.name ?? "")”")
+        case .archive: String(localized: "Archive")
+        case .reopen: String(localized: "Reopen")
+        case .create: String(localized: "Create plan")
+        case .acceptInvitation: String(localized: "Join from invitation")
+        case .revokeMember: String(localized: "Remove member")
+        case .reinstateMember: String(localized: "Reinstate member")
+        case .transferOwnership: String(localized: "Transfer ownership")
+        case .createInvitation: String(localized: "Create invitation")
+        case .revokeInvitation: String(localized: "Revoke invitation")
         }
     }
 

@@ -30,27 +30,28 @@ struct FocusedActionSurface<Content: View>: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let contentWidth = min(640, max(0, geometry.size.width - 56))
-            let contentHeight = max(0, geometry.size.height - 88)
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    LucideIcon(symbolName, size: 34)
+                    LucideIcon(symbolName, size: IconSize.hero)
                         .foregroundStyle(tint)
                         .accessibilityHidden(true)
 
-                    Spacer(minLength: 48)
+                    Spacer(minLength: Spacing.xxxLarge)
 
                     content()
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(width: contentWidth, alignment: .leading)
-                .frame(minHeight: contentHeight, alignment: .topLeading)
-                .padding(.horizontal, 28)
-                .padding(.vertical, 44)
-                .frame(width: geometry.size.width, alignment: .center)
+                // Fill the visible height, so the message sits at the bottom.
+                .frame(
+                    minHeight: max(0, geometry.size.height - Spacing.xxxLarge * 2),
+                    alignment: .topLeading
+                )
+                .readableWidth(ReadableWidth.form)
+                .padding(.horizontal, Spacing.screenGutter)
+                .padding(.vertical, Spacing.xxxLarge)
             }
             .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
@@ -66,6 +67,11 @@ struct FocusedActionSurface<Content: View>: View {
     }
 }
 
+/// The full-width action of a focused state. It uses the design-system
+/// action buttons. A primary destructive action uses the `destructive` style
+/// (red text on a pale red fill). A custom tint (red for a destructive action,
+/// secondary for cancel) colors the title of a secondary button, or fills a
+/// primary one with the system prominent style.
 struct FocusedActionButton<Label: View>: View {
     enum Emphasis {
         case primary
@@ -74,14 +80,14 @@ struct FocusedActionButton<Label: View>: View {
 
     let role: ButtonRole?
     let emphasis: Emphasis
-    let tint: Color
+    let tint: Color?
     let action: () -> Void
     @ViewBuilder private let label: () -> Label
 
     init(
         role: ButtonRole? = nil,
         emphasis: Emphasis = .primary,
-        tint: Color = .accentColor,
+        tint: Color? = nil,
         action: @escaping () -> Void,
         @ViewBuilder label: @escaping () -> Label
     ) {
@@ -93,33 +99,34 @@ struct FocusedActionButton<Label: View>: View {
     }
 
     var body: some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                switch emphasis {
-                case .primary:
-                    button.buttonStyle(.glassProminent)
-                case .secondary:
-                    button.buttonStyle(.glass)
-                }
-            } else {
-                switch emphasis {
-                case .primary:
-                    button.buttonStyle(.borderedProminent)
-                case .secondary:
-                    button.buttonStyle(.bordered)
+        switch (emphasis, tint) {
+        case (.primary, _) where role == .destructive:
+            Button(role: role, action: action, label: label)
+                .buttonStyle(ActionButtonStyle(role: .destructive, size: .large))
+        case (.primary, .none):
+            Button(role: role, action: action, label: label)
+                .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
+        case (.primary, .some(let tint)):
+            // A tinted primary action, such as a red destructive button. The
+            // system prominent style draws white text on the tint.
+            Button(role: role, action: action) {
+                label()
+                    .font(.largeControl)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .buttonBorderShape(.roundedRectangle(radius: Radius.control))
+            .tint(tint)
+        case (.secondary, let tint):
+            Button(role: role, action: action) {
+                if let tint {
+                    label().foregroundStyle(tint)
+                } else {
+                    label()
                 }
             }
-        }
-        .buttonBorderShape(.capsule)
-        .controlSize(.large)
-        .tint(tint)
-    }
-
-    private var button: some View {
-        Button(role: role, action: action) {
-            label()
-                .font(.headline)
-                .frame(maxWidth: .infinity)
+            .buttonStyle(ActionButtonStyle(role: .secondary, size: .large))
         }
     }
 }
@@ -152,39 +159,53 @@ struct CatalogStatusSurface<Content: View>: View {
             animatesBackdrop: true
         ) {
             Text(eyebrow)
-                .font(.headline.weight(.semibold))
+                .font(.rowTitle)
                 .foregroundStyle(Color.accentColor)
 
             Text(title)
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                .font(.focusedSurfaceTitle)
                 .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
+                .wrapsFully()
+                .padding(.top, Spacing.small)
 
             Text(subtitle)
                 .font(.body)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 12)
+                .wrapsFully()
+                .padding(.top, Spacing.medium)
 
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 34)
+                .padding(.top, Spacing.xxxLarge)
         }
-        .scrollDisabled(true)
+        // Scrolling stays on: at accessibility sizes the progress rows are
+        // taller than the screen. FocusedActionSurface stops short content
+        // from bouncing.
         .accessibilityIdentifier("catalog-status-surface")
     }
 }
 
 struct CatalogActivityIndicator: View {
-    let accessibilityLabel: String
+    private let accessibilityLabel: Text
+
+    /// Literal labels resolve through the string catalog, so call sites can
+    /// pass an English source string directly.
+    init(accessibilityLabel: LocalizedStringResource) {
+        self.accessibilityLabel = Text(accessibilityLabel)
+    }
+
+    /// Already-localized runtime text, such as a status message.
+    @_disfavoredOverload
+    init(accessibilityLabel: String) {
+        self.accessibilityLabel = Text(verbatim: accessibilityLabel)
+    }
 
     var body: some View {
         ProgressView()
             .controlSize(.large)
             .tint(Color.accentColor)
             .frame(width: 44, height: 44)
-            .accessibilityLabel(Text(accessibilityLabel))
+            .accessibilityLabel(accessibilityLabel)
     }
 }
 
@@ -211,65 +232,66 @@ struct CatalogErrorSurface<Actions: View>: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let contentWidth = min(640, max(0, geometry.size.width - 56))
-            let contentHeight = max(0, geometry.size.height - 64)
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    HStack(alignment: .center, spacing: 24) {
-                        LucideIcon(symbolName, size: 34)
+                    HStack(alignment: .center, spacing: Spacing.xxLarge) {
+                        LucideIcon(symbolName, size: IconSize.hero)
                             .foregroundStyle(.red)
                             .accessibilityHidden(true)
 
                         Text(message)
                             .font(.body)
                             .foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .wrapsFully()
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 18)
+                            .padding(.vertical, Spacing.large)
                             .overlay(alignment: .top) {
                                 Rectangle()
                                     .fill(Color.red.opacity(0.28))
-                                    .frame(height: 1)
+                                    .frame(height: 0.5)
                             }
                             .overlay(alignment: .bottom) {
                                 Rectangle()
                                     .fill(Color.red.opacity(0.16))
-                                    .frame(height: 1)
+                                    .frame(height: 0.5)
                             }
                     }
                     .accessibilityElement(children: .combine)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Spacer(minLength: 64)
+                    Spacer(minLength: Spacing.xxxLarge)
 
                     VStack(alignment: .leading, spacing: 0) {
                         Text(title)
-                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                            .font(.focusedSurfaceTitle)
                             .foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .wrapsFully()
 
                         Text(advice)
                             .font(.body)
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 12)
+                            .wrapsFully()
+                            .padding(.top, Spacing.medium)
 
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: Spacing.medium) {
                             actions()
                         }
-                        .padding(.top, 34)
+                        .padding(.top, Spacing.xxxLarge)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(width: contentWidth, alignment: .leading)
-                .frame(minHeight: contentHeight, alignment: .topLeading)
-                .padding(.horizontal, 28)
-                .padding(.top, 20)
-                .padding(.bottom, 44)
-                .frame(width: geometry.size.width, alignment: .center)
+                // Fill the visible height, so the title and actions sit at the bottom.
+                .frame(
+                    minHeight: max(0, geometry.size.height - Spacing.xLarge - Spacing.xxxLarge),
+                    alignment: .topLeading
+                )
+                .readableWidth(ReadableWidth.form)
+                .padding(.horizontal, Spacing.screenGutter)
+                .padding(.top, Spacing.xLarge)
+                .padding(.bottom, Spacing.xxxLarge)
             }
             .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
@@ -294,11 +316,26 @@ private struct CatalogAmbientBackdrop: View {
     @State private var isFloating = false
 
     var body: some View {
-        Image(LucideIcon.assetName(for: symbolName))
-            .resizable()
-            .renderingMode(.template)
-            .scaledToFit()
-            .foregroundStyle(tint.opacity(0.045))
+        // A Canvas, not an Image: an accessibility identifier on the parent
+        // surface exposed the hidden image again as "lucide-…", 1.5 screens
+        // wide. A Canvas draws no accessibility element.
+        Canvas { context, size in
+            var glyph = context.resolve(
+                Image(LucideIcon.assetName(for: symbolName)).renderingMode(.template)
+            )
+            glyph.shading = .color(tint.opacity(0.045))
+            let side = min(size.width, size.height)
+            context.draw(
+                glyph,
+                in: CGRect(
+                    x: (size.width - side) / 2,
+                    y: (size.height - side) / 2,
+                    width: side,
+                    height: side
+                )
+            )
+        }
+            .aspectRatio(1, contentMode: .fit)
             .containerRelativeFrame(.horizontal) { width, _ in
                 width * 1.5
             }
@@ -322,20 +359,20 @@ struct DownloadProgressView: View {
     var progresses: Readiness.Progresses
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Spacing.xxLarge) {
+            VStack(alignment: .leading, spacing: Spacing.large) {
                 Text(
                     progresses.fractionCompleted,
                     format: .percent.precision(.fractionLength(1))
                 )
-                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .font(.focusedSurfaceTitle)
                     .monospacedDigit()
                     .foregroundStyle(Color.accentColor)
+                    .singleLineToken()
 
-                ProgressView(value: progresses.fractionCompleted, total: 1)
-                    .progressViewStyle(.linear)
-                    .tint(Color.accentColor)
-                    .scaleEffect(y: 2, anchor: .center)
+                CapsuleProgressBar(segments: [
+                    .init(fraction: progresses.fractionCompleted, color: .accentColor),
+                ])
                     .animation(
                         accessibilityReduceMotion ? nil : .easeOut(duration: 0.22),
                         value: progresses.fractionCompleted
@@ -344,7 +381,7 @@ struct DownloadProgressView: View {
                 DownloadTransferMetricsView(progresses: progresses)
             }
 
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Spacing.large) {
                 ForEach(progresses, id: \.type) { progress in
                     DatabaseProgressRow(progress: progress)
 
@@ -363,13 +400,14 @@ private struct DatabaseProgressRow: View {
     let progress: Readiness.Progress
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+        VStack(alignment: .leading, spacing: Spacing.small) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.small) {
                 LucideLabel(verbatim: progress.type.localizedName, icon: iconName)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.control)
                     .foregroundStyle(.primary)
+                    .layoutPriority(1)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: Spacing.small)
 
                 if isComplete {
                     LucideIcon("checkmark.circle.fill")
@@ -380,9 +418,10 @@ private struct DatabaseProgressRow: View {
                         progress.fractionCompleted,
                         format: .percent.precision(.fractionLength(1))
                     )
-                        .font(.caption)
+                        .font(.meta)
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
+                        .singleLineToken()
                 }
             }
 

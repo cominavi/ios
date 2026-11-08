@@ -10,7 +10,7 @@ struct CircleExternalLink: Identifiable, Equatable, Sendable {
         var title: LocalizedStringResource {
             switch self {
             case .xProfile: "X profile"
-            case .pixiv: "Pixiv"
+            case .pixiv: "pixiv"
             case .website: "Website"
             case .circlems: "Circle.ms"
             }
@@ -64,7 +64,7 @@ struct CircleExternalLink: Identifiable, Equatable, Sendable {
             let components = url.pathComponents.filter { $0 != "/" }
             if let usersIndex = components.firstIndex(of: "users"),
                components.indices.contains(usersIndex + 1) {
-                return String(localized: "Pixiv ID \(components[usersIndex + 1])")
+                return String(localized: "pixiv ID \(components[usersIndex + 1])")
             }
             return url.host ?? url.absoluteString
         case .circlems:

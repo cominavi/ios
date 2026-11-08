@@ -52,18 +52,22 @@ final class ComiNaviAdaptiveLayoutTests: XCTestCase {
         let dayTwo = app.buttons["global-day-2"]
         XCTAssertTrue(dayTwo.waitForExistence(timeout: 5))
         dayTwo.tap()
-        app.buttons["catalog-settings-done"].tap()
+        XCTAssertTrue(dayTwo.waitForNonExistence(timeout: 5))
         XCTAssertTrue(day.label.contains("Day 2"))
 
         tab("Explore", in: app).tap()
-        let search = app.textFields["explore-search-field"]
+        // Explore uses the system search field in the navigation bar.
+        let search = app.searchFields.firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 15))
+        let exploreDay = app.buttons["global-event-day-toolbar-button"]
+        XCTAssertTrue(exploreDay.waitForExistence(timeout: 5))
+        XCTAssertTrue(exploreDay.label.contains("Day 2"))
         capture(app, "duo-explore-portrait")
         search.tap()
         search.typeText("duo continuity")
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertEqual(search.value as? String, "duo continuity")
-        XCTAssertTrue(day.label.contains("Day 2"))
+        XCTAssertTrue(exploreDay.label.contains("Day 2"))
         XCTAssertTrue(app.buttons["explore-filter-button"].isHittable)
         capture(app, "duo-explore-search-landscape")
         XCUIDevice.shared.orientation = .portrait
@@ -91,7 +95,7 @@ final class ComiNaviAdaptiveLayoutTests: XCTestCase {
         defer { XCUIDevice.shared.orientation = .portrait }
         let first = app.images["Test Shinagaki page 1"]
         XCTAssertTrue(first.waitForExistence(timeout: 10))
-        app.collectionViews["shinagaki-lightbox"].swipeLeft()
+        app.scrollViews["shinagaki-lightbox"].swipeLeft()
         let second = app.images["Test Shinagaki page 2"]
         XCTAssertTrue(second.waitForExistence(timeout: 5))
         for orientation: UIDeviceOrientation in [.landscapeLeft, .portrait, .landscapeRight] {
@@ -149,7 +153,7 @@ final class ComiNaviAdaptiveLayoutTests: XCTestCase {
         increment.tap()
         XCTAssertTrue(app.steppers["Bought, 1"].exists)
         capture(app, "duo-purchase-progress-accessibility")
-        app.buttons["Done"].tap()
+        app.sheetCloseButton.tap()
         XCTAssertTrue(surface.waitForExistence(timeout: 5))
     }
 }

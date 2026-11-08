@@ -347,41 +347,41 @@ enum SharedPlanError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .invalidName:
-            String(localized: "プラン名を入力してください。")
+            String(localized: "Enter a plan name.")
         case .planLimitReached:
-            String(localized: "このコミケで作成できる有効なプランは50件までです。")
+            String(localized: "You can have up to 50 active plans for this Comiket.")
         case .planNotFound:
-            String(localized: "プランが見つかりません。")
+            String(localized: "Plan not found.")
         case .eventMismatch:
-            String(localized: "別のコミケのサークルは追加できません。")
+            String(localized: "You cannot add a circle from a different Comiket.")
         case .insufficientRole:
-            String(localized: "このプランを編集する権限がありません。")
+            String(localized: "You do not have permission to edit this plan.")
         case .membershipRevoked:
-            String(localized: "このプランへの参加権限が取り消されました。未送信の変更は残っています。")
+            String(localized: "Your access to this plan was removed. Your unsent changes are still on this device.")
         case .invalidInvite:
-            String(localized: "招待リンクが正しくありません。")
+            String(localized: "This invitation link is not valid.")
         case .removedMember:
-            String(localized: "この招待では再参加できません。オーナーに再招待を依頼してください。")
+            String(localized: "You cannot rejoin with this invitation. Ask the owner to invite you again.")
         case .revisionConflict:
-            String(localized: "別の場所でプランが更新されました。残っている変更を確認してください。")
+            String(localized: "Someone else updated this plan. Review your remaining changes.")
         case .invitationTokenAlreadyReturned:
-            String(localized: "招待は作成済みですが、安全のため招待コードを再表示できません。新しい招待を作成してください。")
+            String(localized: "The invitation was created, but its link cannot be shown again for security. Create a new invitation.")
         case .documentLimit(let message):
             message
         case .planCompactionRequired:
-            String(localized: "変更が多いため、このプランを続けて編集できません。内容を書き出してから、最新のプランでやり直してください。")
+            String(localized: "This plan has too many changes to keep editing. Export its contents, then start again from the latest plan.")
         case .planSyncBacklogLimit:
-            String(localized: "変更が多すぎます。内容を書き出してから、最新のプランでやり直してください。")
+            String(localized: "There are too many changes. Export the contents, then start again from the latest plan.")
         case .syncPayloadTooLarge:
-            String(localized: "送信する変更が大きすぎます。内容を減らしてもう一度お試しください。")
+            String(localized: "These changes are too large to send. Make them smaller and try again.")
         case .syncProtocolViolation:
-            String(localized: "プランを更新できないため、再接続します。")
+            String(localized: "The plan could not be updated. ComiNavi is reconnecting.")
         case .profileRequired:
-            String(localized: "プロフィールを読み込んでからもう一度お試しください。")
+            String(localized: "Sign in to ComiNavi, then try again.")
         case .profileMutationPending:
-            String(localized: "前のプロフィール変更を確認できるまで、新しい変更は保存できません。もう一度同じ操作をお試しください。")
+            String(localized: "New changes cannot be saved until your last profile change is confirmed. Try the same action again.")
         case .persistenceFailed:
-            String(localized: "変更を保存できませんでした。")
+            String(localized: "Your changes could not be saved.")
         }
     }
 }

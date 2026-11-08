@@ -3,14 +3,14 @@ import UIKit
 
 private enum ComiketLocationPickerPurpose: Equatable {
     case currentLocation
+    /// "Go to space": the attendee knows a space code and wants the circle
+    /// there. The flow ends on the circle sheet, which can pin the space.
     case destination
-    case circleSearch
 
     var flowTitle: LocalizedStringResource {
         switch self {
-        case .currentLocation: "Where Am I"
-        case .destination: "Find a Circle"
-        case .circleSearch: "Find a Circle"
+        case .currentLocation: "Where am I?"
+        case .destination: "Go to Space"
         }
     }
 
@@ -18,7 +18,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "Where are you?"
         case .destination: "Which venue is the circle in?"
-        case .circleSearch: "Which venue is the circle in?"
         }
     }
 
@@ -28,8 +27,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
             "Choose your venue manually."
         case .destination:
             "Choose the venue containing the circle you want to visit."
-        case .circleSearch:
-            "Choose the venue containing the circle you want to find."
         }
     }
 
@@ -37,7 +34,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "Which letter do you see?"
         case .destination: "Which block letter is the circle in?"
-        case .circleSearch: "Which block letter is the circle in?"
         }
     }
 
@@ -47,8 +43,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
             "Look for the large block letter nearest to you, then tap the same character below."
         case .destination:
             "Choose the block letter from the circle's Comiket address."
-        case .circleSearch:
-            "Choose the block letter from the circle's Comiket address."
         }
     }
 
@@ -56,7 +50,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "What number do you see?"
         case .destination: "What space number is the circle in?"
-        case .circleSearch: "What space number is the circle in?"
         }
     }
 
@@ -66,16 +59,13 @@ private enum ComiketLocationPickerPurpose: Equatable {
             "Enter the one- or two-digit space number printed beside the block letter."
         case .destination:
             "Enter the one- or two-digit space number from the circle's Comiket address."
-        case .circleSearch:
-            "Enter the one- or two-digit space number from the circle's Comiket address."
         }
     }
 
     var actionTitle: LocalizedStringResource {
         switch self {
         case .currentLocation: "Locate me"
-        case .destination: "Show on map"
-        case .circleSearch: "Show circle"
+        case .destination: "Show circle"
         }
     }
 
@@ -83,7 +73,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "location.viewfinder"
         case .destination: "mappin.and.ellipse"
-        case .circleSearch: "magnifyingglass"
         }
     }
 
@@ -91,7 +80,6 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "where-am-i"
         case .destination: "find-table"
-        case .circleSearch: "find-circle"
         }
     }
 
@@ -99,29 +87,19 @@ private enum ComiketLocationPickerPurpose: Equatable {
         switch self {
         case .currentLocation: "where-am-i-locate"
         case .destination: "find-table-show"
-        case .circleSearch: "find-circle-show"
         }
     }
 
-    var includesDayStep: Bool {
-        self == .circleSearch
+    /// Only the destination flow lets the attendee pick a day. The choice
+    /// stays local until the flow completes.
+    var includesDayChoice: Bool {
+        self == .destination
     }
 
-    var venueStep: Int {
-        includesDayStep ? 2 : 1
-    }
-
-    var characterStep: Int {
-        includesDayStep ? 3 : 2
-    }
-
-    var numberStep: Int {
-        includesDayStep ? 4 : 3
-    }
-
-    var stepCount: Int {
-        includesDayStep ? 4 : 3
-    }
+    var venueStep: Int { 1 }
+    var characterStep: Int { 2 }
+    var numberStep: Int { 3 }
+    var stepCount: Int { 3 }
 }
 
 struct WhereAmIView: View {
@@ -135,26 +113,16 @@ struct WhereAmIView: View {
     }
 }
 
+/// The "Go to space" flow: day, hall, block, and number lead to the circle
+/// sheet for that space.
 struct DestinationPickerView: View {
     let mapModel: MapScreenModel
 
     var body: some View {
         ComiketLocationPickerView(
             mapModel: mapModel,
-            purpose: .destination
-        )
-    }
-}
-
-struct CircleSearchPickerView: View {
-    let mapModel: MapScreenModel
-    let days: [UFDSchema.Day]
-
-    var body: some View {
-        ComiketLocationPickerView(
-            mapModel: mapModel,
-            purpose: .circleSearch,
-            days: days
+            purpose: .destination,
+            days: mapModel.days
         )
     }
 }
@@ -171,7 +139,7 @@ private struct ComiketLocationPickerView: View {
     let purpose: ComiketLocationPickerPurpose
     let days: [UFDSchema.Day]
     @State private var path: [Step] = []
-    @State private var selectedSearchDay: Int?
+    @State private var selectedDay: Int
     @State private var venues: [WhereAmIVenueOption] = []
     @State private var selectedVenue: WhereAmIVenueOption?
     @State private var selectedCharacter: String?
@@ -189,28 +157,20 @@ private struct ComiketLocationPickerView: View {
         self.mapModel = mapModel
         self.purpose = purpose
         self.days = days
+        _selectedDay = State(initialValue: mapModel.selectedDay)
     }
 
     var body: some View {
         NavigationStack(path: $path) {
-            Group {
-                if purpose.includesDayStep, selectedSearchDay == nil {
-                    DaySelectionScreen(
-                        days: days,
-                        selectedDay: mapModel.selectedDay,
-                        accessibilityPrefix: purpose.accessibilityPrefix,
-                        onSelect: selectSearchDay
-                    )
-                } else {
-                    VenueSelectionScreen(
-                        venues: venues,
-                        purpose: purpose,
-                        isLoading: isLoadingVenues,
-                        errorMessage: venueError,
-                        onSelect: selectVenue
-                    )
-                }
-            }
+            VenueSelectionScreen(
+                venues: venues,
+                purpose: purpose,
+                days: purpose.includesDayChoice ? days : [],
+                selectedDay: $selectedDay,
+                isLoading: isLoadingVenues,
+                errorMessage: venueError,
+                onSelect: selectVenue
+            )
             .navigationDestination(for: Step.self) { step in
                 switch step {
                 case .character:
@@ -236,12 +196,9 @@ private struct ComiketLocationPickerView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
+                    MapSheetCloseButton {
                         dismiss()
-                    } label: {
-                        LucideLabel("Close", icon: "xmark")
                     }
-                    .controlSize(.large)
                     .accessibilityIdentifier("\(purpose.accessibilityPrefix)-close")
                 }
             }
@@ -249,28 +206,17 @@ private struct ComiketLocationPickerView: View {
         .tint(.accentColor)
         .sensoryFeedback(.selection, trigger: selectionFeedback)
         .sensoryFeedback(.success, trigger: completionFeedback)
-        .task {
-            if !purpose.includesDayStep {
-                await loadVenues()
-            }
-        }
-        .accessibilityIdentifier("\(purpose.accessibilityPrefix)-flow")
-    }
-
-    private func selectSearchDay(_ day: UFDSchema.Day) {
-        selectedSearchDay = day.dayIndex
-        mapModel.select(day: day.dayIndex)
-        path.removeAll()
-        Task {
+        .task(id: selectedDay) {
             await loadVenues()
         }
+        .accessibilityIdentifier("\(purpose.accessibilityPrefix)-flow")
     }
 
     private func loadVenues() async {
         isLoadingVenues = true
         venueError = nil
         do {
-            venues = try await mapModel.whereAmIVenues()
+            venues = try await mapModel.whereAmIVenues(day: selectedDay)
         } catch is CancellationError {
             return
         } catch {
@@ -318,128 +264,52 @@ private struct ComiketLocationPickerView: View {
             )
             mapModel.locateUser(user)
         case .destination:
-            mapModel.show(
-                WhereAmIResolver.destination(
-                    at: table,
-                    in: selectedVenue
-                ))
-        case .circleSearch:
+            // The app-wide day changes only now, when the attendee confirms.
             mapModel.setSearchPresented(false)
-            mapModel.select(table: table, preferredSubspace: 0)
+            mapModel.open(
+                table: table,
+                mapID: selectedVenue.id,
+                day: selectedDay,
+                preferredSubspace: 0
+            )
         }
         completionFeedback += 1
         dismiss()
     }
 }
 
-private struct DaySelectionScreen: View {
-    let days: [UFDSchema.Day]
-    let selectedDay: Int
-    let accessibilityPrefix: String
-    let onSelect: (UFDSchema.Day) -> Void
-
-    private var orderedDays: [UFDSchema.Day] {
-        days.sorted { $0.dayIndex < $1.dayIndex }
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                WhereAmIHeader(
-                    step: 1,
-                    totalSteps: 4,
-                    title: "Which day is the circle in?",
-                    message: "Choose the event day printed on the circle's Comiket address."
-                )
-
-                VStack(spacing: 12) {
-                    ForEach(orderedDays) { day in
-                        Button {
-                            onSelect(day)
-                        } label: {
-                            HStack(spacing: 14) {
-                                LucideIcon("calendar")
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundStyle(
-                                        day.dayIndex == selectedDay
-                                            ? Color.accentColor
-                                            : Color.secondary
-                                    )
-                                    .frame(width: 30)
-
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Day \(day.dayIndex)")
-                                        .font(.title3.weight(.bold))
-                                        .foregroundStyle(.primary)
-
-                                    if let date = Calendar.current.date(from: day.date) {
-                                        Text(
-                                            date,
-                                            format: CatalogDateFormatting.full(for: date)
-                                        )
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                    }
-                                }
-
-                                Spacer(minLength: 8)
-
-                                LucideIcon("chevron.forward")
-                                    .font(.headline.weight(.semibold))
-                                    .foregroundStyle(.tertiary)
-                                    .accessibilityHidden(true)
-                            }
-                            .padding(.horizontal, 18)
-                            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-                            .background(Color(uiColor: .secondarySystemBackground))
-                            .clipShape(.rect(cornerRadius: 14))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(
-                                        day.dayIndex == selectedDay
-                                            ? Color.accentColor.opacity(0.6)
-                                            : Color(uiColor: .separator).opacity(0.38),
-                                        lineWidth: day.dayIndex == selectedDay ? 1.5 : 0.5
-                                    )
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Day \(day.dayIndex)")
-                        .accessibilityHint("Choose this event day")
-                        .accessibilityIdentifier(
-                            "\(accessibilityPrefix)-day-\(day.dayIndex)"
-                        )
-                    }
-                }
-            }
-            .frame(maxWidth: 720)
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 36)
-            .frame(maxWidth: .infinity)
-        }
-        .background(Color(uiColor: .systemBackground))
-        .navigationTitle("Find a Circle")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 private struct VenueSelectionScreen: View {
     let venues: [WhereAmIVenueOption]
     let purpose: ComiketLocationPickerPurpose
+    let days: [UFDSchema.Day]
+    @Binding var selectedDay: Int
     let isLoading: Bool
     let errorMessage: String?
     let onSelect: (WhereAmIVenueOption) -> Void
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Spacing.sectionGap) {
                 WhereAmIHeader(
                     step: purpose.venueStep,
                     totalSteps: purpose.stepCount,
                     title: purpose.venueTitle,
                     message: purpose.venueMessage
                 )
+
+                if days.count > 1 {
+                    dayPicker
+                }
+
+                if purpose == .currentLocation {
+                    // A full-width card: the tip wraps at the column edge,
+                    // like the venue cards below it, and reads as one element.
+                    InlineBanner(
+                        "Tip: Touch and hold the map to set your position.",
+                        icon: "hand.tap.fill"
+                    )
+                    .accessibilityIdentifier("where-am-i-long-press-tip")
+                }
 
                 if isLoading {
                     ProgressView("Loading venue maps…")
@@ -455,19 +325,29 @@ private struct VenueSelectionScreen: View {
                     venueButtons
                 }
             }
-            .frame(maxWidth: 720)
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 36)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Spacing.screenGutter)
+            .padding(.top, Spacing.xLarge)
+            .padding(.bottom, Spacing.xxxLarge)
+            .readableWidth()
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(purpose.flowTitle)
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private var dayPicker: some View {
+        Picker("Day", selection: $selectedDay) {
+            ForEach(days.sorted { $0.dayIndex < $1.dayIndex }) { day in
+                Text("Day \(day.dayIndex)")
+                    .tag(day.dayIndex)
+            }
+        }
+        .pickerStyle(.segmented)
+        .accessibilityIdentifier("\(purpose.accessibilityPrefix)-day-picker")
+    }
+
     private var venueButtons: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Spacing.medium) {
             ForEach(venues) { venue in
                 LargeVenueButton(
                     venue: venue,
@@ -484,37 +364,36 @@ private struct LargeVenueButton: View {
     let accessibilityPrefix: String
     let action: () -> Void
 
-    @ScaledMetric(relativeTo: .title2) private var minimumHeight = 88.0
-
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 16) {
+            HStack(spacing: Spacing.iconToText) {
+                // Decoration: the badge glyphs (東, EAST) repeat the name.
                 BigSightVenueBadge(icon: venue.placement.kind.icon)
                     .frame(width: 40, height: 40)
                     .accessibilityHidden(true)
 
                 Text(venue.displayName)
-                    .font(.title2.weight(.bold))
+                    .font(.sectionTitle)
                     .foregroundStyle(.primary)
+                    .wrapsFully()
+                    .layoutPriority(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                LucideIcon("chevron.forward")
-                    .font(.headline.weight(.semibold))
+                LucideIcon("chevron.forward", size: IconSize.caption)
                     .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, minHeight: minimumHeight, alignment: .leading)
-            .background(Color(uiColor: .secondarySystemBackground))
-            .clipShape(.rect(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color(uiColor: .separator).opacity(0.38), lineWidth: 0.5)
-            }
-            .contentShape(.rect)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .surface(.card)
+            .contentShape(.rect(cornerRadius: Radius.card, style: .continuous))
+            // One text element for the whole label. A plain-style button
+            // still exposed the badge glyphs (東, EAST) as separate texts,
+            // even with the badge hidden.
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(venue.displayName)
         }
         .buttonStyle(.plain)
+        // The button is one element with the venue name as its label. An
+        // extra accessibility container on it would add a second copy.
         .accessibilityLabel(venue.displayName)
         .accessibilityHint("Select this venue")
         .accessibilityIdentifier("\(accessibilityPrefix)-venue-\(venue.id)")
@@ -546,8 +425,8 @@ private struct CharacterSelectionScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: Spacing.sectionGap) {
+                VStack(alignment: .leading, spacing: Spacing.sectionGap) {
                     WhereAmIHeader(
                         step: purpose.characterStep,
                         totalSteps: purpose.stepCount,
@@ -562,16 +441,18 @@ private struct CharacterSelectionScreen: View {
                             .frame(width: 28, height: 28)
                             .accessibilityHidden(true)
                     }
-                    .font(.headline)
+                    .font(.rowTitle)
                     .foregroundStyle(.secondary)
+                    // The hall name only; the badge glyphs repeat it.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(venue.displayName)
 
                     if isShowingSearch {
                         characterSearchField
                     }
                 }
-                .frame(maxWidth: 760, alignment: .leading)
-                .padding(.horizontal, 20)
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal, Spacing.screenGutter)
+                .readableWidth()
 
                 if isFiltering {
                     searchResults
@@ -579,11 +460,11 @@ private struct CharacterSelectionScreen: View {
                     characterPicker
                 }
             }
-            .padding(.top, 20)
-            .padding(.bottom, 36)
+            .padding(.top, Spacing.xLarge)
+            .padding(.bottom, Spacing.xxxLarge)
             .frame(maxWidth: .infinity)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(venue.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -615,8 +496,8 @@ private struct CharacterSelectionScreen: View {
     }
 
     private var characterSearchField: some View {
-        HStack(spacing: 10) {
-            LucideIcon("magnifyingglass")
+        HStack(spacing: Spacing.small) {
+            LucideIcon("magnifyingglass", size: IconSize.inline)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
 
@@ -633,16 +514,19 @@ private struct CharacterSelectionScreen: View {
                 Button {
                     searchQuery = ""
                 } label: {
-                    LucideIcon("xmark.circle.fill")
+                    LucideIcon("xmark.circle.fill", size: IconSize.inline)
                         .foregroundStyle(.secondary)
+                        .minimumHitArea()
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
             }
         }
-        .padding(.horizontal, 12)
-        .frame(minHeight: 44)
-        .background(Color(uiColor: .secondarySystemBackground))
-        .clipShape(.rect(cornerRadius: 12))
+        .padding(.leading, Spacing.medium)
+        // The clear button draws its own 44 pt target to the edge.
+        .padding(.trailing, searchQuery.isEmpty ? Spacing.medium : 0)
+        .frame(minHeight: HitArea.minimum)
+        .background(Color(uiColor: .secondarySystemBackground), in: .capsule)
     }
 
     @ViewBuilder
@@ -653,18 +537,17 @@ private struct CharacterSelectionScreen: View {
                 icon: "magnifyingglass",
                 description: Text("Try hiragana, katakana, or romaji.")
             )
-            .frame(maxWidth: 760, minHeight: 180)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity)
+            .frame(minHeight: 180)
+            .padding(.horizontal, Spacing.screenGutter)
+            .readableWidth()
         } else {
             AlphabetCharacterPicker(
                 characters: matchingCharacters,
                 accessibilityPrefix: purpose.accessibilityPrefix,
                 onSelect: onSelect
             )
-            .frame(maxWidth: 760)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Spacing.screenGutter)
+            .readableWidth()
         }
     }
 
@@ -672,11 +555,12 @@ private struct CharacterSelectionScreen: View {
     private var characterPicker: some View {
         switch layout.mode {
         case .kana(let columns):
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: Spacing.small) {
                 LucideLabel("Read down, then move right", icon: "arrow.down.right")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.control)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 20)
+                    // Aligned with the first column of the picker below.
+                    .padding(.horizontal, Spacing.screenGutter)
                 KanaCharacterPicker(
                     columns: columns,
                     accessibilityPrefix: purpose.accessibilityPrefix,
@@ -685,23 +569,13 @@ private struct CharacterSelectionScreen: View {
             }
             .frame(maxWidth: .infinity)
         case .alphabet(let characters):
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Spacing.medium) {
                 if layout.usesOnlyLatinAlphabet {
-                    LucideLabel(
+                    InlineBanner(
                         "Uppercase and lowercase letters identify different areas. Check the letter’s case carefully.",
-                        icon: "character.textbox"
+                        icon: "character.textbox",
+                        tone: .warning
                     )
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(uiColor: .secondarySystemBackground))
-                    .clipShape(.rect(cornerRadius: 10))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(uiColor: .separator).opacity(0.3), lineWidth: 0.5)
-                    }
-                    .accessibilityElement(children: .combine)
                     .accessibilityIdentifier(
                         "\(purpose.accessibilityPrefix)-alphabet-case-notice")
                 }
@@ -712,9 +586,8 @@ private struct CharacterSelectionScreen: View {
                     onSelect: onSelect
                 )
             }
-            .frame(maxWidth: 760)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Spacing.screenGutter)
+            .readableWidth()
         }
     }
 }
@@ -729,9 +602,9 @@ private struct KanaCharacterPicker: View {
 
     var body: some View {
         ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: Spacing.medium) {
                 ForEach(columns) { column in
-                    VStack(spacing: 10) {
+                    VStack(spacing: Spacing.medium) {
                         ForEach(column.cells) { cell in
                             if let character = cell.character {
                                 CharacterButton(
@@ -750,10 +623,10 @@ private struct KanaCharacterPicker: View {
                     }
                 }
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, Spacing.xxSmall)
         }
         .defaultScrollAnchor(.leading)
-        .contentMargins(.horizontal, 20, for: .scrollContent)
+        .contentMargins(.horizontal, Spacing.screenGutter, for: .scrollContent)
         .scrollIndicators(.visible)
         .onScrollGeometryChange(for: HorizontalScrollEdgeFade.self) { geometry in
             HorizontalScrollEdgeFade(geometry: geometry)
@@ -826,11 +699,11 @@ private struct AlphabetCharacterPicker: View {
     @ScaledMetric(relativeTo: .largeTitle) private var cellSize = 88.0
 
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: cellSize), spacing: 12)]
+        [GridItem(.adaptive(minimum: cellSize), spacing: Spacing.medium)]
     }
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
+        LazyVGrid(columns: columns, spacing: Spacing.medium) {
             ForEach(characters, id: \.self) { character in
                 CharacterButton(
                     character: character,
@@ -855,18 +728,18 @@ private struct CharacterButton: View {
                 .font(.largeTitle.weight(.bold))
                 .foregroundStyle(.primary)
                 .frame(maxWidth: .infinity, minHeight: minimumSize)
-                .background(Color(uiColor: .secondarySystemBackground))
-                .clipShape(.rect(cornerRadius: 12))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(uiColor: .separator).opacity(0.38), lineWidth: 0.5)
-                }
-                .contentShape(.rect)
+                .background(keyShape.fill(Color(uiColor: .secondarySystemBackground)))
+                .overlay { keyShape.strokeBorder(Color.hairline, lineWidth: 0.5) }
+                .contentShape(keyShape)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Block \(character)")
         .accessibilityHint("Select this block letter")
         .accessibilityIdentifier("\(accessibilityPrefix)-character-\(character)")
+    }
+
+    private var keyShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
     }
 }
 
@@ -879,15 +752,12 @@ private struct NumberSelectionScreen: View {
     let onComplete: () -> Void
 
     @ScaledMetric(relativeTo: .title) private var keyHeight = 56.0
-    @ScaledMetric(relativeTo: .title2) private var locateHeight = 60.0
 
     private var completionHint: LocalizedStringResource {
         switch purpose {
         case .currentLocation:
             "Place your position on the venue map"
         case .destination:
-            "Pin this circle on the map; use current signs and staff directions"
-        case .circleSearch:
             "Open the circle details for this circle"
         }
     }
@@ -906,8 +776,8 @@ private struct NumberSelectionScreen: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Spacing.medium) {
+            VStack(alignment: .leading, spacing: Spacing.medium) {
                 WhereAmIHeader(
                     step: purpose.numberStep,
                     totalSteps: purpose.stepCount,
@@ -916,7 +786,7 @@ private struct NumberSelectionScreen: View {
                 )
 
                 LucideLabel("\(venue.displayName) · Block \(character)", icon: "mappin.and.ellipse")
-                    .font(.headline)
+                    .font(.rowTitle)
                     .foregroundStyle(.secondary)
 
                 numberDisplay
@@ -927,31 +797,30 @@ private struct NumberSelectionScreen: View {
                     LucideLabel(
                         "That space is not present in this block.", icon: "exclamationmark.circle"
                     )
-                    .font(.body.weight(.semibold))
+                    .font(.rowTitle)
                     .foregroundStyle(.red)
+                    .wrapsFully()
                     .accessibilityIdentifier("\(purpose.accessibilityPrefix)-number-error")
                 }
             }
-            .frame(maxWidth: 560)
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, Spacing.screenGutter)
+            .padding(.top, Spacing.xLarge)
+            .readableWidth(ReadableWidth.form)
 
             Spacer(minLength: 0)
 
             Button(action: onComplete) {
                 LucideLabel(resource: purpose.actionTitle, icon: purpose.actionIcon)
-                    .font(.title3.weight(.bold))
-                    .frame(maxWidth: .infinity, minHeight: locateHeight)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(ActionButtonStyle(role: .primary, size: .large))
             .disabled(matchingTable == nil)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 10)
+            .padding(.horizontal, Spacing.screenGutter)
+            .padding(.bottom, Spacing.small)
+            .readableWidth(ReadableWidth.form)
             .accessibilityHint(completionHint)
             .accessibilityIdentifier(purpose.actionIdentifier)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Block \(character)")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -965,14 +834,16 @@ private struct NumberSelectionScreen: View {
             )
             .foregroundStyle(numberDisplayColor)
             .frame(maxWidth: .infinity, minHeight: 72)
-            .background(Color(uiColor: .secondarySystemBackground))
-            .clipShape(.rect(cornerRadius: 12))
+            .background(
+                Color(uiColor: .secondarySystemBackground),
+                in: .rect(cornerRadius: Radius.control, style: .continuous)
+            )
             .overlay {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
+                RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                    .strokeBorder(
                         !number.isEmpty && matchingTable == nil
                             ? Color.red.opacity(0.8)
-                            : Color(uiColor: .separator).opacity(0.38),
+                            : Color.hairline,
                         lineWidth: !number.isEmpty && matchingTable == nil ? 1.5 : 0.5
                     )
             }
@@ -996,15 +867,16 @@ private struct NumberSelectionScreen: View {
             let maximum = tables.map(\.id.spaceNumber).max()
         {
             Text("Available spaces: \(minimum) through \(maximum)")
-                .font(.subheadline.weight(.semibold))
+                .font(.control)
                 .foregroundStyle(.secondary)
+                .wrapsFully()
         }
     }
 
     private var keypad: some View {
         LazyVGrid(
-            columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3),
-            spacing: 12
+            columns: Array(repeating: GridItem(.flexible(), spacing: Spacing.medium), count: 3),
+            spacing: Spacing.medium
         ) {
             ForEach(NumberKey.allCases) { key in
                 Button {
@@ -1014,13 +886,15 @@ private struct NumberSelectionScreen: View {
                         .font(key.font)
                         .foregroundStyle(.primary)
                         .frame(maxWidth: .infinity, minHeight: keyHeight)
-                        .background(Color(uiColor: .secondarySystemBackground))
-                        .clipShape(.rect(cornerRadius: 12))
+                        .background(
+                            Color(uiColor: .secondarySystemBackground),
+                            in: .rect(cornerRadius: Radius.control, style: .continuous)
+                        )
                         .overlay {
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color(uiColor: .separator).opacity(0.38), lineWidth: 0.5)
+                            RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                                .strokeBorder(Color.hairline, lineWidth: 0.5)
                         }
-                        .contentShape(.rect)
+                        .contentShape(.rect(cornerRadius: Radius.control, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .disabled(key == .delete && number.isEmpty)
@@ -1111,20 +985,21 @@ private struct WhereAmIHeader: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        // Compact at every size: at accessibility sizes the first choices
+        // stay above the fold.
+        VStack(alignment: .leading, spacing: Spacing.small) {
             Text("Step \(step) of \(totalSteps)")
-                .font(.headline)
+                .font(.meta.weight(.semibold))
                 .foregroundStyle(.secondary)
             Text(title)
-                .font(.largeTitle.weight(.bold))
+                .font(.title.bold())
                 .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             Text(message)
-                .font(.title3)
+                .font(.rowSubtitle)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
+        .wrapsFully()
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

@@ -157,7 +157,7 @@ final class ComiNaviUITests: XCTestCase {
     }
 
     @MainActor
-    func testSharedPlanEmptyHomeOffersAddAndJoinAsTwoSquareActions() {
+    func testSharedPlanEmptyHomeOffersCreateAndJoinAsStackedActions() {
         let app = XCUIApplication()
         app.launchArguments += [
             "-cominavi-ui-testing-hide-debugger",
@@ -166,15 +166,19 @@ final class ComiNaviUITests: XCTestCase {
         ]
         app.launch()
 
-        let add = app.buttons["Add"]
-        let join = app.buttons["Join"]
-        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        // One primary action (Create) above the secondary Join action, in
+        // one column that shares its leading and trailing edges.
+        let create = app.buttons["shared-plan-create-button"]
+        let join = app.buttons["shared-plan-join-button"]
+        XCTAssertTrue(create.waitForExistence(timeout: 5))
         XCTAssertTrue(join.waitForExistence(timeout: 5))
-        XCTAssertEqual(add.frame.midY, join.frame.midY, accuracy: 2)
-        XCTAssertEqual(add.frame.width, add.frame.height, accuracy: 3)
-        XCTAssertEqual(join.frame.width, join.frame.height, accuracy: 3)
+        XCTAssertLessThan(create.frame.maxY, join.frame.minY + 1)
+        XCTAssertEqual(create.frame.minX, join.frame.minX, accuracy: 2)
+        XCTAssertEqual(create.frame.width, join.frame.width, accuracy: 2)
+        XCTAssertGreaterThanOrEqual(create.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(join.frame.height, 44)
 
-        add.tap()
+        create.tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["shared-plan-create-test-surface"]
                 .waitForExistence(timeout: 5)
@@ -183,6 +187,7 @@ final class ComiNaviUITests: XCTestCase {
         app.terminate()
         app.launch()
         XCTAssertTrue(join.waitForExistence(timeout: 5))
+        makeHittable(join, in: app)
         join.tap()
         XCTAssertTrue(
             app.descendants(matching: .any)["shared-plan-join-guide"]
@@ -265,7 +270,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertEqual(boughtStepper.label, "Bought, 0")
         XCTAssertEqual(requestedStepper.value as? String, "2")
         XCTAssertEqual(boughtStepper.value as? String, "0")
-        app.buttons["Done"].tap()
+        app.sheetCloseButton.tap()
         XCTAssertFalse(app.navigationBars["Purchase progress"].waitForExistence(timeout: 2))
 
         let firstRowMenu = app.buttons["More actions for 新刊セット"]
@@ -426,7 +431,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-ui-testing-shinagaki-lightbox")
         app.launch()
 
-        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let lightbox = app.scrollViews["shinagaki-lightbox"]
         let firstPage = app.images["Test Shinagaki page 1"]
         let secondPage = app.images["Test Shinagaki page 2"]
         let shareButton = app.buttons["shinagaki-lightbox-share"]
@@ -490,7 +495,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertEqual(secondPreview.label, "Image 2 of 2: UI test Shinagaki")
         secondPreview.tap()
 
-        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let lightbox = app.scrollViews["shinagaki-lightbox"]
         let pageIndicator = app.descendants(matching: .any)[
             "shinagaki-lightbox-page-indicator"
         ]
@@ -508,7 +513,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-ui-testing-shinagaki-lightbox")
         app.launch()
 
-        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let lightbox = app.scrollViews["shinagaki-lightbox"]
         let secondPage = app.images["Test Shinagaki page 2"]
         XCTAssertTrue(lightbox.waitForExistence(timeout: 5))
         lightbox.swipeLeft()
@@ -571,7 +576,7 @@ final class ComiNaviUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        let catalogTab = app.buttons["Catalog"]
+        let catalogTab = app.buttons["Map"].firstMatch
         XCTAssertTrue(catalogTab.waitForExistence(timeout: 10))
         catalogTab.tap()
 
@@ -626,16 +631,18 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(app.buttons["explore-attendance-all"].exists)
         XCTAssertTrue(app.buttons["explore-space-all"].exists)
         takeScreenshot(named: "Explore-Filters-Expanded")
-        app.buttons["Done"].tap()
+        app.sheetCloseButton.tap()
 
-        eventDayBanner.tap()
+        app.buttons["global-event-day-toolbar-button"].tap()
         XCTAssertTrue(app.otherElements["catalog-event-day-sheet"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["global-day-1"].exists)
         let secondDay = app.buttons["global-day-2"]
         XCTAssertTrue(secondDay.exists)
         secondDay.tap()
-        XCTAssertEqual(secondDay.value as? String, "Selected")
-        app.buttons["catalog-settings-done"].tap()
+        // Picking a day closes the sheet.
+        XCTAssertTrue(
+            app.otherElements["catalog-event-day-sheet"].waitForNonExistence(timeout: 5)
+        )
 
         mapTab.tap()
         XCTAssertTrue(eventDayBanner.waitForExistence(timeout: 5))
@@ -648,17 +655,30 @@ final class ComiNaviUITests: XCTestCase {
         app.launchArguments.append("-cominavi-ui-testing-no-catalog-shell")
         app.launch()
 
-        let shell = app.otherElements["catalog-independent-shell"]
+        let shell = app.otherElements["app-shell"]
         XCTAssertTrue(shell.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Map"].firstMatch.exists)
         XCTAssertTrue(app.buttons["共有プラン"].exists)
         XCTAssertTrue(app.buttons["Profile"].exists)
-        XCTAssertTrue(app.navigationBars["共有プラン"].exists)
 
-        app.buttons["Catalog"].tap()
+        app.buttons["Map"].firstMatch.tap()
         XCTAssertTrue(app.buttons["Try Again"].waitForExistence(timeout: 5))
 
         app.buttons["共有プラン"].tap()
         XCTAssertTrue(app.navigationBars["共有プラン"].waitForExistence(timeout: 5))
+    }
+
+    /// Profile does not depend on the selected day, and on iPad a banner
+    /// above its navigation stack sat under the tab bar and caught its taps.
+    @MainActor
+    func testProfileHasNoEventDayBanner() {
+        let app = XCUIApplication()
+        app.launchArguments.append("-cominavi-demo-data")
+        app.launch()
+
+        XCTAssertTrue(app.buttons["global-event-day-banner"].waitForExistence(timeout: 30))
+        app.buttons["Profile"].firstMatch.tap()
+        XCTAssertFalse(app.buttons["global-event-day-banner"].waitForExistence(timeout: 2))
     }
 
     @MainActor
@@ -668,7 +688,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(
-            app.otherElements["catalog-independent-shell"].waitForExistence(timeout: 5)
+            app.otherElements["app-shell"].waitForExistence(timeout: 5)
         )
         app.buttons["Profile"].tap()
         let imageCacheLink = app.buttons["profile-image-cache"]
@@ -808,18 +828,31 @@ final class ComiNaviUITests: XCTestCase {
     func testExploreEventDaySelectorStaysAtTopLeading() {
         let app = XCUIApplication()
         app.launchArguments.append("-cominavi-demo-data")
+        app.launchArguments += XCUIApplication.initialTabArguments("explore")
         app.launch()
 
-        let eventDaySelector = app.buttons["global-event-day-banner"]
-        XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 20))
-
-        app.buttons["Explore"].firstMatch.tap()
-        XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.otherElements["explore-screen"].waitForExistence(timeout: 30))
+        let eventDaySelector = app.buttons["global-event-day-toolbar-button"]
+        XCTAssertTrue(eventDaySelector.waitForExistence(timeout: 5))
+        // The capsule shows the same content as the map pill; it may drop
+        // the date or a status capsule to fit, but never the day.
+        XCTAssertTrue(eventDaySelector.label.contains("Day 1"))
 
         let filterButton = app.buttons["explore-filter-button"]
         XCTAssertTrue(filterButton.exists)
-        XCTAssertLessThan(eventDaySelector.frame.midX, app.frame.midX)
-        XCTAssertLessThan(eventDaySelector.frame.maxX, filterButton.frame.minX)
+        let selector = eventDaySelector.frame
+        // The capsule starts in the leading half of the bar and stays in the
+        // window, whatever width its content takes.
+        XCTAssertLessThan(selector.minX, app.frame.midX)
+        XCTAssertTrue(app.frame.contains(selector), "The capsule must not leave the window")
+        XCTAssertLessThan(selector.minY, app.frame.height / 4)
+        // iPhone puts the capsule in the row of the trailing buttons, so it
+        // must end before them; iPad gives it its own row below them.
+        let sharesRow = selector.minY < filterButton.frame.maxY
+            && selector.maxY > filterButton.frame.minY
+        if sharesRow {
+            XCTAssertLessThanOrEqual(selector.maxX, filterButton.frame.minX)
+        }
         takeScreenshot(named: "Explore-Selector-Top-Leading")
     }
 
@@ -1007,7 +1040,7 @@ final class ComiNaviUITests: XCTestCase {
         lastFavoriteColor.tap()
         XCTAssertEqual(lastFavoriteColor.value as? String, "Selected")
 
-        XCTAssertTrue(app.buttons["Done"].isHittable)
+        XCTAssertTrue(app.sheetCloseButton.isHittable)
         takeScreenshot(named: "Explore-Filters-Expanded")
     }
 
@@ -1050,7 +1083,7 @@ final class ComiNaviUITests: XCTestCase {
 
         app.activate()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
-        XCTAssertTrue(app.buttons["Login via circle.ms"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["sign-in-circlems"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -1064,7 +1097,7 @@ final class ComiNaviUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.staticTexts["コミナビへようこそ！"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["circle.msでログイン"].exists)
+        XCTAssertTrue(app.buttons["sign-in-circlems"].exists)
         XCTAssertFalse(app.buttons["C104のデモデータを見る"].exists)
     }
 
@@ -1161,7 +1194,7 @@ final class ComiNaviUITests: XCTestCase {
         ]
         app.launch()
 
-        XCTAssertTrue(app.buttons["Login via circle.ms"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["sign-in-circlems"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.otherElements["sign-in-circlems-environment"].exists)
 
         let logo = app.descendants(matching: .any)["sign-in-logo"]
@@ -1180,7 +1213,7 @@ final class ComiNaviUITests: XCTestCase {
         XCTAssertTrue(
             app.buttons["global-event-day-banner"].waitForExistence(timeout: 120)
         )
-        XCTAssertFalse(app.buttons["Login via circle.ms"].exists)
+        XCTAssertFalse(app.buttons["sign-in-circlems"].exists)
     }
 
     @MainActor
@@ -1222,10 +1255,11 @@ final class ComiNaviUITests: XCTestCase {
             dayButton.tap()
 
             XCTAssertTrue(map.exists, "The map surface disappeared while switching to day \(day)")
-            XCTAssertEqual(dayButton.value as? String, "Selected")
             takeScreenshot(named: "C104-Day-\(day)-Map-Transition")
 
-            app.buttons["catalog-settings-done"].tap()
+            // Picking a day closes the sheet.
+            XCTAssertTrue(dayButton.waitForNonExistence(timeout: 5))
+            XCTAssertTrue(eventDayBanner.label.contains("Day \(day)"))
             takeScreenshot(named: "C104-Day-\(day)-Map-Visible")
             XCTAssertTrue(map.waitForExistence(timeout: 10))
             XCTAssertFalse(app.staticTexts["Map unavailable"].exists)
@@ -1367,7 +1401,7 @@ final class ComiNaviUITests: XCTestCase {
             XCTAssertTrue(target.isHittable)
             target.press(forDuration: 0.7)
 
-            let lightboxes = app.collectionViews.matching(
+            let lightboxes = app.scrollViews.matching(
                 identifier: "shinagaki-lightbox"
             )
             let lightbox = lightboxes.firstMatch
@@ -1470,7 +1504,7 @@ final class ComiNaviUITests: XCTestCase {
 
         firstCircle.press(forDuration: 0.7)
 
-        let lightbox = app.collectionViews["shinagaki-lightbox"]
+        let lightbox = app.scrollViews["shinagaki-lightbox"]
         XCTAssertTrue(lightbox.waitForExistence(timeout: 10))
         XCTAssertFalse(app.descendants(matching: .any)["circle-detail-screen"].exists)
 
@@ -1501,7 +1535,7 @@ final class ComiNaviUITests: XCTestCase {
 
         let cloud = app.otherElements["explore-discovery-cloud"]
         XCTAssertTrue(cloud.waitForExistence(timeout: 20))
-        let eventDayBanner = app.buttons["global-event-day-banner"]
+        let eventDayBanner = app.buttons["global-event-day-toolbar-button"]
         let searchField = app.textFields["explore-search-field"]
         XCTAssertTrue(eventDayBanner.exists)
         XCTAssertTrue(searchField.exists)
@@ -1596,7 +1630,7 @@ final class ComiNaviUITests: XCTestCase {
         )
         waitForExpectations(timeout: 8)
 
-        XCTAssertTrue(app.buttons["global-event-day-banner"].isHittable)
+        XCTAssertTrue(app.buttons["global-event-day-toolbar-button"].isHittable)
         XCTAssertTrue(app.buttons["explore-filter-button"].isHittable)
         takeScreenshot(named: "Explore-iPad-Landscape-Adaptive")
     }
@@ -1767,7 +1801,7 @@ final class ComiNaviUITests: XCTestCase {
         takeScreenshot(named: "Map-Layers-Arrival")
 
         layerButton.tap()
-        app.buttons["Hide Optional Layers"].tap()
+        app.buttons["Hide All Layers"].tap()
         XCTAssertEqual(layerButton.value as? String, "0 of 6 shown")
     }
 
@@ -2130,11 +2164,11 @@ final class ComiNaviUITests: XCTestCase {
         takeScreenshot(named: "WhereAmI-Located")
         app.buttons["current-location-copy"].tap()
         XCTAssertEqual(app.buttons["current-location-copy"].label, "Copied")
-        let done = app.buttons["Done"]
-        done.tap()
+        let close = app.buttons["current-location-close"]
+        close.tap()
         expectation(
             for: NSPredicate(format: "exists == false"),
-            evaluatedWith: done
+            evaluatedWith: close
         )
         waitForExpectations(timeout: 3)
 
@@ -2252,7 +2286,7 @@ final class ComiNaviUITests: XCTestCase {
         alternateEvent.tap()
 
         expectation(
-            for: NSPredicate(format: "value == %@", "Selected"),
+            for: NSPredicate(format: "selected == true"),
             evaluatedWith: alternateEvent
         )
         waitForExpectations(timeout: 30)
@@ -2272,7 +2306,7 @@ final class ComiNaviUITests: XCTestCase {
             XCTAssertTrue(event108.waitForExistence(timeout: 3))
             event108.tap()
             expectation(
-                for: NSPredicate(format: "value == %@", "Selected"),
+                for: NSPredicate(format: "selected == true"),
                 evaluatedWith: event108
             )
             waitForExpectations(timeout: 30)

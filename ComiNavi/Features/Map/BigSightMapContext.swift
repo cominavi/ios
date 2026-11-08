@@ -13,8 +13,8 @@ enum BigSightMapLayer: String, CaseIterable, Identifiable, Sendable {
     var title: String {
         switch self {
         case .gates: String(localized: "Gates & Tickets")
-        case .essentials: String(localized: "Food, Shops & Restrooms")
-        case .assistance: String(localized: "Information & Medical")
+        case .essentials: String(localized: "Food & Restrooms")
+        case .assistance: String(localized: "Info & Medical")
         case .verticalAccess: String(localized: "Elevators & Stairs")
         case .cosplay: String(localized: "Cosplay")
         }
@@ -31,6 +31,82 @@ enum BigSightMapLayer: String, CaseIterable, Identifiable, Sendable {
     }
 
     static let defaultVisible = Set(allCases)
+
+    /// Layers that have at least one facility in `facilities`. Event-specific
+    /// layers such as gates only exist for events with published data.
+    static func available(in facilities: [BigSightFacilityLocation]) -> Set<Self> {
+        Set(facilities.compactMap(\.layer))
+    }
+
+    /// Stable storage form for a set of layers, e.g. "essentials,gates".
+    static func storageValue(for layers: Set<Self>) -> String {
+        layers.map(\.rawValue).sorted().joined(separator: ",")
+    }
+
+    static func layers(fromStorageValue value: String) -> Set<Self> {
+        Set(value.split(separator: ",").compactMap { Self(rawValue: String($0)) })
+    }
+}
+
+/// Presets that switch several map layers at once for a stage of the visit.
+enum MapQuickView: String, CaseIterable, Identifiable, Sendable {
+    case beforeArrival
+    case arrival
+    case onSite
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .beforeArrival: String(localized: "Before arrival")
+        case .arrival: String(localized: "Arrival")
+        case .onSite: String(localized: "On-site")
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .beforeArrival: String(localized: "Gates, food, info, and cosplay")
+        case .arrival: String(localized: "Gates, food, and info")
+        case .onSite: String(localized: "Food, info, stairs, and cosplay")
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .beforeArrival: "map.fill"
+        case .arrival: "figure.walk.arrival"
+        case .onSite: "building.2.fill"
+        }
+    }
+
+    var layers: Set<BigSightMapLayer> {
+        switch self {
+        case .beforeArrival: [.gates, .essentials, .assistance, .cosplay]
+        case .arrival: [.gates, .essentials, .assistance]
+        case .onSite: [.essentials, .assistance, .verticalAccess, .cosplay]
+        }
+    }
+
+    /// A layer without which the preset has no purpose. The arrival view is
+    /// only about gates, so it is hidden when an event has no gate data.
+    var requiredLayer: BigSightMapLayer? {
+        switch self {
+        case .arrival: .gates
+        case .beforeArrival, .onSite: nil
+        }
+    }
+
+    /// The preset that the visible layers match, ignoring layers that have
+    /// no data for the current event.
+    static func matching(
+        _ visibleLayers: Set<BigSightMapLayer>,
+        available: Set<BigSightMapLayer>
+    ) -> MapQuickView? {
+        allCases.first { quickView in
+            quickView.layers.intersection(available) == visibleLayers.intersection(available)
+        }
+    }
 }
 
 enum BigSightMapContextCatalog {
@@ -41,7 +117,7 @@ enum BigSightMapContextCatalog {
         facility("conference-tower", "Conference Tower", .conferenceTower, 35.6297628, 139.7939817),
         facility(
             "general-information", "General Information", .information, 35.6301962, 139.7946672,
-            layer: .assistance, minimumZoom: 1.2),
+            layer: .assistance, minimumZoom: 1.0),
         facility(
             "north-concourse-restroom", "North Concourse Restroom", .restroom, 35.6311241,
             139.7935820,

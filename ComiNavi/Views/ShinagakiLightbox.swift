@@ -194,6 +194,9 @@ struct ShinagakiLightbox: View {
     @State private var imageActionTask: Task<Void, Never>?
     @State private var sharePresentation: ShinagakiSharePresentation?
     @State private var imageActionAlert: ShinagakiLightboxAlert?
+    @State private var zoomedPageIDs: Set<ShinagakiLightboxPage.ID> = []
+    @State private var dismissDragOffset: CGFloat = 0
+    private var isDragToDismissEnabled = false
 
     init(
         image: UIImage,
@@ -235,79 +238,78 @@ struct ShinagakiLightbox: View {
     }
 
     var body: some View {
-        GeometryReader { _ in
-            ZStack {
-                Color.black
-                    .ignoresSafeArea()
-
-                TabView(selection: $selectedPageID) {
-                    ForEach(pages) { page in
-                        ShinagakiLightboxPageView(page: page)
-                            .tag(page.id)
-                            .accessibilityIdentifier(
-                                "shinagaki-lightbox-page-\(page.id)"
-                            )
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .accessibilityIdentifier("shinagaki-lightbox")
+        ZStack {
+            Color.black
+                .opacity(backdropOpacity)
                 .ignoresSafeArea()
 
-                imageActionControls
+            pager
+                .offset(y: dismissDragOffset)
+                .simultaneousGesture(
+                    dismissDragGesture,
+                    including: canDragToDismiss ? .all : .subviews
+                )
+
+            imageActionControls
+                .frame(
+                    maxWidth: .infinity,
+                    maxHeight: .infinity,
+                    alignment: .topLeading
+                )
+                .padding(.top, Spacing.small)
+                .padding(.leading, Spacing.large)
+
+            Button {
+                dismiss()
+            } label: {
+                LucideIcon("xmark", size: IconSize.inline)
+                    .foregroundStyle(.white)
+                    .frame(width: HitArea.minimum, height: HitArea.minimum)
+                    .surface(.floating, padding: 0)
+                    .contentShape(.circle)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close")
+            .accessibilityIdentifier("shinagaki-lightbox-close")
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.top, Spacing.small)
+            .padding(.trailing, Spacing.large)
+
+            if pages.count > 1 {
+                // The floating surface's 24 pt radius makes a capsule at
+                // this 44 pt height.
+                Text("Page \(selectedPageIndex + 1) of \(pages.count)")
+                    .font(.control)
+                    .foregroundStyle(.white)
+                    .singleLineToken()
+                    .padding(.horizontal, Spacing.medium)
+                    .frame(minHeight: HitArea.minimum)
+                    .surface(.floating, padding: 0)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(
+                        "Page \(selectedPageIndex + 1) of \(pages.count)"
+                    )
+                    .accessibilityValue(
+                        "\(selectedPageIndex + 1)/\(pages.count)"
+                    )
+                    .accessibilityAdjustableAction { direction in
+                        movePage(direction)
+                    }
+                    .accessibilityIdentifier(
+                        "shinagaki-lightbox-page-indicator"
+                    )
                     .frame(
                         maxWidth: .infinity,
                         maxHeight: .infinity,
-                        alignment: .topLeading
+                        alignment: .bottom
                     )
-                    .padding(.top, 8)
-                    .padding(.leading, 16)
-
-                Button {
-                    dismiss()
-                } label: {
-                    LucideIcon("xmark")
-                        .font(.body.weight(.bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(.ultraThinMaterial, in: .circle)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close")
-                .accessibilityIdentifier("shinagaki-lightbox-close")
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(.top, 8)
-                .padding(.trailing, 16)
-
-                if pages.count > 1 {
-                    Text("Page \(selectedPageIndex + 1) of \(pages.count)")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 44)
-                        .background(.ultraThinMaterial, in: .capsule)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(
-                            "Page \(selectedPageIndex + 1) of \(pages.count)"
-                        )
-                        .accessibilityValue(
-                            "\(selectedPageIndex + 1)/\(pages.count)"
-                        )
-                        .accessibilityAdjustableAction { direction in
-                            movePage(direction)
-                        }
-                        .accessibilityIdentifier(
-                            "shinagaki-lightbox-page-indicator"
-                        )
-                        .frame(
-                            maxWidth: .infinity,
-                            maxHeight: .infinity,
-                            alignment: .bottom
-                        )
-                        .padding(.bottom, 16)
-                }
+                    .padding(.bottom, Spacing.large)
             }
         }
-        .background(Color.black)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // A drag-to-dismiss presentation uses a clear presentation background,
+        // so the backdrop above fades to reveal the screen underneath.
+        .background(isDragToDismissEnabled ? Color.clear : Color.black)
         // Keep the dark controls local to the lightbox. `preferredColorScheme`
         // is a presentation-level preference and can change the presenting
         // app's appearance while this sheet is shown.
@@ -343,8 +345,113 @@ struct ShinagakiLightbox: View {
         }
     }
 
+    /// Lets a full-screen presentation close with a downward drag, as a
+    /// sheet would. Pass `.presentationBackground(.clear)` with it so the
+    /// presenting screen shows through while the image follows the finger.
+    func dismissesOnDownwardDrag() -> Self {
+        var copy = self
+        copy.isDragToDismissEnabled = true
+        return copy
+    }
+
+    private var canDragToDismiss: Bool {
+        isDragToDismissEnabled && !zoomedPageIDs.contains(selectedPageID)
+    }
+
+    private var backdropOpacity: Double {
+        1 - min(Double(dismissDragOffset) / 600, 0.5)
+    }
+
+    private var dismissDragGesture: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onChanged { value in
+                let translation = value.translation
+                // Horizontal drags page through the pager; only a
+                // mostly-downward drag moves the image.
+                guard translation.height > 0,
+                      abs(translation.height) > abs(translation.width)
+                else {
+                    if dismissDragOffset != 0 { dismissDragOffset = 0 }
+                    return
+                }
+                dismissDragOffset = translation.height
+            }
+            .onEnded { value in
+                guard dismissDragOffset > 0 else { return }
+                if dismissDragOffset > 120 || value.predictedEndTranslation.height > 320 {
+                    dismiss()
+                } else {
+                    withAnimation(.spring(duration: 0.25)) {
+                        dismissDragOffset = 0
+                    }
+                }
+            }
+    }
+
+    /// Full-bleed horizontal pager. A paged `TabView` is backed by a UIKit
+    /// collection view that still applies the window's safe-area insets to
+    /// its content offset, so on a device with an asymmetric side inset
+    /// (iPhone Duo, landscape iPhone) each page sat shifted by that inset and
+    /// the next page showed at the edge. A SwiftUI scroll view that ignores
+    /// the safe area pages by its own full width instead. Each page takes the
+    /// full container size, including the top and bottom insets; the
+    /// controls stay in the safe container.
+    private var pager: some View {
+        GeometryReader { proxy in
+            ScrollViewReader { reader in
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(pages) { page in
+                            ShinagakiLightboxPageView(page: page) { isZoomed in
+                                if isZoomed {
+                                    zoomedPageIDs.insert(page.id)
+                                } else {
+                                    zoomedPageIDs.remove(page.id)
+                                }
+                            }
+                            .frame(
+                                width: proxy.size.width,
+                                height: proxy.size.height
+                            )
+                            .accessibilityIdentifier(
+                                "shinagaki-lightbox-page-\(page.id)"
+                            )
+                            .id(page.id)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: scrolledPageID)
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                .accessibilityIdentifier("shinagaki-lightbox")
+                .onAppear {
+                    reader.scrollTo(selectedPageID)
+                }
+                // Keep the selected page in place when the window resizes
+                // (rotation, iPad multitasking, iPhone Duo pose changes).
+                .onChange(of: proxy.size) {
+                    reader.scrollTo(selectedPageID)
+                }
+            }
+        }
+        .ignoresSafeArea()
+    }
+
+    private var scrolledPageID: Binding<ShinagakiLightboxPage.ID?> {
+        Binding(
+            get: { selectedPageID },
+            set: { newValue in
+                if let newValue, newValue != selectedPageID {
+                    selectedPageID = newValue
+                }
+            }
+        )
+    }
+
     private var imageActionControls: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Spacing.small) {
             Button {
                 startImageAction(.share)
             } label: {
@@ -378,17 +485,17 @@ struct ShinagakiLightbox: View {
             } else {
                 switch kind {
                 case .share:
-                    LucideIcon("square.and.arrow.up")
-                        .font(.body.weight(.bold))
+                    LucideIcon("square.and.arrow.up", size: IconSize.inline)
                 case .save:
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.body.weight(.bold))
+                    LucideIcon("download", size: IconSize.inline)
                 }
             }
         }
         .foregroundStyle(.white)
-        .frame(width: 44, height: 44)
-        .background(.ultraThinMaterial, in: .circle)
+        .frame(width: HitArea.minimum, height: HitArea.minimum)
+        // The floating surface's 24 pt radius rounds this 44 pt square into
+        // a circle.
+        .surface(.floating, padding: 0)
         .contentShape(.circle)
     }
 
@@ -604,12 +711,17 @@ struct ShinagakiShareSheet: UIViewControllerRepresentable {
 
 private struct ShinagakiLightboxPageView: View {
     let page: ShinagakiLightboxPage
+    let onZoomStateChange: (Bool) -> Void
 
     @State private var image: UIImage?
     @State private var didFail = false
 
-    init(page: ShinagakiLightboxPage) {
+    init(
+        page: ShinagakiLightboxPage,
+        onZoomStateChange: @escaping (Bool) -> Void = { _ in }
+    ) {
         self.page = page
+        self.onZoomStateChange = onZoomStateChange
         _image = State(initialValue: page.image)
     }
 
@@ -618,7 +730,8 @@ private struct ShinagakiLightboxPageView: View {
             if let image {
                 ZoomableShinagakiImage(
                     image: image,
-                    accessibilityLabel: page.accessibilityLabel
+                    accessibilityLabel: page.accessibilityLabel,
+                    onZoomStateChange: onZoomStateChange
                 )
             } else if didFail {
                 LucideContentUnavailableView(
@@ -660,9 +773,11 @@ private struct ShinagakiLightboxPageView: View {
 private struct ZoomableShinagakiImage: UIViewRepresentable {
     let image: UIImage
     let accessibilityLabel: String
+    let onZoomStateChange: (Bool) -> Void
 
     func makeUIView(context: Context) -> ShinagakiZoomScrollView {
         let scrollView = ShinagakiZoomScrollView()
+        scrollView.onZoomStateChange = onZoomStateChange
         scrollView.configure(
             image: image,
             accessibilityLabel: accessibilityLabel
@@ -674,6 +789,7 @@ private struct ZoomableShinagakiImage: UIViewRepresentable {
         _ scrollView: ShinagakiZoomScrollView,
         context: Context
     ) {
+        scrollView.onZoomStateChange = onZoomStateChange
         scrollView.configure(
             image: image,
             accessibilityLabel: accessibilityLabel
@@ -688,7 +804,12 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
         let targetScale: CGFloat
     }
 
+    /// Called when the image moves between its fitted and zoomed states, so
+    /// the lightbox can turn drag-to-dismiss off while the image pans.
+    var onZoomStateChange: ((Bool) -> Void)?
+
     private let zoomImageView = UIImageView()
+    private var isZoomed = false
     private var displayedImage: UIImage?
     private var imageDisplaySize = CGSize.zero
     private var lastViewportSize = CGSize.zero
@@ -1023,7 +1144,15 @@ final class ShinagakiZoomScrollView: UIScrollView, UIScrollViewDelegate {
     }
 
     private func updatePanGestureAvailability() {
-        panGestureRecognizer.isEnabled = zoomScale > minimumZoomScale + 0.01
+        let zoomed = zoomScale > minimumZoomScale + 0.01
+        panGestureRecognizer.isEnabled = zoomed
+        guard zoomed != isZoomed else { return }
+        isZoomed = zoomed
+        // Defer so SwiftUI state never changes inside a layout pass.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.isZoomed == zoomed else { return }
+            self.onZoomStateChange?(zoomed)
+        }
     }
 
     private static func displaySize(for image: UIImage) -> CGSize {

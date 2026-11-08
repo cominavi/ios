@@ -155,18 +155,19 @@ struct ImageCacheManagementScreen: View {
                 }
             }
         }
-        .navigationTitle(Text("Image Cache", tableName: "ImageCache"))
+        .readableFormWidth()
+        .navigationTitle(Text("Image cache", tableName: "ImageCache"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Task { await model.refresh() }
                 } label: {
-                    Image(systemName: "arrow.clockwise")
+                    LucideIcon("arrow.clockwise", size: IconSize.action)
                 }
                 .disabled(model.isBusy)
                 .accessibilityLabel(
-                    Text("Refresh Cache Statistics", tableName: "ImageCache")
+                    Text("Refresh cache statistics", tableName: "ImageCache")
                 )
             }
         }
@@ -213,7 +214,7 @@ private struct ImageCacheSummarySection: View {
     var body: some View {
         Section {
             LabeledContent {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.small) {
                     if isRefreshing {
                         ProgressView()
                             .controlSize(.small)
@@ -232,12 +233,12 @@ private struct ImageCacheSummarySection: View {
             }
 
             Button(role: .destructive, action: onClearAll) {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.small) {
                     if isClearingAll {
                         ProgressView()
                             .controlSize(.small)
                     }
-                    Text("Clear All Image Caches", tableName: "ImageCache")
+                    Text("Clear all image caches", tableName: "ImageCache")
                 }
             }
             .disabled(isBusy)
@@ -288,12 +289,12 @@ private struct ImageCacheCategorySection: View {
             Button(role: .destructive) {
                 Task { await model.clear(state) }
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: Spacing.small) {
                     if state.isClearing {
                         ProgressView()
                             .controlSize(.small)
                     }
-                    Text("Clear Cache", tableName: "ImageCache")
+                    Text("Clear cache", tableName: "ImageCache")
                 }
             }
             .disabled(model.isBusy)
@@ -302,7 +303,7 @@ private struct ImageCacheCategorySection: View {
             Label {
                 Text(state.category.title)
             } icon: {
-                Image(systemName: state.category.systemImage)
+                LucideIcon(state.category.icon, size: IconSize.caption)
             }
         } footer: {
             Text(state.category.detail)
@@ -314,13 +315,17 @@ private struct CacheByteCountText: View {
     let bytes: UInt
 
     var body: some View {
-        if bytes == 0 {
-            Text(verbatim: "0 KB")
-                .monospacedDigit()
-        } else {
-            Text(Int64(bytes), format: .byteCount(style: .file))
-                .monospacedDigit()
-        }
+        // An empty cache reads "0 KB" in the person's locale instead of the
+        // spelled-out "Zero KB" that the default style produces.
+        Text(
+            Int64(bytes),
+            format: ByteCountFormatStyle(
+                style: .file,
+                allowedUnits: bytes == 0 ? .kb : .all,
+                spellsOutZero: false
+            )
+        )
+        .monospacedDigit()
     }
 }
 
@@ -342,11 +347,11 @@ private struct CacheUsageBar: View {
                 if fraction > 0 {
                     Capsule()
                         .fill(Color.accentColor)
-                        .frame(width: max(4, geometry.size.width * fraction))
+                        .frame(width: max(Spacing.xSmall, geometry.size.width * fraction))
                 }
             }
         }
-        .frame(height: 5)
+        .frame(height: Spacing.xSmall)
         .accessibilityHidden(true)
     }
 }
@@ -355,9 +360,9 @@ private extension RemoteImageCacheCategory {
     var title: LocalizedStringResource {
         switch self {
         case .shinagaki:
-            LocalizedStringResource("Shinagaki images", table: "ImageCache")
+            LocalizedStringResource("Item list images", table: "ImageCache")
         case .circleArtwork:
-            LocalizedStringResource("Circle artwork", table: "ImageCache")
+            LocalizedStringResource("Circle cut images", table: "ImageCache")
         case .profileImages:
             LocalizedStringResource("Profile images", table: "ImageCache")
         }
@@ -367,7 +372,7 @@ private extension RemoteImageCacheCategory {
         switch self {
         case .shinagaki:
             LocalizedStringResource(
-                "Product previews and Shinagaki images shown in Explore and circle details.",
+                "Product previews and item list images shown in Explore and circle details.",
                 table: "ImageCache"
             )
         case .circleArtwork:
@@ -383,11 +388,12 @@ private extension RemoteImageCacheCategory {
         }
     }
 
-    var systemImage: String {
+    /// Lucide names, the same icon family as the Profile rows.
+    var icon: String {
         switch self {
-        case .shinagaki: "photo.on.rectangle.angled"
-        case .circleArtwork: "person.crop.square"
-        case .profileImages: "person.crop.circle"
+        case .shinagaki: "doc.richtext"
+        case .circleArtwork: "photo.stack"
+        case .profileImages: "person.circle"
         }
     }
 }

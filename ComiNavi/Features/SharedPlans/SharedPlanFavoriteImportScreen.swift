@@ -26,48 +26,39 @@ struct SharedPlanFavoriteImportScreen: View {
         NavigationStack {
             Group {
                 if model.isLoading, model.items.isEmpty {
-                    FocusedActionSurface(
-                        symbolName: "star",
-                        animatesBackdrop: true
+                    EmptyStateView(
+                        "Checking favorites…",
+                        icon: "star",
+                        message: "ComiNavi is looking in Circle.ms for circles that are not in this plan yet."
                     ) {
-                        Text("お気に入りを確認中…")
-                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                        Text("Circle.msから、このプランにまだないサークルを探しています。")
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 12)
                         CatalogActivityIndicator(
-                            accessibilityLabel: "Circle.msのお気に入りを確認中…"
+                            accessibilityLabel: "Checking Circle.ms favorites…"
                         )
-                        .padding(.top, 30)
                     }
                 } else if let issue = model.issueMessage, model.items.isEmpty {
-                    FocusedActionSurface(
-                        symbolName: "exclamationmark.triangle.fill",
-                        tint: .orange
-                    ) {
-                        Text("お気に入りを読み込めません")
-                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    EmptyStateView("Cannot load favorites", icon: "triangle-alert") {
                         Text(issue)
+                            .font(.rowSubtitle)
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 12)
-                        FocusedActionButton(action: load) {
-                            LucideLabel("もう一度試す", icon: "arrow.clockwise")
+                            .multilineTextAlignment(.center)
+                            .wrapsFully()
+                        Button(action: load) {
+                            LucideLabel("Try Again", icon: "arrow.clockwise")
                         }
-                        .padding(.top, 28)
+                        .buttonStyle(.primaryAction)
                     }
                 } else {
                     favoritesList
                 }
             }
-            .navigationTitle("お気に入りから追加")
+            .navigationTitle("Add from Favorites")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("閉じる") { dismiss() }
+                    Button("Close", role: .cancel) { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("追加（\(model.selectedCount)件）") {
+                    Button("Add (\(model.selectedCount))") {
                         Task { await model.importSelected(into: store) }
                     }
                     .disabled(
@@ -86,24 +77,24 @@ struct SharedPlanFavoriteImportScreen: View {
             if !model.permitsImport {
                 Section {
                     Label(
-                        "このプランは現在読み取り専用です。お気に入りの確認だけできます。",
+                        "This plan is read-only right now. You can only view your favorites.",
                         systemImage: "lock"
                     )
                 }
             }
 
             if !model.failures.isEmpty {
-                Section("追加できなかったサークル") {
+                Section("Circles not added") {
                     ForEach(model.failures) { failure in
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                             Text("A selected circle")
-                                .font(.headline)
+                                .font(.rowTitle)
                             Text(failure.message)
-                                .font(.caption)
+                                .font(.meta)
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    Button("選択したサークルを再試行") {
+                    Button("Retry selected circles") {
                         Task { await model.importSelected(into: store) }
                     }
                     .disabled(model.isImporting || !model.permitsImport)
@@ -113,9 +104,9 @@ struct SharedPlanFavoriteImportScreen: View {
             Section {
                 if model.missingItems.isEmpty {
                     ContentUnavailableView(
-                        "追加できるサークルはありません",
+                        "No circles to add",
                         systemImage: "checkmark.circle",
-                        description: Text("Circle.msのお気に入りはすべてこのプランに含まれています。")
+                        description: Text("All of your Circle.ms favorites are already in this plan.")
                     )
                 } else {
                     ForEach(model.missingItems) { item in
@@ -125,11 +116,11 @@ struct SharedPlanFavoriteImportScreen: View {
                                 set: { model.setSelected($0, wcID: item.wcID) }
                             )
                         ) {
-                            VStack(alignment: .leading, spacing: 4) {
+                            VStack(alignment: .leading, spacing: Spacing.xxSmall) {
                                 Text(item.circleName.isEmpty ? String(localized: "Unnamed circle") : item.circleName)
                                 if !item.memo.isEmpty {
                                     Text(item.memo)
-                                        .font(.caption)
+                                        .font(.meta)
                                         .foregroundStyle(.secondary)
                                         .lineLimit(2)
                                 }
@@ -139,23 +130,22 @@ struct SharedPlanFavoriteImportScreen: View {
                     }
                 }
             } header: {
-                Text("プランにまだないお気に入り")
+                Text("Favorites not in this plan")
             } footer: {
-                Text("追加してもCircle.msやComiNaviのお気に入りは変更されません。")
+                Text("Adding circles here does not change your Circle.ms or ComiNavi favorites.")
             }
 
             if !model.existingWCIDs.isEmpty {
-                Section("追加済み・登録済み") {
-                    Text("\(model.existingWCIDs.count)件は重複せずにスキップしました。")
+                Section("Already in this plan") {
+                    Text("Skipped \(model.existingWCIDs.count) circles that are already in this plan.")
                         .foregroundStyle(.secondary)
                 }
             }
         }
         .overlay {
             if model.isImporting {
-                ProgressView("サークルを追加中…")
-                    .padding()
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                ProgressView("Adding circles…")
+                    .surface(.floating, padding: Spacing.large)
             }
         }
     }

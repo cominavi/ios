@@ -89,8 +89,49 @@ final class UnifiedBigSightMapTests: XCTestCase {
         XCTAssertLessThan(renderer.zoomFactor, 9)
         XCTAssertTrue(renderer.isPersistentOverlayVisible)
         XCTAssertGreaterThanOrEqual(renderer.persistentOverlayShapeCount, 3)
-        XCTAssertEqual(renderer.baseMapAlpha, 0.18, accuracy: 0.001)
+        XCTAssertEqual(renderer.baseMapAlpha, 0.5, accuracy: 0.001)
         XCTAssertTrue(renderer.areMapIconsHiddenForSearch)
+    }
+
+    @MainActor
+    func testSearchCountsMatchesPerHallAndClearsWhenSearchCloses() throws {
+        let campus = makeSingleVenueCampus()
+        let venue = try XCTUnwrap(campus.venues.first)
+        let table = try XCTUnwrap(venue.scene.tables.first)
+        let renderer = UnifiedBigSightScene(campus: campus)
+        renderer.reduceMotion = true
+        let matches = [0, 1].map { subspace in
+            CatalogMapSearchMatch(
+                id: 10 + subspace,
+                mapID: venue.id,
+                tableID: table.id,
+                subspace: subspace,
+                circleName: "Circle \(subspace)",
+                penName: ""
+            )
+        }
+
+        @MainActor func update(searchActive: Bool) {
+            renderer.update(
+                campus: campus,
+                scope: .campus,
+                selectedMapID: venue.id,
+                selectedTableID: nil,
+                circlePlacements: [],
+                circleArtwork: [:],
+                searchMatches: matches,
+                searchActive: searchActive,
+                genrePlacements: [],
+                bookmarks: [],
+                locatedUser: nil
+            )
+        }
+
+        update(searchActive: true)
+        XCTAssertEqual(renderer.searchMatchCountsByVenue, [venue.id: 2])
+
+        update(searchActive: false)
+        XCTAssertEqual(renderer.searchMatchCountsByVenue, [:])
     }
 
     @MainActor
@@ -498,14 +539,51 @@ final class UnifiedBigSightMapTests: XCTestCase {
             frame: CGRect(x: 0, y: 0, width: 390, height: 844),
             appearance: .light
         )
-        XCTAssertEqual(
-            host.basemapView.styleURL?.absoluteString, "https://americanamap.org/style.json")
+        // Both appearances use a bundled style, so the map does not depend on
+        // a remote style document.
+        XCTAssertEqual(host.basemapView.styleURL?.lastPathComponent, "AmericanaLight.json")
+        XCTAssertTrue(host.basemapView.styleURL?.isFileURL == true)
 
         host.updateAppearance(.dark)
 
         XCTAssertEqual(host.basemapView.styleURL?.lastPathComponent, "AmericanaDark.json")
         XCTAssertTrue(host.basemapView.styleURL?.isFileURL == true)
         XCTAssertLessThan(luminance(host.backgroundColor), 0.1)
+    }
+
+    func testFacilityTitlesBreakOnlyBetweenWords() throws {
+        let maxWidth = UnifiedMapMarkerMetrics.facilityLabelMaxWidth
+
+        let short = try XCTUnwrap(
+            UnifiedMapMarkerMetrics.facilityTitle("ATM", fontSize: 11, maxWidth: maxWidth)
+        )
+        XCTAssertEqual(short.text, "ATM")
+
+        let japanese = try XCTUnwrap(
+            UnifiedMapMarkerMetrics.facilityTitle(
+                "エントランスプラザ喫煙所", fontSize: 11, maxWidth: maxWidth)
+        )
+        let japaneseLines = japanese.text.components(separatedBy: "\n")
+        XCTAssertEqual(japaneseLines.count, 2)
+        // The break falls between words, never inside プラザ.
+        XCTAssertFalse(japaneseLines[0].hasSuffix("プラ"))
+        XCTAssertTrue(japanese.text.replacingOccurrences(of: "\n", with: "") == "エントランスプラザ喫煙所")
+
+        let english = try XCTUnwrap(
+            UnifiedMapMarkerMetrics.facilityTitle(
+                "Entrance Plaza Smoking Area", fontSize: 11, maxWidth: maxWidth)
+        )
+        XCTAssertEqual(english.text, "Entrance Plaza\nSmoking Area")
+        for line in english.text.components(separatedBy: "\n") {
+            XCTAssertLessThanOrEqual(
+                UnifiedMapMarkerMetrics.titleWidth(line, fontSize: 11), english.width)
+        }
+
+        // One long word cannot break, so the map drops the title.
+        XCTAssertNil(
+            UnifiedMapMarkerMetrics.facilityTitle(
+                String(repeating: "W", count: 40), fontSize: 11, maxWidth: maxWidth)
+        )
     }
 
     func testDarkPalettePreservesContrastForMapGeometry() {
@@ -1136,9 +1214,10 @@ final class UnifiedBigSightMapTests: XCTestCase {
             host.compassButton.frame.minX - MapChromeLayout.controlSpacing,
             accuracy: 0.5
         )
-        XCTAssertLessThan(badge.frame.width, 100)
+        // Caption 2 (11 pt at the default size) in a capsule with 8 pt insets.
+        XCTAssertLessThan(badge.frame.width, 120)
         XCTAssertLessThan(badge.frame.height, 24)
-        XCTAssertEqual(badge.titleLabel?.font.pointSize ?? 0, 8, accuracy: 0.1)
+        XCTAssertEqual(badge.titleLabel?.font.pointSize ?? 0, 11, accuracy: 0.1)
         XCTAssertEqual(badge.configuration?.title, "© OpenStreetMap")
         XCTAssertEqual(badge.menu?.title, "Map data attribution")
         XCTAssertEqual(badge.menu?.children.count, 4)

@@ -77,7 +77,7 @@ final class CircleExternalLinkNormalizerTests: XCTestCase {
 
         XCTAssertEqual(links.map(\.preview), [
             "@cominavi_app",
-            "Pixiv ID 4403610",
+            "pixiv ID 4403610",
             "Circle ID 12309812",
         ])
     }

@@ -17,7 +17,7 @@ final class WhereAmITests: XCTestCase {
         XCTAssertEqual(address.spaceCode, "Ａ01a")
         XCTAssertEqual(address.canonicalDayText, "1日目")
         XCTAssertEqual(address.venueLocationText, "東1ホール Ａ01a")
-        XCTAssertEqual(address.navigationSubtitle, "Day 1 · 東1ホール Ａ01a")
+        XCTAssertEqual(address.navigationSubtitle, "East Ａ01a")
         XCTAssertEqual(address.canonicalText, "1日目 東1ホール Ａ01a")
         XCTAssertEqual(address.nearbyText, "1日目 東1ホール Ａ01a付近")
     }
@@ -46,7 +46,7 @@ final class WhereAmITests: XCTestCase {
 
         XCTAssertEqual(address.canonicalDayText, "1日目")
         XCTAssertEqual(address.venueLocationText, "東7ホール Ａ34a+b")
-        XCTAssertEqual(address.navigationSubtitle, "Day 1 · 東7ホール Ａ34a+b")
+        XCTAssertEqual(address.navigationSubtitle, "East Ａ34a+b")
         XCTAssertEqual(address.canonicalText, "1日目 東7ホール Ａ34a+b")
     }
 

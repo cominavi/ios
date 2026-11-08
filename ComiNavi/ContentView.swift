@@ -7,40 +7,113 @@
 
 import SwiftUI
 
-struct CatalogIndependentContentView: View {
-    private enum TabSelection: Hashable {
-        case catalog
-        case plans
-        case profile
+/// The app's tabs. The raw values are persisted in scene storage, so keep
+/// them stable across releases.
+enum AppTab: String, Hashable {
+    case map
+    case explore
+    case plans
+    case profile
+}
+
+/// The one app shell. Every tab exists in every catalog state: Map and
+/// Explore show the catalog loading surface until a catalog is ready, while
+/// Shared Plans and Profile stay usable during discovery and downloads.
+struct ContentView: View {
+    @State private var catalogLibrary: CatalogLibrary
+    @State private var sharedLocationInbox: SharedLocationInbox
+    /// The tab when no parent owns it, as in previews and UI test hosts.
+    /// EntryView owns the app's tab under the "ContentView.selectedTab" key,
+    /// so this one uses another key.
+    @SceneStorage("ContentView.standaloneSelectedTab") private var standaloneSelection: AppTab = .map
+    @State private var selectedDay = 1
+    @State private var showsCatalogSettings = false
+    @State private var exploreColumnWidth: CGFloat?
+    #if DEBUG
+        @State private var didOpenDayPickerForUITesting = false
+    #endif
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private let externalSelection: Binding<AppTab>?
+    private let catalogResetAction: CatalogResetAction?
+
+    /// Pass `selection` when a parent needs to change the tab, for example
+    /// to open Profile for sign-in from a sheet that it presents.
+    @MainActor
+    init(
+        catalogLibrary: CatalogLibrary = AppData.catalogLibrary,
+        sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox,
+        selection: Binding<AppTab>? = nil,
+        catalogResetAction: CatalogResetAction? = nil
+    ) {
+        _catalogLibrary = State(initialValue: catalogLibrary)
+        _sharedLocationInbox = State(initialValue: sharedLocationInbox)
+        externalSelection = selection
+        self.catalogResetAction = catalogResetAction
     }
 
-    let catalogLibrary: CatalogLibrary
-    let sharedLocationInbox: SharedLocationInbox
-    @State private var selection: TabSelection = .plans
+    private var selection: Binding<AppTab> {
+        externalSelection ?? $standaloneSelection
+    }
 
     var body: some View {
-        TabView(selection: $selection) {
+        TabView(selection: selection) {
             Tab(
-                "Catalog",
+                "Map",
                 image: LucideIcon.assetName(for: "map"),
-                value: .catalog
+                value: AppTab.map
             ) {
-                CatalogLibraryLoadingSurface(catalogLibrary: catalogLibrary)
+                catalogTab { circle in
+                    MapView(
+                        dataSource: circle,
+                        selectedDay: $selectedDay,
+                        eventDaySelector: eventDayBanner(for: circle),
+                        sharedLocationInbox: sharedLocationInbox
+                    )
+                }
+            }
+
+            Tab(
+                "Explore",
+                image: LucideIcon.assetName(for: "binoculars"),
+                value: AppTab.explore
+            ) {
+                catalogTab { circle in
+                    ExploreView(dataSource: circle, selectedDay: $selectedDay) {
+                        CatalogEventDayToolbarButton(
+                            event: catalogLibrary.selectedEvent,
+                            days: circle.comiket.days,
+                            selectedDay: selectedDay,
+                            isDemo: catalogLibrary.mode == .demo,
+                            columnWidth: exploreColumnWidth
+                        ) {
+                            showsCatalogSettings = true
+                        }
+                    }
+                    // The toolbar capsule fits its content to this width;
+                    // on iPad it excludes the sidebar.
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.width
+                    } action: { width in
+                        exploreColumnWidth = width
+                    }
+                }
             }
 
             Tab(
                 "Shared Plans",
                 image: LucideIcon.assetName(for: "list-checks"),
-                value: .plans
+                value: AppTab.plans
             ) {
                 SharedPlansScreen(
                     store: AppData.sharedPlanStore,
-                    comiketNo: nil,
-                    currentUserID: AppData.profileStore.profile?.id
+                    comiketNo: readyDataSource?.comiket.number,
+                    currentUserID: AppData.profileStore.profile?.id,
+                    onRequestSignIn: { selection.wrappedValue = .profile }
                 )
             }
 
-            Tab(value: .profile) {
+            Tab(value: AppTab.profile) {
                 NavigationStack {
                     ProfileScreen(
                         catalogLibrary: catalogLibrary,
@@ -51,310 +124,118 @@ struct CatalogIndependentContentView: View {
                 ProfileTabLabel(profileStore: AppData.profileStore)
             }
         }
-        .accessibilityIdentifier("catalog-independent-shell")
+        // iPad shows a sidebar the user can collapse into the tab bar instead
+        // of a text-only floating bar over the map; iPhone keeps the tab bar.
+        .tabViewStyle(.sidebarAdaptable)
+        .accessibilityIdentifier("app-shell")
         .task {
             if catalogLibrary.phase == .idle {
                 catalogLibrary.start()
             }
         }
-    }
-}
-
-struct ContentView: View {
-    @State private var catalogLibrary: CatalogLibrary
-    @State private var sharedLocationInbox: SharedLocationInbox
-    @State private var selectedDay = 1
-    @State private var showsCatalogSettings = false
-
-    @MainActor
-    init(
-        catalogLibrary: CatalogLibrary = AppData.catalogLibrary,
-        sharedLocationInbox: SharedLocationInbox = AppData.sharedLocationInbox
-    ) {
-        _catalogLibrary = State(initialValue: catalogLibrary)
-        _sharedLocationInbox = State(initialValue: sharedLocationInbox)
-    }
-
-    var body: some View {
-        Group {
-            if let circle = catalogLibrary.dataSource {
-                CatalogContentView(
-                    circle: circle,
-                    catalogLibrary: catalogLibrary,
-                    sharedLocationInbox: sharedLocationInbox,
-                    selectedDay: $selectedDay,
-                    showsCatalogSettings: $showsCatalogSettings
-                )
-                .id(ObjectIdentifier(circle))
-            } else {
-                CatalogLibraryLoadingSurface(catalogLibrary: catalogLibrary)
-            }
-        }
         .onChange(of: catalogLibrary.errorMessage) { _, message in
-            guard let message, catalogLibrary.dataSource?.readiness == .ready else { return }
+            guard let message, readyDataSource != nil else { return }
             AppToast.showError(
                 String(localized: "Catalog switch failed"),
                 subtitle: message
             )
             catalogLibrary.dismissError()
         }
-        .sheet(isPresented: $showsCatalogSettings) {
-            CatalogEventDaySheet(
-                catalogLibrary: catalogLibrary,
-                selectedDay: $selectedDay
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-            .presentationContentInteraction(.scrolls)
-        }
-    }
-}
-
-private struct CatalogLibraryLoadingSurface: View {
-    let catalogLibrary: CatalogLibrary
-
-    var body: some View {
-        switch catalogLibrary.phase {
-        case .failed(let message):
-            CatalogErrorSurface(
-                symbolName: "exclamationmark.triangle.fill",
-                title: String(localized: "Catalog unavailable"),
-                message: message,
-                advice: catalogLibrary.failureRecovery == .redownload
-                    ? String(localized: "Start a fresh download. The incomplete copy will be removed, then the new catalog will be verified before it opens.")
-                    : String(localized: "Please try again.")
-            ) {
-                CatalogRecoveryButton(catalogLibrary: catalogLibrary)
-            }
-
-        case .loading(let event):
-            CatalogStatusSurface(
-                symbolName: "arrow.down.circle.fill",
-                eyebrow: event.shortName,
-                title: String(localized: "Opening catalog…"),
-                subtitle: String(localized: "Preparing catalog…")
-            ) {
-                CatalogActivityIndicator(
-                    accessibilityLabel: String(localized: "Opening catalog…")
-                )
-            }
-
-        case .downloading(let event, let progress):
-            CatalogStatusSurface(
-                symbolName: "arrow.down.circle.fill",
-                eyebrow: event.shortName,
-                title: String(localized: "Downloading catalog…"),
-                subtitle: String(localized: "Downloading the catalog, this may take a while…")
-            ) {
-                DownloadProgressView(progresses: [progress])
-            }
-
-        case .discovering:
-            CatalogStatusSurface(
-                symbolName: "sparkles",
-                eyebrow: String(localized: "Catalog"),
-                title: String(localized: "Finding available catalogs…"),
-                subtitle: String(localized: "Preparing catalog…")
-            ) {
-                CatalogActivityIndicator(
-                    accessibilityLabel: String(localized: "Finding available catalogs…")
-                )
-            }
-
-        case .idle, .ready:
-            CatalogStatusSurface(
-                symbolName: "circle.dotted",
-                eyebrow: String(localized: "Catalog"),
-                title: String(localized: "Opening catalog…"),
-                subtitle: String(localized: "Preparing catalog…")
-            ) {
-                CatalogActivityIndicator(
-                    accessibilityLabel: String(localized: "Opening catalog…")
-                )
-            }
-        }
-    }
-}
-
-private extension CatalogLibrary.Phase {
-    var eventBeingLoaded: CatalogEvent? {
-        switch self {
-        case .loading(let event), .downloading(let event, _): event
-        default: nil
-        }
-    }
-}
-
-private struct CatalogContentView: View {
-    private enum TabSelection: Hashable {
-        case map
-        case explore
-        case plans
-        case profile
-    }
-
-    let circle: CirclemsDataSource
-    let catalogLibrary: CatalogLibrary
-    let sharedLocationInbox: SharedLocationInbox
-    @State private var selection: TabSelection = .map
-    @Binding var selectedDay: Int
-    @Binding var showsCatalogSettings: Bool
-
-    var body: some View {
-        Group {
-            switch circle.readiness {
-            case .uninitialized:
-                CatalogStatusSurface(
-                    symbolName: "circle.dotted",
-                    eyebrow: catalogLibrary.selectedEvent?.shortName
-                        ?? String(localized: "Catalog"),
-                    title: String(localized: "Preparing catalog…"),
-                    subtitle: String(localized: "Opening catalog…")
-                ) {
-                    CatalogActivityIndicator(
-                        accessibilityLabel: String(localized: "Preparing catalog…")
-                    )
-
-                    CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
-                        .padding(.top, 24)
-                }
-
-            case .downloading(let progresses):
-                let eventName =
-                    catalogLibrary.selectedEvent?.shortName ?? String(localized: "catalog")
-                CatalogStatusSurface(
-                    symbolName: "arrow.down.circle.fill",
-                    eyebrow: eventName,
-                    title: String(localized: "Downloading\ncatalog"),
-                    subtitle: String(localized: "Downloading the catalog, this may take a while…")
-                ) {
-                    DownloadProgressView(progresses: progresses)
-                    CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
-                        .padding(.top, 24)
-                }
-
-            case .initializing(let state):
-                let eventName =
-                    catalogLibrary.selectedEvent?.shortName ?? String(localized: "catalog")
-                CatalogStatusSurface(
-                    symbolName: "map",
-                    eyebrow: eventName,
-                    title: String(localized: "Preparing catalog…"),
-                    subtitle: state
-                ) {
-                    CatalogActivityIndicator(accessibilityLabel: state)
-
-                    CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
-                        .padding(.top, 24)
-                }
-
-            case .ready:
-                TabView(selection: $selection) {
-                    Tab(
-                        "Map",
-                        image: LucideIcon.assetName(for: "map"),
-                        value: .map
-                    ) {
-                        MapView(
-                            dataSource: circle,
-                            selectedDay: $selectedDay,
-                            eventDaySelector: eventDayBanner,
-                            sharedLocationInbox: sharedLocationInbox
-                        )
-                    }
-
-                    Tab(
-                        "Explore",
-                        image: LucideIcon.assetName(for: "safari"),
-                        value: .explore
-                    ) {
-                        ExploreView(dataSource: circle, selectedDay: $selectedDay) {
-                            CatalogEventDayToolbarButton(
-                                event: catalogLibrary.selectedEvent,
-                                selectedDay: selectedDay
-                            ) {
-                                showsCatalogSettings = true
-                            }
-                        }
-                    }
-
-                    Tab(
-                        "Shared Plans",
-                        image: LucideIcon.assetName(for: "list-checks"),
-                        value: .plans
-                    ) {
-                        SharedPlansScreen(
-                            store: AppData.sharedPlanStore,
-                            comiketNo: circle.comiket.number,
-                            currentUserID: AppData.profileStore.profile?.id
-                        )
-                    }
-
-                    Tab(value: .profile) {
-                        VStack(spacing: 0) {
-                            HStack(spacing: 0) {
-                                eventDayBanner
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-
-                            NavigationStack {
-                                ProfileScreen(
-                                    catalogLibrary: catalogLibrary,
-                                    sharedLocationInbox: sharedLocationInbox
-                                )
-                            }
-                        }
-                    } label: {
-                        ProfileTabLabel(profileStore: AppData.profileStore)
-                    }
-                }
-
-            case .error(let error):
-                CatalogErrorSurface(
-                    symbolName: "exclamationmark.triangle.fill",
-                    title: String(localized: "Catalog unavailable"),
-                    message: error,
-                    advice: catalogLibrary.failureRecovery == .redownload
-                        ? String(localized: "Start a fresh download. The incomplete copy will be removed, then the new catalog will be verified before it opens.")
-                        : String(localized: "Please try again.")
-                ) {
-                    CatalogRecoveryButton(catalogLibrary: catalogLibrary)
-
-                    CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
-                }
-            }
-        }
-        .onChange(of: circle.readiness, initial: true) {
-            guard case .ready = circle.readiness,
-                  let rememberedDay = catalogLibrary.preferredDay(
-                      forEventNumber: circle.comiket.number,
-                      availableDayIndices: availableDayIndices
-                  ),
-                  rememberedDay != selectedDay
-            else { return }
-
-            selectedDay = rememberedDay
+        .onChange(of: readyDataSourceID, initial: true) {
+            restoreRememberedDay()
+            handlePendingSharedLocation()
+            openDayPickerForUITesting()
         }
         .onChange(of: selectedDay) { _, day in
-            guard case .ready = circle.readiness else { return }
+            guard let circle = readyDataSource else { return }
             catalogLibrary.rememberSelectedDay(
                 day,
                 forEventNumber: circle.comiket.number,
-                availableDayIndices: availableDayIndices
+                availableDayIndices: circle.comiket.days.map(\.dayIndex)
             )
         }
         .onChange(of: sharedLocationInbox.pending?.id, initial: true) {
             handlePendingSharedLocation()
         }
+        .sheet(isPresented: $showsCatalogSettings) {
+            CatalogEventDaySheet(
+                catalogLibrary: catalogLibrary,
+                selectedDay: $selectedDay
+            )
+            .modifier(
+                CatalogEventDaySheetPresentation(
+                    isRegularWidth: horizontalSizeClass == .regular,
+                    isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+                )
+            )
+            .presentationDragIndicator(.visible)
+            .presentationContentInteraction(.scrolls)
+        }
     }
 
-    private var availableDayIndices: [Int] {
-        circle.comiket.days.map(\.dayIndex)
+    /// The open catalog, or nil while the first catalog is still loading. A
+    /// catalog that is being replaced stays ready until its successor is.
+    private var readyDataSource: CirclemsDataSource? {
+        guard let dataSource = catalogLibrary.dataSource,
+              dataSource.readiness == .ready
+        else { return nil }
+        return dataSource
+    }
+
+    private var readyDataSourceID: ObjectIdentifier? {
+        readyDataSource.map(ObjectIdentifier.init)
+    }
+
+    /// Map and Explore depend on one catalog instance, so only they rebuild
+    /// when the catalog changes. The tab selection and the Shared Plans and
+    /// Profile navigation paths survive a Comiket switch.
+    @ViewBuilder
+    private func catalogTab<Content: View>(
+        @ViewBuilder content: (CirclemsDataSource) -> Content
+    ) -> some View {
+        if let circle = readyDataSource {
+            content(circle)
+                .id(ObjectIdentifier(circle))
+        } else {
+            CatalogLibraryLoadingSurface(
+                catalogLibrary: catalogLibrary,
+                resetAction: catalogResetAction
+            )
+        }
+    }
+
+    /// `-cominavi-ui-testing-open-day-picker` opens the Day & Comiket sheet
+    /// once the first catalog is ready, so screenshot scripts reach it
+    /// without a tap.
+    private func openDayPickerForUITesting() {
+        #if DEBUG
+            guard !didOpenDayPickerForUITesting,
+                  readyDataSource != nil,
+                  ProcessInfo.processInfo.arguments.contains(
+                      "-cominavi-ui-testing-open-day-picker"
+                  )
+            else { return }
+            didOpenDayPickerForUITesting = true
+            showsCatalogSettings = true
+        #endif
+    }
+
+    private func restoreRememberedDay() {
+        guard let circle = readyDataSource,
+              let rememberedDay = catalogLibrary.preferredDay(
+                  forEventNumber: circle.comiket.number,
+                  availableDayIndices: circle.comiket.days.map(\.dayIndex)
+              ),
+              rememberedDay != selectedDay
+        else { return }
+
+        selectedDay = rememberedDay
     }
 
     private func handlePendingSharedLocation() {
-        guard let request = sharedLocationInbox.pending else { return }
+        guard let request = sharedLocationInbox.pending,
+              let circle = readyDataSource
+        else { return }
         let location = request.location
 
         guard circle.comiket.number == location.eventNumber else {
@@ -374,17 +255,179 @@ private struct CatalogContentView: View {
         }
 
         selectedDay = location.sceneID.day
-        selection = .map
+        selection.wrappedValue = .map
     }
 
-    private var eventDayBanner: CatalogEventDayBanner {
+    /// iPhone uses the same one-line capsule and fitting rule as the Explore
+    /// toolbar; wide layouts have room for the card with the date.
+    private func eventDayBanner(for circle: CirclemsDataSource) -> CatalogEventDayBanner {
         CatalogEventDayBanner(
             event: catalogLibrary.selectedEvent,
             days: circle.comiket.days,
-            selectedDay: selectedDay
+            selectedDay: selectedDay,
+            isDemo: catalogLibrary.mode == .demo,
+            style: horizontalSizeClass == .regular ? .card : .compact
         ) {
             showsCatalogSettings = true
         }
+    }
+}
+
+/// The Day & Comiket sheet size. iPad shows a fixed form sheet; a medium
+/// detent there cut the Comiket row, and a sheet fitted to its content
+/// height opened at its title bar before the rows were measured. iPhone
+/// starts at the large detent at accessibility sizes, where the medium
+/// detent hid the Comiket section.
+private struct CatalogEventDaySheetPresentation: ViewModifier {
+    let isRegularWidth: Bool
+    let isAccessibilitySize: Bool
+
+    func body(content: Content) -> some View {
+        if isRegularWidth {
+            // The standard form size holds both days and the Comiket
+            // section. `.form.fitted(vertical:)` sized the sheet from the
+            // first layout pass, before the rows reported their height, and
+            // showed only the header and the top of "Day 1".
+            content
+                .presentationSizing(.form)
+        } else if isAccessibilitySize {
+            content.presentationDetents([.large])
+        } else {
+            content.presentationDetents([.medium, .large])
+        }
+    }
+}
+
+/// Lets the catalog failure surface offer EntryView's destructive
+/// "Log Out & Reset" recovery without owning the logout flow.
+struct CatalogResetAction {
+    var isInProgress: Bool
+    var issue: String?
+    var request: () -> Void
+}
+
+/// The single loading and failure surface for the catalog tabs. It covers
+/// discovery, download, opening, and failure with one string set and one
+/// symbol, and every state with a known event list lets the user pick
+/// another Comiket.
+private struct CatalogLibraryLoadingSurface: View {
+    let catalogLibrary: CatalogLibrary
+    let resetAction: CatalogResetAction?
+
+    var body: some View {
+        switch catalogLibrary.phase {
+        case .failed(let message):
+            CatalogErrorSurface(
+                symbolName: "exclamationmark.triangle.fill",
+                title: String(localized: "Catalog unavailable"),
+                message: resetAction?.issue ?? message,
+                advice: catalogLibrary.failureRecovery == .redownload
+                    ? String(localized: "Start a fresh download. The incomplete copy will be removed, then the new catalog will be verified before it opens.")
+                    : String(localized: "Please try again.")
+            ) {
+                CatalogRecoveryButton(catalogLibrary: catalogLibrary)
+
+                if let resetAction {
+                    CatalogResetButton(action: resetAction)
+                }
+
+                CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
+            }
+
+        case .downloading(let event, let progress):
+            downloadingSurface(eyebrow: event.shortName, progresses: [progress])
+
+        case .loading(let event):
+            // Circle.ms catalogs download inside the data source after the
+            // library has handed it over, so its progress wins when present.
+            if let progresses = dataSourceDownloadProgresses {
+                downloadingSurface(eyebrow: event.shortName, progresses: progresses)
+            } else {
+                openingSurface(
+                    eyebrow: event.shortName,
+                    title: String(localized: "Opening catalog…")
+                )
+            }
+
+        case .discovering:
+            openingSurface(
+                eyebrow: String(localized: "Catalog"),
+                title: String(localized: "Finding available catalogs…")
+            )
+
+        case .idle, .ready:
+            openingSurface(
+                eyebrow: catalogLibrary.selectedEvent?.shortName
+                    ?? String(localized: "Catalog"),
+                title: String(localized: "Opening catalog…")
+            )
+        }
+    }
+
+    private var dataSourceDownloadProgresses: Readiness.Progresses? {
+        guard case .downloading(let progresses)? = catalogLibrary.dataSource?.readiness,
+              !progresses.isEmpty
+        else { return nil }
+        return progresses
+    }
+
+    private func openingSurface(eyebrow: String, title: String) -> some View {
+        CatalogStatusSurface(
+            symbolName: "map",
+            eyebrow: eyebrow,
+            title: title,
+            subtitle: String(localized: "The map and the circle list open when the catalog is ready.")
+        ) {
+            CatalogActivityIndicator(accessibilityLabel: title)
+
+            CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
+                .padding(.top, Spacing.sectionGap)
+        }
+    }
+
+    private func downloadingSurface(
+        eyebrow: String,
+        progresses: Readiness.Progresses
+    ) -> some View {
+        CatalogStatusSurface(
+            symbolName: "map",
+            eyebrow: eyebrow,
+            title: String(localized: "Downloading catalog…"),
+            subtitle: String(localized: "This can take a few minutes. You can use Shared Plans and Profile in the meantime.")
+        ) {
+            DownloadProgressView(progresses: progresses)
+
+            CatalogLoadingEventPicker(catalogLibrary: catalogLibrary)
+                .padding(.top, Spacing.sectionGap)
+        }
+    }
+}
+
+private struct CatalogResetButton: View {
+    let action: CatalogResetAction
+
+    var body: some View {
+        FocusedActionButton(
+            role: .destructive,
+            emphasis: .secondary,
+            tint: .red,
+            action: action.request
+        ) {
+            if action.isInProgress {
+                ProgressView()
+                    .accessibilityLabel(Text("Logging out…"))
+            } else {
+                LucideLabel(
+                    "Log Out & Reset",
+                    icon: "person.crop.circle.badge.minus"
+                )
+            }
+        }
+        .disabled(action.isInProgress)
+        .accessibilityHint(
+            Text("Signs you out and removes downloaded catalogs from this device.")
+        )
+        .accessibilityIdentifier("catalog-log-out-reset")
     }
 }
 
@@ -419,12 +462,15 @@ private struct ProfileTabLabel: View {
             Text("Profile")
         } icon: {
             if let avatarURL = profileStore.profile?.avatarURL {
+                // The toolbar glyph size, so the photo matches the
+                // "person.circle" glyph that it replaces.
                 AuthenticatedProfileAvatar(
                     url: avatarURL,
-                    size: 24,
+                    size: IconSize.action,
                     revision: profileStore.profile?.revision
                 )
-                    .accessibilityHidden(true)
+                .clipShape(.circle)
+                .accessibilityHidden(true)
             } else {
                 Image(LucideIcon.assetName(for: "person.circle"))
             }
@@ -450,9 +496,10 @@ private struct CatalogLoadingEventPicker: View {
                     }
                 }
             } label: {
-                LucideLabel("Choose another catalog", icon: "arrow.left.arrow.right")
+                LucideLabel("Choose another Comiket", icon: "arrow.left.arrow.right")
             }
-            .buttonStyle(.bordered)
+            .menuStyle(.button)
+            .buttonStyle(.secondaryAction)
             .accessibilityIdentifier("catalog-loading-event-selector")
         }
     }
