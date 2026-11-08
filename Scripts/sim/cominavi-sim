@@ -87,6 +87,8 @@ import json, sys
 response = json.load(open(sys.argv[1]))
 text = response.get("result") if response.get("ok") else response.get("error")
 print(text or "")
+for warning in response.get("warnings", []):
+    print("warning: " + warning, file=sys.stderr)
 print("%s %sms" % ("ok" if response.get("ok") else "error", response.get("ms")), file=sys.stderr)
 sys.exit(0 if response.get("ok") else 1)
 PY
@@ -190,7 +192,12 @@ doctor_probe() {
     echo "  ${backend}: reaches the app"
     return 0
   fi
-  echo "  ${backend}: reports success but the app never receives the tap"
+  # Only a readable tree that still shows Map selected proves the tap was lost.
+  if "$0" ui 2>/dev/null | grep -qE 'RadioButton "Map" value="?1'; then
+    echo "  ${backend}: reports success but the app never receives the tap"
+  else
+    echo "  ${backend}: unknown (could not read the tab bar after the tap)"
+  fi
   return 1
 }
 
@@ -230,7 +237,7 @@ Driver commands: ping | launch [app args...] | attach | xcui-launch [app args...
 activate | terminate | state |
 url <url> | tap id|label|text <value> | tap-point <x> <y> | long-press <selector> |
 type <text> | key return|delete|escape|tab | swipe up|down|left|right |
-wait <selector> [seconds] | gone <selector> [seconds] | tree [--all] |
+wait [--timeout s] <selector> | gone [--timeout s] <selector> | tree [--all] |
 shot <host path> | alert | alert-tap <button label> | orientation portrait|left|right |
 home | stop
 

@@ -145,7 +145,7 @@ $S driver build                                 # app + UI tests, once per sourc
 $S driver start                                 # starts the runner (30-60 s), returns when ready
 D="$S driver cmd"
 $D launch -cominavi-demo-data -cominavi-ui-testing-initial-tab map
-$D wait id global-event-day-banner 60           # the first query after a fresh install can take ~60 s
+$D wait --timeout 60 id global-event-day-banner # the first query after a fresh install can take ~60 s
 $D tap label Explore
 $D tap id explore-gallery-circle-9719
 $D tap id circle-favorite-action
@@ -163,8 +163,10 @@ $S driver stop
 Each `driver cmd` prints the result on stdout and `ok <ms>` or `error <ms>` on
 stderr. It exits 0 on success, 1 on a command error, 2 on a timeout
 (`COMINAVI_SIM_DRIVER_TIMEOUT`, default 90 s) and 3 when the driver is not
-running. A failed command never ends the driver: XCTest issues raised while a
-command runs become that command's error.
+running. A failed command never ends the driver: XCTest failures raised while a
+command runs become that command's error. Other XCTest issues, such as the
+app's SwiftUI runtime warnings, are printed as `warning:` lines on stderr and
+do not fail the command.
 
 Commands:
 
@@ -179,7 +181,7 @@ Commands:
 | `tap-point <x> <y>`, `long-press <selector>` | Point tap; one-second press |
 | `type <text>`, `key return\|delete\|escape\|tab` | Keyboard input; fails unless a field has keyboard focus |
 | `swipe up\|down\|left\|right` | Drag across the middle of the app |
-| `wait <selector> [s]`, `gone <selector> [s]` | Poll until an element appears or disappears (default 10 s) |
+| `wait [--timeout s] <selector>`, `gone [--timeout s] <selector>` | Poll until an element appears or disappears (default 10 s) |
 | `tree [--all]` | Flattened accessibility tree |
 | `shot <host path>` | PNG screenshot of the app |
 | `alert`, `alert-tap <label>` | List or answer app and SpringBoard alerts |

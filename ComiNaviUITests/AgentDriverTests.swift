@@ -26,12 +26,20 @@ final class AgentDriverTests: XCTestCase {
 
     private var app: XCUIApplication!
     private var directory = URL(fileURLWithPath: NSTemporaryDirectory())
-    /// XCTest issues raised while a command runs. They become that command's
-    /// error instead of failing (and ending) the long-lived test.
+    /// XCTest issues raised while a command runs. Failures (such as an event
+    /// that could not be synthesized) become that command's error instead of
+    /// ending the long-lived test. Other issues, such as the app's SwiftUI
+    /// runtime warnings, are returned as warnings.
     private var commandIssues: [String] = []
+    private var commandWarnings: [String] = []
 
     override func record(_ issue: XCTIssue) {
-        commandIssues.append(issue.compactDescription)
+        switch issue.type {
+        case .assertionFailure, .thrownError, .uncaughtException, .unmatchedExpectedFailure:
+            commandIssues.append(issue.compactDescription)
+        default:
+            commandWarnings.append("[\(issue.type.rawValue)] \(issue.compactDescription)")
+        }
     }
 
     @MainActor
@@ -73,6 +81,7 @@ final class AgentDriverTests: XCTestCase {
                 let start = Date()
                 var response: [String: Any]
                 commandIssues.removeAll()
+                commandWarnings.removeAll()
                 do {
                     let result = try execute(line, stop: &running)
                     response = commandIssues.isEmpty
@@ -81,6 +90,7 @@ final class AgentDriverTests: XCTestCase {
                 } catch {
                     response = ["ok": false, "error": String(describing: error)]
                 }
+                if !commandWarnings.isEmpty { response["warnings"] = commandWarnings }
                 response["ms"] = Int(Date().timeIntervalSince(start) * 1000)
                 response["command"] = line
                 let data = try JSONSerialization.data(withJSONObject: response, options: [.sortedKeys])
@@ -92,6 +102,21 @@ final class AgentDriverTests: XCTestCase {
             }
         }
         try? fileManager.removeItem(at: directory.appendingPathComponent("ready"))
+    }
+
+    /// Parser regression: a numeric last word belongs to the selector.
+    func testTimeoutParsingKeepsNumericLabels() throws {
+        func parse(_ line: String) throws -> ([String], TimeInterval) {
+            try Self.splitTimeout(ArraySlice(line.split(separator: " ").map(String.init)), default: 10)
+        }
+        var (selector, timeout) = try parse("label Test Shinagaki page 1")
+        XCTAssertEqual(selector, ["label", "Test", "Shinagaki", "page", "1"])
+        XCTAssertEqual(timeout, 10)
+        (selector, timeout) = try parse("--timeout 3 label Test Shinagaki page 1")
+        XCTAssertEqual(selector, ["label", "Test", "Shinagaki", "page", "1"])
+        XCTAssertEqual(timeout, 3)
+        XCTAssertThrowsError(try parse("--timeout soon id x"))
+        XCTAssertThrowsError(try parse("--timeout"))
     }
 
     // MARK: - Commands
@@ -227,11 +252,11 @@ final class AgentDriverTests: XCTestCase {
             )
             return "swiped \(direction)"
         case "wait":
-            let (selector, timeout) = splitTimeout(rest, default: 10)
+            let (selector, timeout) = try Self.splitTimeout(rest, default: 10)
             let (_, description) = try resolve(selector, timeout: timeout)
             return "found \(description)"
         case "gone":
-            let (selector, timeout) = splitTimeout(rest, default: 10)
+            let (selector, timeout) = try Self.splitTimeout(rest, default: 10)
             let deadline = Date().addingTimeInterval(timeout)
             repeat {
                 // A malformed selector is an error, never a successful "gone".
@@ -328,11 +353,14 @@ final class AgentDriverTests: XCTestCase {
         throw DriverError("not found after \(timeout)s: \(text)")
     }
 
-    private func splitTimeout(_ words: ArraySlice<String>, default value: TimeInterval) -> ([String], TimeInterval) {
-        if words.count > 2, let last = words.last, let seconds = TimeInterval(last) {
-            return (Array(words.dropLast()), seconds)
+    /// Takes an explicit `--timeout <seconds>` prefix, so a selector whose
+    /// last word is a number (`label Page 1`) is never cut short.
+    static func splitTimeout(_ words: ArraySlice<String>, default value: TimeInterval) throws -> ([String], TimeInterval) {
+        guard words.first == "--timeout" else { return (Array(words), value) }
+        guard words.count > 1, let seconds = TimeInterval(words[words.startIndex + 1]), seconds >= 0 else {
+            throw DriverError("usage: --timeout <seconds> <selector>")
         }
-        return (Array(words), value)
+        return (Array(words.dropFirst(2)), seconds)
     }
 
     @MainActor
