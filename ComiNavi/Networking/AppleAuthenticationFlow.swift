@@ -11,6 +11,9 @@ enum AppleAuthenticationFlowError: LocalizedError, Equatable {
     case invalidCredential
     case persistenceFailed
     case committedOrUnknown
+    /// The system Apple sheet failed for a reason other than a cancel, for
+    /// example no Apple Account is signed in on the device.
+    case authorizationFailed
 
     var errorDescription: String? {
         switch self {
@@ -24,7 +27,22 @@ enum AppleAuthenticationFlowError: LocalizedError, Equatable {
             String(localized: "We could not securely save the Sign in with Apple request.")
         case .committedOrUnknown:
             String(localized: "We are confirming the Sign in with Apple result. No new sign-in was started.")
+        case .authorizationFailed:
+            String(localized: "Sign in with Apple didn't finish. Check that you're signed in to an Apple Account in Settings, then try again.")
         }
+    }
+
+    /// Keeps `ASAuthorizationError.canceled` unchanged, so the sign-in screen
+    /// treats it as a silent cancel, and turns every other system Apple sheet
+    /// error into `.authorizationFailed` with a localized message.
+    static func fromSystemAuthorization(_ error: Error) -> Error {
+        let value = error as NSError
+        if value.domain == ASAuthorizationError.errorDomain,
+           value.code == ASAuthorizationError.canceled.rawValue
+        {
+            return error
+        }
+        return AppleAuthenticationFlowError.authorizationFailed
     }
 }
 
@@ -510,7 +528,7 @@ final class AppleSignInAuthorizationProvider: NSObject,
         controller: ASAuthorizationController,
         didCompleteWithError error: Error
     ) {
-        finish(.failure(error))
+        finish(.failure(AppleAuthenticationFlowError.fromSystemAuthorization(error)))
     }
 
     private func finish(_ result: Result<AppleAuthorizationCredential, Error>) {
@@ -523,14 +541,21 @@ final class AppleSignInAuthorizationProvider: NSObject,
 
 /// Uses Apple's required native control while allowing the app to acquire the
 /// short-lived ComiNavi entry grant before presenting the Apple sheet.
+///
+/// The button style is fixed when UIKit creates the control, so callers that
+/// follow the color scheme recreate it with `.id(colorScheme)`.
 struct AppleSignInControl: UIViewRepresentable {
+    var style: ASAuthorizationAppleIDButton.Style = .black
+    var cornerRadius: CGFloat = 12
+    var accessibilityIdentifier: String?
     let action: @MainActor () -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(action: action) }
 
     func makeUIView(context: Context) -> ASAuthorizationAppleIDButton {
-        let button = ASAuthorizationAppleIDButton(type: .signIn, style: .black)
-        button.cornerRadius = 12
+        let button = ASAuthorizationAppleIDButton(type: .signIn, style: style)
+        button.cornerRadius = cornerRadius
+        button.accessibilityIdentifier = accessibilityIdentifier
         button.addTarget(
             context.coordinator,
             action: #selector(Coordinator.activate),
@@ -539,11 +564,15 @@ struct AppleSignInControl: UIViewRepresentable {
         return button
     }
 
-    func updateUIView(_ uiView: ASAuthorizationAppleIDButton, context: Context) {}
+    func updateUIView(_ uiView: ASAuthorizationAppleIDButton, context: Context) {
+        context.coordinator.action = action
+        uiView.cornerRadius = cornerRadius
+        uiView.accessibilityIdentifier = accessibilityIdentifier
+    }
 
     @MainActor
     final class Coordinator: NSObject {
-        let action: @MainActor () -> Void
+        var action: @MainActor () -> Void
 
         init(action: @escaping @MainActor () -> Void) { self.action = action }
 

@@ -594,8 +594,12 @@ final class SignInViewModel: NSObject, ObservableObject,
     ) -> Bool {
         if flow.submissionAttemptedAt != nil { return false }
         if let flowError = error as? AppleAuthenticationFlowError {
+            // A failed Apple sheet keeps the flow and its entry grant, so a
+            // retry right after it (for example after signing in to an
+            // Apple Account) needs no new special-entry request.
             return flowError != .persistenceFailed
                 && flowError != .committedOrUnknown
+                && flowError != .authorizationFailed
         }
         if case CominaviServiceError.server(_, _, let status) = error {
             return [400, 401, 403, 404, 409, 410, 422].contains(status)
@@ -619,11 +623,15 @@ struct SignInView: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
     @ScaledMetric(relativeTo: .title) private var logoTileSize = 80.0
     /// Half the cap height of `.body`. It moves a row icon up from the text
     /// baseline to the middle of the first line.
     @ScaledMetric(relativeTo: .body) private var bodyCapHalfHeight = 6.0
     @ScaledMetric(relativeTo: .headline) private var googleGlyphSize = IconSize.inline
+    /// Matches the 50 pt minimum of a large `ActionButtonStyle`, so Sign in
+    /// with Apple keeps the same size as Sign in with Google.
+    @ScaledMetric(relativeTo: .headline) private var appleButtonHeight = 50.0
     @StateObject private var vm = SignInViewModel()
     @State private var logoTapCount = 0
     @State private var isDemoDataUnlocked = false
@@ -759,7 +767,7 @@ struct SignInView: View {
     }
 
     /// The sign-in button and everything that belongs to one attempt: its
-    /// progress, the optional demo and Google entries, and the last error.
+    /// progress, the optional demo, Apple and Google entries, and the last error.
     private var actions: some View {
         VStack(alignment: .leading, spacing: Spacing.medium) {
             loginButton
@@ -775,11 +783,16 @@ struct SignInView: View {
                 .accessibilityIdentifier("sign-in-demo-data")
             }
 
+            // App Review Guideline 4.8: wherever Google is reachable, Sign in
+            // with Apple sits beside it as an equivalent option. Both stay
+            // behind the invitation or special-entry gate.
             if let googleInvitation {
+                appleLoginButton(invitation: googleInvitation)
                 if GoogleSignInConfiguration.load() != nil {
                     googleLoginButton(invitation: googleInvitation)
                 }
             } else if googleSpecialEntry {
+                appleLoginButton(invitation: nil)
                 if GoogleSignInConfiguration.load() != nil {
                     googleLoginButton(invitation: nil)
                 }
@@ -1008,6 +1021,35 @@ struct SignInView: View {
         .accessibilityHint("Opens Circle.ms in a secure browser sheet.")
         .accessibilityIdentifier("sign-in-circlems")
         .animation(.easeInOut(duration: 0.2), value: vm.state == .authenticating)
+    }
+
+    private func appleLoginButton(
+        invitation: SharedPlanInvitationInbox.Pending?
+    ) -> some View {
+        let identifier = invitation == nil
+            ? "sign-in-apple-special-entry"
+            : "sign-in-apple-invitation"
+        return AppleSignInControl(
+            style: colorScheme == .dark ? .white : .black,
+            cornerRadius: Radius.control,
+            accessibilityIdentifier: identifier
+        ) {
+            vm.signInWithApple(
+                entryContext: invitation == nil ? .special : .invitation,
+                invitationToken: invitation?.token
+            )
+        }
+        // UIKit fixes the button style at creation.
+        .id(colorScheme)
+        .frame(maxWidth: .infinity, minHeight: appleButtonHeight, maxHeight: appleButtonHeight)
+        .allowsHitTesting(vm.state != .authenticating)
+        .opacity(vm.state == .authenticating ? 0.45 : 1)
+        .accessibilityHint(
+            invitation == nil
+                ? "Sign in with Apple from the special entry"
+                : "Use the invitation to sign in with Apple"
+        )
+        .accessibilityIdentifier(identifier)
     }
 
     private func googleLoginButton(

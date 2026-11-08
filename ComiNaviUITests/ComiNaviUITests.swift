@@ -1184,6 +1184,45 @@ final class ComiNaviUITests: XCTestCase {
         takeScreenshot(named: "C108-Event-Reminders-iPad")
     }
 
+    /// App Review Guideline 4.8: both hidden special-entry links show Sign in
+    /// with Apple beside Sign in with Google, at the same size. Completing
+    /// either provider needs a real account, so the test stops at the
+    /// sign-in screen.
+    @MainActor
+    func testSpecialEntryLinksOfferAppleBesideGoogle() throws {
+        for path in ["google", "apple"] {
+            let app = XCUIApplication()
+            app.launchArguments += [
+                "-cominavi-ui-testing-show-sign-in",
+                "-AppleLanguages", "(en)",
+                "-AppleLocale", "en_US",
+            ]
+            app.launch()
+
+            // No "hidden by default" assertion here: a pending provider flow
+            // in the simulator Keychain correctly restores the special entry.
+            XCTAssertTrue(app.buttons["sign-in-circlems"].waitForExistence(timeout: 10))
+
+            app.open(try XCTUnwrap(URL(string: "cominavi://auth/\(path)")))
+            let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+            let openButton = springboard.buttons["Open"]
+            if openButton.waitForExistence(timeout: 2) {
+                openButton.tap()
+            }
+
+            let apple = app.buttons["sign-in-apple-special-entry"]
+            let google = app.buttons["sign-in-google-special-entry"]
+            XCTAssertTrue(apple.waitForExistence(timeout: 10), "cominavi://auth/\(path)")
+            XCTAssertTrue(google.waitForExistence(timeout: 5), "cominavi://auth/\(path)")
+            XCTAssertTrue(apple.isHittable)
+            XCTAssertEqual(apple.frame.height, google.frame.height, accuracy: 1)
+            XCTAssertEqual(apple.frame.width, google.frame.width, accuracy: 1)
+            XCTAssertLessThan(apple.frame.minY, google.frame.minY)
+            takeScreenshot(named: "Special-Entry-\(path)")
+            app.terminate()
+        }
+    }
+
     @MainActor
     func testTenLogoTapsUnlockDemoCatalogWithoutAuthentication() throws {
         let app = XCUIApplication()

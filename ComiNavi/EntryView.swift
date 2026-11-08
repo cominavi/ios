@@ -111,14 +111,11 @@ struct EntryView: View {
                     await AppData.sharedPlanStore(for: userID).load()
                 }
                 showsInvitationConfirmation = invitationInbox.pending != nil
-                if let flow = try? AppData.pendingGoogleAuthenticationFlow(),
-                   flow.entryContext == .special
-                {
-                    googleSpecialEntryActive = true
-                }
-                if let flow = try? AppData.pendingAppleAuthenticationFlow(),
-                   flow.entryContext == .special
-                {
+                if SpecialEntryAuthenticationState.shouldRestore(
+                    hasVerifiedProfile: verifiedProfileID != nil,
+                    googleFlow: try? AppData.pendingGoogleAuthenticationFlow(),
+                    appleFlow: try? AppData.pendingAppleAuthenticationFlow()
+                ) {
                     googleSpecialEntryActive = true
                 }
             }
@@ -164,6 +161,9 @@ struct EntryView: View {
             .onChange(of: verifiedProfileID, initial: true) { _, userID in
                 guard let userID else { return }
                 googleSpecialEntryActive = false
+                // The provider that signed in has cleared its own flow. Drop
+                // the unused one too, or it reopens the special entry later.
+                try? AppData.retireUnsubmittedAuthenticationFlows()
                 if catalogLibrary.phase == .idle {
                     catalogLibrary.start()
                 }
