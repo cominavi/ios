@@ -82,6 +82,7 @@ struct MapView: View {
 
     @Environment(\.openURL) private var openURL
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(AppPowerPolicy.self) private var powerPolicy
     @State private var model: MapScreenModel
     @State private var showsWhereAmI = false
     @State private var showsDestinationPicker = false
@@ -278,6 +279,9 @@ struct MapView: View {
         }
         .onAppear {
             configureLocationService()
+        }
+        .onChange(of: powerPolicy.isLowPowerModeEnabled, initial: true) { _, isEnabled in
+            locationService.updatePowerPolicy(isLowPowerModeEnabled: isEnabled)
         }
         .onDisappear {
             locationService.stop()
@@ -2931,5 +2935,6 @@ private struct CircleMapSummaryCard: View {
 #if DEBUG
     #Preview {
         MapView(model: .fixture())
+            .environment(AppPowerPolicy())
     }
 #endif

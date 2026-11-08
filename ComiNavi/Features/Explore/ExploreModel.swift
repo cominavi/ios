@@ -381,6 +381,14 @@ final class ExploreModel {
         case unavailable(String)
     }
 
+    #if DEBUG
+        struct DebugRecomputeWorkCounts: Equatable {
+            var totalRecomputeInvocations = 0
+            var catalogComparatorCalls = 0
+            var bookmarkLookups = 0
+        }
+    #endif
+
     var layout: ExploreLayout = .gallery
     var searchQuery = "" {
         didSet {
@@ -391,19 +399,19 @@ final class ExploreModel {
     var selectedGenreID: Int? {
         didSet {
             guard selectedGenreID != oldValue else { return }
-            recomputeVisibleCircles()
+            recomputeVisibleCirclesAfterFilterChange()
         }
     }
     var selectedTag: String? {
         didSet {
             guard selectedTag != oldValue else { return }
-            recomputeVisibleCircles()
+            recomputeVisibleCirclesAfterFilterChange()
         }
     }
     var selectedDiscoveryTermIDs: Set<String> = [] {
         didSet {
             guard selectedDiscoveryTermIDs != oldValue else { return }
-            recomputeVisibleCircles()
+            recomputeVisibleCirclesAfterFilterChange()
         }
     }
     var discoveryMatchMode: ExploreDiscoveryMatchMode = .any {
@@ -421,31 +429,31 @@ final class ExploreModel {
     var shinagakiFilter: ExploreShinagakiFilter = .all {
         didSet {
             guard shinagakiFilter != oldValue else { return }
-            recomputeVisibleCircles()
+            recomputeVisibleCirclesAfterFilterChange()
         }
     }
     var favoriteFilter: ExploreFavoriteFilter = .all {
         didSet {
             guard favoriteFilter != oldValue else { return }
-            recomputeVisibleCircles()
+            recomputeVisibleCirclesAfterFilterChange()
         }
     }
     var selectedFavoriteColors: Set<BookmarkColor> = [] {
         didSet {
             guard selectedFavoriteColors != oldValue else { return }
-            recomputeVisibleCircles()
+            recomputeVisibleCirclesAfterFilterChange()
         }
     }
     var attendanceFilter: ExploreAttendanceFilter = .all {
         didSet {
             guard attendanceFilter != oldValue else { return }
-            recomputeVisibleCircles()
+            recomputeVisibleCirclesAfterFilterChange()
         }
     }
     var spaceFilter: ExploreSpaceFilter = .all {
         didSet {
             guard spaceFilter != oldValue else { return }
-            recomputeVisibleCircles()
+            recomputeVisibleCirclesAfterFilterChange()
         }
     }
 
@@ -484,9 +492,14 @@ final class ExploreModel {
     @ObservationIgnored private var searchRevision = 0
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var loadRevision = 0
+    @ObservationIgnored private var isClearingFilters = false
     @ObservationIgnored private let artworkLoader: CircleDetailArtworkLoader?
     @ObservationIgnored private let imageCache = NSCache<NSNumber, NSData>()
     @ObservationIgnored private let coverThumbnailCache = NSCache<NSString, NSData>()
+    #if DEBUG
+        @ObservationIgnored private(set) var debugLastRecomputeWorkCounts =
+            DebugRecomputeWorkCounts()
+    #endif
 
     init(
         dataSource: CirclemsDataSource,
@@ -680,9 +693,23 @@ final class ExploreModel {
     }
 
     func bookmark(for circle: ExploreCircle) -> MapBookmark? {
-        circle.circles.compactMap { bookmarksByCatalogCircleID[$0.id] }.max {
-            $0.modifiedAt < $1.modifiedAt
+        guard !circle.memberCircles.isEmpty else {
+            return bookmarksByCatalogCircleID[circle.circle.id]
         }
+
+        var newestBookmark: MapBookmark?
+        for memberCircle in circle.memberCircles {
+            guard let bookmark = bookmarksByCatalogCircleID[memberCircle.id] else {
+                continue
+            }
+            if let newestBookmark,
+               newestBookmark.modifiedAt >= bookmark.modifiedAt
+            {
+                continue
+            }
+            newestBookmark = bookmark
+        }
+        return newestBookmark
     }
 
     func refreshUserPlan() async {
@@ -797,6 +824,12 @@ final class ExploreModel {
     }
 
     func clearFilters() {
+        isClearingFilters = true
+        defer {
+            isClearingFilters = false
+            recomputeVisibleCircles()
+        }
+
         selectedGenreID = nil
         selectedTag = fixedTag
         selectedDiscoveryTermIDs = []
@@ -1174,7 +1207,20 @@ final class ExploreModel {
         }
     }
 
+    private func recomputeVisibleCirclesAfterFilterChange() {
+        guard !isClearingFilters else { return }
+        recomputeVisibleCircles()
+    }
+
     private func recomputeVisibleCircles() {
+        #if DEBUG
+            var debugWorkCounts = DebugRecomputeWorkCounts()
+            debugWorkCounts.totalRecomputeInvocations =
+                debugLastRecomputeWorkCounts.totalRecomputeInvocations + 1
+            defer { debugLastRecomputeWorkCounts = debugWorkCounts }
+        #endif
+
+        let needsBookmark = favoriteFilter != .all || !selectedFavoriteColors.isEmpty
         let filteredCircles = allCircles.filter { circle in
             guard circle.day == selectedDay else { return false }
             if let selectedGenreID, circle.genreID != selectedGenreID { return false }
@@ -1189,21 +1235,28 @@ final class ExploreModel {
             default:
                 break
             }
-            let bookmark = bookmark(for: circle)
-            switch favoriteFilter {
-            case .all:
-                break
-            case .saved where bookmark == nil:
-                return false
-            case .notSaved where bookmark != nil:
-                return false
-            default:
-                break
-            }
-            if !selectedFavoriteColors.isEmpty,
-               bookmark.map({ selectedFavoriteColors.contains($0.color) }) != true
-            {
-                return false
+            if needsBookmark {
+                #if DEBUG
+                    debugWorkCounts.bookmarkLookups += circle.memberCircles.isEmpty
+                        ? 1
+                        : circle.memberCircles.count
+                #endif
+                let bookmark = bookmark(for: circle)
+                switch favoriteFilter {
+                case .all:
+                    break
+                case .saved where bookmark == nil:
+                    return false
+                case .notSaved where bookmark != nil:
+                    return false
+                default:
+                    break
+                }
+                if !selectedFavoriteColors.isEmpty {
+                    guard let bookmark,
+                          selectedFavoriteColors.contains(bookmark.color)
+                    else { return false }
+                }
             }
             switch attendanceFilter {
             case .all:
@@ -1228,17 +1281,25 @@ final class ExploreModel {
                 break
             }
             if !selectedDiscoveryTermIDs.isEmpty {
-                let matches = selectedDiscoveryTermIDs.map {
-                    discoveryIndex.circleIDsByTermID[$0]?.contains(circle.id) == true
-                }
                 switch discoveryMatchMode {
-                case .any where !matches.contains(true): return false
-                case .all where matches.contains(false): return false
-                default: break
+                case .any:
+                    guard selectedDiscoveryTermIDs.contains(where: {
+                        discoveryIndex.circleIDsByTermID[$0]?.contains(circle.id) == true
+                    }) else { return false }
+                case .all:
+                    guard selectedDiscoveryTermIDs.allSatisfy({
+                        discoveryIndex.circleIDsByTermID[$0]?.contains(circle.id) == true
+                    }) else { return false }
                 }
             }
             return !hasActiveSearch || searchScoresByCircleID[circle.id] != nil
         }
+
+        if sort == .catalog, !hasActiveSearch {
+            visibleCircles = filteredCircles
+            return
+        }
+
         visibleCircles = filteredCircles.sorted { lhs, rhs in
             if hasActiveSearch {
                 let lhsScore = searchScoresByCircleID[lhs.id] ?? 0
@@ -1248,11 +1309,17 @@ final class ExploreModel {
 
             switch sort {
             case .catalog:
+                #if DEBUG
+                    debugWorkCounts.catalogComparatorCalls += 1
+                #endif
                 return Self.catalogOrder(lhs, rhs)
             case .latestShinagaki:
                 let lhsDate = lhs.enrichment?.latestPostDate ?? .distantPast
                 let rhsDate = rhs.enrichment?.latestPostDate ?? .distantPast
                 if lhsDate != rhsDate { return lhsDate > rhsDate }
+                #if DEBUG
+                    debugWorkCounts.catalogComparatorCalls += 1
+                #endif
                 return Self.catalogOrder(lhs, rhs)
             }
         }

@@ -25,9 +25,22 @@ struct SharedPlanExternalCircleState: Equatable, Identifiable, Sendable {
     }
 }
 
+struct CominaviRealtimeCacheLoad: Sendable {
+    let data: Data
+    let requiresRewrite: Bool
+}
+
 protocol CominaviRealtimeCachePersisting: Sendable {
     func load(eventNumber: Int) async throws -> Data?
+    func loadResult(eventNumber: Int) async throws -> CominaviRealtimeCacheLoad?
     func save(_ data: Data, eventNumber: Int) async throws
+}
+
+extension CominaviRealtimeCachePersisting {
+    func loadResult(eventNumber: Int) async throws -> CominaviRealtimeCacheLoad? {
+        guard let data = try await load(eventNumber: eventNumber) else { return nil }
+        return CominaviRealtimeCacheLoad(data: data, requiresRewrite: false)
+    }
 }
 
 struct FileCominaviRealtimeCacheStore: CominaviRealtimeCachePersisting {
@@ -40,14 +53,22 @@ struct FileCominaviRealtimeCacheStore: CominaviRealtimeCachePersisting {
     }
 
     func load(eventNumber: Int) async throws -> Data? {
+        try await loadResult(eventNumber: eventNumber)?.data
+    }
+
+    func loadResult(eventNumber: Int) async throws -> CominaviRealtimeCacheLoad? {
         let url = fileURL(eventNumber: eventNumber)
         let legacyURL = legacyDirectory?.appendingPathComponent(
             "event-\(eventNumber)-heads.json"
         )
         return try await Task.detached(priority: .utility) {
+            () throws -> CominaviRealtimeCacheLoad? in
             let fileManager = FileManager.default
             if fileManager.fileExists(atPath: url.path) {
-                return try Data(contentsOf: url)
+                return CominaviRealtimeCacheLoad(
+                    data: try Data(contentsOf: url),
+                    requiresRewrite: false
+                )
             }
             guard let legacyURL,
                   fileManager.fileExists(atPath: legacyURL.path)
@@ -56,8 +77,17 @@ struct FileCominaviRealtimeCacheStore: CominaviRealtimeCachePersisting {
             let data = try Data(contentsOf: legacyURL)
             // The legacy snapshot remains usable even if migration cannot be
             // completed yet (for example, while storage is temporarily full).
-            try? Self.write(data, to: url, in: directory, fileManager: fileManager)
-            return data
+            let requiresRewrite: Bool
+            do {
+                try Self.write(data, to: url, in: directory, fileManager: fileManager)
+                requiresRewrite = false
+            } catch {
+                requiresRewrite = true
+            }
+            return CominaviRealtimeCacheLoad(
+                data: data,
+                requiresRewrite: requiresRewrite
+            )
         }.value
     }
 
@@ -119,6 +149,7 @@ actor CominaviRealtimeStore {
     private let cacheStore: any CominaviRealtimeCachePersisting
     private var cacheLoadAttemptedEvents: Set<Int> = []
     private var cacheAvailableEvents: Set<Int> = []
+    private var cacheRequiresRewriteEvents: Set<Int> = []
     private var lastRefreshByEvent: [Int: Date] = [:]
     private var lastRefreshAuthorityByEvent: [Int: RefreshAuthority] = [:]
     private var lastCursorByEvent: [Int: Int] = [:]
@@ -337,20 +368,32 @@ actor CominaviRealtimeStore {
             throw CominaviServiceError.invalidResponse
         }
 
-        let snapshot = Self.cacheSnapshot(
-            eventNumber: eventNumber,
-            lastCursor: cursor,
-            heads: candidateHeads,
-            publicationRevision: candidatePublicationRevision,
-            publicationGeneration: candidatePublicationGeneration,
-            publicationCursor: candidatePublicationCursor,
-            tagOverlay: candidateOverlay
-        )
-        try Self.validate(snapshot, eventNumber: eventNumber)
-        try await cacheStore.save(
-            JSONEncoder().encode(snapshot),
-            eventNumber: eventNumber
-        )
+        let stateChanged = cursor != initialCursor
+            || candidateHeads != initialHeads
+            || candidatePublicationRevision != initialPublicationRevision
+            || candidatePublicationGeneration != initialPublicationGeneration
+            || candidatePublicationCursor != initialPublicationCursor
+            || candidateOverlay != initialOverlay
+        if stateChanged
+            || !cacheAvailableEvents.contains(eventNumber)
+            || cacheRequiresRewriteEvents.contains(eventNumber)
+        {
+            let snapshot = Self.cacheSnapshot(
+                eventNumber: eventNumber,
+                lastCursor: cursor,
+                heads: candidateHeads,
+                publicationRevision: candidatePublicationRevision,
+                publicationGeneration: candidatePublicationGeneration,
+                publicationCursor: candidatePublicationCursor,
+                tagOverlay: candidateOverlay
+            )
+            try Self.validate(snapshot, eventNumber: eventNumber)
+            try await cacheStore.save(
+                JSONEncoder().encode(snapshot),
+                eventNumber: eventNumber
+            )
+            cacheRequiresRewriteEvents.remove(eventNumber)
+        }
 
         headsByEvent[eventNumber] = candidateHeads
         lastCursorByEvent[eventNumber] = cursor
@@ -368,10 +411,13 @@ actor CominaviRealtimeStore {
 
     private func loadCacheIfNeeded(eventNumber: Int) async {
         guard cacheLoadAttemptedEvents.insert(eventNumber).inserted else { return }
-        guard let data = try? await cacheStore.load(eventNumber: eventNumber),
-              let snapshot = try? JSONDecoder().decode(CacheSnapshot.self, from: data),
+        guard let loaded = try? await cacheStore.loadResult(eventNumber: eventNumber),
+              let snapshot = try? JSONDecoder().decode(CacheSnapshot.self, from: loaded.data),
               (try? Self.validate(snapshot, eventNumber: eventNumber)) != nil
         else { return }
+        if loaded.requiresRewrite {
+            cacheRequiresRewriteEvents.insert(eventNumber)
+        }
         if snapshot.version == 3,
            let publicationRevision = snapshot.publicationRevision,
            let publicationGeneration = snapshot.publicationGeneration,
@@ -396,6 +442,7 @@ actor CominaviRealtimeStore {
                 CominaviRealtimeUpdatePage.absentPublicationRevision
             publicationGenerationByEvent[eventNumber] = 0
             publicationCursorByEvent[eventNumber] = 0
+            cacheRequiresRewriteEvents.insert(eventNumber)
         }
         if let overlay = snapshot.tagOverlay {
             installTagOverlay(overlay, eventNumber: eventNumber)
@@ -433,6 +480,7 @@ actor CominaviRealtimeStore {
             JSONEncoder().encode(snapshot),
             eventNumber: eventNumber
         )
+        cacheRequiresRewriteEvents.remove(eventNumber)
     }
 
     private static func merging(

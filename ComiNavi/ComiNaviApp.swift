@@ -120,6 +120,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 struct ComiNaviApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var hapticFeedback = AppHapticFeedback()
+    @State private var powerPolicy = AppPowerPolicy()
 
     var body: some Scene {
         WindowGroup {
@@ -131,6 +132,7 @@ struct ComiNaviApp: App {
                 }
             }
             .environment(\.appHapticFeedback, hapticFeedback)
+            .environment(powerPolicy)
             .sensoryFeedback(trigger: hapticFeedback.event) { _, event in
                 event.cue?.sensoryFeedback
             }

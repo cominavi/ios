@@ -162,6 +162,7 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(AppPowerPolicy.self) private var powerPolicy
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -204,9 +205,10 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
     private func update(host: UnifiedMapHostView, renderer: UnifiedBigSightScene) {
         let appearance = UnifiedMapAppearance(colorScheme)
         host.updateAppearance(appearance)
+        host.frameRateCap = powerPolicy.mapFrameRateCap
         renderer.updateAppearance(appearance)
         renderer.onViewportChange = onViewportChange
-        renderer.reduceMotion = reduceMotion
+        renderer.reduceMotion = reduceMotion || powerPolicy.suppressesNonessentialAnimation
         renderer.update(
             campus: campus,
             scope: scope,
@@ -236,6 +238,11 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        private struct CompassInput: Equatable {
+            let rotation: CGFloat
+            let gridAlignedRotation: CGFloat
+        }
+
         private weak var host: UnifiedMapHostView?
         private weak var renderer: UnifiedBigSightScene?
         private var onSelectVenue: (Int) -> Void = { _ in }
@@ -244,19 +251,42 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
         private var onSelectLocatedUser: () -> Void = {}
         private var onCameraRotationChange: (CGFloat) -> Void = { _ in }
         private var onLocate: (Int, CGPoint, CatalogMapTable, Int) -> Void = { _, _, _, _ in }
+        private var lastPublishedCameraRotation: CGFloat?
+        private var lastPublishedCompassInput: CompassInput?
 
         func connect(host: UnifiedMapHostView, renderer: UnifiedBigSightScene) {
             self.host = host
             self.renderer = renderer
+            let compassInput = CompassInput(
+                rotation: renderer.cameraRotation,
+                gridAlignedRotation: renderer.gridAlignedCameraRotation
+            )
+            // A newly connected renderer must publish its retained rotation to
+            // SwiftUI on the first real camera frame. Compass state is already
+            // initialized below, but the external binding may belong to a
+            // replacement representable and cannot be assumed current.
+            lastPublishedCameraRotation = nil
+            lastPublishedCompassInput = compassInput
             renderer.onCameraChange = { [weak self, weak host, weak renderer] in
                 guard let self, let host, let renderer else { return }
-                host.updateCompass(
-                    rotation: renderer.cameraRotation,
-                    gridAlignedRotation: renderer.gridAlignedCameraRotation
-                )
                 host.updateBasemap(camera: renderer.basemapCamera)
                 host.updateAccessibility(renderer: renderer, scope: renderer.scope)
-                self.onCameraRotationChange(renderer.cameraRotation)
+                let rotation = renderer.cameraRotation
+                let compassInput = CompassInput(
+                    rotation: rotation,
+                    gridAlignedRotation: renderer.gridAlignedCameraRotation
+                )
+                if compassInput != self.lastPublishedCompassInput {
+                    self.lastPublishedCompassInput = compassInput
+                    host.updateCompass(
+                        rotation: compassInput.rotation,
+                        gridAlignedRotation: compassInput.gridAlignedRotation
+                    )
+                }
+                if rotation != self.lastPublishedCameraRotation {
+                    self.lastPublishedCameraRotation = rotation
+                    self.onCameraRotationChange(rotation)
+                }
             }
             renderer.onSemanticScopeChange = { [weak self] scope, mapID in
                 guard let self else { return }
@@ -298,8 +328,8 @@ struct UnifiedBigSightMapView: UIViewRepresentable {
             host.compassButton.addTarget(
                 self, action: #selector(advanceCompassRotation), for: .touchUpInside)
             host.updateCompass(
-                rotation: renderer.cameraRotation,
-                gridAlignedRotation: renderer.gridAlignedCameraRotation
+                rotation: compassInput.rotation,
+                gridAlignedRotation: compassInput.gridAlignedRotation
             )
             host.onActivateVenue = { [weak self, weak renderer] mapID in
                 guard let self else { return }
@@ -492,6 +522,10 @@ final class UnifiedMapHostView: UIView {
     /// Number of SwiftUI location buttons trailing the compass.
     private(set) var locationControlCount = 1
     private var compassTrailingConstraint: NSLayoutConstraint!
+    #if DEBUG
+        private(set) var debugBasemapUpdateCount = 0
+        private(set) var debugCompassUpdateCount = 0
+    #endif
 
     private enum CompassState: Equatable {
         case north
@@ -714,11 +748,23 @@ final class UnifiedMapHostView: UIView {
         NotificationCenter.default.removeObserver(self)
     }
 
+    /// The Low Power Mode frame-rate cap, or nil for the screen maximum.
+    var frameRateCap: Int? {
+        didSet {
+            guard frameRateCap != oldValue else { return }
+            applyPreferredFrameRate()
+        }
+    }
+
+    private func applyPreferredFrameRate() {
+        guard let screen = window?.windowScene?.screen else { return }
+        let maximum = screen.maximumFramesPerSecond
+        mapView.preferredFramesPerSecond = frameRateCap.map { min(max(1, $0), maximum) } ?? maximum
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
-        if let screen = window?.windowScene?.screen {
-            mapView.preferredFramesPerSecond = screen.maximumFramesPerSecond
-        }
+        applyPreferredFrameRate()
         synchronizeBasemapFromScene()
         updateReservedChrome()
 
@@ -793,6 +839,9 @@ final class UnifiedMapHostView: UIView {
     }
 
     func updateCompass(rotation: CGFloat, gridAlignedRotation: CGFloat) {
+        #if DEBUG
+            debugCompassUpdateCount += 1
+        #endif
         let state: CompassState
         if MapCameraMath.isRotation(rotation, alignedWith: gridAlignedRotation) {
             state = .gridAligned
@@ -822,9 +871,19 @@ final class UnifiedMapHostView: UIView {
     }
 
     func updateBasemap(camera: UnifiedBasemapCamera) {
+        #if DEBUG
+            debugBasemapUpdateCount += 1
+        #endif
         requestedBasemapCamera = camera
         applyRequestedBasemapCamera()
     }
+
+    #if DEBUG
+        func resetDebugCameraUpdateCounts() {
+            debugBasemapUpdateCount = 0
+            debugCompassUpdateCount = 0
+        }
+    #endif
 
     private func synchronizeBasemapFromScene() {
         if let renderer = mapView.scene as? UnifiedBigSightScene {
@@ -1495,7 +1554,13 @@ final class UnifiedBigSightScene: SKScene {
     var onViewportChange: ((CatalogMapViewport) -> Void)?
     var onCameraChange: (() -> Void)?
     var onSemanticScopeChange: ((MapScreenModel.Scope, Int?) -> Void)?
-    var reduceMotion = false
+    var reduceMotion = false {
+        didSet {
+            guard reduceMotion, reduceMotion != oldValue else { return }
+            mapCamera.removeAllActions()
+            endGesture()
+        }
+    }
 
     private var campus: BigSightCampusScene
     private var appearance: UnifiedMapAppearance
@@ -1572,8 +1637,13 @@ final class UnifiedBigSightScene: SKScene {
     private static let searchBaseMapAlpha: CGFloat = 0.5
     /// Opacity of a hall badge with no search match.
     private static let searchUnmatchedVenueAlpha: CGFloat = 0.35
+    #if DEBUG
+        private(set) var debugCameraPublicationCount = 0
+        private(set) var debugLevelOfDetailApplicationCount = 0
+    #endif
 
     var cameraRotation: CGFloat { mapCamera.zRotation }
+    var hasActiveCameraAnimation: Bool { mapCamera.hasActions() }
     var gridAlignedCameraRotation: CGFloat { campus.gridAlignedCameraRotation }
     var cameraCampusCenter: CGPoint {
         UnifiedMapProjection.campusPoint(fromScene: mapCamera.position)
@@ -1758,18 +1828,29 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func publishCameraChangeIfNeeded() {
-        guard
-            mapCamera.position != lastCameraPosition
-                || mapCamera.xScale != lastCameraScale
-                || mapCamera.zRotation != lastCameraRotation
-        else { return }
+        let positionChanged = mapCamera.position != lastCameraPosition
+        let scaleChanged = mapCamera.xScale != lastCameraScale
+        let rotationChanged = mapCamera.zRotation != lastCameraRotation
+        guard positionChanged || scaleChanged || rotationChanged else { return }
         clampCamera()
+        // Labels are laid out in screen space around the map chrome, so a
+        // pan needs the level-of-detail pass as much as a zoom or rotation.
         applyLevelOfDetail()
         lastCameraPosition = mapCamera.position
         lastCameraScale = mapCamera.xScale
         lastCameraRotation = mapCamera.zRotation
+        #if DEBUG
+            debugCameraPublicationCount += 1
+        #endif
         onCameraChange?()
     }
+
+    #if DEBUG
+        func resetDebugCameraWorkCounts() {
+            debugCameraPublicationCount = 0
+            debugLevelOfDetailApplicationCount = 0
+        }
+    #endif
 
     func update(
         campus: BigSightCampusScene,
@@ -2701,6 +2782,9 @@ final class UnifiedBigSightScene: SKScene {
     }
 
     private func applyLevelOfDetail() {
+        #if DEBUG
+            debugLevelOfDetailApplicationCount += 1
+        #endif
         let zoom = zoomFactor
         // SpriteKit's positive node rotation is visually opposite the camera
         // rotation after the scene-to-UIKit coordinate flip. Matching the

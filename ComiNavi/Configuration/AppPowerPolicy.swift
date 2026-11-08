@@ -1,0 +1,83 @@
+import Foundation
+import Observation
+
+@MainActor
+protocol AppPowerStateProviding: AnyObject {
+    var isLowPowerModeEnabled: Bool { get }
+}
+
+@MainActor
+final class ProcessInfoPowerStateSource: AppPowerStateProviding {
+    static let shared = ProcessInfoPowerStateSource()
+
+    private init() {}
+
+    var isLowPowerModeEnabled: Bool {
+        ProcessInfo.processInfo.isLowPowerModeEnabled
+    }
+}
+
+@MainActor
+@Observable
+final class AppPowerPolicy: NSObject {
+    static let lowPowerMapFramesPerSecond = 30
+
+    private(set) var isLowPowerModeEnabled: Bool
+
+    @ObservationIgnored private let source: any AppPowerStateProviding
+    @ObservationIgnored private let notificationCenter: NotificationCenter
+
+    init(
+        source: any AppPowerStateProviding = ProcessInfoPowerStateSource.shared,
+        notificationCenter: NotificationCenter = .default
+    ) {
+        self.source = source
+        self.notificationCenter = notificationCenter
+        isLowPowerModeEnabled = source.isLowPowerModeEnabled
+        super.init()
+
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(powerStateDidChange),
+            name: .NSProcessInfoPowerStateDidChange,
+            object: nil
+        )
+    }
+
+    deinit {
+        notificationCenter.removeObserver(self)
+    }
+
+    /// The map frame-rate cap in Low Power Mode, or nil for the screen maximum.
+    var mapFrameRateCap: Int? {
+        isLowPowerModeEnabled ? Self.lowPowerMapFramesPerSecond : nil
+    }
+
+    func preferredMapFramesPerSecond(maximum: Int) -> Int {
+        guard isLowPowerModeEnabled else { return maximum }
+        return min(Self.lowPowerMapFramesPerSecond, max(1, maximum))
+    }
+
+    var suppressesNonessentialAnimation: Bool {
+        isLowPowerModeEnabled
+    }
+
+    var pausesNonessentialBackdrop: Bool {
+        isLowPowerModeEnabled
+    }
+
+    /// The system posts power-state notifications on a global dispatch queue,
+    /// so the selector is nonisolated and hops to the main actor before it
+    /// reads the source or updates observable state.
+    @objc nonisolated private func powerStateDidChange() {
+        Task { @MainActor [weak self] in
+            self?.refreshPowerState()
+        }
+    }
+
+    private func refreshPowerState() {
+        let isEnabled = source.isLowPowerModeEnabled
+        guard isEnabled != isLowPowerModeEnabled else { return }
+        isLowPowerModeEnabled = isEnabled
+    }
+}

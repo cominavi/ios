@@ -195,6 +195,7 @@ final class IssueReportModel {
     private(set) var errorMessage: String?
     private(set) var screenshotErrorMessage: String?
     private(set) var screenshotPNGData: Data?
+    private(set) var screenshotImage: UIImage?
     private(set) var isLoadingScreenshot = false
 
     let context: IssueReportContext
@@ -213,10 +214,6 @@ final class IssueReportModel {
         !trimmedMessage.isEmpty
             && message.count <= Self.maximumMessageLength
             && !isLoadingScreenshot
-    }
-
-    var screenshotImage: UIImage? {
-        screenshotPNGData.flatMap(UIImage.init(data:))
     }
 
     func loadScreenshot(from item: PhotosPickerItem) async {
@@ -238,7 +235,7 @@ final class IssueReportModel {
             let pngData = try await IssueReportScreenshotProcessor.makePNGData(from: selectedData)
             try Task.checkCancellation()
             guard loadGeneration == screenshotLoadGeneration else { return }
-            screenshotPNGData = pngData
+            installPreparedScreenshot(pngData)
         } catch is CancellationError {
             return
         } catch {
@@ -249,14 +246,14 @@ final class IssueReportModel {
 
     func attachPreparedScreenshot(_ pngData: Data) {
         screenshotLoadGeneration += 1
-        screenshotPNGData = pngData
-        screenshotErrorMessage = nil
+        installPreparedScreenshot(pngData)
         isLoadingScreenshot = false
     }
 
     func removeScreenshot() {
         screenshotLoadGeneration += 1
         screenshotPNGData = nil
+        screenshotImage = nil
         screenshotErrorMessage = nil
         isLoadingScreenshot = false
     }
@@ -289,6 +286,12 @@ final class IssueReportModel {
 
     private var trimmedMessage: String {
         message.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func installPreparedScreenshot(_ pngData: Data) {
+        screenshotPNGData = pngData
+        screenshotImage = UIImage(data: pngData)
+        screenshotErrorMessage = nil
     }
 }
 
