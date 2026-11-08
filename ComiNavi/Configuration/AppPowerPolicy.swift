@@ -66,7 +66,18 @@ final class AppPowerPolicy: NSObject {
         isLowPowerModeEnabled
     }
 
-    @objc private func powerStateDidChange() {
-        isLowPowerModeEnabled = source.isLowPowerModeEnabled
+    /// The system posts power-state notifications on a global dispatch queue,
+    /// so the selector is nonisolated and hops to the main actor before it
+    /// reads the source or updates observable state.
+    @objc nonisolated private func powerStateDidChange() {
+        Task { @MainActor [weak self] in
+            self?.refreshPowerState()
+        }
+    }
+
+    private func refreshPowerState() {
+        let isEnabled = source.isLowPowerModeEnabled
+        guard isEnabled != isLowPowerModeEnabled else { return }
+        isLowPowerModeEnabled = isEnabled
     }
 }
