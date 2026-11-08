@@ -161,7 +161,9 @@ driver_stop() {
 # The verdict comes from AXe's accessibility tree, which every probe shares.
 doctor_probe() {
   local backend="$1"
+  # English labels below, so pin the app language whatever the simulator uses.
   "$0" launch -cominavi-demo-data -cominavi-ui-testing-hide-debugger \
+    -AppleLanguages "(en)" -AppleLocale en_US \
     -cominavi-ui-testing-initial-tab map >/dev/null
   if ! "$0" wait 'RadioButton "Map" value="?1' 60 >/dev/null 2>&1; then
     if [[ -z "$("$0" ui 2>/dev/null | sed -n 2p)" ]]; then
@@ -413,7 +415,8 @@ case "${cmd}" in
           xcrun simctl terminate "${udid}" "${bundle_id}" 2>/dev/null || true
           xcrun simctl launch "${udid}" "${bundle_id}" -cominavi-ui-testing-hide-debugger \
             -AppleLanguages "(en)" -AppleLocale en_US "$@" >/dev/null
-          driver_send attach
+          # The driver relaunches with the same arguments if XCUITest misses the app.
+          driver_send attach "$@"
         else
           driver_send "$@"
         fi

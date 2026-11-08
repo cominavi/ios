@@ -171,7 +171,7 @@ Commands:
 | Command | Effect |
 |---|---|
 | `launch [args...]` | Relaunch with `simctl` (adds `-cominavi-ui-testing-hide-debugger` and English), then `attach` |
-| `attach` | Point the driver at the running app |
+| `attach [args...]` | Point the driver at the running app. If XCUITest cannot see it (seen on the first launch after `driver start`), relaunch through XCUITest with `args` |
 | `xcui-launch [args...]` | Relaunch through `XCUIApplication.launch()` (slower; waits for the app to idle) |
 | `activate`, `terminate`, `state` | App lifecycle |
 | `url <url>` | `XCUIApplication.open`: deep links without the SpringBoard sheet |

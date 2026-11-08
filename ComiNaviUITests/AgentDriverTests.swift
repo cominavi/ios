@@ -64,8 +64,11 @@ final class AgentDriverTests: XCTestCase {
             }
             for name in pending {
                 let file = inbox.appendingPathComponent(name)
-                let line = (try? String(contentsOf: file, encoding: .utf8))?
-                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                // Strip only the host's framing newline: `type` payloads keep
+                // leading, trailing and space-only text.
+                var line = (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+                if line.hasSuffix("\n") { line.removeLast() }
+                if line.hasSuffix("\r") { line.removeLast() }
                 try? fileManager.removeItem(at: file)
                 let start = Date()
                 var response: [String: Any]
@@ -138,7 +141,19 @@ final class AgentDriverTests: XCTestCase {
                         activated = true
                     }
                 default:
-                    break
+                    // On the first launch after `driver start`, XCUITest can
+                    // keep reporting `notRunning` for an app simctl already
+                    // launched. Relaunch through XCUITest with the same
+                    // arguments (`attach` receives them from cominavi-sim).
+                    if Date().timeIntervalSince(start) > 3 {
+                        app.terminate()
+                        app.launchArguments = Self.defaultArguments + rest
+                        app.launch()
+                        guard app.wait(for: .runningForeground, timeout: 30) else {
+                            throw DriverError("the app did not reach the foreground")
+                        }
+                        return "attached (relaunched through XCUITest)"
+                    }
                 }
                 Thread.sleep(forTimeInterval: 0.1)
             }
@@ -219,7 +234,8 @@ final class AgentDriverTests: XCTestCase {
             let (selector, timeout) = splitTimeout(rest, default: 10)
             let deadline = Date().addingTimeInterval(timeout)
             repeat {
-                if (try? find(selector, in: snapshot())) == nil { return "gone" }
+                // A malformed selector is an error, never a successful "gone".
+                if try find(selector, in: snapshot()) == nil { return "gone" }
                 Thread.sleep(forTimeInterval: 0.2)
             } while Date() < deadline
             throw DriverError("still present after \(timeout)s: \(selector.joined(separator: " "))")
