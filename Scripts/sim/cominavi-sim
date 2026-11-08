@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+# Drive the ComiNavi Debug build on an iOS Simulator with simctl, AXe and idb.
+# See docs/simulator-automation.md for the playbook and the iPhone Duo notes.
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/../.." && pwd)"
+
+# Default: the iOS 27.1 iPhone Duo used by the 2026-09 Duo audit.
+udid="${COMINAVI_SIM_UDID:-20F70A8B-0A22-4DC4-BA74-7004FF713400}"
+derived_data="${COMINAVI_SIM_DERIVED_DATA:-${repo_root}/build/SimDerivedData}"
+bundle_id="llc.mikunet.cominavi.debug"
+app_path="${derived_data}/Build/Products/Debug-iphonesimulator/ComiNavi.app"
+shots_dir="${COMINAVI_SIM_SHOTS:-${repo_root}/build/sim-shots}"
+
+axe_bin="${AXE:-$(command -v axe || echo /opt/homebrew/bin/axe)}"
+# idb built from source (facebook/idb main); see docs/simulator-automation.md.
+idb_bin="${IDB:-${HOME}/src/idb-venv/bin/idb}"
+idb_companion="${IDB_COMPANION:-${HOME}/src/idb/Build/Distribution/idb_companion}"
+
+# Input backend: AXe input does not reach the iPhone Duo, idb input does.
+# auto = idb on an iPhone Duo, AXe elsewhere.
+input_backend() {
+  case "${COMINAVI_SIM_INPUT:-auto}" in
+    axe|idb) echo "${COMINAVI_SIM_INPUT}" ;;
+    auto)
+      if xcrun simctl list devices -j | python3 -I -c '
+import json, sys
+udid = sys.argv[1]
+for devices in json.load(sys.stdin)["devices"].values():
+    for device in devices:
+        if device["udid"] == udid:
+            sys.exit(0 if device.get("deviceTypeIdentifier", "").endswith("iPhone-Duo") else 1)
+sys.exit(1)' "${udid}"; then
+        echo idb
+      else
+        echo axe
+      fi
+      ;;
+    *) echo "COMINAVI_SIM_INPUT must be auto, axe or idb" >&2; exit 64 ;;
+  esac
+}
+
+idb() {
+  [[ -x "${idb_bin}" && -x "${idb_companion}" ]] || {
+    echo "idb not found (${idb_bin}, ${idb_companion}); see docs/simulator-automation.md" >&2
+    exit 1
+  }
+  "${idb_bin}" --companion-path "${idb_companion}" "$@"
+}
+
+usage() {
+  cat <<'EOF'
+Usage: Scripts/sim/cominavi-sim <command> [args]
+
+  build                    Debug simulator build into build/SimDerivedData
+  boot                     Boot the simulator and wait until it is ready
+  install                  Install the built ComiNavi.app
+  launch [app args...]     Terminate and relaunch (e.g. launch -cominavi-demo-data)
+  terminate                Terminate the app
+  ui [--all]               Flattened accessibility tree (labelled/interactive by default)
+  ui-json                  Raw `axe describe-ui` JSON
+  wait <regex> [seconds]   Poll `ui` until a line matches (default 15 s)
+  tap-label <label> [type] Tap element by accessibility label (type: AXe only)
+  tap-id <identifier>      Tap element by accessibility identifier
+  tap <x> <y>              Tap at point coordinates of the active display
+  type <text>              Type US-keyboard text into the focused field
+  swipe <x1> <y1> <x2> <y2> [duration]
+  home                     Press the home button
+  hinge [degrees]          iPhone Duo: read, or set 0 (folded, cover display) to 180 (flat, inner display)
+  shot <name>              Screenshot the active display to build/sim-shots/<name>.png
+  appearance <light|dark>  Switch appearance
+  displays                 List the simulator's screens
+  backend                  Print the input backend in use (axe or idb)
+  smoke                    build, boot, install, launch with demo data, screenshot
+
+Input goes through idb on an iPhone Duo and through AXe elsewhere. The
+accessibility tree (`ui`, `wait`) always comes from AXe.
+
+Environment: COMINAVI_SIM_UDID, COMINAVI_SIM_INPUT (auto|axe|idb),
+COMINAVI_SIM_DISPLAY (force a simctl display for `shot`), COMINAVI_SIM_DERIVED_DATA,
+COMINAVI_SIM_SHOTS, AXE, IDB, IDB_COMPANION.
+EOF
+}
+
+cmd="${1:-}"
+[[ -n "${cmd}" ]] || { usage; exit 64; }
+shift
+
+case "${cmd}" in
+  build)
+    xcodebuild \
+      -project "${repo_root}/ComiNavi.xcodeproj" \
+      -scheme ComiNavi \
+      -configuration Debug \
+      -destination "platform=iOS Simulator,id=${udid}" \
+      -derivedDataPath "${derived_data}" \
+      -skipPackagePluginValidation \
+      -skipMacroValidation \
+      CODE_SIGN_IDENTITY=- \
+      build
+    ;;
+  boot)
+    # `bootstatus -b` boots a shut-down device and waits; it is a no-op when already booted.
+    xcrun simctl bootstatus "${udid}" -b >/dev/null
+    # SpringBoard needs a moment after bootstatus before AXe can attach.
+    for _ in $(seq 1 30); do
+      if "${axe_bin}" describe-ui --udid "${udid}" >/dev/null 2>&1; then exit 0; fi
+      sleep 2
+    done
+    echo "AXe could not attach to ${udid}" >&2
+    exit 1
+    ;;
+  install)
+    [[ -d "${app_path}" ]] || { echo "Missing ${app_path}; run build first" >&2; exit 1; }
+    xcrun simctl install "${udid}" "${app_path}"
+    ;;
+  launch)
+    xcrun simctl terminate "${udid}" "${bundle_id}" 2>/dev/null || true
+    xcrun simctl launch "${udid}" "${bundle_id}" "$@"
+    ;;
+  terminate)
+    xcrun simctl terminate "${udid}" "${bundle_id}"
+    ;;
+  ui)
+    "${axe_bin}" describe-ui --udid "${udid}" | python3 -I "${script_dir}/ax-flatten.py" "$@"
+    ;;
+  ui-json)
+    "${axe_bin}" describe-ui --udid "${udid}"
+    ;;
+  wait)
+    # Poll the flattened tree until a line matches the extended regex.
+    pattern="${1:?wait needs a regex}"
+    timeout="${2:-15}"
+    deadline=$((SECONDS + timeout))
+    while (( SECONDS < deadline )); do
+      if match="$("$0" ui 2>/dev/null | grep -E -m1 -- "${pattern}")"; then
+        echo "${match}"
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "Timed out after ${timeout}s waiting for /${pattern}/" >&2
+    exit 1
+    ;;
+  tap-label)
+    # AXe's default tap style is dropped on Xcode 27; physical touches land.
+    if [[ "$(input_backend)" == idb ]]; then
+      idb ui tap "$1" --match-key AXLabel --udid "${udid}" --reason "cominavi-sim tap-label"
+    elif [[ -n "${2:-}" ]]; then
+      "${axe_bin}" tap --label "$1" --element-type "$2" --wait-timeout 10 --tap-style physical --udid "${udid}"
+    else
+      "${axe_bin}" tap --label "$1" --wait-timeout 10 --tap-style physical --udid "${udid}"
+    fi
+    ;;
+  tap-id)
+    if [[ "$(input_backend)" == idb ]]; then
+      idb ui tap "$1" --match-key AXUniqueId --udid "${udid}" --reason "cominavi-sim tap-id"
+    else
+      "${axe_bin}" tap --id "$1" --wait-timeout 10 --tap-style physical --udid "${udid}"
+    fi
+    ;;
+  tap)
+    if [[ "$(input_backend)" == idb ]]; then
+      idb ui tap "$1" "$2" --udid "${udid}" --reason "cominavi-sim tap"
+    else
+      "${axe_bin}" tap -x "$1" -y "$2" --tap-style physical --udid "${udid}"
+    fi
+    ;;
+  type)
+    if [[ "$(input_backend)" == idb ]]; then
+      idb ui text "$1" --udid "${udid}" --reason "cominavi-sim type"
+    else
+      "${axe_bin}" type "$1" --udid "${udid}"
+    fi
+    ;;
+  swipe)
+    if [[ "$(input_backend)" == idb ]]; then
+      idb ui swipe "$1" "$2" "$3" "$4" --duration "${5:-0.4}" --udid "${udid}" --reason "cominavi-sim swipe"
+    else
+      "${axe_bin}" swipe --start-x "$1" --start-y "$2" --end-x "$3" --end-y "$4" \
+        --duration "${5:-0.4}" --udid "${udid}"
+    fi
+    ;;
+  home)
+    if [[ "$(input_backend)" == idb ]]; then
+      idb ui button HOME --udid "${udid}" --reason "cominavi-sim home"
+    else
+      "${axe_bin}" button home --udid "${udid}"
+    fi
+    ;;
+  hinge)
+    if [[ -n "${1:-}" ]]; then
+      idb hinge "$1" --udid "${udid}" --reason "cominavi-sim hinge"
+    else
+      idb hinge --udid "${udid}" --reason "cominavi-sim hinge"
+    fi
+    ;;
+  backend)
+    input_backend
+    ;;
+  shot)
+    mkdir -p "${shots_dir}"
+    out="${shots_dir}/${1:?shot needs a name}.png"
+    if [[ -n "${COMINAVI_SIM_DISPLAY:-}" ]]; then
+      xcrun simctl io "${udid}" screenshot --display="${COMINAVI_SIM_DISPLAY}" "${out}" >/dev/null 2>&1
+    elif [[ "$(input_backend)" == idb ]]; then
+      # idb captures the active display; on the Duo that changes with the hinge.
+      idb screenshot "${out}" --udid "${udid}" --reason "cominavi-sim shot" >/dev/null
+    else
+      xcrun simctl io "${udid}" screenshot "${out}" >/dev/null 2>&1
+    fi
+    echo "${out}"
+    ;;
+  appearance)
+    xcrun simctl ui "${udid}" appearance "$1"
+    ;;
+  displays)
+    xcrun simctl io "${udid}" enumerate | grep -E "Screen ID|Name:|Pixel Size|Preferred UI Scale|Power state"
+    ;;
+  smoke)
+    "$0" build
+    "$0" boot
+    "$0" install
+    "$0" launch -cominavi-demo-data
+    sleep 8
+    "$0" shot smoke-launch
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage
+    exit 64
+    ;;
+esac
