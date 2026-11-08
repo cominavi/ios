@@ -402,7 +402,7 @@ final class CatalogLibraryTests: XCTestCase {
     }
 
     func testBundledDemoCatalogFixtureOpensThroughCatalogDataSource() async throws {
-        try? DirectoryManager.shared.removeCachesFor(
+        try? DirectoryManager.shared.removeCatalogDataFor(
             eventID: DemoCatalogSource.c104.id,
             comiketId: String(DemoCatalogSource.c104.number)
         )

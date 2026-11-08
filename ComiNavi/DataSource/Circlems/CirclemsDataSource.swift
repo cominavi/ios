@@ -322,7 +322,7 @@ final class CirclemsDataSource {
             url.path
         case .remote:
             DirectoryManager.shared
-                .cachesFor(
+                .catalogDataFor(
                     eventID: eventID,
                     comiketId: comiketID,
                     .circlems,
@@ -521,7 +521,7 @@ final class CirclemsDataSource {
             )
         }
 
-        let downloadDirectory = DirectoryManager.shared.cachesFor(
+        let downloadDirectory = DirectoryManager.shared.catalogDataFor(
             eventID: eventID,
             comiketId: comiketId,
             .circlems,
@@ -910,9 +910,12 @@ final class CirclemsDataSource {
             includingPropertiesForKeys: nil
         ) {
             let prefix = "\(metadata.type.rawValue)-"
+            // Downloads now live in Application Support, which the system never
+            // purges, so also drop decompression leftovers from interrupted
+            // installs (`<type>-<UUID>.sqlite`) before starting a new one.
             for fileURL in existingFiles
             where fileURL.lastPathComponent.hasPrefix(prefix)
-                && fileURL.pathExtension == "resume-data"
+                && (fileURL.pathExtension == "resume-data" || fileURL.pathExtension == "sqlite")
                 && fileURL != checkpointURL
             {
                 try? FileManager.default.removeItem(at: fileURL)
@@ -954,7 +957,7 @@ final class CirclemsDataSource {
             )
         }
         let mapIndexURL = DirectoryManager.shared
-            .cachesFor(eventID: eventID, comiketId: comiketId, .circlems, .databases, createIfNeeded: true)
+            .catalogDataFor(eventID: eventID, comiketId: comiketId, .circlems, .databases, createIfNeeded: true)
             .appendingPathComponent("map-index.sqlite")
         let mapIndex = try? MapCatalogIndex(
             sourceDatabase: sqliteMain,
@@ -1019,10 +1022,10 @@ final class CirclemsDataSource {
                 )
             }
             
-            // Save the Cover Image under (cachesDirectory)/(comiketNo)/circlems/cover.png, if it does not exist
+            // Save the cover image under the event's circlems/images directory, if it does not exist
             var coverImageURL: URL? = nil
             if let coverImageData = coverImageData {
-                coverImageURL = DirectoryManager.shared.cachesFor(eventID: eventID, comiketId: infoFirst.comiketNo.string, .circlems, .images, createIfNeeded: true)
+                coverImageURL = DirectoryManager.shared.catalogDataFor(eventID: eventID, comiketId: infoFirst.comiketNo.string, .circlems, .images, createIfNeeded: true)
                     .appendingPathComponent("cover.png")
                 try coverImageURL?.writeIfNotExists(coverImageData)
             }
@@ -1393,7 +1396,7 @@ final class CirclemsDataSource {
         let comiketId = comiketId
         let eventID = eventID
         await Task.detached(priority: .utility) {
-            try? DirectoryManager.shared.removeCachesFor(eventID: eventID, comiketId: comiketId)
+            try? DirectoryManager.shared.removeCatalogDataFor(eventID: eventID, comiketId: comiketId)
         }.value
     }
 }
