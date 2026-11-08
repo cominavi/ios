@@ -13,6 +13,9 @@ derived_data="${COMINAVI_SIM_DERIVED_DATA:-${repo_root}/build/SimDerivedData}"
 bundle_id="llc.mikunet.cominavi.debug"
 app_path="${derived_data}/Build/Products/Debug-iphonesimulator/ComiNavi.app"
 shots_dir="${COMINAVI_SIM_SHOTS:-${repo_root}/build/sim-shots}"
+# One driver directory per simulator, so sessions on different devices never mix.
+driver_dir="${repo_root}/build/sim-driver/${udid}"
+driver_test="ComiNaviUITests/AgentDriverTests/testServe"
 
 axe_bin="${AXE:-$(command -v axe || echo /opt/homebrew/bin/axe)}"
 # idb built from source (facebook/idb main); see docs/simulator-automation.md.
@@ -50,6 +53,154 @@ idb() {
   "${idb_bin}" --companion-path "${idb_companion}" "$@"
 }
 
+driver_running() {
+  [[ -f "${driver_dir}/ready" && -f "${driver_dir}/xcodebuild.pid" ]] \
+    && kill -0 "$(cat "${driver_dir}/xcodebuild.pid")" 2>/dev/null
+}
+
+# Sends one command line to the driver and prints its result. Exit 1 on a
+# driver error, 2 on a timeout, 3 when the driver is not running.
+driver_send() {
+  driver_running || { echo "The driver is not running; run: $0 driver start" >&2; return 3; }
+  local seq
+  seq=$(( $(cat "${driver_dir}/seq" 2>/dev/null || echo 0) + 1 ))
+  echo "${seq}" > "${driver_dir}/seq"
+  printf '%s\n' "$*" > "${driver_dir}/inbox/.${seq}.tmp"
+  mv "${driver_dir}/inbox/.${seq}.tmp" "${driver_dir}/inbox/${seq}.cmd"
+  local response="${driver_dir}/outbox/${seq}.json"
+  local deadline=$((SECONDS + ${COMINAVI_SIM_DRIVER_TIMEOUT:-90}))
+  while [[ ! -f "${response}" ]]; do
+    if (( SECONDS >= deadline )); then
+      echo "Timed out waiting for the driver to answer: $*" >&2
+      return 2
+    fi
+    if ! kill -0 "$(cat "${driver_dir}/xcodebuild.pid")" 2>/dev/null; then
+      echo "The driver exited; see ${driver_dir}/xcodebuild.log" >&2
+      rm -f "${driver_dir}/ready"
+      return 3
+    fi
+    sleep 0.02
+  done
+  local status=0
+  python3 -I - "${response}" <<'PY' || status=$?
+import json, sys
+response = json.load(open(sys.argv[1]))
+text = response.get("result") if response.get("ok") else response.get("error")
+print(text or "")
+for warning in response.get("warnings", []):
+    print("warning: " + warning, file=sys.stderr)
+print("%s %sms" % ("ok" if response.get("ok") else "error", response.get("ms")), file=sys.stderr)
+sys.exit(0 if response.get("ok") else 1)
+PY
+  rm -f "${response}"
+  return "${status}"
+}
+
+driver_build() {
+  xcodebuild \
+    -project "${repo_root}/ComiNavi.xcodeproj" \
+    -scheme ComiNavi \
+    -configuration Debug \
+    -destination "platform=iOS Simulator,id=${udid}" \
+    -derivedDataPath "${derived_data}" \
+    -skipPackagePluginValidation \
+    -skipMacroValidation \
+    build-for-testing
+}
+
+driver_start() {
+  if driver_running; then
+    echo "The driver is already running (pid $(cat "${driver_dir}/xcodebuild.pid"))"
+    return 0
+  fi
+  compgen -G "${derived_data}/Build/Products/*.xctestrun" >/dev/null || {
+    echo "No test build in ${derived_data}; run: $0 driver build" >&2
+    return 1
+  }
+  rm -rf "${driver_dir}"
+  mkdir -p "${driver_dir}/inbox" "${driver_dir}/outbox"
+  # The runner reads AGENT_DRIVER_DIR; xcodebuild forwards TEST_RUNNER_* variables.
+  TEST_RUNNER_AGENT_DRIVER_DIR="${driver_dir}" nohup xcodebuild test-without-building \
+    -project "${repo_root}/ComiNavi.xcodeproj" \
+    -scheme ComiNavi \
+    -destination "platform=iOS Simulator,id=${udid}" \
+    -derivedDataPath "${derived_data}" \
+    -only-testing:"${driver_test}" \
+    -parallel-testing-enabled NO \
+    -test-timeouts-enabled NO \
+    > "${driver_dir}/xcodebuild.log" 2>&1 < /dev/null &
+  echo $! > "${driver_dir}/xcodebuild.pid"
+  local deadline=$((SECONDS + 240))
+  while [[ ! -f "${driver_dir}/ready" ]]; do
+    if ! kill -0 "$(cat "${driver_dir}/xcodebuild.pid")" 2>/dev/null; then
+      echo "The driver exited before it was ready; see ${driver_dir}/xcodebuild.log" >&2
+      return 1
+    fi
+    if (( SECONDS >= deadline )); then
+      echo "The driver was not ready after 240 s; see ${driver_dir}/xcodebuild.log" >&2
+      return 1
+    fi
+    sleep 0.5
+  done
+  echo "Driver ready (runner pid $(cat "${driver_dir}/ready"))"
+}
+
+driver_stop() {
+  if driver_running; then
+    COMINAVI_SIM_DRIVER_TIMEOUT=15 driver_send stop >/dev/null 2>&1 || true
+  fi
+  if [[ -f "${driver_dir}/xcodebuild.pid" ]]; then
+    local pid
+    pid="$(cat "${driver_dir}/xcodebuild.pid")"
+    for _ in $(seq 1 40); do kill -0 "${pid}" 2>/dev/null || break; sleep 0.5; done
+    kill "${pid}" 2>/dev/null || true
+    rm -f "${driver_dir}/xcodebuild.pid" "${driver_dir}/ready"
+  fi
+  echo "Driver stopped"
+}
+
+# Tap the Explore tab through one backend and report whether the app saw it.
+# The verdict comes from AXe's accessibility tree, which every probe shares.
+doctor_probe() {
+  local backend="$1"
+  # English labels below, so pin the app language whatever the simulator uses.
+  "$0" launch -cominavi-demo-data -cominavi-ui-testing-hide-debugger \
+    -AppleLanguages "(en)" -AppleLocale en_US \
+    -cominavi-ui-testing-initial-tab map >/dev/null
+  if ! "$0" wait 'RadioButton "Map" value="?1' 60 >/dev/null 2>&1; then
+    if [[ -z "$("$0" ui 2>/dev/null | sed -n 2p)" ]]; then
+      echo "  ${backend}: unknown (AXe reads an empty accessibility tree on this device)"
+    else
+      echo "  ${backend}: unknown (the Map tab did not appear within 60 s)"
+    fi
+    return 1
+  fi
+  local sent=0
+  case "${backend}" in
+    axe) "${axe_bin}" tap --label Explore --element-type RadioButton --tap-style physical \
+           --udid "${udid}" >/dev/null 2>&1 && sent=1 ;;
+    idb) idb ui tap Explore --match-key AXLabel --udid "${udid}" --reason "cominavi-sim doctor" \
+           >/dev/null 2>&1 && sent=1 ;;
+    driver) driver_send activate >/dev/null 2>&1 \
+              && driver_send tap label Explore >/dev/null 2>&1 && sent=1 ;;
+  esac
+  if (( ! sent )); then
+    echo "  ${backend}: error (the tap command failed)"
+    return 1
+  fi
+  if "$0" wait 'RadioButton "Explore" value="?1' 5 >/dev/null 2>&1; then
+    echo "  ${backend}: reaches the app"
+    return 0
+  fi
+  # Only a readable tree that still shows Map selected proves the tap was lost.
+  if "$0" ui 2>/dev/null | grep -qE 'RadioButton "Map" value="?1'; then
+    echo "  ${backend}: reports success but the app never receives the tap"
+  else
+    echo "  ${backend}: unknown (could not read the tab bar after the tap)"
+  fi
+  return 1
+}
+
 usage() {
   cat <<'EOF'
 Usage: Scripts/sim/cominavi-sim <command> [args]
@@ -73,14 +224,31 @@ Usage: Scripts/sim/cominavi-sim <command> [args]
   appearance <light|dark>  Switch appearance
   displays                 List the simulator's screens
   backend                  Print the input backend in use (axe or idb)
+  doctor                   Relaunch the app and report which input backends reach it
   smoke                    build, boot, install, launch with demo data, screenshot
 
+  driver build             build-for-testing (app + UI tests) into the derived data
+  driver start             Start the long-lived XCUITest driver (once, ~20-60 s)
+  driver cmd <command...>  Send one command and print its result (see below)
+  driver status            Print whether the driver is running
+  driver stop              Stop the driver
+
+Driver commands: ping | launch [app args...] | attach | xcui-launch [app args...] |
+activate | terminate | state |
+url <url> | tap id|label|text <value> | tap-point <x> <y> | long-press <selector> |
+type <text> | key return|delete|escape|tab | swipe up|down|left|right |
+wait [--timeout s] <selector> | gone [--timeout s] <selector> | tree [--all] |
+shot <host path> | alert | alert-tap <button label> | orientation portrait|left|right |
+home | stop
+
 Input goes through idb on an iPhone Duo and through AXe elsewhere. The
-accessibility tree (`ui`, `wait`) always comes from AXe.
+accessibility tree (`ui`, `wait`) always comes from AXe. The driver is a
+third input path that works wherever XCUITest works.
 
 Environment: COMINAVI_SIM_UDID, COMINAVI_SIM_INPUT (auto|axe|idb),
 COMINAVI_SIM_DISPLAY (force a simctl display for `shot`), COMINAVI_SIM_DERIVED_DATA,
-COMINAVI_SIM_SHOTS, AXE, IDB, IDB_COMPANION.
+COMINAVI_SIM_SHOTS, COMINAVI_SIM_DRIVER_TIMEOUT (seconds per driver command,
+default 90), AXE, IDB, IDB_COMPANION.
 EOF
 }
 
@@ -218,6 +386,59 @@ case "${cmd}" in
     ;;
   displays)
     xcrun simctl io "${udid}" enumerate | grep -E "Screen ID|Name:|Pixel Size|Preferred UI Scale|Power state"
+    ;;
+  doctor)
+    # Which input path reaches the app on this device? Each probe relaunches
+    # the app on the Map tab, taps Explore, and checks the AX tree.
+    echo "Input backends on ${udid}:"
+    reached=0
+    doctor_probe axe && reached=1 || true
+    if [[ -x "${idb_bin}" && -x "${idb_companion}" ]]; then
+      doctor_probe idb && reached=1 || true
+    else
+      echo "  idb: not installed (see docs/simulator-automation.md)"
+    fi
+    if driver_running; then
+      doctor_probe driver && reached=1 || true
+    else
+      echo "  driver: not running (start it with: $0 driver start)"
+    fi
+    echo "Selected by tap/type/swipe: $(input_backend)"
+    (( reached )) || { echo "No input backend reaches the app" >&2; exit 1; }
+    ;;
+  driver)
+    sub="${1:-}"
+    shift || true
+    case "${sub}" in
+      build) driver_build ;;
+      start) driver_start ;;
+      cmd)
+        [[ $# -gt 0 ]] || { echo "driver cmd needs a command" >&2; exit 64; }
+        if [[ "$1" == launch ]]; then
+          # Launch with simctl and attach the driver. XCUITest's own launch
+          # waits for the app to idle, which can take 25 s or more.
+          shift
+          driver_running || { echo "The driver is not running; run: $0 driver start" >&2; exit 3; }
+          xcrun simctl terminate "${udid}" "${bundle_id}" 2>/dev/null || true
+          xcrun simctl launch "${udid}" "${bundle_id}" -cominavi-ui-testing-hide-debugger \
+            -AppleLanguages "(en)" -AppleLocale en_US "$@" >/dev/null
+          # The driver relaunches with the same arguments if XCUITest misses the app.
+          driver_send attach "$@"
+        else
+          driver_send "$@"
+        fi
+        ;;
+      status)
+        if driver_running; then
+          echo "running (xcodebuild pid $(cat "${driver_dir}/xcodebuild.pid"), runner pid $(cat "${driver_dir}/ready"))"
+        else
+          echo "stopped"
+          exit 1
+        fi
+        ;;
+      stop) driver_stop ;;
+      *) usage; exit 64 ;;
+    esac
     ;;
   smoke)
     "$0" build
