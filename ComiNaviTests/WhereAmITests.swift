@@ -56,6 +56,16 @@ final class WhereAmITests: XCTestCase {
         XCTAssertEqual(address.canonicalText, "1日目 東7ホール Ａ34a+b")
     }
 
+    func testCircleHallGlossUsesTheExactHall() {
+        XCTAssertEqual(CircleHallGloss.mapName(forHallName: "東２"), "E2")
+        XCTAssertEqual(CircleHallGloss.mapName(forHallName: "西1ホール"), "W1")
+        XCTAssertNil(CircleHallGloss.mapName(forHallName: "会場"))
+        XCTAssertEqual(
+            CircleHallGloss.text(forMapName: "E2"),
+            String(localized: "East Hall \("2")")
+        )
+    }
+
     func testCentralSpaceCodeFormatterUsesExplicitCombinedABMarker() {
         XCTAssertEqual(
             ComiketSpaceAddress.spaceCode(
