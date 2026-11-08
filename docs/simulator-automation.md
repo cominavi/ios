@@ -1,14 +1,28 @@
-# Simulator automation with AXe
+# Simulator automation with AXe and idb
 
-Verified on 2026-11-09 on `mbp-m5`: Xcode 27.2 (27B52), AXe 1.8.0
-(`/opt/homebrew/bin/axe`), branch `ux/overhaul` at `845c774`.
+Verified on 2026-11-09 on `mbp-m5` with Xcode 27.2 (27B52), AXe 1.8.0
+(`/opt/homebrew/bin/axe`) and idb built from `facebook/idb` main at `291575b`.
+The app was branch `ux/overhaul` at `845c774`.
 
-`Scripts/sim/cominavi-sim` wraps `xcodebuild`, `simctl`, and AXe for the
+`Scripts/sim/cominavi-sim` wraps `xcodebuild`, `simctl`, AXe and idb for the
 Debug app. It defaults to the iOS 27.1 iPhone Duo
-`20F70A8B-0A22-4DC4-BA74-7004FF713400`; set `COMINAVI_SIM_UDID` for another
+`20F70A8B-0A22-4DC4-BA74-7004FF713400`. Set `COMINAVI_SIM_UDID` for another
 simulator. Screenshots go to `build/sim-shots/` (ignored by Git).
 
-## Build
+The two tools split the work:
+
+| Job | iPhone Duo | Other iPhones and iPads |
+|---|---|---|
+| Accessibility tree (`ui`, `wait`) | AXe | AXe |
+| Input (`tap*`, `type`, `swipe`, `home`) | idb | AXe |
+| Hinge and posture (`hinge`) | idb | n/a |
+| Screenshots (`shot`) | idb (follows the active display) | `simctl` |
+
+The script picks idb automatically for an iPhone Duo device type. Set
+`COMINAVI_SIM_INPUT=axe` or `COMINAVI_SIM_INPUT=idb` to override.
+`cominavi-sim backend` prints the choice.
+
+## Build the app
 
 ```sh
 xcodebuild \
@@ -23,11 +37,29 @@ xcodebuild \
   build
 ```
 
-(`Scripts/sim/cominavi-sim build` runs the same command.) It needs no source
-changes for Xcode 27.2. A clean build takes about two minutes on the M5. Without
+`Scripts/sim/cominavi-sim build` runs the same command. Xcode 27.2 needs no
+source changes. A clean build takes about two minutes on the M5. Without
 `-skipPackagePluginValidation`, a non-interactive build fails at "Validate
 plug-in OpenAPIGenerator", because nobody is there to approve the
 swift-openapi-generator build plugin.
+
+## Install idb (needed for the Duo)
+
+The Homebrew idb release does not have the Duo display and hinge support yet,
+so build idb from source. Its prerequisites are `brew install xcodegen protobuf`
+and Python 3.10 or later.
+
+```sh
+git clone https://github.com/facebook/idb.git ~/src/idb
+cd ~/src/idb && ./build.sh build            # writes Build/Distribution/idb_companion
+python3 -m venv ~/src/idb-venv
+FB_IDB_VERSION="0.0.0.dev0+$(git rev-parse --short HEAD)" ~/src/idb-venv/bin/pip install .
+```
+
+The script expects `~/src/idb-venv/bin/idb` and
+`~/src/idb/Build/Distribution/idb_companion`. Override them with `IDB` and
+`IDB_COMPANION`. It passes `--companion-path`, so the client starts and reuses a
+local companion by itself. You do not need to run `idb connect`.
 
 ## Playbook
 
@@ -38,81 +70,76 @@ $S install                                # install build/SimDerivedData/.../Com
 $S launch -cominavi-demo-data             # relaunch on the offline C104 demo catalog
 $S wait 'id=global-event-day-banner' 30   # poll the AX tree until the shell is up
 $S ui                                     # flattened AX tree: type, label, value, id, frame, center
-$S tap-label Explore RadioButton          # tap by accessibility label (+ optional element type)
+$S tap-label Explore                      # tap by accessibility label
+$S wait 'RadioButton "Explore" value=1'   # confirm the tap landed
 $S tap-id map-search-button               # tap by accessibility identifier
-$S tap 201 138                            # tap at point coordinates
-$S type 'touhou'                          # US-keyboard text only (AXe limitation)
-axe key 40 --udid "$COMINAVI_SIM_UDID"    # Return (HID usage 40)
-$S swipe 201 650 201 250 0.4              # scroll content up
+$S tap 201 104                            # tap at point coordinates (from `ui` centers)
+$S type 'touhou'                          # type into the focused field (US keyboard)
+$S swipe 190 550 190 200 0.4              # scroll content up
+$S hinge                                  # Duo: read the hinge angle
+$S hinge 180                              # Duo: unfold (inner display, landscape)
+$S hinge 0                                # Duo: fold (cover display)
 $S shot explore-search                    # build/sim-shots/explore-search.png
 $S appearance dark
 ```
 
-`ui` prints one line per labelled or interactive element, with `center=(x,y)`
-ready to pass to `tap`. Coordinates are points on the rendering display.
-Prefer `tap-id` or `tap-label` over raw coordinates.
+`ui` prints one line per labelled or interactive element, with a
+`center=(x,y)` you can pass to `tap`. Coordinates are points on the active
+display. Prefer `tap-id` or `tap-label` over raw coordinates, and confirm every
+step with `wait` instead of a fixed sleep.
 
-Launch arguments reach screens without any input (see `ComiNavi/EntryView.swift`
-and the `-cominavi-ui-testing-*` flags):
+Launch arguments reach screens without any input. See
+`ComiNavi/EntryView.swift` and the `-cominavi-ui-testing-*` flags:
 
 ```sh
 $S launch -cominavi-demo-data -cominavi-ui-testing-initial-tab explore   # map|explore|plans|profile
 $S launch -cominavi-ui-testing-show-sign-in
 ```
 
+The selected tab persists between launches, so pass `initial-tab` when a flow
+depends on the starting tab.
+
 ## Findings
 
 ### Xcode 27 drops AXe's default tap style
 
-AXe's default `--tap-style automatic` uses the `simulator` (`tapAt`) path for
-most elements. On Xcode 27.2 it reports success, but the app never receives
-the tap. `--tap-style physical` and `axe touch --down --up` both work, so the
-script always passes `--tap-style physical`. `type`, `swipe`, and `key`
-work as-is.
+AXe's default `--tap-style automatic` uses its `simulator` (`tapAt`) path for
+most elements. On Xcode 27.2 that path reports success, but the app never
+receives the tap. `--tap-style physical` and `axe touch --down --up` both work,
+so the script always passes `--tap-style physical` to AXe. `type`, `swipe` and
+`key` work as they are.
 
-A plain `axe tap` therefore looks like it passes. Confirm every step with
-`wait` on the expected AX state instead of a fixed sleep.
+### iPhone Duo
 
-### iPhone Duo: inspection works, input does not
+The Duo simulator lists five screens in `simctl io <udid> enumerate`. Two of
+them matter:
 
-The Duo simulator enumerates five screens (`simctl io <udid> enumerate`). Two
-matter:
+| Hinge | Active screen | Points | App layout |
+|---|---|---|---|
+| 0° (folded, the boot state) | 1, `LCD` | 466 × 678 | Portrait, with a vertical tab bar on the right edge |
+| 90° and 180° | 3, `LCD-1` | 669 × 951 screen, 951 × 669 app | Landscape, with a vertical tab bar on the right edge |
 
-| Screen | Name | Pixels | Points @3x | State |
-|---|---|---|---|---|
-| 1 | `LCD` (primary) | 1398 × 2034 | 466 × 678 | Renders the UI. The tab bar is a vertical bar on the right edge. |
-| 3 | `LCD-1` (primary-1) | 2007 × 2853 | 669 × 951 | Always black. No posture or hinge control reaches it from the CLI. |
+- **Input:** idb taps, accessibility presses (`tap-label`, `tap-id`), text,
+  swipes and buttons all reach the app in both postures. AXe input does not
+  reach the Duo in either posture. That covers both tap styles, `touch`, and
+  scaled coordinates. AXe 1.8.0 sends digitizer events without a display target,
+  while idb routes them to the active display. The iOS 27.2 Duo runtime
+  (`iOS-27-2-iPhone19-4`) behaves the same way as iOS 27.1.
+- **Accessibility tree:** `axe describe-ui` works in both postures. Its frames
+  are in the active display's points, so they match idb's coordinates. On the
+  home screen, SpringBoard reports elements for both screens mixed together.
+- **Screenshots:** `idb screenshot` captures the active display, so the script
+  uses it on the Duo. `axe screenshot` always captures screen 3, which is black
+  while folded. Once unfolded, `simctl io … screenshot --display=N` returned
+  black frames for both screens. Set `COMINAVI_SIM_DISPLAY` only to force a
+  particular `simctl` display.
+- **Posture:** `idb hinge <0–180>` sends the hinge slider report. Do not use
+  `simctl io … screenConfig power on|off` to switch displays. It does not change
+  the active display, and it leaves SpringBoard spinning on a black screen until
+  the simulator is shut down and booted again.
+- **App accessibility:** on the Duo's cover display, the Explore search field
+  has no accessibility label. It exposes only its placeholder as a value. The
+  same field on the iPhone 18 Pro is labelled "Search circles, creators, tags".
 
-- **Accessibility:** `axe describe-ui` works. App frames are in screen-1
-  points (466 × 678), so `ui` coordinates match screen 1. On the home screen,
-  SpringBoard reports elements for both screens mixed together.
-- **Screenshots:** `axe screenshot` captures screen 3, which is black. Use
-  `xcrun simctl io <udid> screenshot --display=1` instead, as `cominavi-sim shot`
-  does. Set `COMINAVI_SIM_DISPLAY` to change the display.
-- **Input:** no AXe input reaches the app on the Duo. That includes tap by label
-  or coordinates, either tap style, `touch`, and coordinates scaled to screen
-  3. AXe sends digitizer events without a display target, and on the Duo they
-  never reach screen 1. The same commands work on an iPhone 18 Pro running the
-  same build. The iOS 27.2 Duo runtime (`iOS-27-2-iPhone19-4`, device
-  `10193FC3-…`) behaves the same way.
-- **Posture:** neither AXe nor `simctl` can fold the device or change the
-  hinge. `simctl io … screenConfig power on|off` does not switch the active
-  display. It also leaves SpringBoard spinning on a black screen until you
-  run `simctl shutdown` and boot again. Do not use it.
-
-Current upstream idb (`facebook/idb` main, Nov 2026) supports Duo
-displays: display-targeted digitizer input (`DisplaySelection`, the
-`digitizerTarget` of a display) and `idb hinge <degrees>`, sent as a vendor HID
-report to `dtuhidd`. AXe 1.8.0 is the latest AXe release and has neither
-feature. Driving the Duo's screens and posture therefore needs idb built from
-source, or an AXe that adds display selection.
-
-Until then, on the Duo:
-
-1. Reach screens with launch arguments (`-cominavi-ui-testing-initial-tab`,
-   `-cominavi-ui-testing-open-*`).
-2. Inspect them with `cominavi-sim ui` and capture them with `cominavi-sim shot`.
-3. Use XCUITest for interactions (`ComiNaviUITests`). The 2026-09 Duo audit ran
-   its UI tests on this device, as described in `docs/audits/iphone-duo/README.md`.
-4. Run AXe interaction flows on a standard iPhone simulator, such as the iPhone 18 Pro
-   `2D183F50-1555-4F7B-9EDE-13C98A360CBB`.
+XCUITest also drives the Duo. The 2026-09 audit ran its UI tests there; see
+`docs/audits/iphone-duo/README.md`.
