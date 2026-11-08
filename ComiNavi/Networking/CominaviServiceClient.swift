@@ -1740,8 +1740,12 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
             throw CominaviServiceError.invalidResponse
         }
         let output = try await performGeneratedOperation {
+            // Error responses are classified in the transport. Overload and
+            // server failures keep their status even with an empty or HTML
+            // gateway body, so the realtime store can retry them.
             try await generatedClient(
                 validatesErrorResponses: true,
+                preservesRetryableStatus: true,
                 cachePolicy: .useProtocolCachePolicy
             ).listRealtimeUpdates(.init(
                 path: .init(eventNumber: eventNumber),
@@ -3939,6 +3943,7 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         accessToken: String? = nil,
         exactRequestBody: Data? = nil,
         validatesErrorResponses: Bool = false,
+        preservesRetryableStatus: Bool = false,
         cachePolicy: URLRequest.CachePolicy = .reloadIgnoringLocalCacheData,
         timeoutInterval: TimeInterval = 30
     ) -> Client {
@@ -3971,7 +3976,11 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
                    let response = result.1 as? HTTPURLResponse,
                    response.statusCode != 401
                 {
-                    try self.validate(response, data: result.0)
+                    try self.validate(
+                        response,
+                        data: result.0,
+                        preservesRetryableStatus: preservesRetryableStatus
+                    )
                 }
                 return result
             },
@@ -4734,7 +4743,11 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         return (path, String(components[3]))
     }
 
-    private nonisolated func validate(_ response: HTTPURLResponse, data: Data) throws {
+    private nonisolated func validate(
+        _ response: HTTPURLResponse,
+        data: Data,
+        preservesRetryableStatus: Bool = false
+    ) throws {
         guard (200..<300).contains(response.statusCode) else {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
@@ -4779,6 +4792,11 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
                     message: error.message,
                     status: response.statusCode
                 )
+            }
+            if preservesRetryableStatus,
+               response.statusCode == 429 || (500...599).contains(response.statusCode)
+            {
+                throw undocumentedGeneratedServiceError(status: response.statusCode)
             }
             throw CominaviServiceError.invalidResponse
         }

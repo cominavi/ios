@@ -145,8 +145,27 @@ actor CominaviRealtimeStore {
         let tagOverlay: CominaviCircleTagOverlay?
     }
 
+    /// Waits between attempts at one page after a transient failure. The
+    /// page is given up after the last delay; pages already committed stay.
+    static let defaultRetryDelays: [Duration] = [.seconds(1), .seconds(3), .seconds(9)]
+    /// Minimum time between disk writes while a catch-up still has pages to
+    /// fetch. The last page is always written.
+    static let defaultPersistInterval: Duration = .seconds(3)
+
+    /// The state one catch-up builds page by page and commits after each page.
+    private struct EventState: Equatable {
+        var cursor: Int
+        var heads: [Int: [String: CominaviRealtimeUpdate]]
+        var publicationRevision: String
+        var publicationGeneration: Int
+        var publicationCursor: Int
+        var tagOverlay: CominaviCircleTagOverlay?
+    }
+
     private let client: any CominaviRealtimeFetching
     private let cacheStore: any CominaviRealtimeCachePersisting
+    private let retryDelays: [Duration]
+    private let persistInterval: Duration
     private var cacheLoadAttemptedEvents: Set<Int> = []
     private var cacheAvailableEvents: Set<Int> = []
     private var cacheRequiresRewriteEvents: Set<Int> = []
@@ -169,10 +188,14 @@ actor CominaviRealtimeStore {
                 .appendingPathComponent("RealtimeUpdates", isDirectory: true),
             legacyDirectory: DirectoryManager.shared.environmentCachesDirectory
                 .appendingPathComponent("RealtimeUpdates", isDirectory: true)
-        )
+        ),
+        retryDelays: [Duration] = CominaviRealtimeStore.defaultRetryDelays,
+        persistInterval: Duration = CominaviRealtimeStore.defaultPersistInterval
     ) {
         self.client = client
         self.cacheStore = cacheStore
+        self.retryDelays = retryDelays
+        self.persistInterval = persistInterval
     }
 
     func refresh(
@@ -245,10 +268,17 @@ actor CominaviRealtimeStore {
         )
         revalidationTasks[eventNumber] = Task { [weak self] in
             guard let self else { return }
-            try? await self.revalidate(
-                eventNumber: eventNumber,
-                expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256
-            )
+            do {
+                try await self.revalidate(
+                    eventNumber: eventNumber,
+                    expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256
+                )
+            } catch is CancellationError {
+            } catch {
+                // Pages committed before the failure stay; the next refresh
+                // resumes after the last committed cursor.
+                NSLog("Realtime catch-up for C\(eventNumber) stopped: \(error)")
+            }
             await self.finishRevalidation(eventNumber: eventNumber)
         }
     }
@@ -262,30 +292,21 @@ actor CominaviRealtimeStore {
         eventNumber: Int,
         expectedCatalogPayloadSHA256: String?
     ) async throws {
-        let initialCursor = lastCursorByEvent[eventNumber] ?? 0
-        let initialHeads = headsByEvent[eventNumber] ?? [:]
-        let initialOverlay = tagOverlayByEvent[eventNumber]
-        let initialPublicationRevision = publicationRevisionByEvent[eventNumber]
-            ?? CominaviRealtimeUpdatePage.absentPublicationRevision
-        let initialPublicationGeneration = publicationGenerationByEvent[eventNumber] ?? 0
-        let initialPublicationCursor = publicationCursorByEvent[eventNumber] ?? 0
-
-        var cursor = initialCursor
-        var candidateHeads = initialHeads
-        var candidateOverlay = initialOverlay
-        var candidatePublicationRevision = initialPublicationRevision
-        var candidatePublicationGeneration = initialPublicationGeneration
-        var candidatePublicationCursor = initialPublicationCursor
-        var requestedTagRevision = expectedCatalogPayloadSHA256.map { expectedDigest in
-            candidateOverlay?.catalogPayloadSHA256 == expectedDigest
-                ? candidateOverlay?.revision ?? CominaviCircleTagOverlay.absentRevision
-                : CominaviCircleTagOverlay.absentRevision
-        }
+        // Each page is a consistent prefix of the update log (and a reset page
+        // is a whole publication), so the state after any page is safe to
+        // publish. Committing per page lets a weak network keep its progress.
+        var committed = currentState(eventNumber: eventNumber)
+        var candidate = committed
+        var requestedTagRevision = Self.requestedTagRevision(
+            for: candidate.tagOverlay,
+            expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256
+        )
+        var lastPersist: ContinuousClock.Instant?
         while true {
-            let page = try await client.realtimeUpdates(
+            let page = try await fetchPageRetryingTransientFailures(
                 eventNumber: eventNumber,
-                afterCursor: cursor,
-                publicationRevision: candidatePublicationRevision,
+                afterCursor: candidate.cursor,
+                publicationRevision: candidate.publicationRevision,
                 tagRevision: requestedTagRevision
             )
             guard page.updates == page.updates.sorted(by: Self.isUpdateOrdered),
@@ -308,36 +329,36 @@ actor CominaviRealtimeStore {
             }
             if page.resetRequired {
                 guard !page.hasMore,
-                      page.publicationRevision != candidatePublicationRevision,
-                      page.publicationGeneration > candidatePublicationGeneration,
+                      page.publicationRevision != candidate.publicationRevision,
+                      page.publicationGeneration > candidate.publicationGeneration,
                       page.updates.allSatisfy({ $0.cursor >= page.publicationCursor })
                 else {
                     throw CominaviServiceError.invalidResponse
                 }
-                candidateHeads = Self.merging(
+                candidate.heads = Self.merging(
                     page.updates,
                     into: [:],
                     eventNumber: eventNumber
                 )
-                candidatePublicationRevision = page.publicationRevision
-                candidatePublicationGeneration = page.publicationGeneration
-                candidatePublicationCursor = page.publicationCursor
-                cursor = page.updates.last?.cursor ?? page.publicationCursor
+                candidate.publicationRevision = page.publicationRevision
+                candidate.publicationGeneration = page.publicationGeneration
+                candidate.publicationCursor = page.publicationCursor
+                candidate.cursor = page.updates.last?.cursor ?? page.publicationCursor
             } else {
-                guard page.publicationRevision == candidatePublicationRevision,
-                      page.publicationGeneration == candidatePublicationGeneration,
-                      page.publicationCursor == candidatePublicationCursor,
-                      page.updates.allSatisfy({ $0.cursor > cursor })
+                guard page.publicationRevision == candidate.publicationRevision,
+                      page.publicationGeneration == candidate.publicationGeneration,
+                      page.publicationCursor == candidate.publicationCursor,
+                      page.updates.allSatisfy({ $0.cursor > candidate.cursor })
                 else {
                     throw CominaviServiceError.invalidResponse
                 }
-                candidateHeads = Self.merging(
+                candidate.heads = Self.merging(
                     page.updates,
-                    into: candidateHeads,
+                    into: candidate.heads,
                     eventNumber: eventNumber
                 )
                 if let pageCursor = page.updates.last?.cursor {
-                    cursor = pageCursor
+                    candidate.cursor = pageCursor
                 }
             }
             try Self.stageTagOverlay(
@@ -345,68 +366,158 @@ actor CominaviRealtimeStore {
                 status: page.tagOverlayStatus,
                 requestedRevision: requestedTagRevision,
                 expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256,
-                overlay: &candidateOverlay
+                overlay: &candidate.tagOverlay
             )
-            requestedTagRevision = expectedCatalogPayloadSHA256.map { expectedDigest in
-                candidateOverlay?.catalogPayloadSHA256 == expectedDigest
-                    ? candidateOverlay?.revision ?? CominaviCircleTagOverlay.absentRevision
-                    : CominaviCircleTagOverlay.absentRevision
-            }
+            requestedTagRevision = Self.requestedTagRevision(
+                for: candidate.tagOverlay,
+                expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256
+            )
+
+            let now = ContinuousClock.now
+            let persist = !page.hasMore
+                || lastPersist.map { now - $0 >= persistInterval } ?? true
+            try await commit(
+                candidate,
+                over: committed,
+                eventNumber: eventNumber,
+                persist: persist
+            )
+            if persist { lastPersist = now }
+            committed = candidate
             guard page.hasMore else { break }
         }
 
-        guard (lastCursorByEvent[eventNumber] ?? 0) == initialCursor,
-              (headsByEvent[eventNumber] ?? [:]) == initialHeads,
-              (publicationRevisionByEvent[eventNumber]
-                ?? CominaviRealtimeUpdatePage.absentPublicationRevision)
-                == initialPublicationRevision,
-              (publicationGenerationByEvent[eventNumber] ?? 0)
-                == initialPublicationGeneration,
-              (publicationCursorByEvent[eventNumber] ?? 0) == initialPublicationCursor,
-              tagOverlayByEvent[eventNumber] == initialOverlay
-        else {
-            throw CominaviServiceError.invalidResponse
-        }
-
-        let stateChanged = cursor != initialCursor
-            || candidateHeads != initialHeads
-            || candidatePublicationRevision != initialPublicationRevision
-            || candidatePublicationGeneration != initialPublicationGeneration
-            || candidatePublicationCursor != initialPublicationCursor
-            || candidateOverlay != initialOverlay
-        if stateChanged
-            || !cacheAvailableEvents.contains(eventNumber)
-            || cacheRequiresRewriteEvents.contains(eventNumber)
-        {
-            let snapshot = Self.cacheSnapshot(
-                eventNumber: eventNumber,
-                lastCursor: cursor,
-                heads: candidateHeads,
-                publicationRevision: candidatePublicationRevision,
-                publicationGeneration: candidatePublicationGeneration,
-                publicationCursor: candidatePublicationCursor,
-                tagOverlay: candidateOverlay
-            )
-            try Self.validate(snapshot, eventNumber: eventNumber)
-            try await cacheStore.save(
-                JSONEncoder().encode(snapshot),
-                eventNumber: eventNumber
-            )
-            cacheRequiresRewriteEvents.remove(eventNumber)
-        }
-
-        headsByEvent[eventNumber] = candidateHeads
-        lastCursorByEvent[eventNumber] = cursor
-        publicationRevisionByEvent[eventNumber] = candidatePublicationRevision
-        publicationGenerationByEvent[eventNumber] = candidatePublicationGeneration
-        publicationCursorByEvent[eventNumber] = candidatePublicationCursor
-        tagOverlayByEvent[eventNumber] = candidateOverlay
-        tagsByEvent[eventNumber] = candidateOverlay.map(Self.tagsByWCID) ?? [:]
-        cacheAvailableEvents.insert(eventNumber)
         lastRefreshByEvent[eventNumber] = Date()
         lastRefreshAuthorityByEvent[eventNumber] = Self.refreshAuthority(
             expectedCatalogPayloadSHA256: expectedCatalogPayloadSHA256
         )
+    }
+
+    private func currentState(eventNumber: Int) -> EventState {
+        EventState(
+            cursor: lastCursorByEvent[eventNumber] ?? 0,
+            heads: headsByEvent[eventNumber] ?? [:],
+            publicationRevision: publicationRevisionByEvent[eventNumber]
+                ?? CominaviRealtimeUpdatePage.absentPublicationRevision,
+            publicationGeneration: publicationGenerationByEvent[eventNumber] ?? 0,
+            publicationCursor: publicationCursorByEvent[eventNumber] ?? 0,
+            tagOverlay: tagOverlayByEvent[eventNumber]
+        )
+    }
+
+    /// Publishes one page's state in memory and, when `persist` is set, on
+    /// disk. A skipped write marks the cache for rewrite so a later commit (in
+    /// this catch-up or the next one) writes it even if nothing new arrives.
+    private func commit(
+        _ candidate: EventState,
+        over committed: EventState,
+        eventNumber: Int,
+        persist: Bool
+    ) async throws {
+        guard currentState(eventNumber: eventNumber) == committed else {
+            // Another refresh changed this event while the page was in flight.
+            throw CominaviServiceError.invalidResponse
+        }
+        let stateChanged = candidate != committed
+        let needsWrite = stateChanged
+            || !cacheAvailableEvents.contains(eventNumber)
+            || cacheRequiresRewriteEvents.contains(eventNumber)
+        if needsWrite {
+            if persist {
+                let snapshot = Self.cacheSnapshot(
+                    eventNumber: eventNumber,
+                    lastCursor: candidate.cursor,
+                    heads: candidate.heads,
+                    publicationRevision: candidate.publicationRevision,
+                    publicationGeneration: candidate.publicationGeneration,
+                    publicationCursor: candidate.publicationCursor,
+                    tagOverlay: candidate.tagOverlay
+                )
+                try Self.validate(snapshot, eventNumber: eventNumber)
+                try await cacheStore.save(
+                    JSONEncoder().encode(snapshot),
+                    eventNumber: eventNumber
+                )
+                guard currentState(eventNumber: eventNumber) == committed else {
+                    // Another refresh won while this write was in flight. Keep
+                    // its in-memory state and have the next commit rewrite disk.
+                    cacheRequiresRewriteEvents.insert(eventNumber)
+                    throw CominaviServiceError.invalidResponse
+                }
+                cacheRequiresRewriteEvents.remove(eventNumber)
+            } else {
+                cacheRequiresRewriteEvents.insert(eventNumber)
+            }
+        }
+
+        headsByEvent[eventNumber] = candidate.heads
+        lastCursorByEvent[eventNumber] = candidate.cursor
+        publicationRevisionByEvent[eventNumber] = candidate.publicationRevision
+        publicationGenerationByEvent[eventNumber] = candidate.publicationGeneration
+        publicationCursorByEvent[eventNumber] = candidate.publicationCursor
+        if candidate.tagOverlay != committed.tagOverlay
+            || tagsByEvent[eventNumber] == nil
+        {
+            tagOverlayByEvent[eventNumber] = candidate.tagOverlay
+            tagsByEvent[eventNumber] = candidate.tagOverlay.map(Self.tagsByWCID) ?? [:]
+        }
+        cacheAvailableEvents.insert(eventNumber)
+    }
+
+    private func fetchPageRetryingTransientFailures(
+        eventNumber: Int,
+        afterCursor: Int,
+        publicationRevision: String,
+        tagRevision: String?
+    ) async throws -> CominaviRealtimeUpdatePage {
+        var attempt = 0
+        while true {
+            do {
+                return try await client.realtimeUpdates(
+                    eventNumber: eventNumber,
+                    afterCursor: afterCursor,
+                    publicationRevision: publicationRevision,
+                    tagRevision: tagRevision
+                )
+            } catch {
+                guard attempt < retryDelays.count,
+                      Self.isTransient(error),
+                      !Task.isCancelled
+                else { throw error }
+                try await Task.sleep(for: retryDelays[attempt])
+                attempt += 1
+            }
+        }
+    }
+
+    /// Network failures and server overload are worth another attempt.
+    /// Invalid responses, authorization failures and client errors are not.
+    static func isTransient(_ error: any Error) -> Bool {
+        if error is CancellationError { return false }
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .cancelled, .badURL, .unsupportedURL, .userAuthenticationRequired,
+                 .userCancelledAuthentication, .appTransportSecurityRequiresSecureConnection:
+                return false
+            default:
+                return true
+            }
+        }
+        if case CominaviServiceError.server(_, _, let status) = error {
+            return status == 429 || (500...599).contains(status)
+        }
+        return false
+    }
+
+    private static func requestedTagRevision(
+        for overlay: CominaviCircleTagOverlay?,
+        expectedCatalogPayloadSHA256: String?
+    ) -> String? {
+        expectedCatalogPayloadSHA256.map { expectedDigest in
+            overlay?.catalogPayloadSHA256 == expectedDigest
+                ? overlay?.revision ?? CominaviCircleTagOverlay.absentRevision
+                : CominaviCircleTagOverlay.absentRevision
+        }
     }
 
     private func loadCacheIfNeeded(eventNumber: Int) async {

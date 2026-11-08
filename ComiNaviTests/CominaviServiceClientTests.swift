@@ -280,6 +280,48 @@ final class CominaviServiceClientTests: XCTestCase {
         XCTAssertEqual(page.updates.map(\.cursor), [0])
     }
 
+    func testRealtimeOverloadKeepsItsStatusWithoutAnAPIErrorBody() async throws {
+        for (status, body) in [
+            (504, Data("<html>Gateway Timeout</html>".utf8)),
+            (503, Data()),
+            (429, Data("slow down".utf8)),
+        ] {
+            let transport = StaticCominaviTransport(responses: [
+                "GET /api/v2/events/108/updates": (status, body),
+            ])
+            let client = try makeAuthenticatedClient(transport: transport)
+            do {
+                _ = try await client.realtimeUpdates(
+                    eventNumber: 108,
+                    afterCursor: 0,
+                    publicationRevision: CominaviRealtimeUpdatePage.absentPublicationRevision,
+                    tagRevision: nil
+                )
+                XCTFail("HTTP \(status) must fail")
+            } catch CominaviServiceError.server(_, _, let receivedStatus) {
+                XCTAssertEqual(receivedStatus, status)
+                XCTAssertTrue(CominaviRealtimeStore.isTransient(
+                    CominaviServiceError.server(code: "", message: "", status: receivedStatus)
+                ))
+            }
+        }
+
+        // A client error without the envelope is still a plain invalid response.
+        let transport = StaticCominaviTransport(responses: [
+            "GET /api/v2/events/108/updates": (404, Data("<html>Not Found</html>".utf8)),
+        ])
+        let client = try makeAuthenticatedClient(transport: transport)
+        do {
+            _ = try await client.realtimeUpdates(
+                eventNumber: 108,
+                afterCursor: 0,
+                publicationRevision: CominaviRealtimeUpdatePage.absentPublicationRevision,
+                tagRevision: nil
+            )
+            XCTFail("HTTP 404 must fail")
+        } catch CominaviServiceError.invalidResponse {}
+    }
+
     func testRealtimeSnapshotRejectsZeroCursorForIncrementalPage() async throws {
         let response = try realtimeResponse(
             tagOverlay: nil,
