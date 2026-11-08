@@ -32,11 +32,18 @@ final class AgentDriverTests: XCTestCase {
     /// runtime warnings, are returned as warnings.
     private var commandIssues: [String] = []
     private var commandWarnings: [String] = []
+    /// Only `testServe` turns issues into command results; every other test
+    /// in this class records them normally.
+    private var isServing = false
 
     override func record(_ issue: XCTIssue) {
+        guard isServing else {
+            super.record(issue)
+            return
+        }
         switch issue.type {
-        case .assertionFailure, .thrownError, .uncaughtException, .unmatchedExpectedFailure:
-            commandIssues.append(issue.compactDescription)
+        case .assertionFailure, .thrownError, .uncaughtException, .unmatchedExpectedFailure, .system:
+            commandIssues.append("[\(issue.type.rawValue)] \(issue.compactDescription)")
         default:
             commandWarnings.append("[\(issue.type.rawValue)] \(issue.compactDescription)")
         }
@@ -48,6 +55,8 @@ final class AgentDriverTests: XCTestCase {
             throw XCTSkip("AGENT_DRIVER_DIR is not set; the agent driver only runs from cominavi-sim")
         }
         continueAfterFailure = true
+        isServing = true
+        defer { isServing = false }
         directory = URL(fileURLWithPath: path)
         let inbox = directory.appendingPathComponent("inbox")
         let outbox = directory.appendingPathComponent("outbox")
