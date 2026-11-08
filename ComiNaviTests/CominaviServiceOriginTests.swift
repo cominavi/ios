@@ -217,6 +217,34 @@ final class CominaviServiceOriginTests: XCTestCase {
         storeA.saveBoundUserID(nil)
     }
 
+    func testAuthenticatedImageCacheKeysAreBoundToTheOrigin() throws {
+        let avatar = try XCTUnwrap(URL(string: "/api/v2/users/0123456789abcdef0123456789abcdef/avatar"))
+        let production = RemoteImagePipeline.authenticatedCacheKey(
+            for: avatar,
+            revision: 3,
+            serviceOrigin: CominaviServiceOrigin.production
+        )
+        let local = RemoteImagePipeline.authenticatedCacheKey(
+            for: avatar,
+            revision: 3,
+            serviceOrigin: try Switch.validate("http://127.0.0.1:4380")
+        )
+        let otherLocal = RemoteImagePipeline.authenticatedCacheKey(
+            for: avatar,
+            revision: 3,
+            serviceOrigin: try Switch.validate("http://127.0.0.1:4381")
+        )
+        XCTAssertEqual(
+            production,
+            "authenticated:/api/v2/users/0123456789abcdef0123456789abcdef/avatar#3"
+        )
+        XCTAssertEqual(Set([production, local, otherLocal]).count, 3)
+        XCTAssertEqual(
+            RemoteImagePipeline.authenticatedCacheKey(for: avatar, revision: 3),
+            production
+        )
+    }
+
     // MARK: Downloads
 
     func testPlainHTTPDownloadsAreAllowedOnlyOnTheLoopbackServiceOrigin() throws {
