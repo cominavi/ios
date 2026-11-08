@@ -103,6 +103,52 @@ $S launch -cominavi-ui-testing-show-sign-in
 The selected tab persists between launches, so pass `initial-tab` when a flow
 depends on the starting tab.
 
+## Signed-in runs without OAuth (`-cominavi-test-session`)
+
+Debug builds can sign in through the service's test identity provider
+(`POST /api/v2/auth/test/session`, server `docs/staging.md`). It exists only on
+staging and local dev servers, so no Circle.ms, Google or Apple account is
+needed and production is never touched.
+
+```sh
+ORIGIN=http://127.0.0.1:4380                       # local `pnpm dev`, or https://staging.cominavi.net
+export SIMCTL_CHILD_COMINAVI_TEST_IDENTITY_SECRET=... # the server's COMINAVI_TEST_IDENTITY_SECRET
+$S launch -cominavi-service-origin "$ORIGIN" -cominavi-test-session agent-1 \
+  -cominavi-ui-testing-initial-tab profile
+$S wait "Test agent-1" 60
+```
+
+- The label (`^[a-z0-9][a-z0-9-]{0,63}$`) names one stable test user on that
+  service. Reuse it to come back to the same account and data. Use a new one
+  for a clean account.
+- The app signs in at launch, before the profile loads, and installs the
+  session through the same protected Keychain path as every provider. The
+  session lives in that origin's storage namespace, so it never mixes with
+  production data. Each launch with the flag mints a fresh session for the
+  label.
+- Allowed only when the service origin is loopback, a `*.test` host or
+  `staging.cominavi.net`. A missing secret, a bad label, or any other origin
+  (production included) stops the app at launch. A service error, such as a
+  wrong secret, is printed to the console and the app stays signed out.
+- The secret comes only from the `COMINAVI_TEST_IDENTITY_SECRET` environment
+  variable, never from a launch argument. With `simctl`, use the
+  `SIMCTL_CHILD_` prefix. Never commit or print it. The code is compiled out
+  of Staging, TestFlight and App Store builds (`#if DEBUG`).
+
+UI tests use `XCUIApplication.configureTestSession(label:)` from
+`ComiNaviUITests/XCUIApplication+TestSession.swift`. It reads the origin and
+secret from the test runner's environment and skips the test when either one
+is missing:
+
+```sh
+TEST_RUNNER_COMINAVI_TEST_SERVICE_ORIGIN=http://127.0.0.1:4380 \
+TEST_RUNNER_COMINAVI_TEST_IDENTITY_SECRET=... \
+xcodebuild test -project ComiNavi.xcodeproj -scheme ComiNavi \
+  -destination 'platform=iOS Simulator,id=<udid>' \
+  -skipPackagePluginValidation -skipMacroValidation \
+  -only-testing:ComiNaviUITests/ComiNaviTestSessionUITests
+```
+
 ## Check which input reaches the app
 
 ```sh

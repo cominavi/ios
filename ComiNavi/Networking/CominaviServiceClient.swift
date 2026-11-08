@@ -2660,6 +2660,42 @@ actor CominaviServiceClient: CominaviFavoriteSyncing, CirclemsFavoriteImportServ
         return marked
     }
 
+    #if DEBUG
+    /// Debug only: signs in through the test identity provider of a staging or
+    /// local service and installs the session through the same protected
+    /// persistence path as Google, Apple and Circle.ms sign-in. Refused unless
+    /// the service origin is loopback, `*.test` or staging.
+    func authenticateWithTestIdentity(
+        label: String,
+        secret: String
+    ) async throws -> CominaviAuthenticationSession {
+        guard CominaviTestSession.isAllowedOrigin(baseURL),
+              CominaviTestSession.isValidLabel(label),
+              !secret.isEmpty
+        else { throw CominaviServiceError.invalidResponse }
+        let generation = try await beginExplicitIdentityTransition()
+        var request = URLRequest(url: baseURL.appending(path: CominaviTestSession.path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(secret, forHTTPHeaderField: CominaviTestSession.secretHeader)
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["label": label])
+        let (data, response) = try await transport(request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw CominaviServiceError.invalidResponse
+        }
+        try validate(httpResponse, data: data)
+        let authentication = try validatedProductionAuthentication(
+            CominaviTestSession.decodeSession(data)
+        )
+        try await persist(
+            authentication,
+            expectedAuthenticationGeneration: generation,
+            allowingIdentityTransition: true
+        )
+        return authentication
+    }
+    #endif
+
     func appleEntryGrant(
         for flow: AppleAuthenticationFlow,
         invitationToken: String
