@@ -194,9 +194,10 @@ struct CirclemsCatalogSource: CatalogSource {
 
 struct DemoCatalogSource: CatalogSource {
     static let c104 = CatalogEvent(id: 190, number: 104)
-    static let remoteBaseURL = URL(
-        string: "https://cominavi.net/api/v2/review-demo/catalogs/c104/v2"
-    )!
+    static var remoteBaseURL: URL {
+        AppEnvironment.current.serviceOrigin
+            .appending(path: "api/v2/review-demo/catalogs/c104/v2")
+    }
 
     let mode = CatalogDataMode.demo
     private let resourceDirectory: URL?

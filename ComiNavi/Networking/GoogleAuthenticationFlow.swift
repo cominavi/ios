@@ -336,7 +336,12 @@ enum GoogleSpecialEntryLink {
 
     static func authorizationURL(nonce: String) -> URL? {
         guard GoogleAuthenticationFlow.isCanonicalNonce(nonce) else { return nil }
-        var components = URLComponents(string: "https://cominavi.net/auth/google")
+        // The web entry page belongs to the service this build talks to, so a
+        // local or staging origin never mints its entry grant on production.
+        var components = URLComponents(
+            url: AppEnvironment.current.serviceOrigin.appending(path: "auth/google"),
+            resolvingAgainstBaseURL: false
+        )
         components?.queryItems = [URLQueryItem(name: "nonce", value: nonce)]
         return components?.url
     }
