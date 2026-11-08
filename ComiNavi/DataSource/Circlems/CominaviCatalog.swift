@@ -341,6 +341,50 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         let fileName: String
         let catalog: CominaviCatalog
         let fallback: InstalledVersion?
+        /// Files that passed the full SHA-256 check, stamped with the size and
+        /// modification time they had then. Absent in receipts written before
+        /// this field existed; those files get one full check on next open.
+        let verified: [VerifiedFile]?
+
+        func stamp(for fileName: String, sha256: String) -> VerifiedFile? {
+            verified?.first { $0.fileName == fileName && $0.sha256 == sha256 }
+        }
+    }
+
+    /// Proof that one installed file was hashed in full. Installed artifacts
+    /// are immutable and opened read-only, so an unchanged size and
+    /// modification time mean the bytes are the ones that were verified.
+    struct VerifiedFile: Codable, Equatable, Sendable {
+        let fileName: String
+        let sha256: String
+        let bytes: Int64
+        let modificationTime: Double
+
+        static func current(
+            of url: URL,
+            sha256: String,
+            fileManager: FileManager = .default
+        ) throws -> VerifiedFile {
+            let attributes = try fileManager.attributesOfItem(atPath: url.path)
+            guard let size = attributes[.size] as? NSNumber,
+                  let modified = attributes[.modificationDate] as? Date
+            else { throw CominaviCatalogError.invalidDatabase }
+            return VerifiedFile(
+                fileName: url.lastPathComponent,
+                sha256: sha256,
+                bytes: size.int64Value,
+                modificationTime: modified.timeIntervalSinceReferenceDate
+            )
+        }
+    }
+
+    /// How much of an installed artifact to check before opening it.
+    enum ValidationDepth: Equatable, Sendable {
+        /// Full SHA-256, `PRAGMA quick_check` and row counts. Reads every byte.
+        case full
+        /// Size and identity metadata only. Used when the receipt proves this
+        /// exact file already passed a full check.
+        case verifiedReceipt
     }
 
     private struct InstalledVersion: Codable, Sendable {
@@ -437,8 +481,17 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
 
             if fileManager.fileExists(atPath: destinationURL.path) {
                 do {
-                    try await validateDatabase(at: destinationURL, catalog: catalog)
-                    try saveInstalledReceipt(catalog: catalog, url: destinationURL, in: directory)
+                    let verifiedFile = try await validateInstalledDatabase(
+                        at: destinationURL,
+                        catalog: catalog,
+                        receipt: loadInstalledReceipt(in: directory)
+                    )
+                    try saveInstalledReceipt(
+                        catalog: catalog,
+                        url: destinationURL,
+                        verifiedFile: verifiedFile,
+                        in: directory
+                    )
                     try? garbageCollect(in: directory, keeping: destinationURL)
                     return CominaviInstalledCatalog(
                         catalog: catalog,
@@ -483,7 +536,18 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
                 }
             }
             try await installDatabase(from: partialURL, to: destinationURL)
-            try saveInstalledReceipt(catalog: catalog, url: destinationURL, in: directory)
+            // The partial passed the full check above and the copy is local, so
+            // stamp the installed file as verified without hashing it again.
+            try saveInstalledReceipt(
+                catalog: catalog,
+                url: destinationURL,
+                verifiedFile: VerifiedFile.current(
+                    of: destinationURL,
+                    sha256: catalog.artifact.sha256,
+                    fileManager: fileManager
+                ),
+                in: directory
+            )
             try? discardPartial(partialURL, checkpointURL: checkpointURL)
             try? garbageCollect(in: directory, keeping: destinationURL)
             return CominaviInstalledCatalog(
@@ -825,9 +889,9 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
     }
 
     private func validatedFallback(in directory: URL) async throws -> CominaviInstalledCatalog {
-        let receiptURL = installedReceiptURL(in: directory)
-        let data = try Data(contentsOf: receiptURL)
-        let receipt = try JSONDecoder().decode(InstalledReceipt.self, from: data)
+        guard let receipt = loadInstalledReceipt(in: directory) else {
+            throw CominaviCatalogError.invalidInstalledReceipt
+        }
         guard receipt.schemaVersion == 1,
               receipt.fileName == URL(fileURLWithPath: receipt.fileName).lastPathComponent
         else { throw CominaviCatalogError.invalidInstalledReceipt }
@@ -842,7 +906,11 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
             let url = directory.appendingPathComponent(candidate.fileName)
             do {
                 let catalog = try candidate.catalog.validated()
-                try await validateDatabase(at: url, catalog: catalog)
+                _ = try await validateInstalledDatabase(
+                    at: url,
+                    catalog: catalog,
+                    receipt: receipt
+                )
                 return CominaviInstalledCatalog(
                     catalog: catalog,
                     url: url,
@@ -857,9 +925,40 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         throw CominaviCatalogError.invalidInstalledReceipt
     }
 
-    private func validateDatabase(at url: URL, catalog: CominaviCatalog) async throws {
+    /// Validates an installed file and returns the stamp to keep in the
+    /// receipt. Only a file the receipt already vouches for, unchanged since,
+    /// skips the full hash.
+    private func validateInstalledDatabase(
+        at url: URL,
+        catalog: CominaviCatalog,
+        receipt: InstalledReceipt?
+    ) async throws -> VerifiedFile {
+        let current = try VerifiedFile.current(
+            of: url,
+            sha256: catalog.artifact.sha256,
+            fileManager: fileManager
+        )
+        let depth: ValidationDepth =
+            receipt?.stamp(for: url.lastPathComponent, sha256: catalog.artifact.sha256)
+                == current ? .verifiedReceipt : .full
+        try await validateDatabase(at: url, catalog: catalog, depth: depth)
+        return current
+    }
+
+    private func loadInstalledReceipt(in directory: URL) -> InstalledReceipt? {
+        guard let data = try? Data(contentsOf: installedReceiptURL(in: directory)) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(InstalledReceipt.self, from: data)
+    }
+
+    private func validateDatabase(
+        at url: URL,
+        catalog: CominaviCatalog,
+        depth: ValidationDepth = .full
+    ) async throws {
         let worker = Task.detached(priority: .userInitiated) {
-            try Self.validateDatabaseSynchronously(at: url, catalog: catalog)
+            try Self.validateDatabaseSynchronously(at: url, catalog: catalog, depth: depth)
         }
         return try await withTaskCancellationHandler {
             try await worker.value
@@ -870,21 +969,28 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
 
     nonisolated static func validateDatabaseSynchronously(
         at url: URL,
-        catalog: CominaviCatalog
+        catalog: CominaviCatalog,
+        depth: ValidationDepth = .full
     ) throws {
         guard try FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber
             == NSNumber(value: catalog.artifact.bytes)
         else { throw CominaviCatalogError.sizeMismatch }
-        guard try sha256(of: url) == catalog.artifact.sha256 else {
-            throw CominaviCatalogError.digestMismatch
+        if depth == .full {
+            guard try sha256(of: url) == catalog.artifact.sha256 else {
+                throw CominaviCatalogError.digestMismatch
+            }
         }
 
         var configuration = Configuration()
         configuration.readonly = true
         let database = try DatabaseQueue(path: url.path, configuration: configuration)
         try database.read { db in
-            guard try String.fetchOne(db, sql: "PRAGMA quick_check") == "ok",
-                  try Int.fetchOne(db, sql: "PRAGMA user_version") == 1
+            if depth == .full {
+                guard try String.fetchOne(db, sql: "PRAGMA quick_check") == "ok" else {
+                    throw CominaviCatalogError.invalidDatabase
+                }
+            }
+            guard try Int.fetchOne(db, sql: "PRAGMA user_version") == 1
             else { throw CominaviCatalogError.invalidDatabase }
 
             let metadata = try Row.fetchAll(
@@ -918,6 +1024,10 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
             guard normalizedTables.isSubset(of: tables),
                   compatibilityViews.isSubset(of: views)
             else { throw CominaviCatalogError.invalidDatabase }
+
+            // Row counts and the join smoke test scan large tables; the full
+            // check at install time already covered them.
+            guard depth == .full else { return }
 
             let circleCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM circles") ?? -1
             let layoutCount = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM layouts") ?? -1
@@ -977,14 +1087,10 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
     private func saveInstalledReceipt(
         catalog: CominaviCatalog,
         url: URL,
+        verifiedFile: VerifiedFile,
         in directory: URL
     ) throws {
-        let oldReceipt: InstalledReceipt?
-        if let oldData = try? Data(contentsOf: installedReceiptURL(in: directory)) {
-            oldReceipt = try? JSONDecoder().decode(InstalledReceipt.self, from: oldData)
-        } else {
-            oldReceipt = nil
-        }
+        let oldReceipt = loadInstalledReceipt(in: directory)
         let fallback: InstalledVersion?
         if let oldReceipt, oldReceipt.fileName != url.lastPathComponent {
             fallback = InstalledVersion(
@@ -994,11 +1100,22 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
         } else {
             fallback = oldReceipt?.fallback
         }
+        var verified = [verifiedFile]
+        if let fallback,
+           fallback.fileName != verifiedFile.fileName,
+           let fallbackStamp = oldReceipt?.stamp(
+               for: fallback.fileName,
+               sha256: fallback.catalog.artifact.sha256
+           )
+        {
+            verified.append(fallbackStamp)
+        }
         let receipt = InstalledReceipt(
             schemaVersion: 1,
             fileName: url.lastPathComponent,
             catalog: catalog,
-            fallback: fallback
+            fallback: fallback,
+            verified: verified
         )
         try save(receipt, to: installedReceiptURL(in: directory))
     }
