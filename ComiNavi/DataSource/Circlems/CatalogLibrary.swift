@@ -198,22 +198,6 @@ struct DemoCatalogSource: CatalogSource {
         string: "https://cominavi.net/api/v2/review-demo/catalogs/c104/v2"
     )!
 
-    /// Debug and Staging builds bundle the demo databases, so demo mode opens
-    /// them offline. TestFlight and App Store builds exclude them and download
-    /// the App Review copy. Pass `-cominavi-demo-data-remote` to exercise that
-    /// download path from a Debug or Staging build.
-    static func preferred() -> DemoCatalogSource {
-        #if DEBUG || COMINAVI_STAGING
-        if !ProcessInfo.processInfo.arguments.contains("-cominavi-demo-data-remote"),
-           let main = CatalogResourceLocator.url(named: "demo-c104-main.sqlite"),
-           CatalogResourceLocator.url(named: "demo-c104-images.sqlite") != nil
-        {
-            return DemoCatalogSource(resourceDirectory: main.deletingLastPathComponent())
-        }
-        #endif
-        return DemoCatalogSource()
-    }
-
     let mode = CatalogDataMode.demo
     private let resourceDirectory: URL?
     private let remoteBaseURL: URL
@@ -353,7 +337,7 @@ final class CatalogLibrary {
     ) {
         var sources: [CatalogDataMode: any CatalogSource] = [
             .cominavi: CominaviCatalogSource(),
-            .demo: DemoCatalogSource.preferred(),
+            .demo: DemoCatalogSource(),
         ]
         #if DEBUG || COMINAVI_STAGING
         sources[.circlems] = CirclemsCatalogSource(service: service)
