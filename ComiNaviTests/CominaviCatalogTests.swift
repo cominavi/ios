@@ -725,6 +725,149 @@ final class CominaviCatalogTests: XCTestCase {
         XCTAssertEqual(headInvalidations.count, 1)
     }
 
+    func testReopeningVerifiedCatalogSkipsTheFullHashUntilTheFileChanges() async throws {
+        let root = try temporaryDirectory(named: "verified-reopen")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let installRoot = root.appendingPathComponent("installed")
+        let fixture = try makeCatalogDatabase(in: root, versionID: "c108-verified-v1")
+        let validBytes = try Data(contentsOf: fixture.databaseURL)
+        func makeInstaller(_ transport: CatalogTransportStub) -> CominaviCatalogInstaller {
+            CominaviCatalogInstaller(
+                authorizer: CatalogAuthorizerStub(),
+                transport: transport,
+                rootDirectory: installRoot,
+                chunkBytes: 64 * 1_024,
+                retryDelay: .zero
+            )
+        }
+
+        let installed = try await makeInstaller(
+            CatalogTransportStub(artifact: validBytes, catalog: fixture.catalog)
+        ).install(fixture.catalog, publicUserID: "account-a", progress: nil)
+
+        struct Receipt: Decodable {
+            struct Verified: Decodable {
+                let fileName: String
+                let sha256: String
+                let bytes: Int64
+            }
+            let verified: [Verified]?
+        }
+        let receiptData = try Data(contentsOf: installed.url.deletingLastPathComponent()
+            .appendingPathComponent("current.json"))
+        let receipt = try JSONDecoder().decode(Receipt.self, from: receiptData)
+        XCTAssertEqual(receipt.verified?.map(\.fileName), [installed.url.lastPathComponent])
+        XCTAssertEqual(receipt.verified?.first?.sha256, fixture.catalog.artifact.sha256)
+        XCTAssertEqual(receipt.verified?.first?.bytes, fixture.catalog.artifact.bytes)
+
+        // Move the modification time to a whole second, which survives a round
+        // trip through `Date` exactly. The stamp no longer matches, so this open
+        // runs the full check, finds the file intact and stamps it again.
+        let modified = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        try FileManager.default.setAttributes(
+            [.modificationDate: modified],
+            ofItemAtPath: installed.url.path
+        )
+        let restampTransport = CatalogTransportStub(artifact: validBytes, catalog: fixture.catalog)
+        let restamped = try await makeInstaller(restampTransport)
+            .install(fixture.catalog, publicUserID: "account-a", progress: nil)
+        XCTAssertTrue(restamped.isCurrentVersion)
+        let restampRequests = await restampTransport.requests()
+        XCTAssertTrue(restampRequests.isEmpty)
+
+        // Flip one byte inside the large image's overflow pages, which only the
+        // full hash reads, and put the modification time back.
+        var bytes = try Data(contentsOf: installed.url)
+        let run = Data(repeating: 0x5a, count: 2_048)
+        let runRange = try XCTUnwrap(bytes.range(of: run))
+        bytes[runRange.lowerBound + 1_024] ^= 0xff
+        try bytes.write(to: installed.url)
+        try FileManager.default.setAttributes(
+            [.modificationDate: modified],
+            ofItemAtPath: installed.url.path
+        )
+
+        let reopenTransport = CatalogTransportStub(artifact: validBytes, catalog: fixture.catalog)
+        let reopened = try await makeInstaller(reopenTransport)
+            .install(fixture.catalog, publicUserID: "account-a", progress: nil)
+        XCTAssertTrue(reopened.isCurrentVersion)
+        XCTAssertEqual(reopened.url, installed.url)
+        let reopenRequests = await reopenTransport.requests()
+        XCTAssertTrue(reopenRequests.isEmpty, "A stamped file must open without re-hashing")
+
+        // A different modification time voids the stamp: the full check runs,
+        // finds the flipped byte and repairs the file from the network.
+        try FileManager.default.setAttributes(
+            [.modificationDate: modified.addingTimeInterval(60)],
+            ofItemAtPath: installed.url.path
+        )
+        let repairTransport = CatalogTransportStub(artifact: validBytes, catalog: fixture.catalog)
+        let repaired = try await makeInstaller(repairTransport)
+            .install(fixture.catalog, publicUserID: "account-a", progress: nil)
+        XCTAssertTrue(repaired.isCurrentVersion)
+        let repairRequests = await repairTransport.requests()
+        XCTAssertFalse(repairRequests.isEmpty)
+        XCTAssertEqual(try Data(contentsOf: repaired.url), validBytes)
+    }
+
+    func testOfflineDiscoveryStampsALegacyReceiptOnceWithoutPromotingIt() async throws {
+        let root = try temporaryDirectory(named: "legacy-receipt")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fixture = try makeCatalogDatabase(in: root, versionID: "c108-legacy-receipt-v1")
+        let installer = CominaviCatalogInstaller(
+            authorizer: CatalogAuthorizerStub(),
+            transport: CatalogTransportStub(
+                artifact: try Data(contentsOf: fixture.databaseURL),
+                catalog: fixture.catalog
+            ),
+            rootDirectory: root.appendingPathComponent("installed"),
+            chunkBytes: 64 * 1_024,
+            retryDelay: .zero
+        )
+        let installed = try await installer.install(
+            fixture.catalog,
+            publicUserID: "account-a",
+            progress: nil
+        )
+
+        // Rewrite the receipt as a build without stamps would have left it.
+        let receiptURL = installed.url.deletingLastPathComponent()
+            .appendingPathComponent("current.json")
+        var receipt = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: receiptURL)) as? [String: Any]
+        )
+        receipt.removeValue(forKey: "verified")
+        try JSONSerialization.data(withJSONObject: receipt).write(to: receiptURL)
+        let modified = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        try FileManager.default.setAttributes(
+            [.modificationDate: modified],
+            ofItemAtPath: installed.url.path
+        )
+
+        let firstDiscovery = try await installer.installedCatalogs(publicUserID: "account-a")
+        XCTAssertEqual(firstDiscovery.map(\.url), [installed.url])
+        let stamped = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(contentsOf: receiptURL)) as? [String: Any]
+        )
+        XCTAssertEqual(stamped["fileName"] as? String, installed.url.lastPathComponent)
+        XCTAssertNil(stamped["fallback"] as? [String: Any])
+        let verified = try XCTUnwrap(stamped["verified"] as? [[String: Any]])
+        XCTAssertEqual(verified.map { $0["fileName"] as? String }, [installed.url.lastPathComponent])
+
+        // With the stamp saved, the next discovery skips the hash: a flipped
+        // blob byte behind an unchanged modification time goes unnoticed.
+        var bytes = try Data(contentsOf: installed.url)
+        let runRange = try XCTUnwrap(bytes.range(of: Data(repeating: 0x5a, count: 2_048)))
+        bytes[runRange.lowerBound + 1_024] ^= 0xff
+        try bytes.write(to: installed.url)
+        try FileManager.default.setAttributes(
+            [.modificationDate: modified],
+            ofItemAtPath: installed.url.path
+        )
+        let secondDiscovery = try await installer.installedCatalogs(publicUserID: "account-a")
+        XCTAssertEqual(secondDiscovery.map(\.url), [installed.url])
+    }
+
     func testColdLaunchOfflineDiscoversValidatedInstalledReceiptOnlyForBoundIdentity() async throws {
         let root = try temporaryDirectory(named: "offline-receipt")
         defer { try? FileManager.default.removeItem(at: root) }
