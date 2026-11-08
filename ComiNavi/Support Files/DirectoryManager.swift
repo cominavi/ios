@@ -7,6 +7,7 @@
 
 import CryptoKit
 import Foundation
+import os
 
 struct EventStorageShard: Hashable, Sendable {
     let eventID: Int
@@ -48,19 +49,102 @@ struct EventStorageShard: Hashable, Sendable {
     }
 }
 
+/// Moves Circle.ms-mode and demo catalog files out of purgeable Caches into
+/// Application Support, where the system never deletes them on its own. The
+/// moved directory is excluded from iCloud and device backups because it can
+/// always be downloaded again; user data next to it (`users/`) stays backed up.
+enum CatalogDataStorage {
+    /// Returns `<applicationSupportEventDirectory>/<scope>` after moving any
+    /// files left in `<legacyCachesEventDirectory>/<scope>` by older builds.
+    /// Files already in Application Support win over legacy copies.
+    static func prepareScopeDirectory(
+        _ scope: String,
+        applicationSupportEventDirectory: URL,
+        legacyCachesEventDirectory: URL,
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        let directory = applicationSupportEventDirectory
+            .appendingPathComponent(scope, isDirectory: true)
+        let legacyDirectory = legacyCachesEventDirectory
+            .appendingPathComponent(scope, isDirectory: true)
+        try fileManager.createDirectory(
+            at: applicationSupportEventDirectory,
+            withIntermediateDirectories: true
+        )
+        if fileManager.fileExists(atPath: legacyDirectory.path) {
+            try merge(legacyDirectory, into: directory, fileManager: fileManager)
+            try? fileManager.removeItem(at: legacyDirectory)
+            removeIfEmpty(legacyCachesEventDirectory, fileManager: fileManager)
+        }
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        try excludeFromBackup(directory)
+        return directory
+    }
+
+    static func excludeFromBackup(_ directory: URL) throws {
+        var url = directory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try url.setResourceValues(values)
+    }
+
+    /// Moves `source` to `destination`. Both live in the same app container,
+    /// so each move is a rename and never copies catalog bytes.
+    private static func merge(
+        _ source: URL,
+        into destination: URL,
+        fileManager: FileManager
+    ) throws {
+        guard fileManager.fileExists(atPath: destination.path) else {
+            try fileManager.moveItem(at: source, to: destination)
+            return
+        }
+        guard isDirectory(source, fileManager: fileManager),
+              isDirectory(destination, fileManager: fileManager)
+        else { return }
+        for child in try fileManager.contentsOfDirectory(
+            at: source,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        ) {
+            try merge(
+                child,
+                into: destination.appendingPathComponent(child.lastPathComponent),
+                fileManager: fileManager
+            )
+        }
+    }
+
+    private static func isDirectory(_ url: URL, fileManager: FileManager) -> Bool {
+        var isDirectory: ObjCBool = false
+        return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            && isDirectory.boolValue
+    }
+
+    private static func removeIfEmpty(_ directory: URL, fileManager: FileManager) {
+        guard let contents = try? fileManager.contentsOfDirectory(atPath: directory.path),
+              contents.isEmpty
+        else { return }
+        try? fileManager.removeItem(at: directory)
+    }
+}
+
 final class DirectoryManager: Sendable {
     static let shared = DirectoryManager()
 
-    enum CacheScope: String {
+    enum CatalogDataScope: String, CaseIterable {
         case circlems
     }
 
-    enum CacheType: String {
+    enum CatalogDataType: String {
         case images
         case databases
         case downloads
         case metadata
     }
+
+    /// Event shards whose catalog data has been moved out of Caches during
+    /// this process, so the check runs once per shard.
+    private let preparedCatalogShards = OSAllocatedUnfairLock<Set<String>>(initialState: [])
 
     private init() {}
 
@@ -127,44 +211,85 @@ final class DirectoryManager: Sendable {
 
     // --
 
-    func cachesFor(eventID: Int, comiketId: String) -> URL {
-        let url = eventDirectory(
-            in: environmentCachesDirectory,
-            eventID: eventID,
-            comiketId: comiketId
-        )
-        createDirectoryIfNeeded(at: url)
-        return url
-    }
-
-    func cachesFor(
+    /// Downloaded catalog databases, derived indexes and images for one event.
+    /// They live in Application Support (excluded from backup) so the system
+    /// cannot purge them under storage pressure the way it purges Caches.
+    func catalogDataFor(
         eventID: Int,
         comiketId: String,
-        _ scope: CacheScope,
-        _ type: CacheType,
+        _ scope: CatalogDataScope,
+        _ type: CatalogDataType,
         createIfNeeded: Bool = false
     ) -> URL {
-        let url = eventDirectory(
-            in: environmentCachesDirectory,
-            eventID: eventID,
-            comiketId: comiketId
-        )
-        .appendingPathComponent(scope.rawValue, isDirectory: true)
-        .appendingPathComponent(type.rawValue, isDirectory: true)
+        let url = catalogScopeDirectory(eventID: eventID, comiketId: comiketId, scope)
+            .appendingPathComponent(type.rawValue, isDirectory: true)
         if createIfNeeded {
             createDirectoryIfNeeded(at: url)
         }
         return url
     }
 
-    func removeCachesFor(eventID: Int, comiketId: String) throws {
-        let url = eventDirectory(
+    /// Removes the downloaded catalog data for one event, including any copy
+    /// an older build left in Caches. User data in the same event shard
+    /// (favorites, plans) is not touched.
+    func removeCatalogDataFor(eventID: Int, comiketId: String) throws {
+        let fileManager = FileManager.default
+        let directories = CatalogDataScope.allCases.flatMap { scope in
+            [
+                eventDirectory(
+                    in: environmentApplicationSupportDirectory,
+                    eventID: eventID,
+                    comiketId: comiketId
+                ),
+                eventDirectory(
+                    in: environmentCachesDirectory,
+                    eventID: eventID,
+                    comiketId: comiketId
+                ),
+            ].map { $0.appendingPathComponent(scope.rawValue, isDirectory: true) }
+        }
+        for directory in directories where fileManager.fileExists(atPath: directory.path) {
+            try fileManager.removeItem(at: directory)
+        }
+    }
+
+    private func catalogScopeDirectory(
+        eventID: Int,
+        comiketId: String,
+        _ scope: CatalogDataScope
+    ) -> URL {
+        let eventDirectory = eventDirectory(
+            in: environmentApplicationSupportDirectory,
+            eventID: eventID,
+            comiketId: comiketId
+        )
+        let directory = eventDirectory.appendingPathComponent(scope.rawValue, isDirectory: true)
+        let shardKey = directory.path
+        let alreadyPrepared = preparedCatalogShards.withLock { prepared in
+            prepared.contains(shardKey)
+        }
+        guard !alreadyPrepared else { return directory }
+        let legacyEventDirectory = self.eventDirectory(
             in: environmentCachesDirectory,
             eventID: eventID,
             comiketId: comiketId
         )
-        guard FileManager.default.fileExists(atPath: url.path) else { return }
-        try FileManager.default.removeItem(at: url)
+        do {
+            // The lock covers the move so two concurrent downloads (main and
+            // image databases) cannot race on the same rename.
+            try preparedCatalogShards.withLock { prepared in
+                guard !prepared.contains(shardKey) else { return }
+                _ = try CatalogDataStorage.prepareScopeDirectory(
+                    scope.rawValue,
+                    applicationSupportEventDirectory: eventDirectory,
+                    legacyCachesEventDirectory: legacyEventDirectory
+                )
+                prepared.insert(shardKey)
+            }
+        } catch {
+            NSLog("Could not move C\(comiketId) catalog data out of Caches: \(error)")
+        }
+        return directory
     }
 
     func userDataFor(eventID: Int, comiketId: String, userID: Int) -> URL {
