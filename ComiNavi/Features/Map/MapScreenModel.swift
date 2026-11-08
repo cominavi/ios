@@ -459,8 +459,15 @@ final class MapScreenModel {
             do {
                 let loaded = try await catalog.scene(day: day, mapID: hall.externalMapId)
                 try Task.checkCancellation()
-                guard selectedDay == day else { throw CancellationError() }
-                sceneCache[loaded.id] = loaded
+                if selectedDay == day {
+                    // Only the selected day's scenes enter the map's cache.
+                    sceneCache[loaded.id] = loaded
+                } else if requestedDay == nil {
+                    // A lookup for "the current day" is obsolete once the map
+                    // switches day. An explicit day (Go to Space keeps its own
+                    // day until the attendee confirms) still gets its venues.
+                    throw CancellationError()
+                }
                 scenes[hall.externalMapId] = loaded
             } catch is CancellationError {
                 throw CancellationError()

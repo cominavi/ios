@@ -2113,6 +2113,25 @@ final class UnifiedBigSightMapTests: XCTestCase {
     }
 
     @MainActor
+    func testWhereAmIVenuesForAnotherDayLoadWithoutChangingTheMapDay() async throws {
+        let catalog = PausableMapCatalog()
+        let model = makeTwoDayMapModel(initialScope: .venue, catalog: catalog)
+        model.load()
+        try await waitUntilReady(model)
+        XCTAssertEqual(model.selectedDay, 1)
+
+        // Go to Space keeps its own day until the attendee confirms a space.
+        let venues = try await model.whereAmIVenues(day: 2)
+
+        XCTAssertFalse(venues.isEmpty)
+        XCTAssertEqual(model.selectedDay, 1)
+        XCTAssertNotEqual(model.campusScene?.id.day, 2)
+        XCTAssertFalse(model.cachedSceneDays.contains(2))
+        let requestedDayTwoMapIDs = await catalog.requestedMapIDs(day: 2)
+        XCTAssertFalse(requestedDayTwoMapIDs.isEmpty)
+    }
+
+    @MainActor
     func testDaySwitchStopsLoadingRemainingSupersededCampusHalls() async throws {
         let catalog = PausableMapCatalog()
         let model = makeTwoDayMapModel(catalog: catalog)
