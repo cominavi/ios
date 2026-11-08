@@ -246,6 +246,19 @@ enum AppData {
         ).clear()
     }
 
+    /// After a sign-in with any provider, drops the Google and Apple flows
+    /// that never reached the backend. See `SpecialEntryAuthenticationState`.
+    static func retireUnsubmittedAuthenticationFlows() throws {
+        try SpecialEntryAuthenticationState.retireUnsubmittedFlows(
+            google: GoogleAuthenticationFlowCoordinator(
+                storage: googleAuthenticationFlowStore
+            ),
+            apple: AppleAuthenticationFlowCoordinator(
+                storage: appleAuthenticationFlowStore
+            )
+        )
+    }
+
     /// Explicit logout/deletion cancels every protected provider-auth
     /// capability before its durable tombstone can be acknowledged.
     static func clearPendingAuthenticationFlowsForLogout() async throws {
