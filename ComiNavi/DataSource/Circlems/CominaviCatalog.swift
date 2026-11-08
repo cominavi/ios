@@ -906,11 +906,18 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
             let url = directory.appendingPathComponent(candidate.fileName)
             do {
                 let catalog = try candidate.catalog.validated()
-                _ = try await validateInstalledDatabase(
+                let verifiedFile = try await validateInstalledDatabase(
                     at: url,
                     catalog: catalog,
                     receipt: receipt
                 )
+                // Keep the stamp so the next offline open or failed update
+                // does not hash this file again. Current and fallback stay.
+                if receipt.stamp(for: candidate.fileName, sha256: catalog.artifact.sha256)
+                    != verifiedFile
+                {
+                    try? recordVerifiedFile(verifiedFile, in: receipt, directory: directory)
+                }
                 return CominaviInstalledCatalog(
                     catalog: catalog,
                     url: url,
@@ -943,6 +950,28 @@ actor CominaviCatalogInstaller: CominaviCatalogInstalling {
                 == current ? .verifiedReceipt : .full
         try await validateDatabase(at: url, catalog: catalog, depth: depth)
         return current
+    }
+
+    private func recordVerifiedFile(
+        _ verifiedFile: VerifiedFile,
+        in receipt: InstalledReceipt,
+        directory: URL
+    ) throws {
+        let listedFiles = Set([receipt.fileName, receipt.fallback?.fileName].compactMap { $0 })
+        var verified = (receipt.verified ?? []).filter {
+            $0.fileName != verifiedFile.fileName && listedFiles.contains($0.fileName)
+        }
+        verified.append(verifiedFile)
+        try save(
+            InstalledReceipt(
+                schemaVersion: receipt.schemaVersion,
+                fileName: receipt.fileName,
+                catalog: receipt.catalog,
+                fallback: receipt.fallback,
+                verified: verified
+            ),
+            to: installedReceiptURL(in: directory)
+        )
     }
 
     private func loadInstalledReceipt(in directory: URL) -> InstalledReceipt? {
