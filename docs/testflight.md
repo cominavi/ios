@@ -168,7 +168,10 @@ accept a build number twice.
 4. Choose **Product > Archive**.
 5. In Organizer, choose **Distribute App > App Store Connect > Upload**.
 
-For command-line archiving:
+For command-line archiving, pass `-skipPackagePluginValidation`. Outside
+Xcode, nobody can approve the swift-openapi-generator build plugin, so the
+build stops at "Validate plug-in OpenAPIGenerator". The `build_testflight`
+lane passes the same flags:
 
 ```sh
 xcodebuild \
@@ -178,6 +181,8 @@ xcodebuild \
   -destination 'generic/platform=iOS' \
   -archivePath /tmp/ComiNavi-TestFlight.xcarchive \
   -allowProvisioningUpdates \
+  -skipPackagePluginValidation \
+  -skipMacroValidation \
   archive
 ```
 
