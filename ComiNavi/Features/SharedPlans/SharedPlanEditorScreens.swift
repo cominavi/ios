@@ -391,12 +391,6 @@ private enum SharedPlanEditorConfirmation: Identifiable {
     var id: String { "discard-recovery" }
 }
 
-private struct SharedPlanCatalogTableKey: Hashable {
-    let day: Int
-    let mapID: Int
-    let tableID: CatalogMapTable.ID
-}
-
 struct SharedPlanEditorScreen: View {
     let store: SharedPlanStore
     let currentUserID: String?
@@ -797,34 +791,23 @@ struct SharedPlanEditorScreen: View {
             else { return }
             hallNames[content.key] = WhereAmIResolver.venueDisplayName(for: hallName)
         }
-        var combinedByTable: [SharedPlanCatalogTableKey: Bool] = [:]
-        for location in locations {
-            guard !Task.isCancelled else { return }
-            let tableKey = SharedPlanCatalogTableKey(
-                day: location.day,
-                mapID: location.mapID,
-                tableID: location.tableID
-            )
-            guard combinedByTable[tableKey] == nil else { continue }
-            let tableCircles = try? await catalogDataSource.mapCatalog.circles(
-                day: location.day,
-                tableID: location.tableID
-            )
-            combinedByTable[tableKey] = tableCircles.map {
-                CatalogCirclePairing.isCombinedAB($0)
-            } ?? false
-        }
+        // One catalog read for every plan table, so a+b detection does not
+        // scan the catalog once per circle.
+        let planTables = Set(locations.map {
+            CatalogMapDayTable(day: $0.day, tableID: $0.tableID)
+        })
+        let circlesByTable = (try? await catalogDataSource.mapCatalog.circles(
+            forTables: planTables
+        )) ?? [:]
         let loadedCombinedABKeys: Set<SharedPlanCircleKey> = Set(
             model.circles.compactMap { content -> SharedPlanCircleKey? in
-                guard let location = locationsByPublicCircleID[content.key.wcID] else {
-                    return nil
-                }
-                let tableKey = SharedPlanCatalogTableKey(
-                    day: location.day,
-                    mapID: location.mapID,
-                    tableID: location.tableID
-                )
-                return combinedByTable[tableKey] == true ? content.key : nil
+                guard let location = locationsByPublicCircleID[content.key.wcID],
+                      let members = circlesByTable[
+                          CatalogMapDayTable(day: location.day, tableID: location.tableID)
+                      ],
+                      CatalogCirclePairing.isCombinedAB(members)
+                else { return nil }
+                return content.key
             }
         )
         guard !Task.isCancelled else { return }

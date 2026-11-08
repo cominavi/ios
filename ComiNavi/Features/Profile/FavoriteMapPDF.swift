@@ -201,6 +201,16 @@ enum FavoriteMapPDFLoader {
                 < (hallOrder[$1] ?? .max, $1.day, $1.mapID)
         }
 
+        // One catalog read decides which favorite tables are a combined a+b
+        // booth, including tables where only one half is a favorite.
+        let favoriteTables = Set(bookmarkGroups.flatMap { sceneID, bookmarks in
+            bookmarks.map { CatalogMapDayTable(day: sceneID.day, tableID: $0.tableID) }
+        })
+        let circlesByTable = try await dataSource.mapCatalog.circles(forTables: favoriteTables)
+        let combinedTables = Set(circlesByTable.compactMap { table, members in
+            CatalogCirclePairing.isCombinedAB(members) ? table : nil
+        })
+
         var halls: [FavoriteMapPDFHall] = []
         for sceneID in orderedIDs {
             guard let bookmarks = bookmarkGroups[sceneID] else { continue }
@@ -208,16 +218,6 @@ enum FavoriteMapPDFLoader {
                 day: sceneID.day,
                 mapID: sceneID.mapID
             )
-            var combinedTableIDs: Set<CatalogMapTable.ID> = []
-            for tableID in Set(bookmarks.map(\.tableID)) {
-                let members = try await dataSource.mapCatalog.circles(
-                    day: sceneID.day,
-                    tableID: tableID
-                )
-                if CatalogCirclePairing.isCombinedAB(members) {
-                    combinedTableIDs.insert(tableID)
-                }
-            }
             var items = bookmarks.map { bookmark in
                 let circle = circlesByPublicID[bookmark.publicCircleID]
                 let table = scene.tableByID[bookmark.tableID]
@@ -242,7 +242,9 @@ enum FavoriteMapPDFLoader {
                     hallName: hallName,
                     blockName: blockName ?? "?",
                     spaceNumber: bookmark.tableID.spaceNumber,
-                    isCombinedAB: combinedTableIDs.contains(bookmark.tableID),
+                    isCombinedAB: combinedTables.contains(
+                        CatalogMapDayTable(day: sceneID.day, tableID: bookmark.tableID)
+                    ),
                     circleName: circleName ?? String(localized: "Unnamed circle"),
                     penName: penName,
                     memo: memo

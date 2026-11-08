@@ -307,16 +307,13 @@ enum SharedPlanExportLoader {
                 tableID: .init(blockID: blockID, spaceNumber: spaceNumber)
             )
         })
-        var result: Set<TableKey> = []
-        for key in tableKeys {
-            guard let members = try? await mapCatalog.circles(
-                day: key.day,
-                tableID: key.tableID
-            ), CatalogCirclePairing.isCombinedAB(members)
-            else { continue }
-            result.insert(key)
+        let circlesByTable = (try? await mapCatalog.circles(
+            forTables: Set(tableKeys.map { CatalogMapDayTable(day: $0.day, tableID: $0.tableID) })
+        )) ?? [:]
+        return tableKeys.filter { key in
+            circlesByTable[CatalogMapDayTable(day: key.day, tableID: key.tableID)]
+                .map(CatalogCirclePairing.isCombinedAB) ?? false
         }
-        return result
     }
 
     private static func weekdaySymbol(_ day: UFDSchema.Day) -> String {
