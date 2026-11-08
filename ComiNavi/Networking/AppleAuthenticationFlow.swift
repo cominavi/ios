@@ -402,7 +402,12 @@ enum AppleSpecialEntryLink {
 
     static func authorizationURL(nonce: String) -> URL? {
         guard AppleAuthenticationFlow.isCanonicalNonce(nonce) else { return nil }
-        var components = URLComponents(string: "https://cominavi.net/auth/apple")
+        // The web entry page belongs to the service this build talks to, so a
+        // local or staging origin never mints its entry grant on production.
+        var components = URLComponents(
+            url: AppEnvironment.current.serviceOrigin.appending(path: "auth/apple"),
+            resolvingAgainstBaseURL: false
+        )
         components?.queryItems = [URLQueryItem(name: "nonce", value: nonce)]
         return components?.url
     }

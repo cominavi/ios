@@ -185,8 +185,18 @@ enum RemoteImagePipeline {
         try? await cache(for: category).store(image, original: data, forKey: key)
     }
 
-    static func authenticatedCacheKey(for url: URL, revision: Int?) -> String {
-        "authenticated:\(url.absoluteString)#\(revision.map(String.init) ?? "stable")"
+    /// Authenticated avatar URLs are relative to the service, so the key also
+    /// names a non-production service origin. Two services that return the
+    /// same user ID and revision can then never satisfy each other's lookups.
+    /// Production keeps its original keys.
+    static func authenticatedCacheKey(
+        for url: URL,
+        revision: Int?,
+        serviceOrigin: URL = AppEnvironment.current.serviceOrigin
+    ) -> String {
+        let scope = CominaviServiceOrigin.storageComponent(for: serviceOrigin)
+            .map { "\($0):" } ?? ""
+        return "authenticated:\(scope)\(url.absoluteString)#\(revision.map(String.init) ?? "stable")"
     }
 
     static func encodedPNGData(for image: UIImage) async -> Data? {

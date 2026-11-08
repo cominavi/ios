@@ -507,7 +507,9 @@ final class CirclemsDataSource {
         metadata: CirclemsDataSourceDatabaseMetadata,
         progressHandler: (@MainActor @Sendable (Int64, Int64) -> Void)? = nil
     ) async throws {
-        guard let url = metadata.remoteURL, url.scheme == "https" else {
+        guard let url = metadata.remoteURL,
+              CominaviServiceOrigin.isAllowedDownloadURL(url, serviceOrigin: AppEnvironment.current.serviceOrigin)
+        else {
             throw NSError(
                 domain: "CirclemsDataSource",
                 code: 1,

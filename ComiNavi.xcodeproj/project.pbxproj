@@ -568,6 +568,7 @@
 				COMINAVI_GOOGLE_CLIENT_ID = "90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2.apps.googleusercontent.com";
 				COMINAVI_OAUTH_CALLBACK_SCHEME = cominavi;
 				COMINAVI_OAUTH_REDIRECT_URL = "https://cominavi.net/oauth/circlems/landing";
+				COMINAVI_SERVICE_BASE_URL = "https://cominavi.net";
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_ASSET_PATHS = "\"ComiNavi/Preview Content\"";
@@ -615,6 +616,7 @@
 				COMINAVI_GOOGLE_CLIENT_ID = "90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2.apps.googleusercontent.com";
 				COMINAVI_OAUTH_CALLBACK_SCHEME = cominavi;
 				COMINAVI_OAUTH_REDIRECT_URL = "https://cominavi.net/oauth/circlems/landing";
+				COMINAVI_SERVICE_BASE_URL = "https://cominavi.net";
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_ASSET_PATHS = "\"ComiNavi/Preview Content\"";
@@ -766,6 +768,7 @@
 				COMINAVI_GOOGLE_CLIENT_ID = "90593751186-1pj9cb56nuasbvn31lah71kl1ljmfvj2.apps.googleusercontent.com";
 				COMINAVI_OAUTH_CALLBACK_SCHEME = cominavi;
 				COMINAVI_OAUTH_REDIRECT_URL = "https://cominavi.net/oauth/circlems/landing";
+				COMINAVI_SERVICE_BASE_URL = "https://cominavi.net";
 				CURRENT_PROJECT_VERSION = 2026082701;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
