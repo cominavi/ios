@@ -1362,7 +1362,11 @@ final class ExploreModel {
 
         var result: [Int: String] = [:]
         for location in locations {
-            guard let hallName = hallNamesByMapID[location.mapID] else { continue }
+            // Prefer the exact hall ("東1") from the layout over the map
+            // group ("東123") that spans several halls.
+            guard let hallName = location.hallName?.nilIfBlank
+                ?? hallNamesByMapID[location.mapID]
+            else { continue }
             result[location.tableID.blockID] = hallName
         }
         return result

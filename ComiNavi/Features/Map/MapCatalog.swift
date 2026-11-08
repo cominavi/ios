@@ -252,6 +252,23 @@ struct CatalogBookmarkLocation: Equatable, Sendable {
     let mapID: Int
     let tableID: CatalogMapTable.ID
     let subspace: Int
+    let hallName: String?
+
+    func resolvedHallName(in catalog: Comiket) -> String? {
+        if let exactHallName = Self.nonBlank(hallName) {
+            return exactHallName
+        }
+        let fallbackHallName = catalog.days
+            .first(where: { $0.dayIndex == day })?
+            .halls.first(where: { $0.externalMapId == mapID })?
+            .name
+        return Self.nonBlank(fallbackHallName)
+    }
+
+    private static func nonBlank(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == false ? trimmed : nil
+    }
 }
 
 struct CatalogMapViewport: Equatable, Sendable {
@@ -270,12 +287,41 @@ struct CatalogMapViewport: Equatable, Sendable {
 protocol MapCatalog: Sendable {
     func scene(day: Int, mapID: Int) async throws -> CatalogMapScene
     func circles(day: Int, tableID: CatalogMapTable.ID) async throws -> [CatalogMapCircle]
+    /// The circles of many tables in one read, keyed by day and table. Tables
+    /// with no circles are absent from the result.
+    func circles(
+        forTables tables: Set<CatalogMapDayTable>
+    ) async throws -> [CatalogMapDayTable: [CatalogMapCircle]]
     func circlePlacements(in viewport: CatalogMapViewport) async throws -> [CatalogMapCirclePlacement]
     func circleImages(circleIDs: [Int]) async throws -> [Int: Data]
     func search(day: Int, query: String) async throws -> [CatalogMapSearchMatch]
     func genrePlacements(day: Int, mapID: Int) async throws -> [CatalogMapGenrePlacement]
     func bookmarkLocations(updateIDs: [Int]) async throws -> [CatalogBookmarkLocation]
     func bookmarkLocations(publicCircleIDs: [Int]) async throws -> [CatalogBookmarkLocation]
+}
+
+/// A table on one event day.
+struct CatalogMapDayTable: Hashable, Sendable {
+    let day: Int
+    let tableID: CatalogMapTable.ID
+}
+
+extension MapCatalog {
+    /// One lookup per table. Catalogs backed by SQLite override this with a
+    /// single query.
+    func circles(
+        forTables tables: Set<CatalogMapDayTable>
+    ) async throws -> [CatalogMapDayTable: [CatalogMapCircle]] {
+        var result: [CatalogMapDayTable: [CatalogMapCircle]] = [:]
+        for table in tables {
+            try Task.checkCancellation()
+            let circles = try await circles(day: table.day, tableID: table.tableID)
+            if !circles.isEmpty {
+                result[table] = circles
+            }
+        }
+        return result
+    }
 }
 
 struct SQLiteMapCatalog: MapCatalog {
@@ -440,24 +486,83 @@ struct SQLiteMapCatalog: MapCatalog {
                     ORDER BY circle.spaceNoSub
                     """,
                 arguments: [day, tableID.blockID, tableID.spaceNumber]
-            ).compactMap { row -> CatalogMapCircle? in
-                guard let id: Int = row["id"] else { return nil }
-                let urlString: String? = row["circlems"]
-                let portalURLString: String? = row["CirclemsPortalURL"]
-                return CatalogMapCircle(
-                    id: id,
-                    publicCircleID: row["publicCircleId"],
-                    updateID: row["updateId"],
-                    subspace: row["spaceNoSub"] ?? 0,
-                    circleName: row["circleName"] ?? "",
-                    penName: row["penName"] ?? "",
-                    description: row["description"] ?? "",
-                    genreName: row["genreName"],
-                    circlemsURL: urlString.flatMap(URL.init(string:)),
-                    circlemsPortalURL: portalURLString.flatMap(URL.init(string:))
-                )
-            }
+            ).compactMap(Self.mapCircle)
         }
+    }
+
+    func circles(
+        forTables tables: Set<CatalogMapDayTable>
+    ) async throws -> [CatalogMapDayTable: [CatalogMapCircle]] {
+        guard !tables.isEmpty else { return [:] }
+        let days = Array(Set(tables.map(\.day))).sorted()
+        let blockIDs = Array(Set(tables.map(\.tableID.blockID))).sorted()
+        return try await mainDatabase.read { database in
+            // `ComiketCircleWC` has no index on its placement, so a query per
+            // table scans the whole table each time. One scan filtered by day
+            // and block, grouped here, costs the same as a single lookup.
+            var result: [CatalogMapDayTable: [CatalogMapCircle]] = [:]
+            for blockBatch in stride(from: 0, to: blockIDs.count, by: 500) {
+                let batch = Array(blockIDs[blockBatch ..< min(blockBatch + 500, blockIDs.count)])
+                let rows = try Row.fetchAll(
+                    database,
+                    sql: """
+                        SELECT circle.id,
+                               circle.day,
+                               circle.blockId,
+                               circle.spaceNo,
+                               circleExtension.WCId AS publicCircleId,
+                               circle.updateId,
+                               circle.spaceNoSub,
+                               circle.circleName,
+                               circle.penName,
+                               circle.description,
+                               circle.circlems,
+                               circleExtension.CirclemsPortalURL,
+                               genre.name AS genreName
+                        FROM ComiketCircleWC circle
+                        LEFT JOIN ComiketCircleExtend circleExtension ON circleExtension.id = circle.id
+                        LEFT JOIN ComiketGenreWC genre ON genre.id = circle.genreId
+                        WHERE circle.day IN (\(Array(repeating: "?", count: days.count).joined(separator: ",")))
+                          AND circle.blockId IN (\(Array(repeating: "?", count: batch.count).joined(separator: ",")))
+                        ORDER BY circle.spaceNoSub
+                        """,
+                    arguments: StatementArguments(days + batch)
+                )
+                for row in rows {
+                    guard let day: Int = row["day"],
+                          let blockID: Int = row["blockId"],
+                          let spaceNumber: Int = row["spaceNo"]
+                    else { continue }
+                    let key = CatalogMapDayTable(
+                        day: day,
+                        tableID: .init(blockID: blockID, spaceNumber: spaceNumber)
+                    )
+                    guard tables.contains(key), let circle = Self.mapCircle(row) else {
+                        continue
+                    }
+                    result[key, default: []].append(circle)
+                }
+            }
+            return result
+        }
+    }
+
+    private static func mapCircle(_ row: Row) -> CatalogMapCircle? {
+        guard let id: Int = row["id"] else { return nil }
+        let urlString: String? = row["circlems"]
+        let portalURLString: String? = row["CirclemsPortalURL"]
+        return CatalogMapCircle(
+            id: id,
+            publicCircleID: row["publicCircleId"],
+            updateID: row["updateId"],
+            subspace: row["spaceNoSub"] ?? 0,
+            circleName: row["circleName"] ?? "",
+            penName: row["penName"] ?? "",
+            description: row["description"] ?? "",
+            genreName: row["genreName"],
+            circlemsURL: urlString.flatMap(URL.init(string:)),
+            circlemsPortalURL: portalURLString.flatMap(URL.init(string:))
+        )
     }
 
     func circlePlacements(in viewport: CatalogMapViewport) async throws -> [CatalogMapCirclePlacement] {
@@ -650,12 +755,14 @@ struct SQLiteMapCatalog: MapCatalog {
                            circle.blockId,
                            circle.spaceNo,
                            circle.spaceNoSub,
-                           layout.mapId
+                           layout.mapId,
+                           area.name AS hallName
                     FROM ComiketCircleWC circle
                     JOIN ComiketCircleExtend circleExtension ON circleExtension.id = circle.id
                     JOIN ComiketLayoutWC layout
                       ON layout.blockId = circle.blockId
                      AND layout.spaceNo = circle.spaceNo
+                    LEFT JOIN ComiketAreaWC area ON area.id = layout.hallId
                     WHERE circle.updateId IN (\(placeholders))
                     """,
                 arguments: arguments
@@ -677,7 +784,8 @@ struct SQLiteMapCatalog: MapCatalog {
                     day: day,
                     mapID: mapID,
                     tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
-                    subspace: row["spaceNoSub"] ?? 0
+                    subspace: row["spaceNoSub"] ?? 0,
+                    hallName: row["hallName"]
                 )
             }
         }
@@ -700,12 +808,14 @@ struct SQLiteMapCatalog: MapCatalog {
                            circle.blockId,
                            circle.spaceNo,
                            circle.spaceNoSub,
-                           layout.mapId
+                           layout.mapId,
+                           area.name AS hallName
                     FROM ComiketCircleWC circle
                     JOIN ComiketCircleExtend circleExtension ON circleExtension.id = circle.id
                     JOIN ComiketLayoutWC layout
                       ON layout.blockId = circle.blockId
                      AND layout.spaceNo = circle.spaceNo
+                    LEFT JOIN ComiketAreaWC area ON area.id = layout.hallId
                     WHERE circleExtension.WCId IN (\(placeholders))
                     """,
                 arguments: arguments
@@ -729,7 +839,8 @@ struct SQLiteMapCatalog: MapCatalog {
             day: day,
             mapID: mapID,
             tableID: .init(blockID: blockID, spaceNumber: spaceNumber),
-            subspace: row["spaceNoSub"] ?? 0
+            subspace: row["spaceNoSub"] ?? 0,
+            hallName: row["hallName"]
         )
     }
 
@@ -911,7 +1022,8 @@ struct FixtureMapCatalog: MapCatalog {
                     day: 1,
                     mapID: 1,
                     tableID: table.id,
-                    subspace: subspace
+                    subspace: subspace,
+                    hallName: table.hallName
                 )
             }
         }.filter { updateIDs.contains($0.updateID) }
@@ -928,7 +1040,8 @@ struct FixtureMapCatalog: MapCatalog {
                     day: 1,
                     mapID: 1,
                     tableID: table.id,
-                    subspace: subspace
+                    subspace: subspace,
+                    hallName: table.hallName
                 )
             }
         }.filter { publicCircleIDs.contains($0.publicCircleID) }

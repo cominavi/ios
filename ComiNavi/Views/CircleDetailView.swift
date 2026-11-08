@@ -471,10 +471,13 @@ struct CircleDetailView: View {
                 .first(where: { $0.dayIndex == location.day })?
                 .halls.first(where: { $0.externalMapId == location.mapID })
         else { return }
-        circleHallMapName = hall.mapName
+        // The exact hall ("東2") gives "East Hall 2"; the map name ("E123")
+        // covers several halls and is only the fallback.
+        circleHallMapName = location.hallName.flatMap(CircleHallGloss.mapName(forHallName:))
+            ?? hall.mapName
         circleAddress = ComiketSpaceAddress(
             day: location.day,
-            hallName: hall.name,
+            hallName: location.resolvedHallName(in: dataSource.comiket) ?? hall.name,
             blockName: block.name,
             spaceNumber: location.tableID.spaceNumber,
             subspace: isCombinedAB ? nil : location.subspace,
@@ -2255,7 +2258,22 @@ private struct ShinagakiMediaGallery: View {
 
 /// Builds an English gloss for a Big Sight hall from its catalog map name,
 /// for example "W12" becomes "West Halls 1–2" and "E7" becomes "East Hall 7".
-private enum CircleHallGloss {
+enum CircleHallGloss {
+    /// The map-name form of an exact catalog hall: "東２" becomes "E2" and
+    /// "西1" becomes "W1". Returns nil for names without a direction and number.
+    static func mapName(forHallName hallName: String) -> String? {
+        let compact = ComiketSpaceAddress.compactHallName(hallName)
+        let direction: String
+        switch compact.first {
+        case "東": direction = "E"
+        case "西": direction = "W"
+        case "南": direction = "S"
+        default: return nil
+        }
+        let digits = compact.dropFirst().compactMap(\.wholeNumberValue).map(String.init).joined()
+        return digits.isEmpty ? nil : direction + digits
+    }
+
     static func text(forMapName mapName: String) -> String? {
         guard let direction = mapName.uppercased().first else { return nil }
         let numbers = mapName.dropFirst().compactMap(\.wholeNumberValue)
