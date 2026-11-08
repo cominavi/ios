@@ -113,3 +113,51 @@ final class CatalogDataStorageTests: XCTestCase {
         try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup ?? false
     }
 }
+
+final class DirectoryManagerCatalogDataTests: XCTestCase {
+    func testRemovingCatalogDataKeepsBackupExclusionWhenRecreatedInTheSameProcess() throws {
+        let manager = DirectoryManager.shared
+        let eventID = 990_000 + Int.random(in: 0 ..< 9_999)
+        let comiketID = "9\(eventID % 1_000)"
+        defer { try? manager.removeCatalogDataFor(eventID: eventID, comiketId: comiketID) }
+
+        let databases = manager.catalogDataFor(
+            eventID: eventID,
+            comiketId: comiketID,
+            .circlems,
+            .databases,
+            createIfNeeded: true
+        )
+        let scope = databases.deletingLastPathComponent()
+        let users = try manager.userDataFor(
+            eventID: eventID,
+            comiketId: comiketID,
+            publicUserID: "catalog-data-test"
+        )
+        defer {
+            try? manager.removeApplicationSupportData(publicUserID: "catalog-data-test")
+        }
+        XCTAssertTrue(try isExcludedFromBackup(scope))
+
+        try manager.removeCatalogDataFor(eventID: eventID, comiketId: comiketID)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scope.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: users.path))
+
+        let recreated = manager.catalogDataFor(
+            eventID: eventID,
+            comiketId: comiketID,
+            .circlems,
+            .databases,
+            createIfNeeded: true
+        )
+        XCTAssertEqual(recreated, databases)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recreated.path))
+        XCTAssertTrue(try isExcludedFromBackup(scope))
+        XCTAssertFalse(try isExcludedFromBackup(users))
+    }
+
+    private func isExcludedFromBackup(_ url: URL) throws -> Bool {
+        try URL(fileURLWithPath: url.path)
+            .resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup ?? false
+    }
+}

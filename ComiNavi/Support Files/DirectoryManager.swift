@@ -233,23 +233,31 @@ final class DirectoryManager: Sendable {
     /// an older build left in Caches. User data in the same event shard
     /// (favorites, plans) is not touched.
     func removeCatalogDataFor(eventID: Int, comiketId: String) throws {
-        let fileManager = FileManager.default
-        let directories = CatalogDataScope.allCases.flatMap { scope in
-            [
-                eventDirectory(
-                    in: environmentApplicationSupportDirectory,
-                    eventID: eventID,
-                    comiketId: comiketId
-                ),
-                eventDirectory(
-                    in: environmentCachesDirectory,
-                    eventID: eventID,
-                    comiketId: comiketId
-                ),
-            ].map { $0.appendingPathComponent(scope.rawValue, isDirectory: true) }
-        }
-        for directory in directories where fileManager.fileExists(atPath: directory.path) {
-            try fileManager.removeItem(at: directory)
+        let applicationSupportEvent = eventDirectory(
+            in: environmentApplicationSupportDirectory,
+            eventID: eventID,
+            comiketId: comiketId
+        )
+        let cachesEvent = eventDirectory(
+            in: environmentCachesDirectory,
+            eventID: eventID,
+            comiketId: comiketId
+        )
+        for scope in CatalogDataScope.allCases {
+            let directory = applicationSupportEvent
+                .appendingPathComponent(scope.rawValue, isDirectory: true)
+            let legacyDirectory = cachesEvent
+                .appendingPathComponent(scope.rawValue, isDirectory: true)
+            // Forget the shard under the same lock that prepares it, so the
+            // next access recreates the directory with backup exclusion.
+            try preparedCatalogShards.withLock { prepared in
+                prepared.remove(directory.path)
+                let fileManager = FileManager.default
+                for url in [directory, legacyDirectory]
+                where fileManager.fileExists(atPath: url.path) {
+                    try fileManager.removeItem(at: url)
+                }
+            }
         }
     }
 
