@@ -29108,6 +29108,34 @@
         }
       }
     },
+    "Sign in with Apple didn't finish. Check that you're signed in to an Apple Account in Settings, then try again." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appleでサインインを完了できませんでした。設定でApple Accountにサインインしていることを確認して、もう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple로 로그인을 완료하지 못했습니다. 설정에서 Apple 계정에 로그인되어 있는지 확인한 후 다시 시도해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未能完成通过 Apple 登录。请确认已在“设置”中登录 Apple 账户，然后重试"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法完成 Apple 登入。請確認已在「設定」中登入 Apple 帳號，然後再試一次"
+          }
+        }
+      }
+    },
     "Sign in with Apple from the special entry" : {
       "localizations" : {
         "ja" : {

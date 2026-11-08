@@ -594,8 +594,12 @@ final class SignInViewModel: NSObject, ObservableObject,
     ) -> Bool {
         if flow.submissionAttemptedAt != nil { return false }
         if let flowError = error as? AppleAuthenticationFlowError {
+            // A failed Apple sheet keeps the flow and its entry grant, so a
+            // retry right after it (for example after signing in to an
+            // Apple Account) needs no new special-entry request.
             return flowError != .persistenceFailed
                 && flowError != .committedOrUnknown
+                && flowError != .authorizationFailed
         }
         if case CominaviServiceError.server(_, _, let status) = error {
             return [400, 401, 403, 404, 409, 410, 422].contains(status)

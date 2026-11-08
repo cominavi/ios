@@ -11,6 +11,9 @@ enum AppleAuthenticationFlowError: LocalizedError, Equatable {
     case invalidCredential
     case persistenceFailed
     case committedOrUnknown
+    /// The system Apple sheet failed for a reason other than a cancel, for
+    /// example no Apple Account is signed in on the device.
+    case authorizationFailed
 
     var errorDescription: String? {
         switch self {
@@ -24,7 +27,22 @@ enum AppleAuthenticationFlowError: LocalizedError, Equatable {
             String(localized: "We could not securely save the Sign in with Apple request.")
         case .committedOrUnknown:
             String(localized: "We are confirming the Sign in with Apple result. No new sign-in was started.")
+        case .authorizationFailed:
+            String(localized: "Sign in with Apple didn't finish. Check that you're signed in to an Apple Account in Settings, then try again.")
         }
+    }
+
+    /// Keeps `ASAuthorizationError.canceled` unchanged, so the sign-in screen
+    /// treats it as a silent cancel, and turns every other system Apple sheet
+    /// error into `.authorizationFailed` with a localized message.
+    static func fromSystemAuthorization(_ error: Error) -> Error {
+        let value = error as NSError
+        if value.domain == ASAuthorizationError.errorDomain,
+           value.code == ASAuthorizationError.canceled.rawValue
+        {
+            return error
+        }
+        return AppleAuthenticationFlowError.authorizationFailed
     }
 }
 
@@ -510,7 +528,7 @@ final class AppleSignInAuthorizationProvider: NSObject,
         controller: ASAuthorizationController,
         didCompleteWithError error: Error
     ) {
-        finish(.failure(error))
+        finish(.failure(AppleAuthenticationFlowError.fromSystemAuthorization(error)))
     }
 
     private func finish(_ result: Result<AppleAuthorizationCredential, Error>) {
