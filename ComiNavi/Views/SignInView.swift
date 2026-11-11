@@ -577,6 +577,7 @@ final class SignInViewModel: NSObject, ObservableObject,
         // Once bytes may have reached the service, an expired replay response
         // is committed-or-unknown until the backend can reconcile the durable
         // request. Never silently mint a second refresh-token family.
+        if (error as? CominaviServiceError)?.isSignInNotAllowlisted == true { return true }
         if flow.submissionAttemptedAt != nil { return false }
         if let flowError = error as? GoogleAuthenticationFlowError {
             return flowError != .persistenceFailed
@@ -592,6 +593,7 @@ final class SignInViewModel: NSObject, ObservableObject,
         _ error: Error,
         flow: AppleAuthenticationFlow
     ) -> Bool {
+        if (error as? CominaviServiceError)?.isSignInNotAllowlisted == true { return true }
         if flow.submissionAttemptedAt != nil { return false }
         if let flowError = error as? AppleAuthenticationFlowError {
             // A failed Apple sheet keeps the flow and its entry grant, so a
