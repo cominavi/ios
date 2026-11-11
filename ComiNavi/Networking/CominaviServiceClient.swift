@@ -24,6 +24,16 @@ enum CominaviServiceError: LocalizedError, Sendable {
         currentPlan: SharedPlan?
     )
 
+    /// The backend refused a Google or Apple identity that is not on the
+    /// owner's allowlist. It refuses before writing anything, so the sign-in
+    /// flow is finished even if its request already reached the service.
+    var isSignInNotAllowlisted: Bool {
+        if case .server(let code, _, let status) = self {
+            return status == 403 && code == "sign_in_not_allowlisted"
+        }
+        return false
+    }
+
     var errorDescription: String? {
         switch self {
         case .notLoggedIn:
@@ -46,6 +56,10 @@ enum CominaviServiceError: LocalizedError, Sendable {
                 String(localized: "Link a Circle.ms account before syncing favorites.")
             case "circlems_favorite_sync_failed":
                 String(localized: "Circle.ms favorites could not be synced. Please try again.")
+            case "sign_in_not_allowlisted":
+                String(
+                    localized: "This account isn't on the ComiNavi invite list. Sign in with Circle.ms instead."
+                )
             default:
                 message
             }

@@ -3402,6 +3402,67 @@ final class CominaviServiceClientTests: XCTestCase {
         )
     }
 
+    func testAllowlistRefusalIsTerminalAndPointsToCirclems() async throws {
+        let requestID = try XCTUnwrap(UUID(
+            uuidString: "CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC"
+        ))
+        let grantData = try JSONEncoder.iso8601.encode(CominaviGoogleEntryGrant(
+            entryGrant: "ggggggggggggggggggggggggggggggggggggggggggg",
+            expiresAt: Date(timeIntervalSinceNow: 300)
+        ))
+        let refusal = Data(
+            #"{"error":"sign_in_not_allowlisted","message":"This Google account is not on the ComiNavi sign-in allowlist. Sign in with Circle.ms instead."}"#.utf8
+        )
+        let transport = StaticCominaviTransport(responses: [
+            "POST /api/v2/auth/google/entry-grant": (200, grantData),
+            "POST /api/v2/auth/google": (403, refusal),
+        ])
+        let flowStorage = InMemoryGoogleAuthenticationFlowStore()
+        let client = try CominaviServiceClient(
+            baseURL: XCTUnwrap(URL(string: "https://cominavi.net")),
+            transport: { request in try await transport.response(for: request) },
+            sessionStore: MutableCominaviSessionStore(session: nil, boundUserID: nil),
+            googleAuthenticationFlowStorage: flowStorage
+        )
+        var flow = GoogleAuthenticationFlow(
+            requestID: requestID,
+            nonce: String(repeating: "n", count: 43),
+            entryContext: .invitation,
+            createdAt: Date()
+        )
+        try flowStorage.save(flow)
+        var publication = try await client.googleEntryGrant(
+            for: flow,
+            invitationToken: "AbCdEf0123_-"
+        )
+        publication = try await client.recordGoogleIDToken(
+            "header.payload.signature",
+            publication: publication
+        )
+        flow = publication.flow
+
+        do {
+            _ = try await client.authenticateWithGoogle(flow)
+            XCTFail("An identity that is not allowlisted must be refused")
+        } catch let error as CominaviServiceError {
+            XCTAssertTrue(error.isSignInNotAllowlisted)
+            XCTAssertEqual(
+                error.errorDescription,
+                String(
+                    localized: "This account isn't on the ComiNavi invite list. Sign in with Circle.ms instead."
+                )
+            )
+        }
+        XCTAssertFalse(
+            CominaviServiceError.server(
+                code: "sign_in_not_allowlisted",
+                message: "",
+                status: 401
+            ).isSignInNotAllowlisted
+        )
+        XCTAssertFalse(CominaviServiceError.invalidResponse.isSignInNotAllowlisted)
+    }
+
     func testGoogleCompletionMarkerClearsWithoutChangingSessionFamily() async throws {
         let requestID = UUID()
         let profile = fixtureProfile(

@@ -151,4 +151,142 @@ final class SpecialEntryAuthenticationStateTests: XCTestCase {
             XCTAssertFalse(mapped.localizedDescription.contains("AuthorizationError"))
         }
     }
+
+    // MARK: Allowlist refusal (cominavi/server#13)
+
+    private let refusal = CominaviServiceError.server(
+        code: "sign_in_not_allowlisted",
+        message: "This Google account is not on the ComiNavi sign-in allowlist.",
+        status: 403
+    )
+    private let otherForbidden = CominaviServiceError.server(
+        code: "forbidden",
+        message: "Forbidden.",
+        status: 403
+    )
+
+    private func submittedGoogleFlow() -> GoogleAuthenticationFlow {
+        GoogleAuthenticationFlow(
+            requestID: UUID(),
+            nonce: String(repeating: "g", count: 43),
+            entryContext: .special,
+            createdAt: now,
+            entryGrant: String(repeating: "e", count: 43),
+            entryGrantExpiresAt: now.addingTimeInterval(300),
+            idToken: "header.payload.signature",
+            submissionAttemptedAt: now
+        )
+    }
+
+    private func submittedAppleFlow() -> AppleAuthenticationFlow {
+        AppleAuthenticationFlow(
+            requestID: UUID(),
+            nonce: String(repeating: "a", count: 43),
+            entryContext: .special,
+            createdAt: now,
+            entryGrant: String(repeating: "e", count: 43),
+            entryGrantExpiresAt: now.addingTimeInterval(300),
+            identityToken: "header.payload.signature",
+            authorizationCode: "single-use-code",
+            submissionAttemptedAt: now
+        )
+    }
+
+    /// A refused Google sign-in whose request already reached the service
+    /// clears its flow, so relaunch does not reopen the special entry.
+    func testAllowlistRefusedGoogleSignInClearsFlowAndDoesNotReopen() throws {
+        let googleStorage = InMemoryGoogleAuthenticationFlowStore()
+        let appleStorage = InMemoryAppleAuthenticationFlowStore()
+        let flow = submittedGoogleFlow()
+        try googleStorage.save(flow)
+        let (google, _) = coordinators(google: googleStorage, apple: appleStorage)
+        XCTAssertNotNil(try google.load(now: now))
+
+        XCTAssertTrue(SpecialEntryAuthenticationState.settleFailedSignIn(
+            refusal,
+            googleFlow: flow,
+            clear: google.clear
+        ))
+
+        let (relaunchedGoogle, relaunchedApple) = coordinators(
+            google: googleStorage,
+            apple: appleStorage
+        )
+        let later = now.addingTimeInterval(60)
+        let googleFlow = try relaunchedGoogle.load(now: later)
+        XCTAssertNil(googleFlow)
+        XCTAssertFalse(SpecialEntryAuthenticationState.shouldRestore(
+            hasVerifiedProfile: false,
+            googleFlow: googleFlow,
+            appleFlow: try relaunchedApple.load(now: later)
+        ))
+    }
+
+    func testAllowlistRefusedAppleSignInClearsFlowAndDoesNotReopen() throws {
+        let googleStorage = InMemoryGoogleAuthenticationFlowStore()
+        let appleStorage = InMemoryAppleAuthenticationFlowStore()
+        let flow = submittedAppleFlow()
+        try appleStorage.save(flow)
+        let (_, apple) = coordinators(google: googleStorage, apple: appleStorage)
+        XCTAssertNotNil(try apple.load(now: now))
+
+        XCTAssertTrue(SpecialEntryAuthenticationState.settleFailedSignIn(
+            refusal,
+            appleFlow: flow,
+            clear: apple.clear
+        ))
+
+        let (relaunchedGoogle, relaunchedApple) = coordinators(
+            google: googleStorage,
+            apple: appleStorage
+        )
+        let later = now.addingTimeInterval(60)
+        let appleFlow = try relaunchedApple.load(now: later)
+        XCTAssertNil(appleFlow)
+        XCTAssertFalse(SpecialEntryAuthenticationState.shouldRestore(
+            hasVerifiedProfile: false,
+            googleFlow: try relaunchedGoogle.load(now: later),
+            appleFlow: appleFlow
+        ))
+    }
+
+    /// Any other failure after submission is committed-or-unknown: both
+    /// providers keep their flow for receipt recovery.
+    func testOtherFailuresAfterSubmissionKeepTheFlow() throws {
+        let googleStorage = InMemoryGoogleAuthenticationFlowStore()
+        let appleStorage = InMemoryAppleAuthenticationFlowStore()
+        let googleFlow = submittedGoogleFlow()
+        let appleFlow = submittedAppleFlow()
+        try googleStorage.save(googleFlow)
+        try appleStorage.save(appleFlow)
+        let (google, apple) = coordinators(google: googleStorage, apple: appleStorage)
+
+        for error: Error in [
+            otherForbidden,
+            CominaviServiceError.server(
+                code: "sign_in_not_allowlisted",
+                message: "",
+                status: 401
+            ),
+            CominaviServiceError.invalidResponse,
+        ] {
+            XCTAssertFalse(SpecialEntryAuthenticationState.settleFailedSignIn(
+                error,
+                googleFlow: googleFlow,
+                clear: google.clear
+            ))
+            XCTAssertFalse(SpecialEntryAuthenticationState.settleFailedSignIn(
+                error,
+                appleFlow: appleFlow,
+                clear: apple.clear
+            ))
+        }
+        XCTAssertNotNil(try google.load(now: now))
+        XCTAssertNotNil(try apple.load(now: now))
+        XCTAssertTrue(SpecialEntryAuthenticationState.shouldRestore(
+            hasVerifiedProfile: false,
+            googleFlow: try google.load(now: now),
+            appleFlow: try apple.load(now: now)
+        ))
+    }
 }

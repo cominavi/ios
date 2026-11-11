@@ -32327,6 +32327,34 @@
         }
       }
     },
+    "This account isn't on the ComiNavi invite list. Sign in with Circle.ms instead." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアカウントはComiNaviの招待リストに登録されていません。Circle.msでサインインしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 계정은 ComiNavi 초대 목록에 없습니다. Circle.ms로 로그인해 주세요."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此账号不在 ComiNavi 邀请名单中，请使用 Circle.ms 登录。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此帳號不在 ComiNavi 邀請名單中，請使用 Circle.ms 登入。"
+          }
+        }
+      }
+    },
     "This can take a few minutes. You can use Shared Plans and Profile in the meantime." : {
       "localizations" : {
         "ja" : {
