@@ -437,9 +437,11 @@ final class SignInViewModel: NSObject, ObservableObject,
                 flowRequestID: flow.requestID
             )
         } catch {
-            if isTerminalGoogleAuthentication(error, flow: flow) {
-                try? AppData.clearGoogleAuthenticationFlow()
-            }
+            SpecialEntryAuthenticationState.settleFailedSignIn(
+                error,
+                googleFlow: flow,
+                clear: AppData.clearGoogleAuthenticationFlow
+            )
             throw error
         }
     }
@@ -504,9 +506,11 @@ final class SignInViewModel: NSObject, ObservableObject,
                 flowRequestID: flow.requestID
             )
         } catch {
-            if isTerminalAppleAuthentication(error, flow: flow) {
-                try? AppData.clearAppleAuthenticationFlow()
-            }
+            SpecialEntryAuthenticationState.settleFailedSignIn(
+                error,
+                appleFlow: flow,
+                clear: AppData.clearAppleAuthenticationFlow
+            )
             throw error
         }
     }
@@ -568,45 +572,6 @@ final class SignInViewModel: NSObject, ObservableObject,
         let value = error as NSError
         return value.domain == ASAuthorizationError.errorDomain
             && value.code == ASAuthorizationError.canceled.rawValue
-    }
-
-    private func isTerminalGoogleAuthentication(
-        _ error: Error,
-        flow: GoogleAuthenticationFlow
-    ) -> Bool {
-        // Once bytes may have reached the service, an expired replay response
-        // is committed-or-unknown until the backend can reconcile the durable
-        // request. Never silently mint a second refresh-token family.
-        if (error as? CominaviServiceError)?.isSignInNotAllowlisted == true { return true }
-        if flow.submissionAttemptedAt != nil { return false }
-        if let flowError = error as? GoogleAuthenticationFlowError {
-            return flowError != .persistenceFailed
-                && flowError != .committedOrUnknown
-        }
-        if case CominaviServiceError.server(_, _, let status) = error {
-            return [400, 401, 403, 404, 409, 410, 422].contains(status)
-        }
-        return false
-    }
-
-    private func isTerminalAppleAuthentication(
-        _ error: Error,
-        flow: AppleAuthenticationFlow
-    ) -> Bool {
-        if (error as? CominaviServiceError)?.isSignInNotAllowlisted == true { return true }
-        if flow.submissionAttemptedAt != nil { return false }
-        if let flowError = error as? AppleAuthenticationFlowError {
-            // A failed Apple sheet keeps the flow and its entry grant, so a
-            // retry right after it (for example after signing in to an
-            // Apple Account) needs no new special-entry request.
-            return flowError != .persistenceFailed
-                && flowError != .committedOrUnknown
-                && flowError != .authorizationFailed
-        }
-        if case CominaviServiceError.server(_, _, let status) = error {
-            return [400, 401, 403, 404, 409, 410, 422].contains(status)
-        }
-        return false
     }
 }
 
