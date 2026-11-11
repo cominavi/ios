@@ -275,7 +275,9 @@ platform :ios do
       output_name: File.basename(DEFAULT_IPA_PATH),
       export_options: TESTFLIGHT_EXPORT_OPTIONS,
       skip_build_archive: options[:skip_build_archive] || false,
-      xcargs: authentication_args
+      # Command-line builds cannot answer Xcode's trust prompt for the
+      # swift-openapi-generator build plugin, so validation is skipped here.
+      xcargs: "#{authentication_args} -skipPackagePluginValidation -skipMacroValidation"
     )
     testflight_operation_status(
       state: options[:part_of_release] ? "running" : "succeeded",
